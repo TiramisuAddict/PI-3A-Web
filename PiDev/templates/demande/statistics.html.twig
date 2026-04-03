@@ -1,0 +1,169 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Statistiques des Demandes{% endblock %}
+
+{% block body %}
+<div class="row mb-4 align-items-center">
+    <div class="col-auto">
+        <a href="{{ path('demande_index') }}" class="btn btn-outline-secondary">
+            <i class="ti ti-arrow-left me-1"></i>Retour
+        </a>
+    </div>
+    <div class="col">
+        <div class="page-pretitle">Demandes</div>
+        <h2 class="page-title">
+            <i class="ti ti-chart-bar me-2"></i>Statistiques
+        </h2>
+    </div>
+</div>
+
+<div class="row row-deck row-cards mb-4">
+    <div class="col-sm-6 col-lg-4">
+        <div class="stat-card text-center p-4">
+            <span class="avatar avatar-xl bg-primary-lt mb-3">
+                <i class="ti ti-files" style="font-size: 2rem;"></i>
+            </span>
+            <div class="h1 mb-1">{{ stats.total }}</div>
+            <div class="mini-muted">Total des demandes</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-4">
+        <div class="stat-card text-center p-4">
+            <span class="avatar avatar-xl bg-green-lt mb-3">
+                <i class="ti ti-check" style="font-size: 2rem;"></i>
+            </span>
+            <div class="h1 mb-1 text-green">{{ stats.byStatus['Résolue'] | default(0) }}</div>
+            <div class="mini-muted">Demandes résolues</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-4">
+        <div class="stat-card text-center p-4">
+            <span class="avatar avatar-xl bg-yellow-lt mb-3">
+                <i class="ti ti-loader" style="font-size: 2rem;"></i>
+            </span>
+            <div class="h1 mb-1 text-yellow">{{ stats.byStatus['En cours'] | default(0) }}</div>
+            <div class="mini-muted">Demandes en cours</div>
+        </div>
+    </div>
+</div>
+
+<div class="row row-deck row-cards">
+    <div class="col-lg-6">
+        <div class="surface-card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-flag me-2"></i>Par Statut
+                </h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <tbody>
+                        {% set statusColors = {'Nouvelle': 'bg-blue', 'En cours': 'bg-yellow', 'En attente': 'bg-orange', 'Résolue': 'bg-green', 'Fermée': 'bg-secondary', 'Annulée': 'bg-red'} %}
+                        {% for status, count in stats.byStatus %}
+                        <tr>
+                            <td>
+                                <span class="badge {{ statusColors[status] | default('bg-secondary') }}">{{ status }}</span>
+                            </td>
+                            <td class="w-50">
+                                <div class="progress progress-sm">
+                                    <div class="progress-bar {{ statusColors[status] | default('bg-secondary') }}" style="width: {{ stats.total > 0 ? (count / stats.total * 100) : 0 }}%"></div>
+                                </div>
+                            </td>
+                            <td class="text-end fw-bold">{{ count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="surface-card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-alert-triangle me-2"></i>Par Priorité
+                </h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <tbody>
+                        {% set priorityColors = {'HAUTE': 'bg-red', 'NORMALE': 'bg-blue', 'BASSE': 'bg-green'} %}
+                        {% for priorite, count in stats.byPriorite %}
+                        <tr>
+                            <td>
+                                <span class="badge {{ priorityColors[priorite] | default('bg-secondary') }}">{{ priorite }}</span>
+                            </td>
+                            <td class="w-50">
+                                <div class="progress progress-sm">
+                                    <div class="progress-bar {{ priorityColors[priorite] | default('bg-secondary') }}" style="width: {{ stats.total > 0 ? (count / stats.total * 100) : 0 }}%"></div>
+                                </div>
+                            </td>
+                            <td class="text-end fw-bold">{{ count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="surface-card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-folder me-2"></i>Par Catégorie
+                </h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <tbody>
+                        {% for categorie, count in stats.byCategorie %}
+                        <tr>
+                            <td>
+                                <span class="soft-pill">
+                                    <i class="ti ti-folder"></i>{{ categorie }}
+                                </span>
+                            </td>
+                            <td class="w-50">
+                                <div class="progress progress-sm">
+                                    <div class="progress-bar bg-primary" style="width: {{ stats.total > 0 ? (count / stats.total * 100) : 0 }}%"></div>
+                                </div>
+                            </td>
+                            <td class="text-end fw-bold">{{ count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="surface-card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-tag me-2"></i>Par Type
+                </h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <tbody>
+                        {% for type, count in stats.byType %}
+                        <tr>
+                            <td>{{ type }}</td>
+                            <td class="w-50">
+                                <div class="progress progress-sm">
+                                    <div class="progress-bar bg-purple" style="width: {{ stats.total > 0 ? (count / stats.total * 100) : 0 }}%"></div>
+                                </div>
+                            </td>
+                            <td class="text-end fw-bold">{{ count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

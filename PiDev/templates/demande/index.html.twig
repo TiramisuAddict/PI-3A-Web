@@ -1,0 +1,279 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Liste des Demandes{% endblock %}
+
+{% block body %}
+<div class="row mb-4 align-items-center">
+    <div class="col">
+        <div class="page-pretitle">Gestion</div>
+        <h2 class="page-title">
+            <i class="ti ti-file-text me-2"></i>Liste des Demandes
+        </h2>
+    </div>
+    <div class="col-auto">
+        <div class="btn-list">
+            <a href="{{ path('demande_new') }}" class="btn btn-primary">
+                <i class="ti ti-plus me-1"></i>Nouvelle Demande
+            </a>
+            <a href="{{ path('demande_statistics') }}" class="btn btn-outline-primary">
+                <i class="ti ti-chart-bar me-1"></i>Statistiques
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row row-deck row-cards mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card p-3">
+            <div class="d-flex align-items-center mb-2">
+                <span class="avatar avatar-sm bg-primary-lt me-2">
+                    <i class="ti ti-files"></i>
+                </span>
+                <span class="mini-muted">Total</span>
+            </div>
+            <div class="h1 mb-0">{{ stats.total }}</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card p-3">
+            <div class="d-flex align-items-center mb-2">
+                <span class="avatar avatar-sm bg-blue-lt me-2">
+                    <i class="ti ti-clock"></i>
+                </span>
+                <span class="mini-muted">Nouvelles</span>
+            </div>
+            <div class="h1 mb-0 text-blue">{{ stats.byStatus['Nouvelle'] | default(0) }}</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card p-3">
+            <div class="d-flex align-items-center mb-2">
+                <span class="avatar avatar-sm bg-yellow-lt me-2">
+                    <i class="ti ti-loader"></i>
+                </span>
+                <span class="mini-muted">En Cours</span>
+            </div>
+            <div class="h1 mb-0 text-yellow">{{ stats.byStatus['En cours'] | default(0) }}</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card p-3">
+            <div class="d-flex align-items-center mb-2">
+                <span class="avatar avatar-sm bg-green-lt me-2">
+                    <i class="ti ti-check"></i>
+                </span>
+                <span class="mini-muted">Résolues</span>
+            </div>
+            <div class="h1 mb-0 text-green">{{ stats.byStatus['Résolue'] | default(0) }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="surface-card mb-4">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="ti ti-filter me-2"></i>Filtres
+        </h3>
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{{ path('demande_index') }}">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Catégorie</label>
+                    <select name="categorie" class="form-select">
+                        <option value="">Toutes les catégories</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat }}" {{ filters.categorie == cat ? 'selected' : '' }}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Statut</label>
+                    <select name="status" class="form-select">
+                        <option value="">Tous</option>
+                        {% for status in statuses %}
+                            <option value="{{ status }}" {{ filters.status == status ? 'selected' : '' }}>{{ status }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Priorité</label>
+                    <select name="priorite" class="form-select">
+                        <option value="">Toutes</option>
+                        {% for priorite in priorites %}
+                            <option value="{{ priorite }}" {{ filters.priorite == priorite ? 'selected' : '' }}>{{ priorite }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Recherche</label>
+                    <input type="text" name="search" class="form-control" value="{{ filters.search }}" placeholder="Titre ou description...">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="ti ti-search me-1"></i>Filtrer
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="surface-card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="ti ti-list me-2"></i>Demandes ({{ demandes|length }})
+        </h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Titre</th>
+                    <th>Catégorie</th>
+                    <th>Type</th>
+                    <th>Priorité</th>
+                    <th>Statut</th>
+                    <th>Date</th>
+                    <th class="w-1">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for demande in demandes %}
+                <tr>
+                    <td class="text-muted">#{{ demande.id }}</td>
+                    <td>
+                        <a href="{{ path('demande_show', {id: demande.id}) }}" class="text-reset fw-semibold">
+                            {{ demande.titre }}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="soft-pill">
+                            <i class="ti ti-folder"></i>{{ demande.categorie }}
+                        </span>
+                    </td>
+                    <td class="mini-muted">{{ demande.typeDemande }}</td>
+                    <td>
+                        {% if demande.priorite == 'HAUTE' %}
+                            <span class="badge bg-red">{{ demande.priorite }}</span>
+                        {% elseif demande.priorite == 'NORMALE' %}
+                            <span class="badge bg-blue">{{ demande.priorite }}</span>
+                        {% else %}
+                            <span class="badge bg-green">{{ demande.priorite }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if demande.status == 'Nouvelle' %}
+                            <span class="badge bg-blue">{{ demande.status }}</span>
+                        {% elseif demande.status == 'En cours' %}
+                            <span class="badge bg-yellow">{{ demande.status }}</span>
+                        {% elseif demande.status == 'En attente' %}
+                            <span class="badge bg-orange">{{ demande.status }}</span>
+                        {% elseif demande.status == 'Résolue' %}
+                            <span class="badge bg-green">{{ demande.status }}</span>
+                        {% elseif demande.status == 'Annulée' %}
+                            <span class="badge bg-red">{{ demande.status }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ demande.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="mini-muted">{{ demande.dateCreation|date('d/m/Y H:i') }}</td>
+                    <td>
+                        <div class="btn-list flex-nowrap">
+                            <a href="{{ path('demande_show', {id: demande.id}) }}" class="btn btn-icon btn-outline-primary" title="Voir">
+                                <i class="ti ti-eye"></i>
+                            </a>
+                            <a href="{{ path('demande_edit', {id: demande.id}) }}" class="btn btn-icon btn-outline-warning" title="Modifier">
+                                <i class="ti ti-edit"></i>
+                            </a>
+                            <button type="button" class="btn btn-icon btn-outline-danger" title="Supprimer" data-bs-toggle="modal" data-bs-target="#deleteModal" data-id="{{ demande.id }}">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center py-5">
+                        <div class="empty">
+                            <div class="empty-icon">
+                                <i class="ti ti-file-off"></i>
+                            </div>
+                            <p class="empty-title">Aucune demande trouvée</p>
+                            <p class="empty-subtitle text-muted">
+                                Créez votre première demande pour commencer
+                            </p>
+                            <div class="empty-action">
+                                <a href="{{ path('demande_new') }}" class="btn btn-primary">
+                                    <i class="ti ti-plus me-1"></i>Nouvelle Demande
+                                </a>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal modal-blur fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-body text-center py-4">
+                <i class="ti ti-alert-triangle text-danger mb-2" style="font-size: 3rem;"></i>
+                <h3>Êtes-vous sûr?</h3>
+                <div class="text-muted">Cette action est irréversible.</div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn w-100" data-bs-dismiss="modal">Annuler</button>
+                        </div>
+                        <div class="col">
+                            <button type="button" class="btn btn-danger w-100" id="confirmDelete">Supprimer</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+let deleteId = null;
+const deleteModal = document.getElementById('deleteModal');
+
+deleteModal.addEventListener('show.bs.modal', function(event) {
+    const button = event.relatedTarget;
+    deleteId = button.getAttribute('data-id');
+});
+
+document.getElementById('confirmDelete').addEventListener('click', async function() {
+    if (!deleteId) return;
+    
+    try {
+        const response = await fetch('/demande/api/' + deleteId + '/delete', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            window.location.reload();
+        } else {
+            alert('Erreur: ' + result.message);
+        }
+    } catch (error) {
+        alert('Erreur de connexion');
+    }
+});
+</script>
+{% endblock %}
