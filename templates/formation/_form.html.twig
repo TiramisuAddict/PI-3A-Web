@@ -1,0 +1,37 @@
+{{ form_start(form) }}
+    <div class="mb-3">
+        {{ form_label(form.titre, 'Titre', {'label_attr': {'class': 'form-label'}}) }}
+        {{ form_widget(form.titre, {'attr': {'class': 'form-control'}}) }}
+        <div class="text-danger small">{{ form_errors(form.titre) }}</div>
+    </div>
+    <div class="mb-3">
+        {{ form_label(form.organisme, 'Organisme', {'label_attr': {'class': 'form-label'}}) }}
+        {{ form_widget(form.organisme, {'attr': {'class': 'form-control'}}) }}
+        <div class="text-danger small">{{ form_errors(form.organisme) }}</div>
+    </div>
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            {{ form_label(form.dateDebut, 'Date debut', {'label_attr': {'class': 'form-label'}}) }}
+            {{ form_widget(form.dateDebut, {'attr': {'class': 'form-control'}}) }}
+            <div class="text-danger small">{{ form_errors(form.dateDebut) }}</div>
+        </div>
+        <div class="col-md-6 mb-3">
+            {{ form_label(form.dateFin, 'Date fin', {'label_attr': {'class': 'form-label'}}) }}
+            {{ form_widget(form.dateFin, {'attr': {'class': 'form-control'}}) }}
+            <div class="text-danger small">{{ form_errors(form.dateFin) }}</div>
+        </div>
+    </div>
+    <div class="mb-3">
+        {{ form_label(form.lieu, 'Lieu', {'label_attr': {'class': 'form-label'}}) }}
+        {{ form_widget(form.lieu, {'attr': {'class': 'form-control'}}) }}
+        <div class="text-danger small">{{ form_errors(form.lieu) }}</div>
+    </div>
+    <div class="mb-3">
+        {{ form_label(form.capacite, 'Capacite', {'label_attr': {'class': 'form-label'}}) }}
+        {{ form_widget(form.capacite, {'attr': {'class': 'form-control'}}) }}
+        <div class="text-danger small">{{ form_errors(form.capacite) }}</div>
+    </div>
+    <div class="mt-3">
+        <button class="btn btn-primary">{{ button_label|default('Enregistrer') }}</button>
+    </div>
+{{ form_end(form) }}

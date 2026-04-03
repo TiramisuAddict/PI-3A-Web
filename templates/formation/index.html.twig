@@ -1,0 +1,140 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Formations{% endblock %}
+
+{% block body %}
+
+    <div class="app-hero position-relative p-4 p-md-5 mb-4">
+        <div class="row align-items-center g-4 position-relative">
+            <div class="col-lg-7">
+                <div class="soft-pill mb-3"><i class="ti ti-layout-dashboard"></i> Espace RH</div>
+                <h2 class="display-6 mb-2">Gestion des Formations RH</h2>
+                <span class="flag flag-country-us"></span>
+                <p class="mini-muted mb-0">Creation, modification, suppression et suivi des demandes en attente dans une interface plus lisible.</p>
+            </div>
+            
+            <div class="col-lg-5 text-lg-end">
+                <a class="btn btn-primary btn-lg shadow-sm" href="{{ path('app_formation_new') }}">
+                    <i class="ti ti-plus me-1"></i>
+                    Nouvelle formation
+                </a>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-4">
+            <div class="col-md-4">
+                <div class="stat-card p-3 h-100">
+                    <div class="mini-muted">Formations</div>
+                    <div class="h2 mb-0">{{ formations|length }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card p-3 h-100">
+                    <div class="mini-muted">Demandes en attente</div>
+                    <div class="h2 mb-0">{{ pending_by_formation|reduce((carry, value) => carry + value, 0) }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card p-3 h-100">
+                    <div class="mini-muted">Formation la plus recente</div>
+                    <div class="h5 mb-0">{{ formations|first ? formations|first.titre : 'Aucune' }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% for message in app.flashes('success') %}
+        <div class="alert alert-success" role="alert">{{ message }}</div>
+    {% endfor %}
+
+    {% for message in app.flashes('error') %}
+        <div class="alert alert-danger" role="alert">{{ message }}</div>
+    {% endfor %}
+
+    <div class="surface-card">
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead>
+                <tr>
+                    <th>Titre</th>
+                    <th>Organisme</th>
+                    <th>Date debut</th>
+                    <th>Date fin</th>
+                    <th>Lieu</th>
+                    <th>Capacite</th>
+                    <th class="w-1">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for formation in formations %}
+                    <tr>
+                        {% set rowPending = pending_by_formation[formation.id] ?? 0 %}
+                        {% set formationPendingRequests = pending_inscriptions_by_formation[formation.id] ?? [] %}
+                        <td>{{ formation.titre }}</td>
+                        <td>{{ formation.organisme }}</td>
+                        <td>{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}</td>
+                        <td>{{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}</td>
+                        <td>{{ formation.lieu }}</td>
+                        <td>{{ formation.capacite }}</td>
+                        <td>
+                            <div class="btn-list flex-nowrap justify-content-end">
+                                {% if rowPending > 0 %}
+                                    <button class="btn btn-sm btn-outline-warning btn-icon-only position-relative" type="button" data-bs-toggle="offcanvas" data-bs-target="#pendingInscriptionsPanel{{ formation.id }}" aria-controls="pendingInscriptionsPanel{{ formation.id }}" title="{{ rowPending }} inscription(s) en attente">
+                                        <i class="ti ti-bell"></i>
+                                        <span class="badge bg-warning text-dark position-absolute top-0 start-100 translate-middle">{{ rowPending }}</span>
+                                    </button>
+                                {% endif %}
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_formation_show', {'id': formation.id}) }}">Voir</a>
+                                <a class="btn btn-sm btn-primary" href="{{ path('app_formation_edit', {'id': formation.id}) }}">Modifier</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7" class="text-secondary">Aucune formation trouvee.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% for formation in formations %}
+        {% set formationPendingRequests = pending_inscriptions_by_formation[formation.id] ?? [] %}
+        {% if formationPendingRequests is not empty %}
+            <div class="offcanvas offcanvas-end" tabindex="-1" id="pendingInscriptionsPanel{{ formation.id }}" aria-labelledby="pendingInscriptionsLabel{{ formation.id }}">
+                <div class="offcanvas-header">
+                    <h2 class="offcanvas-title" id="pendingInscriptionsLabel{{ formation.id }}">Demandes en attente - {{ formation.titre }}</h2>
+                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body">
+                    <div class="d-flex flex-column gap-3">
+                        {% for ins in formationPendingRequests %}
+                            <div class="surface-card p-3">
+                                <div>
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <div class="fw-bold">{{ ins.prenom }} {{ ins.nom }}</div>
+                                            <div class="text-secondary small">{{ ins.formation_titre }}</div>
+                                        </div>
+                                        <span class="badge bg-orange text-white">En attente</span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <div class="text-secondary small mb-1">Raison</div>
+                                        <div>{{ ins.raison ?: 'Aucune raison saisie.' }}</div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <form method="post" action="{{ path('app_inscription_rh_accept', {'id': ins.id_inscription}) }}">
+                                            <button type="submit" class="btn btn-success btn-sm">Accepter</button>
+                                        </form>
+                                        <form method="post" action="{{ path('app_inscription_rh_refuse', {'id': ins.id_inscription}) }}">
+                                            <button type="submit" class="btn btn-danger btn-sm">Refuser</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
+{% endblock %}
