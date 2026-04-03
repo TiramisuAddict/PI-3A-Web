@@ -1,0 +1,94 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+<h1>Remplissez ce formulaire</h1>
+
+{{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
+
+<div>
+    {{ form_label(form.nom_entreprise) }}
+    {{ form_widget(form.nom_entreprise) }}
+</div>
+
+<div>
+    {{ form_label(form.pays) }}
+    {{ form_widget(form.pays) }}
+</div>
+
+<div>
+    {{ form_label(form.ville) }}
+    {{ form_widget(form.ville) }}
+</div>
+
+<div>
+    {{ form_label(form.nom) }}
+    {{ form_widget(form.nom) }}
+</div>
+
+<div>
+    {{ form_label(form.prenom) }}
+    {{ form_widget(form.prenom) }}
+</div>
+
+<div>
+    {{ form_label(form.matricule_fiscale) }}
+    {{ form_widget(form.matricule_fiscale) }}
+</div>
+
+<div>
+    {{ form_label(form.telephone) }}
+    {{ form_widget(form.telephone) }}
+</div>
+
+<div>
+    {{ form_label(form.e_mail) }}
+    {{ form_widget(form.e_mail) }}
+</div>
+
+<div>
+    {{ form_label(form.site_web) }}
+    {{ form_widget(form.site_web) }}
+</div>
+
+<div>
+    {{ form_label(form.logo) }}
+    {{ form_widget(form.logo) }}
+</div>
+
+<div class="form-footer">
+
+    {% if form.vars.submitted %}
+
+        {% set hasEmpty = false %}
+
+        {% for field in form %}
+            {% if field.vars.errors is defined %}
+                {% if field.vars.errors|length > 0 %}
+                    {% for error in field.vars.errors %}
+                        {% if 'obligatoire' in error.message %}
+                            {% set hasEmpty = true %}
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+
+        {% if hasEmpty %}
+            <div style="color:red; font-weight:bold;">
+                Les champs obligatoires doivent être remplis
+            </div>
+        {% else %}
+            {{ form_errors(form.e_mail) }}
+            {{ form_errors(form.telephone) }}
+        {% endif %}
+
+    {% endif %}
+
+    {{ form_widget(form.Soumettre) }}
+
+</div>
+
+{{ form_end(form) }}
+<p>vous avez déja un compte?</p> <a href="{{ path('compteEntreprise') }}">se connecter</a>
+
+{% endblock %}

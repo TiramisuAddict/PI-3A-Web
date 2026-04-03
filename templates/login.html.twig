@@ -1,0 +1,31 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Connexion{% endblock %}
+
+{% block body %}
+<div class="form-fieldset">
+    <h1>Se connecter</h1>
+
+   
+
+    {{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
+        <div>
+            {{ form_label(form.email) }}
+            {{ form_widget(form.email) }}
+            {{ form_errors(form.email) }}
+        </div>
+
+        <div>
+            {{ form_label(form.password) }}
+            {{ form_widget(form.password) }}
+            {{ form_errors(form.password) }}
+        </div>
+         {% for message in app.flashes('error') %}
+        <div class="alert alert-danger">{{ message }}</div>
+        {% endfor %}
+        <div class="form-footer">
+            {{ form_widget(form.se_connecter) }}
+        </div>
+    {{ form_end(form) }}
+</div>
+{% endblock %}
