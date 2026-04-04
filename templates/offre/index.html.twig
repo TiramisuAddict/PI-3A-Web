@@ -1,0 +1,67 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Hello OffreController!{% endblock %}
+
+{% block body %}
+<style>
+    .example-wrapper { margin: 1em auto; max-width: 800px; width: 95%; font: 18px/1.5 sans-serif; }
+    .example-wrapper code { background: #F5F5F5; padding: 2px 6px; }
+</style>
+
+<div class="example-wrapper">
+    <h1> {{offres|length}} Offres disponibles </h1>
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">ID employer</th>
+                <th scope="col">Titre du poste</th>
+                <th scope="col">Type de contrat</th>
+                <th scope="col">Date limite</th>
+                <th scope="col">etat</th>
+                <th scope="col">Categorie</th>
+                <th scope="col">nbr candidats</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for offre in offres %}
+            <tr>
+                <td>{{offre.id_employer}}</td>
+                <td>{{offre.titre_poste}}</td>
+                <td>{{offre.type_contrat}}</td>
+                <td>{{offre.date_limite|date('Y-m-d')}}</td>
+                <td>{{offre.etat}}</td>
+                <td>{{offre.categorie}}</td>
+                <td>{{offre.candidats|length}}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2> Liste des candidats </h2>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">nom visiteur</th>
+                <th scope="col">prenom visiteur</th>
+                <th scope="col">email visiteur</th>
+                <th scope="col">etat</th>
+                <th scope="col">score</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for offre in offres %}
+                {% for candidat in offre.candidats %}
+                    <tr>
+                        <td>{{ candidat.visiteur.nom }}</td>
+                        <td>{{ candidat.visiteur.prenom }}</td>
+                        <td>{{ candidat.visiteur.e_mail }}</td>
+                        <td>{{ candidat.etat }}</td>
+                        <td>{{ candidat.score }}</td>
+                    </tr>
+                {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
