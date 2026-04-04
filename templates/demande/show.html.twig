@@ -1,17 +1,166 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Demande #{{ demande.id }}{% endblock %}
+{% block title %}Demande - {{ demande.titre }}{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<style>
+    .demande-header {
+        background: linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(255, 255, 255, 0.95));
+        border: 1px solid var(--app-border);
+        border-radius: 16px;
+        padding: 30px;
+        margin-bottom: 24px;
+    }
+    .demande-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 15px;
+    }
+    .meta-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+    .meta-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 16px;
+        border-radius: 25px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    .meta-badge i {
+        margin-right: 6px;
+    }
+    .meta-badge.category {
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+    }
+    .meta-badge.type {
+        background: rgba(107, 114, 128, 0.1);
+        color: #374151;
+    }
+    .detail-card {
+        background: white;
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        padding: 20px;
+        height: 100%;
+        transition: all 0.2s ease;
+    }
+    .detail-card:hover {
+        box-shadow: var(--app-shadow-soft);
+        transform: translateY(-2px);
+    }
+    .detail-label {
+        font-size: 0.85rem;
+        color: #6b7280;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+    }
+    .detail-label i {
+        margin-right: 6px;
+        font-size: 1rem;
+    }
+    .detail-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1f2937;
+        word-break: break-word;
+    }
+    .description-box {
+        background: #f9fafb;
+        border-radius: 12px;
+        padding: 20px;
+        line-height: 1.7;
+        color: #374151;
+    }
+    .timeline-card {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    .timeline-item {
+        position: relative;
+        padding-left: 30px;
+        padding-bottom: 25px;
+        border-left: 2px solid var(--app-border);
+        margin-left: 10px;
+    }
+    .timeline-item:last-child {
+        border-left-color: transparent;
+        padding-bottom: 0;
+    }
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -8px;
+        top: 0;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--app-accent);
+        border: 3px solid white;
+        box-shadow: 0 0 0 2px var(--app-accent-soft);
+    }
+    .timeline-date {
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin-bottom: 5px;
+    }
+    .timeline-content {
+        background: #f9fafb;
+        border-radius: 10px;
+        padding: 15px;
+    }
+    .timeline-actor {
+        font-size: 0.85rem;
+        color: #6b7280;
+    }
+    .timeline-comment {
+        font-size: 0.9rem;
+        color: #374151;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--app-border);
+    }
+    .status-change {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .date-display {
+        background: rgba(13, 110, 253, 0.08);
+        border-radius: 10px;
+        padding: 15px 20px;
+        text-align: center;
+    }
+    .date-display .day {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--app-accent);
+        line-height: 1;
+    }
+    .date-display .month-year {
+        font-size: 0.9rem;
+        color: #6b7280;
+        margin-top: 5px;
+    }
+</style>
+{% endblock %}
 
 {% block body %}
 <div class="row mb-4 align-items-center">
     <div class="col-auto">
         <a href="{{ path('demande_index') }}" class="btn btn-outline-secondary">
-            <i class="ti ti-arrow-left me-1"></i>Retour
+            <i class="ti ti-arrow-left me-1"></i>Retour a la liste
         </a>
     </div>
     <div class="col">
-        <div class="page-pretitle">Demande #{{ demande.id }}</div>
-        <h2 class="page-title">{{ demande.titre }}</h2>
     </div>
     <div class="col-auto">
         <div class="btn-list">
@@ -25,61 +174,84 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-lg-8">
-        <div class="app-hero p-4 mb-4 position-relative">
-            <div class="row">
-                <div class="col">
-                    <h3 class="mb-3">{{ demande.titre }}</h3>
-                    <div class="d-flex flex-wrap gap-2">
-                        <span class="soft-pill">
-                            <i class="ti ti-folder"></i>{{ demande.categorie }}
-                        </span>
-                        <span class="soft-pill">
-                            <i class="ti ti-tag"></i>{{ demande.typeDemande }}
-                        </span>
-                        {% if demande.priorite == 'HAUTE' %}
-                            <span class="badge bg-red">{{ demande.priorite }}</span>
-                        {% elseif demande.priorite == 'NORMALE' %}
-                            <span class="badge bg-blue">{{ demande.priorite }}</span>
-                        {% else %}
-                            <span class="badge bg-green">{{ demande.priorite }}</span>
-                        {% endif %}
-                        {% if demande.status == 'Nouvelle' %}
-                            <span class="badge bg-blue">{{ demande.status }}</span>
-                        {% elseif demande.status == 'En cours' %}
-                            <span class="badge bg-yellow">{{ demande.status }}</span>
-                        {% elseif demande.status == 'En attente' %}
-                            <span class="badge bg-orange">{{ demande.status }}</span>
-                        {% elseif demande.status == 'Résolue' %}
-                            <span class="badge bg-green">{{ demande.status }}</span>
-                        {% elseif demande.status == 'Annulée' %}
-                            <span class="badge bg-red">{{ demande.status }}</span>
-                        {% else %}
-                            <span class="badge bg-secondary">{{ demande.status }}</span>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-auto text-end">
-                    <div class="mini-muted">Créée le</div>
-                    <div class="fw-bold">{{ demande.dateCreation|date('d/m/Y à H:i') }}</div>
-                </div>
+<div class="demande-header">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <h1 class="demande-title">{{ demande.titre }}</h1>
+            <div class="meta-badges">
+                <span class="meta-badge category">
+                    <i class="ti ti-folder"></i>{{ demande.categorie }}
+                </span>
+                <span class="meta-badge type">
+                    <i class="ti ti-tag"></i>{{ demande.typeDemande }}
+                </span>
+                {% if demande.priorite == 'HAUTE' %}
+                    <span class="badge bg-red text-white" style="padding: 8px 16px; font-size: 0.9rem;">
+                        <i class="ti ti-alert-triangle me-1"></i>{{ demande.priorite }}
+                    </span>
+                {% elseif demande.priorite == 'NORMALE' %}
+                    <span class="badge bg-blue text-white" style="padding: 8px 16px; font-size: 0.9rem;">
+                        <i class="ti ti-minus me-1"></i>{{ demande.priorite }}
+                    </span>
+                {% else %}
+                    <span class="badge bg-green text-white" style="padding: 8px 16px; font-size: 0.9rem;">
+                        <i class="ti ti-arrow-down me-1"></i>{{ demande.priorite }}
+                    </span>
+                {% endif %}
+                {% if demande.status == 'Nouvelle' %}
+                    <span class="badge bg-blue text-white" style="padding: 8px 16px; font-size: 0.9rem;">
+                        <i class="ti ti-sparkles me-1"></i>{{ demande.status }}
+                    </span>
+                {% elseif demande.status == 'En cours' %}
+                    <span class="badge bg-yellow text-dark" style="padding: 8px 16px; font-size: 0.9rem;">
+                        <i class="ti ti-loader me-1"></i>{{ demande.status }}
+                    </span>
+                {% elseif demande.status == 'En attente' %}
+                    <span class="badge bg-orange text-white" style="padding: 8px 16px; font-size: 0.9rem;">
+                        <i class="ti ti-clock me-1"></i>{{ demande.status }}
+                    </span>
+                {% elseif demande.status == 'Resolue' %}
+                    <span class="badge bg-green text-white" style="padding: 8px 16px; font-size: 0.9rem;">
+                        <i class="ti ti-check me-1"></i>{{ demande.status }}
+                    </span>
+                {% elseif demande.status == 'Annulee' %}
+                    <span class="badge bg-red text-white" style="padding: 8px 16px; font-size: 0.9rem;">
+                        <i class="ti ti-x me-1"></i>{{ demande.status }}
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary text-white" style="padding: 8px 16px; font-size: 0.9rem;">
+                        <i class="ti ti-lock me-1"></i>{{ demande.status }}
+                    </span>
+                {% endif %}
             </div>
         </div>
+        <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
+            <div class="date-display d-inline-block">
+                <div class="day">{{ demande.dateCreation|date('d') }}</div>
+                <div class="month-year">{{ demande.dateCreation|date('M Y') }}</div>
+            </div>
+        </div>
+    </div>
+</div>
 
+<div class="row">
+    <div class="col-lg-8">
         <div class="surface-card mb-4">
             <div class="card-header">
-                <h3 class="card-title">
+                <h3 class="card-title mb-0">
                     <i class="ti ti-info-circle me-2"></i>Description
                 </h3>
             </div>
             <div class="card-body">
                 {% if demande.description %}
-                    <p class="mb-0">{{ demande.description|nl2br }}</p>
+                    <div class="description-box">
+                        {{ demande.description|nl2br }}
+                    </div>
                 {% else %}
-                    <p class="text-muted mb-0">
-                        <i class="ti ti-info-circle me-1"></i>Aucune description fournie
-                    </p>
+                    <div class="text-center text-muted py-4">
+                        <i class="ti ti-notes-off" style="font-size: 2rem;"></i>
+                        <p class="mt-2 mb-0">Aucune description fournie</p>
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -87,8 +259,8 @@
         {% if demande.details and demande.details.details|length > 0 %}
         <div class="surface-card mb-4">
             <div class="card-header">
-                <h3 class="card-title">
-                    <i class="ti ti-forms me-2"></i>Détails spécifiques
+                <h3 class="card-title mb-0">
+                    <i class="ti ti-list-details me-2"></i>Details specifiques
                 </h3>
             </div>
             <div class="card-body">
@@ -96,9 +268,12 @@
                     {% for key, value in demande.details.details %}
                         {% if not key ends with 'Lat' and not key ends with 'Lon' and value %}
                         <div class="col-md-6">
-                            <div class="stat-card p-3">
-                                <div class="mini-muted mb-1">{{ fieldLabels[key] | default(key) }}</div>
-                                <div class="fw-semibold">{{ value }}</div>
+                            <div class="detail-card">
+                                <div class="detail-label">
+                                    <i class="ti ti-point"></i>
+                                    {{ fieldLabels[key] | default(key) }}
+                                </div>
+                                <div class="detail-value">{{ value }}</div>
                             </div>
                         </div>
                         {% endif %}
@@ -110,45 +285,43 @@
     </div>
 
     <div class="col-lg-4">
-        <div class="surface-card">
+        <div class="surface-card timeline-card">
             <div class="card-header">
-                <h3 class="card-title">
+                <h3 class="card-title mb-0">
                     <i class="ti ti-history me-2"></i>Historique
                 </h3>
             </div>
             <div class="card-body">
                 {% if demande.historiques|length > 0 %}
-                    <ul class="timeline">
-                        {% for historique in demande.historiques %}
-                        <li class="timeline-event">
-                            <div class="timeline-event-icon bg-primary-lt">
-                                <i class="ti ti-refresh"></i>
+                    {% for historique in demande.historiques %}
+                    <div class="timeline-item">
+                        <div class="timeline-date">
+                            <i class="ti ti-calendar me-1"></i>{{ historique.dateAction|date('d/m/Y H:i') }}
+                        </div>
+                        <div class="timeline-content">
+                            <div class="status-change">
+                                {% if historique.ancienStatut %}
+                                    <span class="badge bg-secondary">{{ historique.ancienStatut }}</span>
+                                    <i class="ti ti-arrow-right"></i>
+                                {% endif %}
+                                <span class="badge bg-primary">{{ historique.nouveauStatut }}</span>
                             </div>
-                            <div class="card timeline-event-card">
-                                <div class="card-body p-3">
-                                    <div class="mini-muted mb-1">{{ historique.dateAction|date('d/m/Y H:i') }}</div>
-                                    <div class="mb-2">
-                                        {% if historique.ancienStatut %}
-                                            <span class="badge bg-secondary">{{ historique.ancienStatut }}</span>
-                                            <i class="ti ti-arrow-right mx-1"></i>
-                                        {% endif %}
-                                        <span class="badge bg-primary">{{ historique.nouveauStatut }}</span>
-                                    </div>
-                                    <div class="mini-muted">
-                                        <i class="ti ti-user me-1"></i>{{ historique.acteur }}
-                                    </div>
-                                    {% if historique.commentaire %}
-                                        <div class="mt-2 small">{{ historique.commentaire }}</div>
-                                    {% endif %}
+                            <div class="timeline-actor mt-2">
+                                <i class="ti ti-user me-1"></i>{{ historique.acteur }}
+                            </div>
+                            {% if historique.commentaire %}
+                                <div class="timeline-comment">
+                                    <i class="ti ti-message me-1"></i>{{ historique.commentaire }}
                                 </div>
-                            </div>
-                        </li>
-                        {% endfor %}
-                    </ul>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
                 {% else %}
-                    <p class="text-muted mb-0">
-                        <i class="ti ti-info-circle me-1"></i>Aucun historique
-                    </p>
+                    <div class="text-center text-muted py-4">
+                        <i class="ti ti-history-off" style="font-size: 2rem;"></i>
+                        <p class="mt-2 mb-0">Aucun historique</p>
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -167,7 +340,7 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label class="form-label">Nouveau statut</label>
-                    <select class="form-select" id="newStatus">
+                    <select class="form-select form-select-lg" id="newStatus">
                         {% for status in statuses %}
                             <option value="{{ status }}" {{ status == demande.status ? 'selected' : '' }}>{{ status }}</option>
                         {% endfor %}
@@ -175,7 +348,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Commentaire</label>
-                    <textarea class="form-control" id="statusComment" rows="3" placeholder="Commentaire (optionnel)"></textarea>
+                    <textarea class="form-control" id="statusComment" rows="3" placeholder="Ajouter un commentaire (optionnel)"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -192,26 +365,36 @@
 {% block javascripts %}
 {{ parent() }}
 <script>
-document.getElementById('saveStatus').addEventListener('click', async function() {
-    const newStatus = document.getElementById('newStatus').value;
-    const comment = document.getElementById('statusComment').value;
+document.getElementById("saveStatus").addEventListener("click", function() {
+    var newStatus = document.getElementById("newStatus").value;
+    var comment = document.getElementById("statusComment").value;
+    var btn = this;
     
-    try {
-        const response = await fetch('/demande/api/{{ demande.id }}/status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus, commentaire: comment })
-        });
-        const result = await response.json();
-        
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader me-1"></i>Enregistrement...';
+    
+    fetch("/demande/api/{{ demande.id }}/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus, commentaire: comment })
+    })
+    .then(function(response) {
+        return response.json();
+    })
+    .then(function(result) {
         if (result.success) {
             window.location.reload();
         } else {
-            alert('Erreur: ' + result.message);
+            alert("Erreur: " + result.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
         }
-    } catch (error) {
-        alert('Erreur de connexion');
-    }
+    })
+    .catch(function(error) {
+        alert("Erreur de connexion");
+        btn.disabled = false;
+        btn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
+    });
 });
 </script>
 {% endblock %}

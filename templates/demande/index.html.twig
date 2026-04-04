@@ -2,219 +2,413 @@
 
 {% block title %}Liste des Demandes{% endblock %}
 
+{% block stylesheets %}
+{{ parent() }}
+<style>
+    .search-container {
+        position: relative;
+    }
+    .search-container .search-icon {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6b7280;
+        font-size: 1.2rem;
+    }
+    .search-container input {
+        padding-left: 45px;
+        height: 50px;
+        font-size: 1rem;
+        border-radius: 12px;
+        border: 2px solid var(--app-border);
+        transition: all 0.3s ease;
+    }
+    .search-container input:focus {
+        border-color: var(--app-accent);
+        box-shadow: 0 0 0 4px var(--app-accent-soft);
+    }
+    .stat-card {
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--app-shadow);
+    }
+    .stat-card .stat-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+    .stat-card .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-card .stat-label {
+        font-size: 0.9rem;
+        color: #6b7280;
+        margin-top: 5px;
+    }
+    .demande-row {
+        transition: all 0.2s ease;
+    }
+    .demande-row:hover {
+        background: var(--app-accent-soft) !important;
+    }
+    .demande-row.hidden {
+        display: none;
+    }
+    .badge-priority {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border-radius: 20px;
+    }
+    .badge-status {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border-radius: 20px;
+    }
+    .action-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+    .action-btn:hover {
+        transform: scale(1.1);
+    }
+    .filter-badge {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .filter-badge:hover {
+        transform: scale(1.05);
+    }
+    .filter-badge.active {
+        box-shadow: 0 0 0 3px var(--app-accent-soft);
+    }
+    .empty-state {
+        padding: 60px 20px;
+        text-align: center;
+    }
+    .empty-state i {
+        font-size: 4rem;
+        color: #d1d5db;
+        margin-bottom: 20px;
+    }
+    .category-tag {
+        background: linear-gradient(135deg, var(--app-accent-soft), rgba(13, 110, 253, 0.05));
+        color: var(--app-accent);
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .type-text {
+        color: #374151;
+        font-weight: 500;
+    }
+    .date-text {
+        color: #6b7280;
+        font-size: 0.85rem;
+    }
+    .titre-link {
+        color: #1f2937;
+        font-weight: 600;
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+    .titre-link:hover {
+        color: var(--app-accent);
+    }
+    .results-count {
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .quick-filters {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+    .quick-filter-btn {
+        padding: 8px 16px;
+        border-radius: 20px;
+        border: 1px solid var(--app-border);
+        background: white;
+        color: #374151;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .quick-filter-btn:hover,
+    .quick-filter-btn.active {
+        background: var(--app-accent);
+        color: white;
+        border-color: var(--app-accent);
+    }
+</style>
+{% endblock %}
+
 {% block body %}
 <div class="row mb-4 align-items-center">
     <div class="col">
-        <div class="page-pretitle">Gestion</div>
-        <h2 class="page-title">
-            <i class="ti ti-file-text me-2"></i>Liste des Demandes
+        <h2 class="page-title mb-1">
+            <i class="ti ti-file-text me-2"></i>Gestion des Demandes
         </h2>
+        <p class="text-muted mb-0">Gerez et suivez toutes les demandes</p>
     </div>
     <div class="col-auto">
         <div class="btn-list">
-            <a href="{{ path('demande_new') }}" class="btn btn-primary">
-                <i class="ti ti-plus me-1"></i>Nouvelle Demande
+            <a href="{{ path('demande_new') }}" class="btn btn-primary btn-lg">
+                <i class="ti ti-plus me-2"></i>Nouvelle Demande
             </a>
-            <a href="{{ path('demande_statistics') }}" class="btn btn-outline-primary">
-                <i class="ti ti-chart-bar me-1"></i>Statistiques
+            <a href="{{ path('demande_statistics') }}" class="btn btn-outline-primary btn-lg">
+                <i class="ti ti-chart-bar me-2"></i>Statistiques
             </a>
         </div>
     </div>
 </div>
 
 <div class="row row-deck row-cards mb-4">
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-card p-3">
-            <div class="d-flex align-items-center mb-2">
-                <span class="avatar avatar-sm bg-primary-lt me-2">
+    <div class="col-6 col-lg-3">
+        <div class="stat-card p-4" onclick="filterByStatus('')">
+            <div class="d-flex align-items-center">
+                <div class="stat-icon bg-primary-lt text-primary me-3">
                     <i class="ti ti-files"></i>
-                </span>
-                <span class="mini-muted">Total</span>
+                </div>
+                <div>
+                    <div class="stat-value text-primary">{{ stats.total }}</div>
+                    <div class="stat-label">Total</div>
+                </div>
             </div>
-            <div class="h1 mb-0">{{ stats.total }}</div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-card p-3">
-            <div class="d-flex align-items-center mb-2">
-                <span class="avatar avatar-sm bg-blue-lt me-2">
+    <div class="col-6 col-lg-3">
+        <div class="stat-card p-4" onclick="filterByStatus('Nouvelle')">
+            <div class="d-flex align-items-center">
+                <div class="stat-icon bg-blue-lt text-blue me-3">
                     <i class="ti ti-clock"></i>
-                </span>
-                <span class="mini-muted">Nouvelles</span>
+                </div>
+                <div>
+                    <div class="stat-value text-blue">{{ stats.byStatus['Nouvelle'] | default(0) }}</div>
+                    <div class="stat-label">Nouvelles</div>
+                </div>
             </div>
-            <div class="h1 mb-0 text-blue">{{ stats.byStatus['Nouvelle'] | default(0) }}</div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-card p-3">
-            <div class="d-flex align-items-center mb-2">
-                <span class="avatar avatar-sm bg-yellow-lt me-2">
+    <div class="col-6 col-lg-3">
+        <div class="stat-card p-4" onclick="filterByStatus('En cours')">
+            <div class="d-flex align-items-center">
+                <div class="stat-icon bg-yellow-lt text-yellow me-3">
                     <i class="ti ti-loader"></i>
-                </span>
-                <span class="mini-muted">En Cours</span>
+                </div>
+                <div>
+                    <div class="stat-value text-yellow">{{ stats.byStatus['En cours'] | default(0) }}</div>
+                    <div class="stat-label">En cours</div>
+                </div>
             </div>
-            <div class="h1 mb-0 text-yellow">{{ stats.byStatus['En cours'] | default(0) }}</div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-card p-3">
-            <div class="d-flex align-items-center mb-2">
-                <span class="avatar avatar-sm bg-green-lt me-2">
+    <div class="col-6 col-lg-3">
+        <div class="stat-card p-4" onclick="filterByStatus('Resolue')">
+            <div class="d-flex align-items-center">
+                <div class="stat-icon bg-green-lt text-green me-3">
                     <i class="ti ti-check"></i>
-                </span>
-                <span class="mini-muted">Résolues</span>
+                </div>
+                <div>
+                    <div class="stat-value text-green">{{ stats.byStatus['Resolue'] | default(0) }}</div>
+                    <div class="stat-label">Resolues</div>
+                </div>
             </div>
-            <div class="h1 mb-0 text-green">{{ stats.byStatus['Résolue'] | default(0) }}</div>
         </div>
     </div>
 </div>
 
 <div class="surface-card mb-4">
-    <div class="card-header">
-        <h3 class="card-title">
-            <i class="ti ti-filter me-2"></i>Filtres
-        </h3>
-    </div>
-    <div class="card-body">
-        <form method="GET" action="{{ path('demande_index') }}">
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <label class="form-label">Catégorie</label>
-                    <select name="categorie" class="form-select">
-                        <option value="">Toutes les catégories</option>
-                        {% for cat in categories %}
-                            <option value="{{ cat }}" {{ filters.categorie == cat ? 'selected' : '' }}>{{ cat }}</option>
-                        {% endfor %}
-                    </select>
+    <div class="card-body p-4">
+        <div class="row align-items-center">
+            <div class="col-lg-6 mb-3 mb-lg-0">
+                <div class="search-container">
+                    <i class="ti ti-search search-icon"></i>
+                    <input type="text" 
+                           id="searchInput" 
+                           class="form-control" 
+                           placeholder="Rechercher par titre, categorie, type, statut..."
+                           autocomplete="off">
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label">Statut</label>
-                    <select name="status" class="form-select">
-                        <option value="">Tous</option>
-                        {% for status in statuses %}
-                            <option value="{{ status }}" {{ filters.status == status ? 'selected' : '' }}>{{ status }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Priorité</label>
-                    <select name="priorite" class="form-select">
-                        <option value="">Toutes</option>
-                        {% for priorite in priorites %}
-                            <option value="{{ priorite }}" {{ filters.priorite == priorite ? 'selected' : '' }}>{{ priorite }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Recherche</label>
-                    <input type="text" name="search" class="form-control" value="{{ filters.search }}" placeholder="Titre ou description...">
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="ti ti-search me-1"></i>Filtrer
+            </div>
+            <div class="col-lg-6">
+                <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                    <button type="button" class="quick-filter-btn active" data-filter="all">
+                        <i class="ti ti-list me-1"></i>Tous
+                    </button>
+                    <button type="button" class="quick-filter-btn" data-filter="HAUTE">
+                        <i class="ti ti-alert-circle me-1"></i>Priorite Haute
+                    </button>
+                    <button type="button" class="quick-filter-btn" data-filter="Nouvelle">
+                        <i class="ti ti-sparkles me-1"></i>Nouvelles
+                    </button>
+                    <button type="button" class="quick-filter-btn" data-filter="En cours">
+                        <i class="ti ti-progress me-1"></i>En cours
                     </button>
                 </div>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
 <div class="surface-card">
-    <div class="card-header">
-        <h3 class="card-title">
-            <i class="ti ti-list me-2"></i>Demandes ({{ demandes|length }})
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">
+            <i class="ti ti-list me-2"></i>Liste des Demandes
         </h3>
+        <span class="results-count" id="resultsCount">{{ demandes|length }} demandes</span>
     </div>
     <div class="table-responsive">
-        <table class="table table-vcenter card-table">
+        <table class="table table-vcenter card-table" id="demandesTable">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Titre</th>
-                    <th>Catégorie</th>
+                    <th style="width: 30%">Titre</th>
+                    <th>Categorie</th>
                     <th>Type</th>
-                    <th>Priorité</th>
+                    <th>Priorite</th>
                     <th>Statut</th>
                     <th>Date</th>
-                    <th class="w-1">Actions</th>
+                    <th class="text-end" style="width: 120px">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="demandesBody">
                 {% for demande in demandes %}
-                <tr>
-                    <td class="text-muted">#{{ demande.id }}</td>
+                <tr class="demande-row" 
+                    data-titre="{{ demande.titre|lower }}"
+                    data-categorie="{{ demande.categorie|lower }}"
+                    data-type="{{ demande.typeDemande|lower }}"
+                    data-priorite="{{ demande.priorite }}"
+                    data-status="{{ demande.status }}">
                     <td>
-                        <a href="{{ path('demande_show', {id: demande.id}) }}" class="text-reset fw-semibold">
+                        <a href="{{ path('demande_show', {id: demande.id}) }}" class="titre-link">
                             {{ demande.titre }}
                         </a>
                     </td>
                     <td>
-                        <span class="soft-pill">
-                            <i class="ti ti-folder"></i>{{ demande.categorie }}
+                        <span class="category-tag">
+                            <i class="ti ti-folder me-1"></i>{{ demande.categorie }}
                         </span>
                     </td>
-                    <td class="mini-muted">{{ demande.typeDemande }}</td>
+                    <td>
+                        <span class="type-text">{{ demande.typeDemande }}</span>
+                    </td>
                     <td>
                         {% if demande.priorite == 'HAUTE' %}
-                            <span class="badge bg-red">{{ demande.priorite }}</span>
+                            <span class="badge badge-priority bg-red text-white">
+                                <i class="ti ti-alert-triangle me-1"></i>{{ demande.priorite }}
+                            </span>
                         {% elseif demande.priorite == 'NORMALE' %}
-                            <span class="badge bg-blue">{{ demande.priorite }}</span>
+                            <span class="badge badge-priority bg-blue text-white">
+                                <i class="ti ti-minus me-1"></i>{{ demande.priorite }}
+                            </span>
                         {% else %}
-                            <span class="badge bg-green">{{ demande.priorite }}</span>
+                            <span class="badge badge-priority bg-green text-white">
+                                <i class="ti ti-arrow-down me-1"></i>{{ demande.priorite }}
+                            </span>
                         {% endif %}
                     </td>
                     <td>
                         {% if demande.status == 'Nouvelle' %}
-                            <span class="badge bg-blue">{{ demande.status }}</span>
+                            <span class="badge badge-status bg-blue text-white">
+                                <i class="ti ti-sparkles me-1"></i>{{ demande.status }}
+                            </span>
                         {% elseif demande.status == 'En cours' %}
-                            <span class="badge bg-yellow">{{ demande.status }}</span>
+                            <span class="badge badge-status bg-yellow text-dark">
+                                <i class="ti ti-loader me-1"></i>{{ demande.status }}
+                            </span>
                         {% elseif demande.status == 'En attente' %}
-                            <span class="badge bg-orange">{{ demande.status }}</span>
-                        {% elseif demande.status == 'Résolue' %}
-                            <span class="badge bg-green">{{ demande.status }}</span>
-                        {% elseif demande.status == 'Annulée' %}
-                            <span class="badge bg-red">{{ demande.status }}</span>
+                            <span class="badge badge-status bg-orange text-white">
+                                <i class="ti ti-clock me-1"></i>{{ demande.status }}
+                            </span>
+                        {% elseif demande.status == 'Resolue' %}
+                            <span class="badge badge-status bg-green text-white">
+                                <i class="ti ti-check me-1"></i>{{ demande.status }}
+                            </span>
+                        {% elseif demande.status == 'Annulee' %}
+                            <span class="badge badge-status bg-red text-white">
+                                <i class="ti ti-x me-1"></i>{{ demande.status }}
+                            </span>
                         {% else %}
-                            <span class="badge bg-secondary">{{ demande.status }}</span>
+                            <span class="badge badge-status bg-secondary text-white">
+                                <i class="ti ti-lock me-1"></i>{{ demande.status }}
+                            </span>
                         {% endif %}
                     </td>
-                    <td class="mini-muted">{{ demande.dateCreation|date('d/m/Y H:i') }}</td>
                     <td>
-                        <div class="btn-list flex-nowrap">
-                            <a href="{{ path('demande_show', {id: demande.id}) }}" class="btn btn-icon btn-outline-primary" title="Voir">
+                        <span class="date-text">
+                            <i class="ti ti-calendar me-1"></i>{{ demande.dateCreation|date('d/m/Y') }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-list flex-nowrap justify-content-end">
+                            <a href="{{ path('demande_show', {id: demande.id}) }}" 
+                               class="action-btn btn btn-outline-primary" 
+                               title="Voir">
                                 <i class="ti ti-eye"></i>
                             </a>
-                            <a href="{{ path('demande_edit', {id: demande.id}) }}" class="btn btn-icon btn-outline-warning" title="Modifier">
+                            <a href="{{ path('demande_edit', {id: demande.id}) }}" 
+                               class="action-btn btn btn-outline-warning" 
+                               title="Modifier">
                                 <i class="ti ti-edit"></i>
                             </a>
-                            <button type="button" class="btn btn-icon btn-outline-danger" title="Supprimer" data-bs-toggle="modal" data-bs-target="#deleteModal" data-id="{{ demande.id }}">
+                            <button type="button" 
+                                    class="action-btn btn btn-outline-danger" 
+                                    title="Supprimer" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#deleteModal" 
+                                    data-id="{{ demande.id }}">
                                 <i class="ti ti-trash"></i>
                             </button>
                         </div>
                     </td>
                 </tr>
                 {% else %}
-                <tr>
-                    <td colspan="8" class="text-center py-5">
-                        <div class="empty">
-                            <div class="empty-icon">
-                                <i class="ti ti-file-off"></i>
-                            </div>
-                            <p class="empty-title">Aucune demande trouvée</p>
-                            <p class="empty-subtitle text-muted">
-                                Créez votre première demande pour commencer
-                            </p>
-                            <div class="empty-action">
-                                <a href="{{ path('demande_new') }}" class="btn btn-primary">
-                                    <i class="ti ti-plus me-1"></i>Nouvelle Demande
-                                </a>
-                            </div>
+                <tr id="emptyRow">
+                    <td colspan="7">
+                        <div class="empty-state">
+                            <i class="ti ti-file-off"></i>
+                            <h3>Aucune demande trouvee</h3>
+                            <p class="text-muted">Creez votre premiere demande pour commencer</p>
+                            <a href="{{ path('demande_new') }}" class="btn btn-primary btn-lg mt-3">
+                                <i class="ti ti-plus me-2"></i>Nouvelle Demande
+                            </a>
                         </div>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+    
+    <div class="empty-state" id="noResults" style="display: none;">
+        <i class="ti ti-search-off"></i>
+        <h3>Aucun resultat</h3>
+        <p class="text-muted">Aucune demande ne correspond a votre recherche</p>
+        <button type="button" class="btn btn-outline-primary mt-3" onclick="clearSearch()">
+            <i class="ti ti-refresh me-2"></i>Effacer la recherche
+        </button>
     </div>
 </div>
 
@@ -224,9 +418,9 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             <div class="modal-status bg-danger"></div>
             <div class="modal-body text-center py-4">
-                <i class="ti ti-alert-triangle text-danger mb-2" style="font-size: 3rem;"></i>
-                <h3>Êtes-vous sûr?</h3>
-                <div class="text-muted">Cette action est irréversible.</div>
+                <i class="ti ti-alert-triangle text-danger mb-3" style="font-size: 3rem;"></i>
+                <h3>Confirmer la suppression</h3>
+                <p class="text-muted">Cette action est irreversible. Voulez-vous vraiment supprimer cette demande?</p>
             </div>
             <div class="modal-footer">
                 <div class="w-100">
@@ -235,7 +429,9 @@
                             <button type="button" class="btn w-100" data-bs-dismiss="modal">Annuler</button>
                         </div>
                         <div class="col">
-                            <button type="button" class="btn btn-danger w-100" id="confirmDelete">Supprimer</button>
+                            <button type="button" class="btn btn-danger w-100" id="confirmDelete">
+                                <i class="ti ti-trash me-1"></i>Supprimer
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -248,32 +444,159 @@
 {% block javascripts %}
 {{ parent() }}
 <script>
-let deleteId = null;
-const deleteModal = document.getElementById('deleteModal');
-
-deleteModal.addEventListener('show.bs.modal', function(event) {
-    const button = event.relatedTarget;
-    deleteId = button.getAttribute('data-id');
-});
-
-document.getElementById('confirmDelete').addEventListener('click', async function() {
-    if (!deleteId) return;
+(function() {
+    "use strict";
     
-    try {
-        const response = await fetch('/demande/api/' + deleteId + '/delete', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' }
+    var deleteId = null;
+    var searchInput = document.getElementById("searchInput");
+    var resultsCount = document.getElementById("resultsCount");
+    var noResults = document.getElementById("noResults");
+    var tableBody = document.getElementById("demandesBody");
+    var currentFilter = "all";
+    
+    document.addEventListener("DOMContentLoaded", init);
+    
+    function init() {
+        searchInput.addEventListener("input", debounce(performSearch, 300));
+        searchInput.addEventListener("keyup", function(e) {
+            if (e.key === "Escape") {
+                clearSearch();
+            }
         });
-        const result = await response.json();
         
-        if (result.success) {
-            window.location.reload();
-        } else {
-            alert('Erreur: ' + result.message);
+        document.querySelectorAll(".quick-filter-btn").forEach(function(btn) {
+            btn.addEventListener("click", function() {
+                document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+                    b.classList.remove("active");
+                });
+                this.classList.add("active");
+                currentFilter = this.getAttribute("data-filter");
+                performSearch();
+            });
+        });
+        
+        var deleteModal = document.getElementById("deleteModal");
+        if (deleteModal) {
+            deleteModal.addEventListener("show.bs.modal", function(event) {
+                var button = event.relatedTarget;
+                deleteId = button.getAttribute("data-id");
+            });
         }
-    } catch (error) {
-        alert('Erreur de connexion');
+        
+        document.getElementById("confirmDelete").addEventListener("click", deleteDemande);
     }
-});
+    
+    function performSearch() {
+        var searchTerm = searchInput.value.toLowerCase().trim();
+        var rows = document.querySelectorAll(".demande-row");
+        var visibleCount = 0;
+        
+        rows.forEach(function(row) {
+            var titre = row.getAttribute("data-titre") || "";
+            var categorie = row.getAttribute("data-categorie") || "";
+            var type = row.getAttribute("data-type") || "";
+            var priorite = row.getAttribute("data-priorite") || "";
+            var status = row.getAttribute("data-status") || "";
+            
+            var matchesSearch = searchTerm === "" || 
+                titre.indexOf(searchTerm) !== -1 ||
+                categorie.indexOf(searchTerm) !== -1 ||
+                type.indexOf(searchTerm) !== -1 ||
+                priorite.toLowerCase().indexOf(searchTerm) !== -1 ||
+                status.toLowerCase().indexOf(searchTerm) !== -1;
+            
+            var matchesFilter = currentFilter === "all" ||
+                priorite === currentFilter ||
+                status === currentFilter;
+            
+            if (matchesSearch && matchesFilter) {
+                row.classList.remove("hidden");
+                visibleCount++;
+            } else {
+                row.classList.add("hidden");
+            }
+        });
+        
+        resultsCount.textContent = visibleCount + " demande" + (visibleCount !== 1 ? "s" : "");
+        
+        if (visibleCount === 0 && rows.length > 0) {
+            noResults.style.display = "block";
+            tableBody.parentElement.style.display = "none";
+        } else {
+            noResults.style.display = "none";
+            tableBody.parentElement.style.display = "table";
+        }
+    }
+    
+    function clearSearch() {
+        searchInput.value = "";
+        currentFilter = "all";
+        document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+            b.classList.remove("active");
+        });
+        document.querySelector('.quick-filter-btn[data-filter="all"]').classList.add("active");
+        performSearch();
+    }
+    
+    function filterByStatus(status) {
+        searchInput.value = "";
+        currentFilter = status || "all";
+        
+        document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+            b.classList.remove("active");
+            if (b.getAttribute("data-filter") === currentFilter) {
+                b.classList.add("active");
+            }
+        });
+        
+        performSearch();
+    }
+    
+    function deleteDemande() {
+        if (!deleteId) return;
+        
+        var btn = document.getElementById("confirmDelete");
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ti ti-loader me-1"></i>Suppression...';
+        
+        fetch("/demande/api/" + deleteId + "/delete", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" }
+        })
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(result) {
+            if (result.success) {
+                window.location.reload();
+            } else {
+                alert("Erreur: " + result.message);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ti ti-trash me-1"></i>Supprimer';
+            }
+        })
+        .catch(function(error) {
+            alert("Erreur de connexion");
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ti ti-trash me-1"></i>Supprimer';
+        });
+    }
+    
+    function debounce(func, wait) {
+        var timeout;
+        return function() {
+            var context = this;
+            var args = arguments;
+            clearTimeout(timeout);
+            timeout = setTimeout(function() {
+                func.apply(context, args);
+            }, wait);
+        };
+    }
+    
+    window.filterByStatus = filterByStatus;
+    window.clearSearch = clearSearch;
+    
+})();
 </script>
 {% endblock %}
