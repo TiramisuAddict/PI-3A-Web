@@ -3,21 +3,21 @@
 {% block title %}Nouveau projet{% endblock %}
 
 {% block body %}
-    <div class="page-wrapper">
-        <div class="page-header d-print-none">
-            <div class="container-xl">
-                <div class="row g-2 align-items-center">
-                    <div class="col">
-                        <h2 class="page-title">Nouveau projet</h2>
-                        <div class="text-secondary mt-1">Creez un projet et affectez son responsable et son equipe.</div>
-                    </div>
-                </div>
+    <div class="workspace-card p-3 mb-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-auto">
+                <span class="avatar bg-primary-lt text-primary"><i class="ti ti-folders"></i></span>
             </div>
-        </div>
-        <div class="page-body">
-            <div class="container-xl">
-                {{ include('projet/_form.html.twig', {'button_label': 'Creer le projet'}) }}
+            <div class="col">
+                <div class="workspace-subtle text-uppercase fw-semibold" style="letter-spacing:.08em; font-size:11px;">Creation</div>
+                <h2 class="mb-1">Nouveau projet</h2>
+                <div class="workspace-subtle">Renseignez les informations essentielles puis affectez l'equipe.</div>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{{ path('app_projet_index') }}" class="btn btn-outline-secondary">Retour a la liste</a>
             </div>
         </div>
     </div>
+
+    {{ include('projet/_form.html.twig', {'button_label': 'Creer le projet'}) }}
 {% endblock %}

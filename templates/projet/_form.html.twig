@@ -1,70 +1,95 @@
 {{ form_start(form) }}
-    <div class="row row-cards">
-        <div class="col-12 col-lg-8">
-            <div class="card">
+    {% if form.vars.errors|length > 0 %}
+        <div class="alert alert-danger mb-3">
+            {{ form_errors(form) }}
+        </div>
+    {% endif %}
+
+    <div class="row g-3 align-items-start">
+        <div class="col-12 col-xl-8">
+            <div class="card mb-3">
                 <div class="card-header">
-                    <h3 class="card-title">Informations principales</h3>
+                    <h3 class="card-title">Identité du projet</h3>
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
-                        {{ form_row(form.nom, {'attr': {'class': 'form-control', 'placeholder': 'Ex: Refonte du portail client'}}) }}
+                        {{ form_label(form.nom, null, {'label_attr': {'class': 'form-label'}}) }}
+                        {{ form_widget(form.nom, {'attr': {'class': 'form-control', 'placeholder': 'Ex: Refonte espace collaborateur'}}) }}
+                        {{ form_errors(form.nom) }}
                     </div>
-                    <div class="mb-3">
-                        {{ form_row(form.description, {'attr': {'class': 'form-control', 'rows': 5, 'placeholder': 'Contexte, objectifs et livrables attendus...'}}) }}
+                    <div>
+                        {{ form_label(form.description, null, {'label_attr': {'class': 'form-label'}}) }}
+                        {{ form_widget(form.description, {'attr': {'class': 'form-control', 'rows': 6, 'placeholder': 'Objectifs, contexte, livrables et perimetre du projet...'}}) }}
+                        {{ form_errors(form.description) }}
                     </div>
                 </div>
             </div>
 
-            <div class="card mt-3">
+            <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Planification</h3>
+                    <h3 class="card-title">Planning et pilotage</h3>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            {{ form_row(form.date_debut, {'attr': {'class': 'form-control'}}) }}
+                            {{ form_label(form.date_debut, null, {'label_attr': {'class': 'form-label'}}) }}
+                            {{ form_widget(form.date_debut, {'attr': {'class': 'form-control'}}) }}
+                            {{ form_errors(form.date_debut) }}
                         </div>
                         <div class="col-md-6">
-                            {{ form_row(form.date_fin_prevue, {'attr': {'class': 'form-control'}}) }}
+                            {{ form_label(form.date_fin_prevue, null, {'label_attr': {'class': 'form-label'}}) }}
+                            {{ form_widget(form.date_fin_prevue, {'attr': {'class': 'form-control'}}) }}
+                            {{ form_errors(form.date_fin_prevue) }}
                         </div>
                         <div class="col-md-6">
-                            {{ form_row(form.date_fin_reelle, {'attr': {'class': 'form-control'}}) }}
+                            {{ form_label(form.date_fin_reelle, null, {'label_attr': {'class': 'form-label'}}) }}
+                            {{ form_widget(form.date_fin_reelle, {'attr': {'class': 'form-control'}}) }}
+                            <div class="form-hint">Optionnel: a renseigner a la cloture du projet.</div>
+                            {{ form_errors(form.date_fin_reelle) }}
                         </div>
                         <div class="col-md-3">
-                            {{ form_row(form.statut, {'attr': {'class': 'form-select'}}) }}
+                            {{ form_label(form.statut, null, {'label_attr': {'class': 'form-label'}}) }}
+                            {{ form_widget(form.statut, {'attr': {'class': 'form-select'}}) }}
+                            {{ form_errors(form.statut) }}
                         </div>
                         <div class="col-md-3">
-                            {{ form_row(form.priorite, {'attr': {'class': 'form-select'}}) }}
+                            {{ form_label(form.priorite, null, {'label_attr': {'class': 'form-label'}}) }}
+                            {{ form_widget(form.priorite, {'attr': {'class': 'form-select'}}) }}
+                            {{ form_errors(form.priorite) }}
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-12 col-lg-4">
-            <div class="card">
+        <div class="col-12 col-xl-4">
+            <div class="card mb-3">
                 <div class="card-header">
-                    <h3 class="card-title">Equipe projet</h3>
+                    <h3 class="card-title">Equipe</h3>
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
-                        {{ form_row(form.responsable, {'attr': {'class': 'form-select'}}) }}
+                        {{ form_label(form.responsable, null, {'label_attr': {'class': 'form-label'}}) }}
+                        {{ form_widget(form.responsable, {'attr': {'class': 'form-select'}}) }}
+                        {{ form_errors(form.responsable) }}
                     </div>
-                    <div class="mb-2">
-                        {{ form_row(form.membresEquipe, {'attr': {'class': 'form-select', 'size': 10}}) }}
+                    <div>
+                        {{ form_label(form.membresEquipe, null, {'label_attr': {'class': 'form-label'}}) }}
+                        {{ form_widget(form.membresEquipe, {'attr': {'class': 'form-select', 'size': 9}}) }}
+                        <div class="form-hint">Selection multiple: Ctrl (Windows) / Cmd (Mac).</div>
+                        {{ form_errors(form.membresEquipe) }}
                     </div>
-                    <div class="form-hint">
-                        Utilisez Ctrl (Windows) ou Cmd (Mac) pour selectionner plusieurs membres.
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" type="submit">{{ button_label|default('Enregistrer') }}</button>
+                        <a href="{{ path('app_projet_index') }}" class="btn btn-outline-secondary">Annuler</a>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-
-    {{ form_errors(form) }}
-
-    <div class="mt-3 d-flex gap-2">
-        <button class="btn btn-primary">{{ button_label|default('Enregistrer') }}</button>
-        <a href="{{ path('app_projet_index') }}" class="btn btn-outline-secondary">Annuler</a>
     </div>
 {{ form_end(form) }}

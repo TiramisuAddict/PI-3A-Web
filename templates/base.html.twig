@@ -2,17 +2,248 @@
 <html>
     <head>
         <meta charset="UTF-8">
-        <title>{% block title %}Welcome!{% endblock %}</title>
+        <title>{% block title %}Gestion Projets{% endblock %}</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>⚫️</text><text y=%221.3em%22 x=%220.2em%22 font-size=%2276%22 fill=%22%23fff%22>sf</text></svg>">
         {% block stylesheets %}
             <meta name="viewport" content="width=device-width, initial-scale=1">
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.35.0/dist/tabler-icons.min.css">
+            <style>
+                :root {
+                    --workspace-bg: #eff2f8;
+                    --workspace-card: #ffffff;
+                    --workspace-border: #e7ebf2;
+                    --workspace-text: #20293a;
+                    --workspace-muted: #64748b;
+                    --workspace-topbar: linear-gradient(90deg, #5b2bd8 0%, #6c3ff0 55%, #5f30de 100%);
+                }
+
+                body {
+                    font-family: 'Manrope', 'Segoe UI', sans-serif;
+                    background: var(--workspace-bg);
+                    color: var(--workspace-text);
+                    margin: 0;
+                }
+
+                .workspace-shell {
+                    min-height: 100vh;
+                }
+
+                .workspace-topbar {
+                    height: 72px;
+                    background: var(--workspace-topbar);
+                    color: #fff;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 0 20px;
+                    box-shadow: 0 10px 24px rgba(72, 32, 164, 0.28);
+                    position: sticky;
+                    top: 0;
+                    z-index: 30;
+                }
+
+                .workspace-topbar-menu {
+                    display: flex;
+                    gap: 12px;
+                    align-items: center;
+                    flex-wrap: wrap;
+                }
+
+                .workspace-topbar-link {
+                    color: rgba(255, 255, 255, 0.86);
+                    text-decoration: none;
+                    font-weight: 700;
+                    font-size: 14px;
+                    padding: 9px 14px;
+                    border-radius: 999px;
+                    transition: all .2s ease;
+                }
+
+                .workspace-topbar-link:hover {
+                    color: #fff;
+                    background: rgba(255, 255, 255, 0.12);
+                }
+
+                .workspace-topbar-link.is-active {
+                    background: #fff;
+                    color: #4a26b8;
+                    box-shadow: 0 8px 16px rgba(35, 12, 94, 0.24);
+                }
+
+                .workspace-layout {
+                    display: grid;
+                    grid-template-columns: 280px 1fr;
+                    gap: 20px;
+                    padding: 20px;
+                }
+
+                .workspace-sidebar {
+                    background: var(--workspace-card);
+                    border: 1px solid var(--workspace-border);
+                    border-radius: 18px;
+                    box-shadow: 0 4px 20px rgba(12, 20, 37, .05);
+                    padding: 18px 14px;
+                    height: calc(100vh - 112px);
+                    position: sticky;
+                    top: 92px;
+                    overflow: auto;
+                }
+
+                .workspace-sidebar-title {
+                    font-size: 28px;
+                    font-weight: 800;
+                    margin: 0;
+                }
+
+                .workspace-side-link {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    text-decoration: none;
+                    color: #2f3a4d;
+                    padding: 10px 10px;
+                    border-radius: 10px;
+                    font-weight: 700;
+                    margin-top: 4px;
+                }
+
+                .workspace-side-link:hover,
+                .workspace-side-link.is-active {
+                    background: #f2f4fb;
+                    color: #40209e;
+                }
+
+                .workspace-sublist {
+                    margin-top: 6px;
+                    padding-left: 8px;
+                }
+
+                .workspace-sublist-link {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    text-decoration: none;
+                    color: #334155;
+                    padding: 8px 10px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    margin-top: 2px;
+                }
+
+                .workspace-sublist-link:hover,
+                .workspace-sublist-link.is-active {
+                    background: #e9f0ff;
+                    color: #1947b8;
+                }
+
+                .workspace-initials {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 999px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 11px;
+                    font-weight: 800;
+                    background: #e8eefc;
+                    color: #2b4ea2;
+                    flex-shrink: 0;
+                }
+
+                .workspace-content {
+                    min-width: 0;
+                }
+
+                .workspace-card {
+                    background: var(--workspace-card);
+                    border: 1px solid var(--workspace-border);
+                    border-radius: 14px;
+                    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+                    transition: transform .16s ease, box-shadow .16s ease;
+                }
+
+                .workspace-card:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+                }
+
+                .workspace-subtle {
+                    color: var(--workspace-muted);
+                }
+
+                @media (max-width: 991px) {
+                    .workspace-layout {
+                        grid-template-columns: 1fr;
+                        padding: 14px;
+                    }
+
+                    .workspace-sidebar {
+                        position: static;
+                        height: auto;
+                    }
+
+                    .workspace-topbar {
+                        height: auto;
+                        align-items: flex-start;
+                        flex-direction: column;
+                        gap: 10px;
+                        padding: 12px 14px;
+                    }
+                }
+            </style>
         {% endblock %}
 
         {% block javascripts %}
             {% block importmap %}{{ importmap('app') }}{% endblock %}
             <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/js/tabler.min.js"></script>
+            <script>
+                window.addEventListener('DOMContentLoaded', function () {
+                    const form = document.getElementById('project-filter-form');
+                    if (!form) {
+                        return;
+                    }
+
+                    const controls = form.querySelectorAll('input[type="text"], select');
+                    const searchInput = form.querySelector('input[name="search"]');
+                    let timeoutId = null;
+
+                    const submitWithDebounce = function () {
+                        if (timeoutId !== null) {
+                            clearTimeout(timeoutId);
+                        }
+
+                        timeoutId = setTimeout(function () {
+                            form.submit();
+                        }, 300);
+                    };
+
+                    controls.forEach(function (control) {
+                        if (control.tagName === 'SELECT') {
+                            control.addEventListener('change', function () {
+                                form.submit();
+                            });
+                        } else {
+                            control.addEventListener('input', submitWithDebounce);
+                        }
+                    });
+
+                    window.addEventListener('keydown', function (event) {
+                        const target = event.target;
+                        const isTyping = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+                        if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !isTyping && searchInput) {
+                            event.preventDefault();
+                            searchInput.focus();
+                            searchInput.select();
+                        }
+                    });
+                });
+            </script>
         {% endblock %}
 
         {% set frankenphpHotReload = app.request.server.get('FRANKENPHP_HOT_RELOAD') %}
@@ -22,7 +253,141 @@
         <script src="https://cdn.jsdelivr.net/npm/frankenphp-hot-reload/+esm" type="module"></script>
         {% endif %}
     </head>
-    <body class="theme-light bg-body-tertiary">
-        {% block body %}{% endblock %}
+    <body class="theme-light">
+        {% set route = app.request.attributes.get('_route')|default('') %}
+        <div class="workspace-shell">
+            <header class="workspace-topbar">
+                <nav class="workspace-topbar-menu">
+                    <a href="{{ path('app_projet_index') }}" class="workspace-topbar-link {{ route starts with 'app_projet_' ? 'is-active' : '' }}"><i class="ti ti-layout-kanban me-1"></i>Projets</a>
+                </nav>
+            </header>
+
+            <div class="workspace-layout">
+                <aside class="workspace-sidebar">
+                    <div class="d-flex justify-content-between align-items-center mb-3 px-2">
+                        <h2 class="workspace-sidebar-title">Projets</h2>
+                        <a href="{{ path('app_projet_new') }}" class="btn btn-sm btn-primary btn-icon" title="Nouveau projet">
+                            <i class="ti ti-plus"></i>
+                        </a>
+                    </div>
+
+                    <a href="#sidebar-projets" class="workspace-side-link" data-bs-toggle="collapse" aria-expanded="true" aria-controls="sidebar-projets">
+                        <span><i class="ti ti-list-details me-2"></i>Tous les projets</span>
+                        <i class="ti ti-chevron-down"></i>
+                    </a>
+
+                    <div id="sidebar-projets" class="collapse show workspace-sublist">
+                        {% for p in sidebarProjets|default([]) %}
+                            {% set isSelected = sidebarSelectedProjetId|default(0) == p.idProjet %}
+                            {% set delayed = p.statut != 'TERMINE' and p.statut != 'ANNULE' and p.dateFinPrevue and p.dateFinPrevue|date('Y-m-d') < 'now'|date('Y-m-d') %}
+                            {% set initialNom = p.responsable and p.responsable.nom ? p.responsable.nom|slice(0,1) : '?' %}
+                            {% set initialPrenom = p.responsable and p.responsable.prenom ? p.responsable.prenom|slice(0,1) : '' %}
+                            <div class="workspace-sublist-link {{ isSelected ? 'is-active' : '' }}">
+                                <a
+                                    href="{{ path('app_projet_index', {
+                                        projet: p.idProjet,
+                                        search: filters.search|default(''),
+                                        statut: filters.statut|default(''),
+                                        priorite: filters.priorite|default(''),
+                                        responsable: filters.responsable|default(''),
+                                        date_from: filters.date_from|default(''),
+                                        date_to: filters.date_to|default('')
+                                    }) }}"
+                                    class="text-decoration-none text-reset flex-grow-1 d-flex align-items-center gap-2 min-w-0"
+                                >
+                                    <span class="workspace-initials">{{ (initialNom ~ initialPrenom)|upper }}</span>
+                                    <span class="text-truncate">{{ p.nom }}</span>
+                                    {% if delayed %}
+                                        <span class="text-danger" title="Projet en retard"><i class="ti ti-alert-triangle-filled"></i></span>
+                                    {% endif %}
+                                </a>
+
+                                <div class="dropdown ms-2">
+                                    <button class="btn btn-sm btn-ghost-secondary btn-icon" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="ti ti-dots"></i>
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end">
+                                        <a class="dropdown-item" href="{{ path('app_projet_show', {'id_projet': p.idProjet}) }}">
+                                            <i class="ti ti-eye me-2"></i>Détails
+                                        </a>
+                                        <a class="dropdown-item" href="{{ path('app_projet_edit', {'id_projet': p.idProjet}) }}">
+                                            <i class="ti ti-pencil me-2"></i>Modifier
+                                        </a>
+                                        <div class="dropdown-divider"></div>
+                                        <form method="post" action="{{ path('app_projet_delete', {'id_projet': p.idProjet}) }}" onsubmit="return confirm('Voulez-vous vraiment supprimer ce projet ?');">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ p.idProjet) }}">
+                                            <button class="dropdown-item text-danger" type="submit">
+                                                <i class="ti ti-trash me-2"></i>Supprimer
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="px-2 py-2 small workspace-subtle">Aucun projet.</div>
+                        {% endfor %}
+                    </div>
+
+                    <a href="#sidebar-filtres" class="workspace-side-link" data-bs-toggle="collapse" aria-expanded="true" aria-controls="sidebar-filtres">
+                        <span><i class="ti ti-filter me-2"></i>Filtres</span>
+                        <i class="ti ti-chevron-down"></i>
+                    </a>
+
+                    <div id="sidebar-filtres" class="collapse show workspace-sublist">
+                        {% if route == 'app_projet_index' %}
+                            <form id="project-filter-form" method="get" action="{{ path('app_projet_index') }}" class="px-2 pb-1">
+                                {% if sidebarSelectedProjetId is defined and sidebarSelectedProjetId %}
+                                    <input type="hidden" name="projet" value="{{ sidebarSelectedProjetId }}">
+                                {% endif %}
+                                <div class="mb-2">
+                                    <input type="text" name="search" value="{{ filters.search|default('') }}" class="form-control form-control-sm" placeholder="Recherche...">
+                                </div>
+                                <div class="mb-2">
+                                    <select name="statut" class="form-select form-select-sm">
+                                        <option value="">Statut: tous</option>
+                                        <option value="PLANIFIE" {{ filters.statut|default('') == 'PLANIFIE' ? 'selected' : '' }}>Planifie</option>
+                                        <option value="EN_COURS" {{ filters.statut|default('') == 'EN_COURS' ? 'selected' : '' }}>En cours</option>
+                                        <option value="EN_ATTENTE" {{ filters.statut|default('') == 'EN_ATTENTE' ? 'selected' : '' }}>En attente</option>
+                                        <option value="TERMINE" {{ filters.statut|default('') == 'TERMINE' ? 'selected' : '' }}>Termine</option>
+                                        <option value="ANNULE" {{ filters.statut|default('') == 'ANNULE' ? 'selected' : '' }}>Annule</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <select name="priorite" class="form-select form-select-sm">
+                                        <option value="">Priorite: toutes</option>
+                                        <option value="BASSE" {{ filters.priorite|default('') == 'BASSE' ? 'selected' : '' }}>Basse</option>
+                                        <option value="MOYENNE" {{ filters.priorite|default('') == 'MOYENNE' ? 'selected' : '' }}>Moyenne</option>
+                                        <option value="HAUTE" {{ filters.priorite|default('') == 'HAUTE' ? 'selected' : '' }}>Haute</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <select name="responsable" class="form-select form-select-sm">
+                                        <option value="">Responsable: tous</option>
+                                        {% for responsable in responsables|default([]) %}
+                                            <option value="{{ responsable.idEmploye|default('') }}" {{ filters.responsable|default('') == responsable.idEmploye|default('') ? 'selected' : '' }}>
+                                                {{ responsable.nom }} {{ responsable.prenom }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <input type="date" name="date_from" value="{{ filters.date_from|default('') }}" class="form-control form-control-sm" title="Date de debut minimum">
+                                </div>
+                                <div class="mb-2">
+                                    <input type="date" name="date_to" value="{{ filters.date_to|default('') }}" class="form-control form-control-sm" title="Date de fin prevue maximum">
+                                </div>
+                                <a href="{{ path('app_projet_index') }}" class="btn btn-link btn-sm px-0">Reinitialiser</a>
+                            </form>
+                        {% else %}
+                            <div class="px-2 py-2 small workspace-subtle">Les filtres sont disponibles sur la liste des projets.</div>
+                        {% endif %}
+                    </div>
+                </aside>
+
+                <main class="workspace-content">
+                    {% block body %}{% endblock %}
+                </main>
+            </div>
+        </div>
     </body>
 </html>

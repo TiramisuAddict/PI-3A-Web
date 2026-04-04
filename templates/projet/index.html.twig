@@ -3,152 +3,99 @@
 {% block title %}Projets{% endblock %}
 
 {% block body %}
-    {% set total = projets|length %}
-    {% set enCours = 0 %}
-    {% set termines = 0 %}
-    {% set prioritaires = 0 %}
-    {% for projet in projets %}
-        {% if projet.statut == 'EN_COURS' %}{% set enCours = enCours + 1 %}{% endif %}
-        {% if projet.statut == 'TERMINE' %}{% set termines = termines + 1 %}{% endif %}
-        {% if projet.priorite == 'HAUTE' %}{% set prioritaires = prioritaires + 1 %}{% endif %}
-    {% endfor %}
+    <div class="row g-3">
+        <div class="col-12">
+            {% if selectedProjet %}
+                <div class="workspace-card p-3 mb-3">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                        <div>
+                            <h2 class="mb-1">{{ selectedProjet.nom }}</h2>
+                            <div class="workspace-subtle">
+                                {% if selectedProjet.responsable %}
+                                    Responsable: {{ selectedProjet.responsable.nom }} {{ selectedProjet.responsable.prenom }}
+                                {% else %}
+                                    Responsable non defini
+                                {% endif %}
+                            </div>
+                        </div>
+                        <a href="{{ path('app_projet_edit', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary-lt">Modifier le projet</a>
+                    </div>
 
-    <div class="page-wrapper">
-        <div class="page-header d-print-none">
-            <div class="container-xl">
-                <div class="row g-2 align-items-center">
-                    <div class="col">
-                        <h2 class="page-title">Projets</h2>
-                        <div class="text-secondary mt-1">Suivi des projets, responsables et equipe.</div>
-                    </div>
-                    <div class="col-auto ms-auto d-print-none">
-                        <a href="{{ path('app_projet_new') }}" class="btn btn-primary">
-                            <i class="ti ti-plus me-1"></i>
-                            Nouveau projet
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="page-body">
-            <div class="container-xl">
-                <div class="row row-deck row-cards mb-3">
-                    <div class="col-sm-6 col-lg-3">
-                        <div class="card card-sm">
-                            <div class="card-body">
-                                <div class="d-flex align-items-center">
-                                    <span class="bg-primary text-white avatar me-3"><i class="ti ti-folders"></i></span>
-                                    <div>
-                                        <div class="h1 mb-0">{{ total }}</div>
-                                        <div class="text-secondary">Total projets</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-sm-6 col-lg-3">
-                        <div class="card card-sm">
-                            <div class="card-body">
-                                <div class="d-flex align-items-center">
-                                    <span class="bg-azure text-white avatar me-3"><i class="ti ti-progress"></i></span>
-                                    <div>
-                                        <div class="h1 mb-0">{{ enCours }}</div>
-                                        <div class="text-secondary">En cours</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-sm-6 col-lg-3">
-                        <div class="card card-sm">
-                            <div class="card-body">
-                                <div class="d-flex align-items-center">
-                                    <span class="bg-green text-white avatar me-3"><i class="ti ti-check"></i></span>
-                                    <div>
-                                        <div class="h1 mb-0">{{ termines }}</div>
-                                        <div class="text-secondary">Termines</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-sm-6 col-lg-3">
-                        <div class="card card-sm">
-                            <div class="card-body">
-                                <div class="d-flex align-items-center">
-                                    <span class="bg-red text-white avatar me-3"><i class="ti ti-alert-triangle"></i></span>
-                                    <div>
-                                        <div class="h1 mb-0">{{ prioritaires }}</div>
-                                        <div class="text-secondary">Priorite haute</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="table-responsive">
-                        <table class="table table-vcenter card-table">
-                            <thead>
-                                <tr>
-                                    <th>Projet</th>
-                                    <th>Responsable</th>
-                                    <th>Statut</th>
-                                    <th>Priorite</th>
-                                    <th>Debut</th>
-                                    <th>Fin prevue</th>
-                                    <th class="w-1"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            {% for projet in projets %}
-                                <tr>
-                                    <td>
-                                        <div class="fw-semibold">{{ projet.nom }}</div>
-                                        <div class="text-secondary text-truncate" style="max-width: 340px;">{{ projet.description }}</div>
-                                    </td>
-                                    <td>
-                                        {% if projet.responsable %}
-                                            {{ projet.responsable.nom }} {{ projet.responsable.prenom }}
-                                        {% else %}
-                                            <span class="text-secondary">Non defini</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% set statutColor = 'secondary' %}
-                                        {% if projet.statut == 'EN_COURS' %}{% set statutColor = 'azure' %}{% endif %}
-                                        {% if projet.statut == 'TERMINE' %}{% set statutColor = 'green' %}{% endif %}
-                                        {% if projet.statut == 'ANNULE' %}{% set statutColor = 'red' %}{% endif %}
-                                        <span class="badge bg-{{ statutColor }}-lt">{{ projet.statut }}</span>
-                                    </td>
-                                    <td>
-                                        {% set prioriteColor = 'secondary' %}
-                                        {% if projet.priorite == 'HAUTE' %}{% set prioriteColor = 'red' %}{% endif %}
-                                        {% if projet.priorite == 'MOYENNE' %}{% set prioriteColor = 'orange' %}{% endif %}
-                                        {% if projet.priorite == 'BASSE' %}{% set prioriteColor = 'green' %}{% endif %}
-                                        <span class="badge bg-{{ prioriteColor }}-lt">{{ projet.priorite is empty ? 'AUCUNE' : projet.priorite }}</span>
-                                    </td>
-                                    <td>{{ projet.dateDebut ? projet.dateDebut|date('d/m/Y') : '-' }}</td>
-                                    <td>{{ projet.dateFinPrevue ? projet.dateFinPrevue|date('d/m/Y') : '-' }}</td>
-                                    <td>
-                                        <div class="btn-list flex-nowrap">
-                                            <a href="{{ path('app_projet_show', {'id_projet': projet.idProjet}) }}" class="btn btn-sm">Voir</a>
-                                            <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-sm btn-primary-lt">Modifier</a>
-                                        </div>
-                                    </td>
-                                </tr>
+                    <div class="mt-3">
+                        <div class="small fw-semibold mb-2">Equipe</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for membre in selectedProjet.membresEquipe %}
+                                <span class="badge bg-blue-lt">{{ membre.nom }} {{ membre.prenom }}</span>
                             {% else %}
-                                <tr>
-                                    <td colspan="7" class="text-center text-secondary py-4">Aucun projet pour le moment.</td>
-                                </tr>
+                                <span class="workspace-subtle">Aucun membre.</span>
                             {% endfor %}
-                            </tbody>
-                        </table>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+                {% set taskColumns = [
+                    {'key':'A_FAIRE', 'label':'A faire', 'header':'bg-blue-lt text-blue'},
+                    {'key':'EN_COURS', 'label':'En cours', 'header':'bg-azure-lt text-azure'},
+                    {'key':'TERMINE', 'label':'Termine', 'header':'bg-green-lt text-green'}
+                ] %}
+
+                <div class="row g-3 align-items-start">
+                    {% for column in taskColumns %}
+                        <div class="col-12 col-md-4">
+                            <div class="workspace-card p-2 h-100">
+                                <div class="rounded p-2 fw-bold {{ column.header }}">{{ column.label }}</div>
+
+                                <div class="mt-2" style="max-height: 60vh; overflow: auto;">
+                                    {% set hasTasks = false %}
+                                    {% for tache in selectedProjet.taches %}
+                                        {% set normalizedStatus = (tache.statut_tache ?? '')|upper|replace({' ': '_', '-': '_'}) %}
+                                        {% if normalizedStatus == column.key %}
+                                            {% set hasTasks = true %}
+                                            {% set taskPrioriteColor = 'secondary' %}
+                                            {% if tache.priorite == 'HAUTE' %}{% set taskPrioriteColor = 'red' %}{% endif %}
+                                            {% if tache.priorite == 'MOYENNE' %}{% set taskPrioriteColor = 'orange' %}{% endif %}
+                                            {% if tache.priorite == 'BASSE' %}{% set taskPrioriteColor = 'green' %}{% endif %}
+
+                                            <article class="workspace-card p-3 mb-2">
+                                                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                                    <div class="fw-semibold text-truncate">{{ tache.titre }}</div>
+                                                    <span class="badge bg-{{ taskPrioriteColor }}-lt">{{ tache.priorite is empty ? 'AUCUNE' : tache.priorite }}</span>
+                                                </div>
+                                                <div class="small workspace-subtle mb-2">
+                                                    {{ tache.description|length > 80 ? tache.description|slice(0, 80) ~ '...' : tache.description }}
+                                                </div>
+                                                <div class="small workspace-subtle d-flex justify-content-between">
+                                                    <span><i class="ti ti-calendar me-1"></i>{{ tache.date_limite ? tache.date_limite|date('d/m/Y') : '-' }}</span>
+                                                    <span><i class="ti ti-chart-pie me-1"></i>{{ tache.progression is not null ? tache.progression ~ '%' : '0%' }}</span>
+                                                </div>
+                                            </article>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    {% if not hasTasks %}
+                                        <div class="p-3 text-center workspace-subtle small">Aucune tache</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                {% if hasActiveFilters|default(false) %}
+                    <div class="workspace-card p-4 text-center">
+                        <div class="h3 mb-2">Aucun resultat</div>
+                        <div class="workspace-subtle mb-3">Aucun projet ne correspond aux filtres appliques.</div>
+                        <a href="{{ path('app_projet_index') }}" class="btn btn-outline-secondary">Reinitialiser les filtres</a>
+                    </div>
+                {% else %}
+                    <div class="workspace-card p-4 text-center">
+                        <div class="h3 mb-2">Aucun projet pour le moment</div>
+                        <div class="workspace-subtle mb-3">Commencez par creer votre premier projet.</div>
+                        <a href="{{ path('app_projet_new') }}" class="btn btn-primary">Nouveau projet</a>
+                    </div>
+                {% endif %}
+            {% endif %}
         </div>
     </div>
 {% endblock %}
+

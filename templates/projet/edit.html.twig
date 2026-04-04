@@ -3,24 +3,22 @@
 {% block title %}Modifier projet{% endblock %}
 
 {% block body %}
-    <div class="page-wrapper">
-        <div class="page-header d-print-none">
-            <div class="container-xl">
-                <div class="row g-2 align-items-center">
-                    <div class="col">
-                        <h2 class="page-title">Modifier projet</h2>
-                        <div class="text-secondary mt-1">Mettez a jour les informations, le statut et l'equipe.</div>
-                    </div>
-                    <div class="col-auto ms-auto d-print-none">
-                        {{ include('projet/_delete_form.html.twig') }}
-                    </div>
-                </div>
+    <div class="workspace-card p-3 mb-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-auto">
+                <span class="avatar bg-azure-lt text-azure"><i class="ti ti-pencil"></i></span>
             </div>
-        </div>
-        <div class="page-body">
-            <div class="container-xl">
-                {{ include('projet/_form.html.twig', {'button_label': 'Mettre a jour'}) }}
+            <div class="col">
+                <div class="workspace-subtle text-uppercase fw-semibold" style="letter-spacing:.08em; font-size:11px;">Edition</div>
+                <h2 class="mb-1">Modifier projet</h2>
+                <div class="workspace-subtle">Ajustez les dates, le statut, la priorite et la composition de l'equipe.</div>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary me-2">Retour</a>
+                {{ include('projet/_delete_form.html.twig') }}
             </div>
         </div>
     </div>
+
+    {{ include('projet/_form.html.twig', {'button_label': 'Mettre a jour'}) }}
 {% endblock %}
