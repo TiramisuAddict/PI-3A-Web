@@ -67,6 +67,175 @@
         .section-spacer {
             padding: 1.25rem 1.25rem 0;
         }
+
+        .employee-table .btn {
+            min-width: 6.2rem;
+        }
+
+        .status-badge {
+            font-weight: 700;
+            letter-spacing: .01em;
+        }
+
+        .status-badge.pending {
+            background: #f59e0b;
+            color: #fff;
+        }
+
+        .status-badge.accepted {
+            background: #16a34a;
+            color: #fff;
+        }
+
+        .status-badge.refused {
+            background: #dc2626;
+            color: #fff;
+        }
+
+        .review-count-badge {
+            min-width: 1.5rem;
+        }
+
+        .formation-layout {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1rem;
+            padding: 1rem 1.25rem 1.25rem;
+        }
+
+        .formation-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .9rem;
+        }
+
+        .formation-item {
+            border: 2px solid rgba(30, 99, 204, 0.75);
+            border-radius: 14px;
+            background: #fff;
+            padding: .9rem;
+            box-shadow: 0 10px 22px rgba(30, 64, 175, 0.08);
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
+
+        .formation-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 26px rgba(30, 64, 175, 0.12);
+        }
+
+        .formation-item.is-selected {
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2), 0 16px 30px rgba(30, 64, 175, 0.12);
+        }
+
+        .formation-meta {
+            font-size: .78rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .formation-score {
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            margin-bottom: .55rem;
+        }
+
+        .score-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+            border-radius: 999px;
+            padding: .2rem .55rem;
+            font-size: .78rem;
+            font-weight: 700;
+            letter-spacing: .01em;
+        }
+
+        .score-pill.rating {
+            color: #0b57d0;
+            background: rgba(13, 110, 253, 0.14);
+        }
+
+        .score-pill.rating::before {
+            content: '★';
+            font-size: .82rem;
+            line-height: 1;
+        }
+
+        .score-pill.reviews {
+            color: #0f766e;
+            background: rgba(13, 148, 136, 0.13);
+        }
+
+        .score-pill.reviews::before {
+            content: '👤';
+            font-size: .8rem;
+            line-height: 1;
+        }
+
+        .score-pill.empty {
+            color: #64748b;
+            background: rgba(148, 163, 184, 0.15);
+        }
+
+        .formation-item h4 {
+            margin: .2rem 0 .45rem;
+            font-size: 1.08rem;
+            line-height: 1.25;
+            color: #0f172a;
+        }
+
+        .formation-item .formation-dates {
+            font-size: .86rem;
+            color: #475569;
+            margin-bottom: .45rem;
+        }
+
+        .formation-item .formation-note {
+            border-top: 1px dashed #c9d5e7;
+            margin-top: .55rem;
+            padding-top: .55rem;
+        }
+
+        .formation-sidepanel {
+            border: 2px solid rgba(30, 99, 204, 0.75);
+            border-radius: 14px;
+            background: #fff;
+            overflow: hidden;
+            height: fit-content;
+            position: sticky;
+            top: 5.75rem;
+        }
+
+        .formation-sidepanel-header {
+            padding: .9rem 1rem;
+            border-bottom: 1px solid #dbe5f3;
+            background: #eef5ff;
+        }
+
+        .formation-sidepanel-body {
+            padding: .9rem 1rem;
+        }
+
+        .formation-no-results {
+            grid-column: 1 / -1;
+            margin-bottom: 0;
+        }
+
+        @media (max-width: 991.98px) {
+            .formation-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .formation-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .formation-sidepanel {
+                position: static;
+            }
+        }
     </style>
 {% endblock %}
 
@@ -179,107 +348,120 @@
                 </div>
             </form>
         </div>
-        <div class="table-responsive">
-            <table class="table table-vcenter card-table table-clean mb-0">
-                <thead>
-                <tr>
-                    <th>Titre</th>
-                    <th>Organisme</th>
-                    <th>Date debut</th>
-                    <th>Date fin</th>
-                    <th>Avis</th>
-                    <th>Note moyenne</th>
-                    <th>Lieu</th>
-                    <th>Capacite</th>
-                    <th class="w-1">Action</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for formation in formations %}
-                    <tr>
+        <div class="formation-layout">
+            <div>
+                <div class="formation-grid">
+                    {% for formation in formations %}
                         {% set state = inscription_by_formation[formation.id] ?? null %}
                         {% set reviews = review_stats_by_formation[formation.id] ?? {'reviews_count': 0, 'average_note': 0} %}
                         {% set formationQuery = app.request.query.all|merge({'formation': formation.id}) %}
-                        <td>{{ formation.titre }}</td>
-                        <td>{{ formation.organisme }}</td>
-                        <td>{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}</td>
-                        <td>{{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}</td>
-                        <td>
-                            <span class="badge bg-azure-lt text-azure">{{ reviews.reviews_count }}</span>
-                        </td>
-                        <td>
-                            {% if reviews.reviews_count > 0 %}
-                                <span class="rating-pill"><i class="ti ti-star-filled"></i>{{ reviews.average_note }}/5</span>
-                            {% else %}
-                                <span class="text-secondary">-</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ formation.lieu }}</td>
-                        <td>{{ formation.capacite }}</td>
-                        <td>
-                            {% if employee_logged %}
-                                {% if state and state.statut == 'EN_ATTENTE' %}
-                                    <div class="d-flex flex-column gap-1 align-items-start">
-                                        <span class="badge bg-orange text-white">En attente</span>
-                                        <a class="btn btn-sm btn-outline-primary" href="{{ path('app_inscription_employe', formationQuery) }}">Modifier raison</a>
-                                        <form method="post" action="{{ path('app_inscription_employe') }}">
-                                            <input type="hidden" name="action" value="annuler">
-                                            <input type="hidden" name="inscription_id" value="{{ state.id }}">
-                                            <button class="btn btn-sm btn-outline-danger" type="submit">Annuler</button>
-                                        </form>
-                                    </div>
-                                {% elseif state and state.statut == 'ACCEPTEE' %}
-                                    <div class="d-flex flex-column gap-1 align-items-start">
-                                        <span class="badge bg-green text-white">Acceptee</span>
-                                        <a class="btn btn-sm btn-outline-primary" href="{{ path('app_inscription_employe', formationQuery) }}">Evaluer</a>
-                                        {% set existingEvaluation = evaluation_by_formation[formation.id] ?? null %}
-                                        {% if existingEvaluation %}
-                                            <span class="text-secondary small">Note: {{ existingEvaluation.note }}/5</span>
-                                        {% endif %}
-                                    </div>
-                                {% elseif state and state.statut == 'REFUSEE' %}
-                                    <span class="badge bg-red text-white">Refusee</span>
+                        <article
+                            class="formation-item {{ selected_formation and selected_formation.id == formation.id ? 'is-selected' : '' }}"
+                            data-title="{{ formation.titre }}"
+                            data-organisme="{{ formation.organisme }}"
+                            data-lieu="{{ formation.lieu }}"
+                            data-date-debut="{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}"
+                            data-rating="{{ reviews.average_note|default(0) }}"
+                            data-reviews="{{ reviews.reviews_count|default(0) }}"
+                        >
+                            <div class="formation-score">
+                                {% if reviews.reviews_count > 0 %}
+                                    <span class="score-pill rating">{{ reviews.average_note }}/5</span>
+                                    <span class="score-pill reviews">{{ reviews.reviews_count }} avis</span>
                                 {% else %}
-                                    <a class="btn btn-sm btn-success" href="{{ path('app_inscription_employe', formationQuery) }}">Inscription</a>
+                                    <span class="score-pill empty"><i class="ti ti-sparkles"></i>Pas encore d'avis</span>
                                 {% endif %}
-                            {% else %}
-                                <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe', formationQuery) }}">Voir avis</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% else %}
-                    <tr><td colspan="9" class="text-secondary">Aucune formation disponible.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                <div class="formation-meta">{{ formation.dateDebut ? formation.dateDebut|date('d M Y') : '' }}</div>
+                                {% if state and state.statut == 'EN_ATTENTE' %}
+                                    <span class="badge status-badge pending">En attente</span>
+                                {% elseif state and state.statut == 'ACCEPTEE' %}
+                                    <span class="badge status-badge accepted">Acceptee</span>
+                                {% elseif state and state.statut == 'REFUSEE' %}
+                                    <span class="badge status-badge refused">Refusee</span>
+                                {% else %}
+                                    <span class="badge bg-azure-lt text-azure">Disponible</span>
+                                {% endif %}
+                            </div>
+
+                            <h4>{{ formation.titre }}</h4>
+                            <div class="mini-muted mb-2">{{ formation.organisme }}</div>
+                            <div class="formation-dates">{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }} - {{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}</div>
+
+                            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                                <span class="badge bg-secondary-lt text-secondary">{{ formation.lieu }}</span>
+                                <span class="badge bg-indigo-lt text-indigo">Capacite {{ formation.capacite }}</span>
+                            </div>
+
+                            <div class="formation-note">
+                                {% if employee_logged %}
+                                    {% if state and state.statut == 'EN_ATTENTE' %}
+                                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                                            <a class="btn btn-sm btn-outline-primary" href="{{ path('app_inscription_employe', formationQuery) }}">Modifier raison</a>
+                                            <form method="post" action="{{ path('app_inscription_employe') }}">
+                                                <input type="hidden" name="action" value="annuler">
+                                                <input type="hidden" name="inscription_id" value="{{ state.id }}">
+                                                <button class="btn btn-sm btn-outline-danger" type="submit">Annuler</button>
+                                            </form>
+                                        </div>
+                                    {% elseif state and state.statut == 'ACCEPTEE' %}
+                                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                                            <a class="btn btn-sm btn-outline-primary" href="{{ path('app_inscription_employe', formationQuery) }}">Evaluer</a>
+                                            {% set existingEvaluation = evaluation_by_formation[formation.id] ?? null %}
+                                            {% if existingEvaluation %}
+                                                <span class="mini-muted">Note: {{ existingEvaluation.note }}/5</span>
+                                            {% endif %}
+                                        </div>
+                                    {% elseif state and state.statut == 'REFUSEE' %}
+                                        <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe', formationQuery) }}">Voir details</a>
+                                    {% else %}
+                                        <a class="btn btn-sm btn-success" href="{{ path('app_inscription_employe', formationQuery) }}">Inscription</a>
+                                    {% endif %}
+                                {% else %}
+                                    <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe', formationQuery) }}">Voir avis</a>
+                                {% endif %}
+                            </div>
+                        </article>
+                    {% else %}
+                        <div class="alert alert-secondary mb-0">Aucune formation disponible.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <aside class="formation-sidepanel">
+                <div class="formation-sidepanel-header">
+                    <div class="mini-muted">Formation selectionnee</div>
+                    <div class="fw-bold">{{ selected_formation ? selected_formation.titre : 'Aucune selection' }}</div>
+                </div>
+                <div class="formation-sidepanel-body">
+                    {% if selected_formation %}
+                        <div class="mini-muted mb-2">{{ selected_formation.organisme }}</div>
+                        <div class="mb-3">{{ selected_formation.dateDebut ? selected_formation.dateDebut|date('Y-m-d') : '' }} - {{ selected_formation.dateFin ? selected_formation.dateFin|date('Y-m-d') : '' }}</div>
+
+                        {% if formation_reviews is not empty %}
+                            <div class="d-flex flex-column gap-2">
+                                {% for review in formation_reviews|slice(0, 4) %}
+                                    <div class="stat-card p-2">
+                                        <div class="d-flex justify-content-between align-items-start mb-1">
+                                            <div class="fw-bold small">{{ review.prenom }} {{ review.nom }}</div>
+                                            <span class="badge bg-blue-lt text-blue">{{ review.note }}/5</span>
+                                        </div>
+                                        <div class="small text-secondary">{{ review.commentaire ?: 'Aucun commentaire.' }}</div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-secondary">Aucun avis pour cette formation.</div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-secondary">Choisissez une formation pour afficher ses details.</div>
+                    {% endif %}
+                </div>
+            </aside>
         </div>
     </div>
-
-    {% if selected_formation %}
-        <div class="surface-card mb-3">
-            <div class="card-header">
-                <h3 class="card-title">Avis sur {{ selected_formation.titre }}</h3>
-            </div>
-            <div class="card-body">
-                {% if formation_reviews is not empty %}
-                    <div class="d-flex flex-column gap-3">
-                        {% for review in formation_reviews %}
-                            <div class="stat-card p-3">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div class="fw-bold">{{ review.prenom }} {{ review.nom }}</div>
-                                    <span class="badge bg-blue-lt text-blue">{{ review.note }}/5</span>
-                                </div>
-                                <div class="mb-2">{{ review.commentaire ?: 'Aucun commentaire.' }}</div>
-                                <div class="mini-muted">{{ review.date_evaluation ? review.date_evaluation|date('Y-m-d H:i') : '' }}</div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="text-secondary">Aucun avis pour cette formation.</div>
-                {% endif %}
-            </div>
-        </div>
-    {% endif %}
 
     <script>
         (function () {
@@ -288,25 +470,128 @@
                 return;
             }
 
-            const controls = filterForm.querySelectorAll('select, input[type="number"], input[type="text"]');
-            let submitTimer = null;
+            const grid = document.querySelector('.formation-grid');
+            const cards = Array.from(document.querySelectorAll('.formation-item'));
+            const searchInput = filterForm.querySelector('input[name="q"]');
+            const sortSelect = filterForm.querySelector('select[name="sort"]');
+            const minRatingSelect = filterForm.querySelector('select[name="min_rating"]');
+            const minReviewsInput = filterForm.querySelector('input[name="min_reviews"]');
+            let noResults = document.getElementById('formation-no-results');
 
-            const scheduleSubmit = () => {
-                if (submitTimer) {
-                    clearTimeout(submitTimer);
+            if (!noResults && grid) {
+                noResults = document.createElement('div');
+                noResults.id = 'formation-no-results';
+                noResults.className = 'alert alert-secondary formation-no-results d-none';
+                noResults.textContent = 'Aucune formation ne correspond a vos filtres.';
+                grid.appendChild(noResults);
+            }
+
+            const parseDate = (dateValue) => {
+                if (!dateValue) {
+                    return null;
                 }
-
-                submitTimer = setTimeout(() => {
-                    filterForm.requestSubmit();
-                }, 250);
+                const parsed = new Date(dateValue + 'T00:00:00');
+                return Number.isNaN(parsed.getTime()) ? null : parsed;
             };
 
-            controls.forEach((control) => {
-                control.addEventListener('change', scheduleSubmit);
-                if (control.tagName === 'INPUT') {
-                    control.addEventListener('input', scheduleSubmit);
+            const applyClientFilters = () => {
+                const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+                const sort = sortSelect ? sortSelect.value : 'date_desc';
+                const minRating = Math.max(0, parseFloat(minRatingSelect ? minRatingSelect.value : '0') || 0);
+                const minReviews = Math.max(0, parseInt(minReviewsInput ? minReviewsInput.value : '0', 10) || 0);
+
+                const visibleCards = [];
+                cards.forEach((card) => {
+                    const title = (card.dataset.title || '').toLowerCase();
+                    const organisme = (card.dataset.organisme || '').toLowerCase();
+                    const lieu = (card.dataset.lieu || '').toLowerCase();
+                    const rating = parseFloat(card.dataset.rating || '0') || 0;
+                    const reviews = parseInt(card.dataset.reviews || '0', 10) || 0;
+
+                    const matchesQuery = query === '' || (title + ' ' + organisme + ' ' + lieu).includes(query);
+                    const matchesMinReviews = reviews >= minReviews;
+                    const matchesMinRating = minRating <= 0 || (reviews > 0 && rating >= minRating);
+
+                    const isVisible = matchesQuery && matchesMinReviews && matchesMinRating;
+                    card.classList.toggle('d-none', !isVisible);
+                    if (isVisible) {
+                        visibleCards.push(card);
+                    }
+                });
+
+                visibleCards.sort((a, b) => {
+                    const dateA = parseDate(a.dataset.dateDebut || '');
+                    const dateB = parseDate(b.dataset.dateDebut || '');
+                    const ratingA = parseFloat(a.dataset.rating || '0') || 0;
+                    const ratingB = parseFloat(b.dataset.rating || '0') || 0;
+                    const reviewsA = parseInt(a.dataset.reviews || '0', 10) || 0;
+                    const reviewsB = parseInt(b.dataset.reviews || '0', 10) || 0;
+                    const titleA = (a.dataset.title || '').toLowerCase();
+                    const titleB = (b.dataset.title || '').toLowerCase();
+
+                    if (sort === 'rating_desc') {
+                        if (ratingB !== ratingA) {
+                            return ratingB - ratingA;
+                        }
+                        return reviewsB - reviewsA;
+                    }
+
+                    if (sort === 'reviews_desc') {
+                        if (reviewsB !== reviewsA) {
+                            return reviewsB - reviewsA;
+                        }
+                        return ratingB - ratingA;
+                    }
+
+                    if (sort === 'title_asc') {
+                        return titleA.localeCompare(titleB);
+                    }
+
+                    return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+                });
+
+                if (grid) {
+                    visibleCards.forEach((card) => grid.appendChild(card));
+                    if (noResults) {
+                        grid.appendChild(noResults);
+                    }
+                }
+
+                if (noResults) {
+                    noResults.classList.toggle('d-none', visibleCards.length > 0);
+                }
+            };
+
+            if (searchInput) {
+                searchInput.addEventListener('input', applyClientFilters);
+                searchInput.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        applyClientFilters();
+                    }
+                });
+            }
+
+            [sortSelect, minRatingSelect, minReviewsInput].forEach((control) => {
+                if (control) {
+                    control.addEventListener('input', applyClientFilters);
+                    control.addEventListener('change', applyClientFilters);
                 }
             });
+
+            const resetLink = filterForm.querySelector('a[title="Reinitialiser filtres"]');
+            if (resetLink && searchInput && sortSelect && minRatingSelect && minReviewsInput) {
+                resetLink.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    searchInput.value = '';
+                    sortSelect.value = 'date_desc';
+                    minRatingSelect.value = '0';
+                    minReviewsInput.value = '0';
+                    applyClientFilters();
+                });
+            }
+
+            applyClientFilters();
         })();
     </script>
 

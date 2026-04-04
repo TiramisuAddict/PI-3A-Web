@@ -75,6 +75,22 @@ final class FormationController extends AbstractController
             ['%rh%']
         );
 
+        $q = trim($request->query->getString('q', ''));
+        $sort = (string) $request->query->get('sort', 'date_desc');
+        $dateScope = (string) $request->query->get('date_scope', 'all');
+        $minCapacite = max(0, (int) $request->query->get('min_capacite', 0));
+        $selectedFormationId = max(0, (int) $request->query->get('formation', 0));
+
+        $allowedSort = ['date_desc', 'date_asc', 'title_asc', 'organisme_asc', 'capacity_desc'];
+        if (!in_array($sort, $allowedSort, true)) {
+            $sort = 'date_desc';
+        }
+
+        $allowedDateScopes = ['all', 'upcoming', 'ongoing', 'finished'];
+        if (!in_array($dateScope, $allowedDateScopes, true)) {
+            $dateScope = 'all';
+        }
+
         if (!$rhLogged) {
             return $this->render('formation/index.html.twig', [
                 'formations' => [],
@@ -84,8 +100,15 @@ final class FormationController extends AbstractController
                 'rh_logged' => false,
                 'rh_users' => $rhUsers,
                 'best_reviewed_formation' => null,
+                'q' => $q,
+                'sort' => $sort,
+                'date_scope' => $dateScope,
+                'min_capacite' => $minCapacite,
+                'selected_formation' => null,
             ]);
         }
+
+        $selectedFormation = $selectedFormationId > 0 ? $formationRepository->find($selectedFormationId) : null;
 
         $pendingInscriptions = $connection->fetchAllAssociative(
             'SELECT i.id_inscription, i.id_employe, i.raison, i.statut, f.id_formation AS formation_id, f.titre AS formation_titre, COALESCE(e.prenom, "") AS prenom, COALESCE(e.nom, "") AS nom
@@ -107,13 +130,18 @@ final class FormationController extends AbstractController
         }
 
         return $this->render('formation/index.html.twig', [
-            'formations' => $formationRepository->findBy([], ['dateDebut' => 'DESC']),
+            'formations' => $formationRepository->findForRhDashboard($q, $sort, $minCapacite, $dateScope),
             'pending_inscriptions' => $pendingInscriptions,
             'pending_by_formation' => $pendingByFormation,
             'pending_inscriptions_by_formation' => $pendingInscriptionByFormation,
             'rh_logged' => true,
             'rh_users' => $rhUsers,
             'best_reviewed_formation' => $evaluationFormationRepository->findBestReviewedFormation(),
+            'q' => $q,
+            'sort' => $sort,
+            'date_scope' => $dateScope,
+            'min_capacite' => $minCapacite,
+            'selected_formation' => $selectedFormation,
         ]);
     }
 
