@@ -73,7 +73,7 @@ class Formation
         return $this->dateDebut;
     }
 
-    public function setDateDebut(\DateTimeImmutable $dateDebut): static
+    public function setDateDebut(?\DateTimeImmutable $dateDebut): static
     {
         $this->dateDebut = $dateDebut;
 
@@ -85,7 +85,7 @@ class Formation
         return $this->dateFin;
     }
 
-    public function setDateFin(\DateTimeImmutable $dateFin): static
+    public function setDateFin(?\DateTimeImmutable $dateFin): static
     {
         $this->dateFin = $dateFin;
 
@@ -119,6 +119,20 @@ class Formation
     #[Assert\Callback]
     public function validateDates(ExecutionContextInterface $context): void
     {
+        $today = new \DateTimeImmutable('today');
+
+        if ($this->dateDebut !== null && $this->dateDebut < $today) {
+            $context->buildViolation('La date de debut ne peut pas etre dans le passe.')
+                ->atPath('dateDebut')
+                ->addViolation();
+        }
+
+        if ($this->dateFin !== null && $this->dateFin < $today) {
+            $context->buildViolation('La date de fin ne peut pas etre dans le passe.')
+                ->atPath('dateFin')
+                ->addViolation();
+        }
+
         if ($this->dateDebut !== null && $this->dateFin !== null && $this->dateFin < $this->dateDebut) {
             $context->buildViolation('La date de fin doit etre apres la date de debut.')
                 ->atPath('dateFin')

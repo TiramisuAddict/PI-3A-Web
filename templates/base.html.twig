@@ -17,6 +17,7 @@
                     --app-shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.05);
                     --app-accent: #0d6efd;
                     --app-accent-soft: rgba(13, 110, 253, 0.10);
+                    --app-content-gap: 1.5rem;
                 }
 
                 body {
@@ -30,6 +31,29 @@
 
                 .navbar-brand-title {
                     letter-spacing: 0.2px;
+                }
+
+                .navbar-brand-wrap {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: .7rem;
+                }
+
+                .navbar-brand-logo {
+                    width: 2.1rem;
+                    height: 2.1rem;
+                    border-radius: .55rem;
+                    box-shadow: 0 4px 14px rgba(59, 76, 202, 0.25);
+                    flex-shrink: 0;
+                }
+
+                .navbar-brand-subtitle {
+                    display: block;
+                    margin-top: -2px;
+                    font-size: .72rem;
+                    color: #6b7280;
+                    font-weight: 600;
+                    letter-spacing: .02em;
                 }
 
                 .page {
@@ -65,8 +89,12 @@
                 }
 
                 .app-shell {
-                    padding-top: 1.25rem;
-                    padding-bottom: 2.5rem;
+                    padding-top: 1.5rem;
+                    padding-bottom: 2.75rem;
+                }
+
+                .app-shell > * + * {
+                    margin-top: var(--app-content-gap);
                 }
 
                 .app-hero {
@@ -90,12 +118,16 @@
                     border-radius: 18px;
                     box-shadow: var(--app-shadow-soft);
                     overflow: hidden;
-                    background: rgba(255,255,255,.95);
+                    background: #ffffff;
                 }
 
                 .surface-card .card-header {
                     background: rgba(248, 250, 255, 0.92);
                     border-bottom: 1px solid var(--app-border);
+                }
+
+                .surface-card .card-body {
+                    padding: 1rem 1.25rem;
                 }
 
                 .stat-card {
@@ -136,8 +168,54 @@
                     padding-bottom: .95rem;
                 }
 
+                .table thead th {
+                    border-bottom-width: 1px;
+                    font-weight: 700;
+                }
+
+                .table tbody tr:nth-of-type(even) {
+                    background: rgba(248, 250, 255, 0.72);
+                }
+
                 .table tbody tr:hover {
                     background: rgba(13, 110, 253, 0.035);
+                }
+
+                .navbar .nav-link {
+                    border-radius: 10px;
+                    color: #4b5563;
+                    padding: .45rem .7rem;
+                    transition: color .15s ease, background-color .15s ease;
+                }
+
+                .navbar .nav-link:hover {
+                    color: #0d6efd;
+                    background: rgba(13, 110, 253, 0.08);
+                }
+
+                /* Keep scrollbars neutral instead of accent-blue */
+                * {
+                    scrollbar-width: auto;
+                    scrollbar-color: #b8c2cf #eef1f5;
+                }
+
+                *::-webkit-scrollbar {
+                    width: 12px;
+                    height: 12px;
+                }
+
+                *::-webkit-scrollbar-track {
+                    background: #eef1f5;
+                }
+
+                *::-webkit-scrollbar-thumb {
+                    background-color: #b8c2cf;
+                    border-radius: 999px;
+                    border: 2px solid #eef1f5;
+                }
+
+                *::-webkit-scrollbar-thumb:hover {
+                    background-color: #9ea9b8;
                 }
 
                 .mini-muted {
@@ -159,14 +237,26 @@
             <header class="navbar navbar-expand-md d-print-none">
                 <div class="container-xl">
                     <h1 class="navbar-brand navbar-brand-autodark pe-0 pe-md-3 m-0">
-                        <span class="navbar-brand-title">PI-3A Gestion Formation</span>
+                        <span class="navbar-brand-wrap">
+                            <img class="navbar-brand-logo" src="{{ asset('assets/momentum-logo.svg') }}" alt="Momentum logo">
+                            <span>
+                                <span class="navbar-brand-title">Momentum</span>
+                               
+                            </span>
+                        </span>
                     </h1>
+                    {% set currentRoute = app.request is defined ? app.request.attributes.get('_route') : '' %}
+                    {% set isRhArea = currentRoute starts with 'app_formation' %}
                     {% set currentEmployeeName = app.session is defined and app.session.get('employee_name') ? app.session.get('employee_name') : '' %}
                     {% set currentEmployeeRole = app.session is defined and app.session.get('employee_role') ? app.session.get('employee_role')|lower : '' %}
+                    {% set currentRhName = app.session is defined and app.session.get('rh_name') ? app.session.get('rh_name') : '' %}
+                    {% set currentRhRole = app.session is defined and app.session.get('rh_role') ? app.session.get('rh_role')|lower : '' %}
+                    {% set displayName = isRhArea ? currentRhName : currentEmployeeName %}
+                    {% set displayRole = isRhArea ? currentRhRole : currentEmployeeRole %}
                     <div class="navbar-text d-none d-md-block ms-3">
-                        {% if currentEmployeeName %}
-                            <span class="app-topbar-chip me-2"><i class="ti ti-user-circle"></i>{{ currentEmployeeName }}</span>
-                            <span class="soft-pill">{{ currentEmployeeRole|upper }}</span>
+                        {% if displayName %}
+                            <span class="app-topbar-chip me-2"><i class="ti ti-user-circle"></i>{{ displayName }}</span>
+                            <span class="soft-pill">{{ displayRole|upper }}</span>
                         {% endif %}
                     </div>
                     <div class="navbar-nav flex-row order-md-last align-items-center gap-2">
