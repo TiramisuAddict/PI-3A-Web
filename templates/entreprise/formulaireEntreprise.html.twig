@@ -1,94 +1,215 @@
 {% extends 'base.html.twig' %}
 
+{% block title %}Inscription Entreprise{% endblock %}
+
 {% block body %}
-<h1>Remplissez ce formulaire</h1>
+<div style="height:100vh; display:flex; overflow:hidden;">
 
-{{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
+    {# ── Colonne gauche : image + dégradé ── #}
+    <div style="flex:1; position:relative; display:flex; flex-direction:column; justify-content:flex-end; padding:2rem; overflow:hidden;">
 
-<div>
-    {{ form_label(form.nom_entreprise) }}
-    {{ form_widget(form.nom_entreprise) }}
-</div>
+      <img src="/images/building3.jpeg"
+        style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0;">
 
-<div>
-    {{ form_label(form.pays) }}
-    {{ form_widget(form.pays) }}
-</div>
+      <div style="position:absolute; inset:0; background:linear-gradient(135deg, rgba(66,84,214,0.88) 0%, rgba(100,130,255,0.88) 100%); z-index:1;"></div>
 
-<div>
-    {{ form_label(form.ville) }}
-    {{ form_widget(form.ville) }}
-</div>
+    
+      <div style="position:relative; z-index:3;" class="text-white">
+        <h2 class="h5 fw-bold mb-2">Rejoignez <strong>Momentum</strong></h2>
+        <p style="color:rgba(255,255,255,0.6); font-size:0.8rem; margin:0;">
+          Créez votre espace entreprise et commencez à gérer vos équipes dès aujourd'hui.
+        </p>
+      </div>
 
-<div>
-    {{ form_label(form.nom) }}
-    {{ form_widget(form.nom) }}
-</div>
+    </div>
 
-<div>
-    {{ form_label(form.prenom) }}
-    {{ form_widget(form.prenom) }}
-</div>
+    {# ── Colonne droite : formulaire ── #}
+    <div style="flex:1; background:#fff; display:flex; align-items:center; justify-content:center; padding:1rem; overflow-y:auto;">
+      <div style="width:100%; max-width:500px; padding:1rem 0;">
 
-<div>
-    {{ form_label(form.matricule_fiscale) }}
-    {{ form_widget(form.matricule_fiscale) }}
-</div>
+        <h1 class="h1 fw-bold mb-1">Créer un compte entreprise</h1>
+        <p class="text-muted mb-3" style="font-size:0.78rem;">Remplissez les informations ci-dessous</p>
 
-<div>
-    {{ form_label(form.telephone) }}
-    {{ form_widget(form.telephone) }}
-</div>
-
-<div>
-    {{ form_label(form.e_mail) }}
-    {{ form_widget(form.e_mail) }}
-</div>
-
-<div>
-    {{ form_label(form.site_web) }}
-    {{ form_widget(form.site_web) }}
-</div>
-
-<div>
-    {{ form_label(form.logo) }}
-    {{ form_widget(form.logo) }}
-</div>
-
-<div class="form-footer">
-
-    {% if form.vars.submitted %}
-
-        {% set hasEmpty = false %}
-
-        {% for field in form %}
-            {% if field.vars.errors is defined %}
-                {% if field.vars.errors|length > 0 %}
-                    {% for error in field.vars.errors %}
-                        {% if 'obligatoire' in error.message %}
-                            {% set hasEmpty = true %}
-                        {% endif %}
-                    {% endfor %}
-                {% endif %}
+        {# Message d'erreur unique #}
+        {% if form.vars.submitted %}
+          {% set hasError = false %}
+          {% for field in form %}
+            {% if field.vars.errors is defined and field.vars.errors|length > 0 %}
+              {% set hasError = true %}
             {% endif %}
-        {% endfor %}
+          {% endfor %}
 
-        {% if hasEmpty %}
-            <div style="color:red; font-weight:bold;">
-                Les champs obligatoires doivent être remplis
+          {% if hasError %}
+            <div class="alert alert-danger py-2" role="alert">
+              <div class="d-flex gap-2 align-items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  class="icon alert-icon flex-shrink-0">
+                  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/>
+                  <path d="M12 8v4"/>
+                  <path d="M12 16h.01"/>
+                </svg>
+                <div style="font-size:0.85rem;">
+                          {% set hasBlank = false %}
+          {% set hasFormat = false %}
+          {% for field in form %}
+            {% if field.vars.errors is defined %}
+              {% for error in field.vars.errors %}
+                {% if 'obligatoire' in error.message %}
+                  {% set hasBlank = true %}
+                {% else %}
+                  {% set hasFormat = true %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          {% endfor %}
+
+          {% if hasBlank %}
+            <div>Veuillez remplir tous les champs obligatoires.</div>
+          {% endif %}
+          {% if hasFormat %}
+            {% for field in form %}
+              {% if field.vars.errors is defined %}
+                {% for error in field.vars.errors %}
+                  {% if 'obligatoire' not in error.message %}
+                    <div>{{ error.message }}</div>
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endif %}
+           
+
+        {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'enctype': 'multipart/form-data'}}) }}
+
+          <div class="row g-2">
+
+            <div class="col-12">
+              {{ form_label(form.nom_entreprise, null, {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.nom_entreprise, {'attr': {'class': 'form-control ', 'placeholder': "Nom de l'entreprise"}}) }}
             </div>
-        {% else %}
-            {{ form_errors(form.e_mail) }}
-            {{ form_errors(form.telephone) }}
-        {% endif %}
 
-    {% endif %}
+            <div class="col-md-6">
+              {{ form_label(form.pays, null, {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.pays, {'attr': {'class': 'form-control ', 'placeholder': 'Pays'}}) }}
+            </div>
+            <div class="col-md-6">
+              {{ form_label(form.ville, null, {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.ville, {'attr': {'class': 'form-control ', 'placeholder': 'Ville'}}) }}
+            </div>
 
-    {{ form_widget(form.Soumettre) }}
+            <div class="col-md-6">
+              {{ form_label(form.nom, null, {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.nom, {'attr': {'class': 'form-control ', 'placeholder': 'Nom'}}) }}
+            </div>
+            <div class="col-md-6">
+              {{ form_label(form.prenom, null, {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.prenom, {'attr': {'class': 'form-control ', 'placeholder': 'Prénom'}}) }}
+            </div>
+
+            <div class="col-12">
+              {{ form_label(form.matricule_fiscale, null, {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.matricule_fiscale, {'attr': {'class': 'form-control ', 'placeholder': 'Matricule fiscale'}}) }}
+            </div>
+
+            <div class="col-md-6">
+              {{ form_label(form.telephone, null, {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.telephone, {'attr': {'class': 'form-control ', 'placeholder': 'Téléphone'}}) }}
+            </div>
+            <div class="col-md-6">
+              {{ form_label(form.e_mail, null, {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.e_mail, {'attr': {'class': 'form-control ', 'placeholder': 'Email'}}) }}
+            </div>
+
+            <div class="col-12">
+              {{ form_label(form.site_web, null, {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.site_web, {'attr': {'class': 'form-control ', 'placeholder': 'https://votresite.com'}}) }}
+            </div>
+
+            {# Logo : bouton personnalisé qui ouvre l'explorateur #}
+            <div class="col-12">
+              {{ form_label(form.logo, null, {'label_attr': {'class': 'form-label small mb-1'}}) }}
+
+              <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                  onclick="document.getElementById('logo-input').click()">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="icon me-1">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  Choisir une image
+                </button>
+                <span id="logo-filename" class="text-muted small">Aucun fichier sélectionné</span>
+              </div>
+
+              {# Input caché #}
+              <div style="display:none;">
+                {{ form_widget(form.logo, {
+                  'attr': {
+                    'accept': 'image/*',
+                    'id': 'logo-input'
+                  }
+                }) }}
+              </div>
+
+              <div id="logo-preview" class="mt-1 d-none">
+                <img id="logo-img" src="" alt="Aperçu"
+                  style="height:40px; border-radius:6px; border:1px solid #dee2e6; padding:3px;">
+              </div>
+            </div>
+
+          </div>
+
+          <div class="mt-3">
+            {{ form_widget(form.Soumettre, {
+              'attr': {
+                'class': 'btn w-100 fw-bold text-white ',
+                'style': 'background:#4254D6; border:none; letter-spacing:1px;'
+              }
+            }) }}
+          </div>
+
+          <div class="text-center small text-muted mt-2">
+            Vous avez déjà un compte ?
+            <a href="{{ path('login') }}" class="fw-bold ms-1" style="color:#4254D6;">
+              Se connecter
+            </a>
+          </div>
+
+        {{ form_end(form) }}
+      </div>
+    </div>
 
 </div>
 
-{{ form_end(form) }}
-<p>vous avez déja un compte?</p> <a href="{{ path('compteEntreprise') }}">se connecter</a>
+<script>
+  document.getElementById('logo-input').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    var filename = document.getElementById('logo-filename');
+
+    if (file && file.type.startsWith('image/')) {
+      filename.textContent = file.name;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        document.getElementById('logo-img').src = ev.target.result;
+        document.getElementById('logo-preview').classList.remove('d-none');
+      };
+      reader.readAsDataURL(file);
+    } else {
+      filename.textContent = 'Aucun fichier sélectionné';
+      document.getElementById('logo-preview').classList.add('d-none');
+    }
+  });
+</script>
 
 {% endblock %}

@@ -136,8 +136,6 @@ class Entreprise
 
     #[ORM\Column(type: 'string', nullable: false)]
     #[Assert\NotBlank(message: "Le champ e-mail est obligatoire")]
-    #[Assert\Email(message: "Email invalide")]
-    #[Assert\Regex(pattern: "/^[a-zA-Z0-9._%+-]+@gmail\.com$/",message: "Email invalide")]
     private ?string $e_mail = null;
 
     public function getE_mail(): ?string
