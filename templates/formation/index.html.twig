@@ -14,10 +14,12 @@
             </div>
             
             <div class="col-lg-5 text-lg-end">
-                <a class="btn btn-primary btn-lg shadow-sm" href="{{ path('app_formation_new') }}">
-                    <i class="ti ti-plus me-1"></i>
-                    Nouvelle formation
-                </a>
+                {% if rh_logged %}
+                    <a class="btn btn-primary btn-lg shadow-sm" href="{{ path('app_formation_new') }}">
+                        <i class="ti ti-plus me-1"></i>
+                        Nouvelle formation
+                    </a>
+                {% endif %}
             </div>
         </div>
 
@@ -36,8 +38,13 @@
             </div>
             <div class="col-md-4">
                 <div class="stat-card p-3 h-100">
-                    <div class="mini-muted">Formation la plus recente</div>
-                    <div class="h5 mb-0">{{ formations|first ? formations|first.titre : 'Aucune' }}</div>
+                    <div class="mini-muted">Meilleure formation (avis)</div>
+                    {% if best_reviewed_formation %}
+                        <div class="h5 mb-1">{{ best_reviewed_formation.formation_titre }}</div>
+                        <div class="mini-muted">{{ best_reviewed_formation.reviews_count }} avis - Moyenne {{ best_reviewed_formation.average_note }}/5</div>
+                    {% else %}
+                        <div class="h5 mb-0">Aucune evaluation</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -51,6 +58,49 @@
         <div class="alert alert-danger" role="alert">{{ message }}</div>
     {% endfor %}
 
+    <div class="surface-card mb-3">
+        <div class="card-header">
+            <h3 class="card-title">Identification RH</h3>
+        </div>
+        <div class="card-body">
+            {% if not rh_logged %}
+                <form method="post" action="{{ path('app_formation_rh') }}">
+                    <input type="hidden" name="action" value="login">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-8">
+                            <label class="form-label" for="rh_id">RH</label>
+                            <select class="form-select" id="rh_id" name="rh_id" required>
+                                <option value="">Choisir un RH</option>
+                                {% for rh in rh_users %}
+                                    <option value="{{ rh.id_employe }}">{{ rh.prenom }} {{ rh.nom }} ({{ rh.role }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary w-100" type="submit">Entrer</button>
+                        </div>
+                    </div>
+                </form>
+            {% else %}
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <span class="badge bg-green-lt">RH connecte</span>
+                        <span class="ms-2">{{ app.session.get('rh_name') }}</span>
+                    </div>
+                    <form method="post" action="{{ path('app_formation_rh') }}">
+                        <input type="hidden" name="action" value="logout">
+                        <button class="btn btn-outline-secondary btn-sm" type="submit">Changer ID</button>
+                    </form>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not rh_logged %}
+        <div class="alert alert-info">Choisissez votre ID RH pour afficher les formations et gerer les demandes.</div>
+    {% endif %}
+
+    {% if rh_logged %}
     <div class="surface-card">
         <div class="table-responsive">
             <table class="table table-vcenter card-table">
@@ -96,7 +146,9 @@
             </table>
         </div>
     </div>
+    {% endif %}
 
+    {% if rh_logged %}
     {% for formation in formations %}
         {% set formationPendingRequests = pending_inscriptions_by_formation[formation.id] ?? [] %}
         {% if formationPendingRequests is not empty %}
@@ -137,4 +189,5 @@
             </div>
         {% endif %}
     {% endfor %}
+    {% endif %}
 {% endblock %}
