@@ -1,68 +1,108 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Projet{% endblock %}
+{% block title %}Details projet{% endblock %}
 
 {% block body %}
-    <h1>Projet</h1>
+    {% set statutColor = 'secondary' %}
+    {% if projet.statut == 'EN_COURS' %}{% set statutColor = 'azure' %}{% endif %}
+    {% if projet.statut == 'TERMINE' %}{% set statutColor = 'green' %}{% endif %}
+    {% if projet.statut == 'ANNULE' %}{% set statutColor = 'red' %}{% endif %}
+    {% set prioriteColor = 'secondary' %}
+    {% if projet.priorite == 'HAUTE' %}{% set prioriteColor = 'red' %}{% endif %}
+    {% if projet.priorite == 'MOYENNE' %}{% set prioriteColor = 'orange' %}{% endif %}
+    {% if projet.priorite == 'BASSE' %}{% set prioriteColor = 'green' %}{% endif %}
 
-    <table class="table">
-        <tbody>
-            <tr>
-                <th>Id</th>
-                <td>{{ projet.idProjet }}</td>
-            </tr>
-            <tr>
-                <th>Nom</th>
-                <td>{{ projet.nom }}</td>
-            </tr>
-            <tr>
-                <th>Description</th>
-                <td>{{ projet.description }}</td>
-            </tr>
-            <tr>
-                <th>Date debut</th>
-                <td>{{ projet.dateDebut ? projet.dateDebut|date('Y-m-d') : '' }}</td>
-            </tr>
-            <tr>
-                <th>Date fin prevue</th>
-                <td>{{ projet.dateFinPrevue ? projet.dateFinPrevue|date('Y-m-d') : '' }}</td>
-            </tr>
-            <tr>
-                <th>Date fin reelle</th>
-                <td>{{ projet.dateFinReelle ? projet.dateFinReelle|date('Y-m-d') : '' }}</td>
-            </tr>
-            <tr>
-                <th>Statut</th>
-                <td>{{ projet.statut }}</td>
-            </tr>
-            <tr>
-                <th>Priorite</th>
-                <td>{{ projet.priorite }}</td>
-            </tr>
-            <tr>
-                <th>Responsable</th>
-                <td>
-                    {% if projet.responsable %}
-                        {{ projet.responsable.nom }} {{ projet.responsable.prenom }}
-                    {% endif %}
-                </td>
-            </tr>
-            <tr>
-                <th>Membres equipe</th>
-                <td>
-                    {% for employe in projet.membresEquipe %}
-                        {{ employe.nom }} {{ employe.prenom }}{% if not loop.last %}, {% endif %}
-                    {% else %}
-                        Aucun membre
-                    {% endfor %}
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="page-wrapper">
+        <div class="page-header d-print-none">
+            <div class="container-xl">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">{{ projet.nom }}</h2>
+                        <div class="text-secondary mt-1">Projet #{{ projet.idProjet }}</div>
+                    </div>
+                    <div class="col-auto ms-auto d-print-none">
+                        <div class="btn-list">
+                            <a href="{{ path('app_projet_index') }}" class="btn btn-outline-secondary">Retour</a>
+                            <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-primary">Modifier</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <a href="{{ path('app_projet_index') }}">back to list</a>
+        <div class="page-body">
+            <div class="container-xl">
+                <div class="row row-cards">
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Description</h3>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-0">{{ projet.description }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">Etat du projet</h3></div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <span class="text-secondary">Statut</span><br>
+                                    <span class="badge bg-{{ statutColor }}-lt">{{ projet.statut }}</span>
+                                </div>
+                                <div>
+                                    <span class="text-secondary">Priorite</span><br>
+                                    <span class="badge bg-{{ prioriteColor }}-lt">{{ projet.priorite is empty ? 'AUCUNE' : projet.priorite }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-    <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}">edit</a>
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">Planning</h3></div>
+                            <div class="card-body">
+                                <div class="mb-2"><span class="text-secondary">Debut</span><br>{{ projet.dateDebut ? projet.dateDebut|date('d/m/Y') : '-' }}</div>
+                                <div class="mb-2"><span class="text-secondary">Fin prevue</span><br>{{ projet.dateFinPrevue ? projet.dateFinPrevue|date('d/m/Y') : '-' }}</div>
+                                <div><span class="text-secondary">Fin reelle</span><br>{{ projet.dateFinReelle ? projet.dateFinReelle|date('d/m/Y') : '-' }}</div>
+                            </div>
+                        </div>
+                    </div>
 
-    {{ include('projet/_delete_form.html.twig') }}
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">Equipe</h3></div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <span class="text-secondary">Responsable</span><br>
+                                    {% if projet.responsable %}
+                                        <span class="fw-semibold">{{ projet.responsable.nom }} {{ projet.responsable.prenom }}</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <span class="text-secondary">Membres</span>
+                                    <div class="mt-2 d-flex flex-wrap gap-2">
+                                        {% for employe in projet.membresEquipe %}
+                                            <span class="badge bg-blue-lt">{{ employe.nom }} {{ employe.prenom }}</span>
+                                        {% else %}
+                                            <span class="text-secondary">Aucun membre</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="d-flex justify-content-end">
+                            {{ include('projet/_delete_form.html.twig') }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}

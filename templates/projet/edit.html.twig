@@ -1,13 +1,26 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Edit Projet{% endblock %}
+{% block title %}Modifier projet{% endblock %}
 
 {% block body %}
-    <h1>Edit Projet</h1>
-
-    {{ include('projet/_form.html.twig', {'button_label': 'Update'}) }}
-
-    <a href="{{ path('app_projet_index') }}">back to list</a>
-
-    {{ include('projet/_delete_form.html.twig') }}
+    <div class="page-wrapper">
+        <div class="page-header d-print-none">
+            <div class="container-xl">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">Modifier projet</h2>
+                        <div class="text-secondary mt-1">Mettez a jour les informations, le statut et l'equipe.</div>
+                    </div>
+                    <div class="col-auto ms-auto d-print-none">
+                        {{ include('projet/_delete_form.html.twig') }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="page-body">
+            <div class="container-xl">
+                {{ include('projet/_form.html.twig', {'button_label': 'Mettre a jour'}) }}
+            </div>
+        </div>
+    </div>
 {% endblock %}
