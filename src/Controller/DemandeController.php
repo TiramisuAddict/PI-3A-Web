@@ -85,93 +85,100 @@ class DemandeController extends AbstractController
         return new JsonResponse($fields);
     }
 
-    #[Route('/api/create', name: 'demande_api_create', methods: ['POST'])]
-    public function create(Request $request): JsonResponse
-    {
-        try {
-            $data = json_decode($request->getContent(), true);
+#[Route('/api/create', name: 'demande_api_create', methods: ['POST'])]
+public function create(Request $request): JsonResponse
+{
+    try {
+        $data = json_decode($request->getContent(), true);
 
-            if (!$data) {
-                return new JsonResponse(['success' => false, 'message' => 'Donnees invalides'], 400);
-            }
-
-            // Get employee ID from request or session
-            $employeeId = $data['idEmploye'] ?? $this->getEmployeeId();
-            
-            if (!$employeeId || !$this->isValidEmployeeId($employeeId)) {
-                return new JsonResponse([
-                    'success' => false, 
-                    'message' => 'ID employe invalide. Veuillez selectionner un employe valide.'
-                ], 400);
-            }
-
-            $demande = new Demande();
-            $demande->setIdEmploye((int)$employeeId);
-            $demande->setCategorie($data['categorie'] ?? '');
-            $demande->setTypeDemande($data['typeDemande'] ?? '');
-            $demande->setTitre($data['titre'] ?? '');
-            $demande->setDescription($data['description'] ?? '');
-            $demande->setPriorite($data['priorite'] ?? 'NORMALE');
-            $demande->setStatus('Nouvelle');
-            $demande->setDateCreation(new \DateTime());
-
-            $this->em->persist($demande);
-            $this->em->flush();
-
-            if (!empty($data['details'])) {
-                $details = new DemandeDetails();
-                $details->setDemande($demande);
-                $details->setDetails($data['details']);
-                $this->em->persist($details);
-                $this->em->flush();
-            }
-
-            $historique = new HistoriqueDemande();
-            $historique->setDemande($demande);
-            $historique->setNouveauStatut('Nouvelle');
-            $historique->setActeur($this->getEmployeeName());
-            $historique->setCommentaire('Demande creee');
-            $historique->setDateAction(new \DateTime());
-            $this->em->persist($historique);
-            $this->em->flush();
-
-            return new JsonResponse([
-                'success' => true,
-                'id' => $demande->getId(),
-                'message' => 'Demande creee avec succes'
-            ]);
-
-        } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Erreur: ' . $e->getMessage()
-            ], 500);
+        if (!$data) {
+            return new JsonResponse(['success' => false, 'message' => 'Donnees invalides'], 400);
         }
-    }
 
-    #[Route('/{id}', name: 'demande_show', requirements: ['id' => '\d+'])]
-    public function show(int $id): Response
-    {
-        $demande = $this->demandeRepository->find($id);
+        $employeeId = $data['idEmploye'] ?? $this->getEmployeeId();
         
-        if (!$demande) {
-            throw $this->createNotFoundException('Demande non trouvee');
+        if (!$employeeId || !$this->isValidEmployeeId($employeeId)) {
+            return new JsonResponse([
+                'success' => false, 
+                'message' => 'ID employe invalide. Veuillez selectionner un employe valide.'
+            ], 400);
         }
 
-        $fieldLabels = [];
-        if ($demande->getDetails()) {
-            foreach ($demande->getDetails()->getDetails() as $key => $value) {
-                $fieldLabels[$key] = $this->formHelper->getFieldLabel($demande->getTypeDemande(), $key);
-            }
+        $demande = new Demande();
+        $demande->setIdEmploye((int)$employeeId);
+        $demande->setCategorie($data['categorie'] ?? '');
+        $demande->setTypeDemande($data['typeDemande'] ?? '');
+        $demande->setTitre($data['titre'] ?? '');
+        $demande->setDescription($data['description'] ?? '');
+        $demande->setPriorite($data['priorite'] ?? 'NORMALE');
+        $demande->setStatus('Nouvelle');
+        $demande->setDateCreation(new \DateTime());
+
+        $this->em->persist($demande);
+        $this->em->flush();
+
+        if (!empty($data['details']) && is_array($data['details'])) {
+            $detailsEntity = new DemandeDetails();
+            $detailsEntity->setDemande($demande);
+            $detailsEntity->setDetails($data['details']);
+            
+            $this->em->persist($detailsEntity);
+            $this->em->flush();
+            
+            $demande->setDetails($detailsEntity);
         }
 
-        return $this->render('demande/show.html.twig', [
-            'demande' => $demande,
-            'fieldLabels' => $fieldLabels,
-            'statuses' => $this->formHelper->getStatuses(),
+        $historique = new HistoriqueDemande();
+        $historique->setDemande($demande);
+        $historique->setNouveauStatut('Nouvelle');
+        $historique->setActeur($this->getEmployeeName());
+        $historique->setCommentaire('Demande creee');
+        $historique->setDateAction(new \DateTime());
+        
+        $this->em->persist($historique);
+        $this->em->flush();
+
+        return new JsonResponse([
+            'success' => true,
+            'id' => $demande->getId(),
+            'message' => 'Demande creee avec succes'
         ]);
+
+    } catch (\Exception $e) {
+        return new JsonResponse([
+            'success' => false,
+            'message' => 'Erreur: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+#[Route('/{id}', name: 'demande_show', requirements: ['id' => '\d+'])]
+public function show(int $id): Response
+{
+    $demande = $this->demandeRepository->find($id);
+    
+    if (!$demande) {
+        throw $this->createNotFoundException('Demande non trouvee');
     }
 
+    $detailsData = [];
+    $fieldLabels = [];
+    
+    if ($demande->getDetails() !== null) {
+        $detailsData = $demande->getDetails()->getDetails();
+        
+        foreach ($detailsData as $key => $value) {
+            $fieldLabels[$key] = $this->formHelper->getFieldLabel($demande->getTypeDemande(), $key);
+        }
+    }
+
+    return $this->render('demande/show.html.twig', [
+        'demande' => $demande,
+        'detailsData' => $detailsData,
+        'fieldLabels' => $fieldLabels,
+        'statuses' => $this->formHelper->getStatuses(),
+    ]);
+}
     #[Route('/{id}/edit', name: 'demande_edit', requirements: ['id' => '\d+'])]
     public function edit(int $id): Response
     {
@@ -213,7 +220,6 @@ public function update(int $id, Request $request): JsonResponse
 
         $oldStatus = $demande->getStatus();
 
-        // Update fields
         if (isset($data['categorie'])) {
             $demande->setCategorie($data['categorie']);
         }
@@ -230,7 +236,6 @@ public function update(int $id, Request $request): JsonResponse
             $demande->setPriorite($data['priorite']);
         }
         
-        // Handle status change
         if (isset($data['status']) && $data['status'] !== $oldStatus) {
             $demande->setStatus($data['status']);
             
@@ -244,7 +249,6 @@ public function update(int $id, Request $request): JsonResponse
             $this->em->persist($historique);
         }
 
-        // Handle details
         if (isset($data['details']) && !empty($data['details'])) {
             $details = $demande->getDetails();
             if (!$details) {
@@ -366,10 +370,8 @@ public function update(int $id, Request $request): JsonResponse
                 return (int)$id;
             }
         } catch (\Exception $e) {
-            // Ignore
         }
         
-        // Get first valid employee from database
         $firstEmployee = $this->getFirstEmployeeId();
         return $firstEmployee;
     }
@@ -383,7 +385,6 @@ public function update(int $id, Request $request): JsonResponse
                 return $name;
             }
         } catch (\Exception $e) {
-            // Ignore
         }
         return 'Systeme';
     }
@@ -399,7 +400,6 @@ public function update(int $id, Request $request): JsonResponse
                 return (int)$result['id_employe'];
             }
         } catch (\Exception $e) {
-            // Table might not exist or be named differently
         }
         
         return null;

@@ -260,25 +260,20 @@
         console.log("Current categorie:", CURRENT_CATEGORIE);
         console.log("Current type:", CURRENT_TYPE);
         
-        // Populate types for current category
         populateTypes(CURRENT_CATEGORIE, CURRENT_TYPE);
         
-        // Category change listener
         document.getElementById("categorie").addEventListener("change", function() {
             populateTypes(this.value, null);
         });
         
-        // Form submit
         document.getElementById("demandeForm").addEventListener("submit", onFormSubmit);
         
-        // Map modal
         var mapModalEl = document.getElementById("mapModal");
         if (mapModalEl) {
             mapModal = new bootstrap.Modal(mapModalEl);
             mapModalEl.addEventListener("shown.bs.modal", initMap);
         }
         
-        // Map buttons
         document.querySelectorAll(".btn-map").forEach(function(btn) {
             btn.addEventListener("click", function() {
                 var fieldKey = this.getAttribute("data-field");
@@ -287,13 +282,11 @@
             });
         });
         
-        // Confirm location
         var confirmBtn = document.getElementById("confirmLocation");
         if (confirmBtn) {
             confirmBtn.addEventListener("click", confirmLocationSelection);
         }
         
-        // Search button
         var searchBtn = document.getElementById("searchBtn");
         if (searchBtn) {
             searchBtn.addEventListener("click", function() {
@@ -301,7 +294,6 @@
             });
         }
         
-        // Search input enter
         var mapSearchInput = document.getElementById("mapSearch");
         if (mapSearchInput) {
             mapSearchInput.addEventListener("keypress", function(e) {
@@ -351,7 +343,6 @@
             details: {}
         };
         
-        // Collect details fields
         var entries = formData.entries();
         var entry = entries.next();
         while (!entry.done) {
@@ -369,12 +360,10 @@
         
         console.log("Data to send:", data);
         
-        // Disable button
         var btnSubmit = document.getElementById("btnSubmit");
         btnSubmit.disabled = true;
         btnSubmit.innerHTML = '<i class="ti ti-loader me-1"></i>Enregistrement...';
         
-        // Send request
         fetch("/demande/api/" + DEMANDE_ID + "/update", {
             method: "POST",
             headers: {

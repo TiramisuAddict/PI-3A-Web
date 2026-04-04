@@ -17,8 +17,8 @@ class DemandeDetails
     #[ORM\JoinColumn(name: 'id_demande', referencedColumnName: 'id_demande', nullable: false)]
     private ?Demande $demande = null;
 
-    #[ORM\Column(name: 'details', type: 'text')]
-    private ?string $detailsJson = null;
+    #[ORM\Column(name: 'details', type: 'text', nullable: true)]
+    private ?string $detailsText = null;
 
     public function getId(): ?int
     {
@@ -43,27 +43,33 @@ class DemandeDetails
 
     public function getDetails(): array
     {
-        if (empty($this->detailsJson)) {
+        if (empty($this->detailsText)) {
             return [];
         }
-        $decoded = json_decode($this->detailsJson, true);
+        
+        $decoded = json_decode($this->detailsText, true);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return [];
+        }
+        
         return is_array($decoded) ? $decoded : [];
     }
 
     public function setDetails(array $details): self
     {
-        $this->detailsJson = json_encode($details, JSON_UNESCAPED_UNICODE);
+        $this->detailsText = json_encode($details, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         return $this;
     }
 
-    public function getDetailsJson(): ?string
+    public function getDetailsText(): ?string
     {
-        return $this->detailsJson;
+        return $this->detailsText;
     }
 
-    public function setDetailsJson(?string $detailsJson): self
+    public function setDetailsText(?string $detailsText): self
     {
-        $this->detailsJson = $detailsJson;
+        $this->detailsText = $detailsText;
         return $this;
     }
 }
