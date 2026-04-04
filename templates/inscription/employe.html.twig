@@ -2,6 +2,74 @@
 
 {% block title %}Inscription Employe{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .surface-card .card-header {
+            padding: 1rem 1.25rem;
+            background: linear-gradient(180deg, rgba(248, 250, 255, 0.98), rgba(242, 246, 252, 0.96));
+        }
+
+        .surface-card .card-title {
+            margin: 0;
+            font-size: 1.02rem;
+            font-weight: 700;
+            color: #0f172a;
+            letter-spacing: .01em;
+        }
+
+        .filter-toolbar {
+            background: rgba(248, 250, 255, 0.92);
+            padding: 1rem 1.25rem;
+        }
+
+        .filter-toolbar .form-label {
+            font-size: .78rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #64748b;
+            margin-bottom: .35rem;
+        }
+
+        .rating-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            border-radius: 999px;
+            padding: .2rem .55rem;
+            font-size: .78rem;
+            background: rgba(13, 110, 253, 0.10);
+            color: #0d6efd;
+            font-weight: 700;
+        }
+
+        .rating-pill .ti {
+            font-size: .85rem;
+        }
+
+        .table-clean thead th {
+            background: rgba(248, 250, 255, 0.95);
+            color: #64748b;
+            font-size: .74rem;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            border-bottom: 1px solid rgba(228, 233, 242, 0.95);
+        }
+
+        .table-clean tbody td {
+            vertical-align: middle;
+        }
+
+        .table-clean tbody tr:hover {
+            background: rgba(13, 110, 253, 0.02);
+        }
+
+        .section-spacer {
+            padding: 1.25rem 1.25rem 0;
+        }
+    </style>
+{% endblock %}
+
 {% block body %}
     <div class="app-hero position-relative p-4 p-md-5 mb-4">
         <div class="row align-items-center g-4 position-relative">
@@ -70,14 +138,57 @@
         <div class="card-header">
             <h3 class="card-title">Formations disponibles</h3>
         </div>
+        <div class="card-body border-bottom filter-toolbar">
+            <form method="get" action="{{ path('app_inscription_employe') }}" class="row g-3 align-items-end" id="formation-filter-form">
+                <input type="hidden" name="formation" value="{{ selected_formation ? selected_formation.id : '' }}">
+                <div class="col-lg-4 col-md-6">
+                    <label class="form-label" for="q">Recherche</label>
+                    <div class="input-icon">
+                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                        <input id="q" name="q" class="form-control" type="text" value="{{ q|default('') }}" placeholder="Titre, organisme, lieu...">
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label" for="sort">Tri</label>
+                    <select id="sort" name="sort" class="form-select">
+                        <option value="date_desc" {{ sort == 'date_desc' ? 'selected' : '' }}>Plus recentes</option>
+                        <option value="rating_desc" {{ sort == 'rating_desc' ? 'selected' : '' }}>Meilleure note</option>
+                        <option value="reviews_desc" {{ sort == 'reviews_desc' ? 'selected' : '' }}>Plus d'avis</option>
+                        <option value="title_asc" {{ sort == 'title_asc' ? 'selected' : '' }}>Titre A-Z</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label" for="min_rating">Note minimale</label>
+                    <select id="min_rating" name="min_rating" class="form-select">
+                        <option value="0" {{ min_rating == 0 ? 'selected' : '' }}>Toutes</option>
+                        <option value="1" {{ min_rating == 1 ? 'selected' : '' }}>1+</option>
+                        <option value="2" {{ min_rating == 2 ? 'selected' : '' }}>2+</option>
+                        <option value="3" {{ min_rating == 3 ? 'selected' : '' }}>3+</option>
+                        <option value="4" {{ min_rating == 4 ? 'selected' : '' }}>4+</option>
+                        <option value="5" {{ min_rating == 5 ? 'selected' : '' }}>5</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label" for="min_reviews">Avis minimum</label>
+                    <input id="min_reviews" name="min_reviews" class="form-control" type="number" min="0" value="{{ min_reviews }}">
+                </div>
+                <div class="col-lg-1 col-md-6">
+                    <a class="btn btn-outline-secondary w-100" href="{{ path('app_inscription_employe') }}" title="Reinitialiser filtres">
+                        <i class="ti ti-refresh"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
         <div class="table-responsive">
-            <table class="table table-vcenter card-table">
+            <table class="table table-vcenter card-table table-clean mb-0">
                 <thead>
                 <tr>
                     <th>Titre</th>
                     <th>Organisme</th>
                     <th>Date debut</th>
                     <th>Date fin</th>
+                    <th>Avis</th>
+                    <th>Note moyenne</th>
                     <th>Lieu</th>
                     <th>Capacite</th>
                     <th class="w-1">Action</th>
@@ -87,10 +198,22 @@
                 {% for formation in formations %}
                     <tr>
                         {% set state = inscription_by_formation[formation.id] ?? null %}
+                        {% set reviews = review_stats_by_formation[formation.id] ?? {'reviews_count': 0, 'average_note': 0} %}
+                        {% set formationQuery = app.request.query.all|merge({'formation': formation.id}) %}
                         <td>{{ formation.titre }}</td>
                         <td>{{ formation.organisme }}</td>
                         <td>{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}</td>
                         <td>{{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}</td>
+                        <td>
+                            <span class="badge bg-azure-lt text-azure">{{ reviews.reviews_count }}</span>
+                        </td>
+                        <td>
+                            {% if reviews.reviews_count > 0 %}
+                                <span class="rating-pill"><i class="ti ti-star-filled"></i>{{ reviews.average_note }}/5</span>
+                            {% else %}
+                                <span class="text-secondary">-</span>
+                            {% endif %}
+                        </td>
                         <td>{{ formation.lieu }}</td>
                         <td>{{ formation.capacite }}</td>
                         <td>
@@ -98,6 +221,7 @@
                                 {% if state and state.statut == 'EN_ATTENTE' %}
                                     <div class="d-flex flex-column gap-1 align-items-start">
                                         <span class="badge bg-orange text-white">En attente</span>
+                                        <a class="btn btn-sm btn-outline-primary" href="{{ path('app_inscription_employe', formationQuery) }}">Modifier raison</a>
                                         <form method="post" action="{{ path('app_inscription_employe') }}">
                                             <input type="hidden" name="action" value="annuler">
                                             <input type="hidden" name="inscription_id" value="{{ state.id }}">
@@ -105,24 +229,86 @@
                                         </form>
                                     </div>
                                 {% elseif state and state.statut == 'ACCEPTEE' %}
-                                    <span class="badge bg-green text-white">Acceptee</span>
+                                    <div class="d-flex flex-column gap-1 align-items-start">
+                                        <span class="badge bg-green text-white">Acceptee</span>
+                                        <a class="btn btn-sm btn-outline-primary" href="{{ path('app_inscription_employe', formationQuery) }}">Evaluer</a>
+                                        {% set existingEvaluation = evaluation_by_formation[formation.id] ?? null %}
+                                        {% if existingEvaluation %}
+                                            <span class="text-secondary small">Note: {{ existingEvaluation.note }}/5</span>
+                                        {% endif %}
+                                    </div>
                                 {% elseif state and state.statut == 'REFUSEE' %}
                                     <span class="badge bg-red text-white">Refusee</span>
                                 {% else %}
-                                    <a class="btn btn-sm btn-success" href="{{ path('app_inscription_employe', {'formation': formation.id}) }}">Inscription</a>
+                                    <a class="btn btn-sm btn-success" href="{{ path('app_inscription_employe', formationQuery) }}">Inscription</a>
                                 {% endif %}
                             {% else %}
-                                <button class="btn btn-sm" disabled>Inscription</button>
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe', formationQuery) }}">Voir avis</a>
                             {% endif %}
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="7" class="text-secondary">Aucune formation disponible.</td></tr>
+                    <tr><td colspan="9" class="text-secondary">Aucune formation disponible.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+
+    {% if selected_formation %}
+        <div class="surface-card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">Avis sur {{ selected_formation.titre }}</h3>
+            </div>
+            <div class="card-body">
+                {% if formation_reviews is not empty %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for review in formation_reviews %}
+                            <div class="stat-card p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="fw-bold">{{ review.prenom }} {{ review.nom }}</div>
+                                    <span class="badge bg-blue-lt text-blue">{{ review.note }}/5</span>
+                                </div>
+                                <div class="mb-2">{{ review.commentaire ?: 'Aucun commentaire.' }}</div>
+                                <div class="mini-muted">{{ review.date_evaluation ? review.date_evaluation|date('Y-m-d H:i') : '' }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-secondary">Aucun avis pour cette formation.</div>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+
+    <script>
+        (function () {
+            const filterForm = document.getElementById('formation-filter-form');
+            if (!filterForm) {
+                return;
+            }
+
+            const controls = filterForm.querySelectorAll('select, input[type="number"], input[type="text"]');
+            let submitTimer = null;
+
+            const scheduleSubmit = () => {
+                if (submitTimer) {
+                    clearTimeout(submitTimer);
+                }
+
+                submitTimer = setTimeout(() => {
+                    filterForm.requestSubmit();
+                }, 250);
+            };
+
+            controls.forEach((control) => {
+                control.addEventListener('change', scheduleSubmit);
+                if (control.tagName === 'INPUT') {
+                    control.addEventListener('input', scheduleSubmit);
+                }
+            });
+        })();
+    </script>
 
     {% if employee_logged and selected_formation %}
         {% set selectedState = inscription_by_formation[selected_formation.id] ?? null %}
@@ -132,16 +318,234 @@
             </div>
             <div class="card-body">
                 {% if selectedState and selectedState.statut == 'EN_ATTENTE' %}
-                    <div class="alert alert-warning mb-0 d-flex justify-content-between align-items-center">
-                        <span>Votre demande est en attente. Vous pouvez encore l'annuler.</span>
-                        <form method="post" action="{{ path('app_inscription_employe') }}" class="ms-3">
+                    <div class="alert alert-warning mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span>Votre demande est en attente. Vous pouvez modifier la raison ou annuler.</span>
+                        <form method="post" action="{{ path('app_inscription_employe') }}" class="ms-0 ms-md-3">
                             <input type="hidden" name="action" value="annuler">
                             <input type="hidden" name="inscription_id" value="{{ selectedState.id }}">
                             <button class="btn btn-outline-danger btn-sm" type="submit">Annuler</button>
                         </form>
                     </div>
+
+                    <form method="post" action="{{ path('app_inscription_employe') }}" id="reason-form" data-analyze-url="{{ path('app_inscription_employe_analyze') }}" data-generate-url="{{ path('app_inscription_employe_generate') }}">
+                        <input type="hidden" name="action" value="modifier_raison">
+                        <input type="hidden" name="inscription_id" value="{{ selectedState.id }}">
+                        <input type="hidden" name="formation_id" value="{{ selected_formation.id }}">
+
+                        <div class="mb-3">
+                            <label for="raison" class="form-label">Raison</label>
+                            <textarea id="raison" name="raison" class="form-control" rows="5" placeholder="Expliquez pourquoi vous voulez suivre cette formation...">{{ selectedState.raison|default('') }}</textarea>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-outline-primary" type="button" data-action="analyze">
+                                <i class="ti ti-scan me-1"></i>
+                                Corriger LanguageTool
+                            </button>
+                            <button class="btn btn-primary" type="button" data-action="generate">
+                                <i class="ti ti-sparkles me-1"></i>
+                                Generer avec IA
+                            </button>
+                            <button class="btn btn-success" type="submit">Modifier la demande</button>
+                        </div>
+
+                        <div id="assistant-notice" class="alert alert-info mt-3 mb-0 d-none"></div>
+                    </form>
+
+                    <div id="analysis-panel" class="d-none">
+                        <div class="row g-3 mt-4">
+                            <div class="col-lg-4">
+                                <div class="stat-card p-3 h-100">
+                                    <div class="mini-muted">Langue detectee</div>
+                                    <div id="analysis-language" class="h4 mb-0 text-capitalize"></div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="stat-card p-3 h-100">
+                                    <div class="mini-muted">Corrections LanguageTool</div>
+                                    <div id="analysis-count" class="h4 mb-0"></div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="stat-card p-3 h-100">
+                                    <div class="mini-muted">Texte fourni</div>
+                                    <div id="analysis-length" class="h4 mb-0"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-3">
+                            <div class="col-lg-6">
+                                <div class="stat-card p-3 h-100">
+                                    <div class="mini-muted mb-2">Version corrigee</div>
+                                    <div id="analysis-corrected"></div>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="stat-card p-3 h-100">
+                                    <div class="mini-muted mb-2">Version amelioree par l'IA</div>
+                                    <div id="analysis-generated"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="analysis-messages" class="stat-card p-3 mt-3 d-none">
+                            <div class="mini-muted mb-2">Détails des corrections</div>
+                            <ul class="mb-0 ps-3" id="analysis-messages-list"></ul>
+                        </div>
+                    </div>
+
+                    <script>
+                        (function () {
+                            const form = document.getElementById('reason-form');
+                            if (!form) {
+                                return;
+                            }
+
+                            const reasonField = document.getElementById('raison');
+                            const noticeBox = document.getElementById('assistant-notice');
+                            const analysisPanel = document.getElementById('analysis-panel');
+                            const analysisLanguage = document.getElementById('analysis-language');
+                            const analysisCount = document.getElementById('analysis-count');
+                            const analysisLength = document.getElementById('analysis-length');
+                            const analysisCorrected = document.getElementById('analysis-corrected');
+                            const analysisGenerated = document.getElementById('analysis-generated');
+                            const analysisMessages = document.getElementById('analysis-messages');
+                            const analysisMessagesList = document.getElementById('analysis-messages-list');
+                            const analyzeUrl = form.dataset.analyzeUrl;
+                            const generateUrl = form.dataset.generateUrl;
+
+                            const setNotice = (message, variant) => {
+                                if (!noticeBox) {
+                                    return;
+                                }
+
+                                noticeBox.classList.remove('d-none', 'alert-info', 'alert-danger');
+                                noticeBox.classList.add(variant === 'error' ? 'alert-danger' : 'alert-info');
+                                noticeBox.textContent = message;
+                            };
+
+                            const renderAnalysis = (payload, mode) => {
+                                const analysis = payload.analysis || {};
+                                const text = payload.text || '';
+
+                                if (reasonField && text) {
+                                    reasonField.value = text;
+                                }
+
+                                if (analysisPanel) {
+                                    analysisPanel.classList.remove('d-none');
+                                }
+
+                                if (analysisLanguage) {
+                                    analysisLanguage.textContent = analysis.language || '';
+                                }
+
+                                if (analysisCount) {
+                                    analysisCount.textContent = Array.isArray(analysis.grammarMessages) ? String(analysis.grammarMessages.length) : '0';
+                                }
+
+                                if (analysisLength) {
+                                    analysisLength.textContent = analysis.originalText ? String(analysis.originalText.length) : '0';
+                                }
+
+                                if (analysisCorrected) {
+                                    analysisCorrected.textContent = analysis.correctedText || (mode === 'analyze' ? 'Aucune correction proposee.' : '');
+                                }
+
+                                if (analysisGenerated) {
+                                    analysisGenerated.textContent = analysis.generatedText || (mode === 'generate' ? 'Aucune suggestion IA disponible.' : '');
+                                }
+
+                                if (analysisMessages && analysisMessagesList) {
+                                    analysisMessagesList.innerHTML = '';
+
+                                    if (Array.isArray(analysis.grammarMessages) && analysis.grammarMessages.length > 0) {
+                                        analysisMessages.classList.remove('d-none');
+                                        analysis.grammarMessages.forEach((message) => {
+                                            const item = document.createElement('li');
+                                            item.textContent = message;
+                                            analysisMessagesList.appendChild(item);
+                                        });
+                                    } else {
+                                        analysisMessages.classList.add('d-none');
+                                    }
+                                }
+
+                                setNotice(payload.message || (mode === 'analyze' ? 'LanguageTool a propose une version corrigee.' : 'Hugging Face a genere un paragraphe complet.'), 'info');
+                            };
+
+                            const postAction = async (url, mode) => {
+                                const formData = new FormData();
+                                formData.append('formation_id', form.querySelector('input[name="formation_id"]').value || '');
+                                formData.append('raison', reasonField ? reasonField.value : '');
+
+                                const response = await fetch(url, {
+                                    method: 'POST',
+                                    body: formData,
+                                    headers: {
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                        'Accept': 'application/json',
+                                    },
+                                });
+
+                                const payload = await response.json().catch(() => null);
+                                if (!response.ok || !payload || !payload.ok) {
+                                    setNotice(payload && payload.message ? payload.message : 'Une erreur est survenue.', 'error');
+                                    return;
+                                }
+
+                                renderAnalysis(payload, mode);
+                            };
+
+                            form.querySelectorAll('button[data-action]').forEach((button) => {
+                                button.addEventListener('click', () => {
+                                    const mode = button.dataset.action;
+                                    const url = mode === 'analyze' ? analyzeUrl : generateUrl;
+
+                                    if (!reasonField || reasonField.value.trim() === '') {
+                                        setNotice('Veuillez saisir une raison avant de lancer l action.', 'error');
+                                        if (reasonField) {
+                                            reasonField.focus();
+                                        }
+                                        return;
+                                    }
+
+                                    setNotice(mode === 'analyze' ? 'Correction en cours...' : 'Generation en cours...', 'info');
+                                    postAction(url, mode).catch(() => {
+                                        setNotice('Impossible de contacter le service IA.', 'error');
+                                    });
+                                });
+                            });
+                        })();
+                    </script>
                 {% elseif selectedState and selectedState.statut == 'ACCEPTEE' %}
-                    <div class="alert alert-success mb-0">Cette inscription est acceptee.</div>
+                    {% set selectedEvaluation = evaluation_by_formation[selected_formation.id] ?? null %}
+                    <div class="alert alert-success mb-3">Cette inscription est acceptee. Vous pouvez evaluer la formation.</div>
+
+                    <form method="post" action="{{ path('app_inscription_employe') }}">
+                        <input type="hidden" name="action" value="evaluer">
+                        <input type="hidden" name="formation_id" value="{{ selected_formation.id }}">
+
+                        <div class="mb-3">
+                            <label class="form-label d-block">Note</label>
+                            <div class="d-flex flex-wrap gap-3">
+                                {% for i in 1..5 %}
+                                    <label class="form-check form-check-inline m-0">
+                                        <input class="form-check-input" type="radio" name="note" value="{{ i }}" {{ selectedEvaluation and selectedEvaluation.note == i ? 'checked' : (not selectedEvaluation and i == 5 ? 'checked' : '') }}>
+                                        <span class="form-check-label">{{ i }}/5</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="commentaire" class="form-label">Commentaire</label>
+                            <textarea id="commentaire" name="commentaire" class="form-control" rows="4" placeholder="Partagez votre avis sur cette formation...">{{ selectedEvaluation.commentaire|default('') }}</textarea>
+                        </div>
+
+                        <button class="btn btn-primary" type="submit">Enregistrer evaluation</button>
+                    </form>
                 {% elseif selectedState and selectedState.statut == 'REFUSEE' %}
                     <div class="alert alert-danger mb-0">Cette inscription est refusee.</div>
                 {% else %}
