@@ -40,10 +40,10 @@ class Demande
     #[ORM\Column(name: 'type_demande', length: 100)]
     private ?string $typeDemande = null;
 
-    #[ORM\OneToOne(mappedBy: 'demande', cascade: ['persist', 'remove'])]
+    #[ORM\OneToOne(mappedBy: 'demande', targetEntity: DemandeDetails::class, cascade: ['persist', 'remove'], fetch: 'EAGER')]
     private ?DemandeDetails $details = null;
 
-    #[ORM\OneToMany(mappedBy: 'demande', targetEntity: HistoriqueDemande::class, cascade: ['persist', 'remove'])]
+    #[ORM\OneToMany(mappedBy: 'demande', targetEntity: HistoriqueDemande::class, cascade: ['persist', 'remove'], fetch: 'EAGER')]
     #[ORM\OrderBy(['dateAction' => 'DESC'])]
     private Collection $historiques;
 
