@@ -2,10 +2,11 @@
 
 namespace App\Entity;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-
+use Symfony\Component\Validator\Constraints as Assert;
 use App\Repository\EntrepriseRepository;
 
 #[ORM\Entity(repositoryClass: EntrepriseRepository::class)]
@@ -29,6 +30,7 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Assert\NotBlank(message: "le champ nom entreprise est obligatoire")]
     private ?string $nom_entreprise = null;
 
     public function getNom_entreprise(): ?string
@@ -43,6 +45,7 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Assert\NotBlank(message: " le champ pays est obligatoire")]
     private ?string $pays = null;
 
     public function getPays(): ?string
@@ -57,6 +60,7 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Assert\NotBlank(message: "Le champ ville est obligatoire")]
     private ?string $ville = null;
 
     public function getVille(): ?string
@@ -71,6 +75,7 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Assert\NotBlank(message: "Le champ nom est obligatoire")]
     private ?string $nom = null;
 
     public function getNom(): ?string
@@ -85,6 +90,7 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Assert\NotBlank(message: "Le champ prénom est obligatoire")]
     private ?string $prenom = null;
 
     public function getPrenom(): ?string
@@ -99,6 +105,7 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Assert\NotBlank(message: "Le matricule fiscal est obligatoire")]
     private ?string $matricule_fiscale = null;
 
     public function getMatricule_fiscale(): ?string
@@ -113,6 +120,7 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'integer', nullable: false)]
+    #[Assert\NotBlank(message: "Le champ téléphone est obligatoire")]
     private ?int $telephone = null;
 
     public function getTelephone(): ?int
@@ -127,6 +135,7 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Assert\NotBlank(message: "Le champ e-mail est obligatoire")]
     private ?string $e_mail = null;
 
     public function getE_mail(): ?string
@@ -196,8 +205,13 @@ class Entreprise
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Employé::class, mappedBy: 'entreprise')]
+    #[ORM\OneToMany(targetEntity: Employe::class, mappedBy: 'entreprise')]
     private Collection $employés;
+
+    public function __construct()
+    {
+        $this->employés = new ArrayCollection();
+    }
 
     /**
      * @return Collection<int, Employé>
@@ -210,7 +224,7 @@ class Entreprise
         return $this->employés;
     }
 
-    public function addEmployé(Employé $employé): self
+    public function addEmployé(Employe $employé): self
     {
         if (!$this->getEmployés()->contains($employé)) {
             $this->getEmployés()->add($employé);
@@ -218,9 +232,96 @@ class Entreprise
         return $this;
     }
 
-    public function removeEmployé(Employé $employé): self
+    public function removeEmployé(Employe $employé): self
     {
         $this->getEmployés()->removeElement($employé);
+        return $this;
+    }
+
+    public function getIdEntreprise(): ?int
+    {
+        return $this->id_entreprise;
+    }
+
+    public function getNomEntreprise(): ?string
+    {
+        return $this->nom_entreprise;
+    }
+
+    public function setNomEntreprise(string $nom_entreprise): static
+    {
+        $this->nom_entreprise = $nom_entreprise;
+
+        return $this;
+    }
+
+    public function getMatriculeFiscale(): ?string
+    {
+        return $this->matricule_fiscale;
+    }
+
+    public function setMatriculeFiscale(string $matricule_fiscale): static
+    {
+        $this->matricule_fiscale = $matricule_fiscale;
+
+        return $this;
+    }
+
+    public function getEMail(): ?string
+    {
+        return $this->e_mail;
+    }
+
+    public function setEMail(string $e_mail): static
+    {
+        $this->e_mail = $e_mail;
+
+        return $this;
+    }
+
+    public function getSiteWeb(): ?string
+    {
+        return $this->site_web;
+    }
+
+    public function setSiteWeb(?string $site_web): static
+    {
+        $this->site_web = $site_web;
+
+        return $this;
+    }
+
+    public function getDateDemande(): ?\DateTime
+    {
+        return $this->date_demande;
+    }
+
+    public function setDateDemande(\DateTime $date_demande): static
+    {
+        $this->date_demande = $date_demande;
+
+        return $this;
+    }
+
+    public function addEmploy(Employe $employ): static
+    {
+        if (!$this->employés->contains($employ)) {
+            $this->employés->add($employ);
+            $employ->setEntreprise($this);
+        }
+
+        return $this;
+    }
+
+    public function removeEmploy(Employe $employ): static
+    {
+        if ($this->employés->removeElement($employ)) {
+            // set the owning side to null (unless already changed)
+            if ($employ->getEntreprise() === $this) {
+                $employ->setEntreprise(null);
+            }
+        }
+
         return $this;
     }
 

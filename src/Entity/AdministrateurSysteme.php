@@ -56,4 +56,28 @@ class AdministrateurSysteme
         return $this;
     }
 
+    public function getEMail(): ?string
+    {
+        return $this->e_mail;
+    }
+
+    public function setEMail(string $e_mail): static
+    {
+        $this->e_mail = $e_mail;
+
+        return $this;
+    }
+
+    public function getMotDePasse(): ?string
+    {
+        return $this->mot_de_passe;
+    }
+
+    public function setMotDePasse(string $mot_de_passe): static
+    {
+        $this->mot_de_passe = $mot_de_passe;
+
+        return $this;
+    }
+
 }

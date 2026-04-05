@@ -29,20 +29,6 @@ class Compte
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $e_mail = null;
-
-    public function getE_mail(): ?string
-    {
-        return $this->e_mail;
-    }
-
-    public function setE_mail(string $e_mail): self
-    {
-        $this->e_mail = $e_mail;
-        return $this;
-    }
-
-    #[ORM\Column(type: 'string', nullable: false)]
     private ?string $mot_de_passe = null;
 
     public function getMot_de_passe(): ?string
@@ -56,18 +42,35 @@ class Compte
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Employé::class, inversedBy: 'comptes')]
+    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'comptes')]
     #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
-    private ?Employé $employé = null;
+    private ?Employe $employé = null;
 
-    public function getEmployé(): ?Employé
+    public function getEmployé(): ?Employe
     {
         return $this->employé;
     }
 
-    public function setEmployé(?Employé $employé): self
+    public function setEmployé(?Employe $employé): self
     {
         $this->employé = $employé;
+        return $this;
+    }
+
+    public function getIdCompte(): ?int
+    {
+        return $this->id_compte;
+    }
+
+    public function getMotDePasse(): ?string
+    {
+        return $this->mot_de_passe;
+    }
+
+    public function setMotDePasse(string $mot_de_passe): static
+    {
+        $this->mot_de_passe = $mot_de_passe;
+
         return $this;
     }
 
