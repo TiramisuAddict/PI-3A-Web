@@ -98,8 +98,31 @@
     </style>
 {% endblock %}
 
+{# clear form when modal is closed #}
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.modal[id^="postulerModal-"]').forEach(function (modal) {
+                modal.addEventListener('hidden.bs.modal', function () {
+                    modal.querySelectorAll('form').forEach(function (form) {
+                        form.reset();
+                        form.querySelectorAll('.is-valid, .is-invalid').forEach(function (field) {
+                            field.classList.remove('is-valid', 'is-invalid');
+                        });
+                    });
+                });
+            });
+        });
+    </script>
+{% endblock %}
+
 {% block body %}
 {# filter parameters #}
+
+{% set logged_user_id = offres[0].candidats[0].visiteur.id_visiteur %}
+{{ logged_user_id }}
+
 {% set queryName = app.request.query.get('q')|default('') %}
 {% set queryCategory = app.request.query.get('category')|default('') %}
 {% set queryContract = app.request.query.get('contract')|default('') %}
@@ -112,9 +135,12 @@
     {% endif %}
 {% endfor %}
 
+{# check flashes #}
+
+
 {# navbar #}
 <div class="offres-page">
-    {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'offres', logged_user: false } %}
+    {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'offres', logged_user: true } %}
 
     <section class="container-xl mt-3">
         <div id="offresCarousel" class="carousel slide offres-carousel" data-bs-ride="carousel">
@@ -208,7 +234,8 @@
 
             <div class="row g-3">
                 {% for offre in offres %}
-                    {% set modalId = 'applyModal-' ~ offre.id %}
+                    {% set applyModalId = 'postulerModal-' ~ offre.id %}
+                    {% set detailsModalId = 'detailsModal-' ~ offre.id %}
                     <div class="col-12 col-md-6 col-xl-4">
                         <div class="card offre-card h-100">
                             <div class="card-body d-flex flex-column">
@@ -234,20 +261,40 @@
 
                                 <div class="mt-3 pt-1 mt-auto row g-2">
                                     <div class="col-6 d-grid">
-                                        <a href="#" class="btn btn-primary">Postuler</a>
+                                        <button type="button" class="btn btn-primary" data-bs-toggle="modal"
+                                            data-bs-target="#{{ applyModalId }}">
+                                            Postuler
+                                        </button>
+
+                                        <div class="modal fade" id="{{ applyModalId }}" tabindex="-1" aria-labelledby="{{ applyModalId }}Label" aria-hidden="true">
+                                            <div class="modal-dialog modal-lg" role="document">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="{{ applyModalId }}Label">Postuler - {{ offre.titre_poste }}</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        {{ render(controller('App\\Controller\\CandidatController::postuler', {
+                                                            'offreId': offre.id,
+                                                            'visiteurId': 8
+                                                        })) }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div class="col-6 d-grid">
                                         <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
-                                            data-bs-target="#{{ modalId }}">
+                                            data-bs-target="#{{ detailsModalId }}">
                                             Détails
                                         </button>
 
-                                        <div class="modal fade" id="{{ modalId }}" tabindex="-1" aria-labelledby="{{ modalId }}Label" aria-hidden="true">
+                                        <div class="modal fade" id="{{ detailsModalId }}" tabindex="-1" aria-labelledby="{{ detailsModalId }}Label" aria-hidden="true">
                                             <div class="modal-dialog" role="document">
                                                 <div class="modal-content">
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title" id="{{ modalId }}Label">Poste {{ offre.titre_poste }}</h5>
+                                                        <h5 class="modal-title" id="{{ detailsModalId }}Label">Poste {{ offre.titre_poste }}</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"
                                                         aria-label="Close"></button>
                                                     </div>
