@@ -1,0 +1,47 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Notifications{% endblock %}
+
+{% block body %}
+<div class="surface-card p-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <h1 class="mb-0">Notifications</h1>
+        <a class="btn btn-primary" href="{{ path('app_notification_new') }}"><i class="ti ti-plus me-1"></i>Créer</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>id_notification</th>
+                    <th>user_id</th>
+                    <th>titre</th>
+                    <th>message</th>
+                    <th>date_creation</th>
+                    <th>is_read</th>
+                    <th>post</th>
+                    <th class="text-nowrap">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for notification in notifications %}
+                <tr>
+                    <td>{{ notification.id_notification }}</td>
+                    <td>{{ notification.user_id }}</td>
+                    <td>{{ notification.titre }}</td>
+                    <td>{{ notification.message|length > 50 ? notification.message|slice(0, 50) ~ '…' : notification.message }}</td>
+                    <td>{{ notification.date_creation ? notification.date_creation|date('Y-m-d H:i') : '' }}</td>
+                    <td>{{ notification.isRead ? 'Oui' : 'Non' }}</td>
+                    <td>{% if notification.post %}#{{ notification.post.id_post }}{% else %}—{% endif %}</td>
+                    <td class="text-nowrap">
+                        <a class="btn btn-sm btn-primary" href="{{ path('app_notification_show', { id_notification: notification.id_notification }) }}"><i class="ti ti-eye"></i></a>
+                        <a class="btn btn-sm btn-warning" href="{{ path('app_notification_edit', { id_notification: notification.id_notification }) }}"><i class="ti ti-edit"></i></a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8" class="text-center text-secondary py-4">Aucun enregistrement</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
