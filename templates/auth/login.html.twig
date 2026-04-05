@@ -14,7 +14,7 @@
           <img src="/images/WKlogo.svg" height="32" alt="Logo">
         </div>
 
-        <h2 class="h3 fw-bold mb-4 text-secondary">Accédez à votre espace entreprise</h2>
+        <div class="text-muted  mb-4 text-secondary">Accédez à votre espace entreprise</div>
 
         {# Erreurs flash #}
         {% for message in app.flashes('error') %}
@@ -44,8 +44,8 @@
           <div class="mb-3">
             {{ form_widget(form.email, {
               'attr': {
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Username'
+                'class': 'form-control ',
+                'placeholder': 'Email'
               }
             }) }}
             {{ form_errors(form.email) }}
@@ -56,8 +56,8 @@
             <div class="input-group input-group-flat">
               {{ form_widget(form.password, {
                 'attr': {
-                  'class': 'form-control form-control-lg',
-                  'placeholder': 'Password',
+                  'class': 'form-control ',
+                  'placeholder': 'Mot de passe',
                   'id': 'password-input'
                 }
               }) }}
@@ -70,7 +70,7 @@
           <div class="mb-3">
             {{ form_widget(form.se_connecter, {
               'attr': {
-                'class': 'btn w-100 btn-lg fw-bold text-white',
+                'class': 'btn w-100  fw-bold text-white',
                 'style': 'background:#4254D6; border:none; letter-spacing:1px;'
               }
             }) }}
@@ -81,6 +81,14 @@
             Vous n'avez pas un compte entreprise ?
             <a href="{{ path('compteEntreprise') }}" class="fw-bold ms-1" style="color:#4254D6;">
               Inscrivez-vous
+            </a>
+          </div>
+          <div class="text-center small text-muted mt-1">
+          <p>ou</p></div>
+          <div class="text-center small text-muted">
+            Vous souhaitez postuler ou avez vous déja postuler ?
+            <a href="{{ path('compteEntreprise') }}" class="fw-bold ms-1" style="color:#4254D6;">
+              Accédez à l'espace candidat
             </a>
           </div>
 

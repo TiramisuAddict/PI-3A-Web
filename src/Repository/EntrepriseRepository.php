@@ -40,4 +40,20 @@ class EntrepriseRepository extends ServiceEntityRepository
     //            ->getOneOrNullResult()
     //        ;
     //    }
+         public function findByFilters($search, $status)
+            {
+                $qb = $this->createQueryBuilder('e');
+
+                if ($search) {
+                    $qb->andWhere('LOWER(e.nom) LIKE :search')
+                    ->setParameter('search', '%'.strtolower($search).'%');
+                }
+
+                if ($status) {
+                    $qb->andWhere('e.statut = :status')
+                    ->setParameter('status', $status);
+                }
+
+                return $qb->getQuery()->getResult();
+            }
 }

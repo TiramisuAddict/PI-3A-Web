@@ -28,16 +28,16 @@ class Demande
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Employé::class, inversedBy: 'demandes')]
+    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'demandes')]
     #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
-    private ?Employé $employé = null;
+    private ?Employe $employé = null;
 
-    public function getEmployé(): ?Employé
+    public function getEmployé(): ?Employe
     {
         return $this->employé;
     }
 
-    public function setEmployé(?Employé $employé): self
+    public function setEmployé(?Employe $employé): self
     {
         $this->employé = $employé;
         return $this;

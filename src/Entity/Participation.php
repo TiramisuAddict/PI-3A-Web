@@ -28,16 +28,16 @@ class Participation
         return $this;
     }
 
-    #[ORM\OneToOne(targetEntity: Employé::class, inversedBy: 'participation')]
+    #[ORM\OneToOne(targetEntity: Employe::class, inversedBy: 'participation')]
     #[ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe', unique: true)]
-    private ?Employé $employé = null;
+    private ?Employe $employé = null;
 
-    public function getEmployé(): ?Employé
+    public function getEmployé(): ?Employe
     {
         return $this->employé;
     }
 
-    public function setEmployé(?Employé $employé): self
+    public function setEmployé(?Employe $employé): self
     {
         $this->employé = $employé;
         return $this;

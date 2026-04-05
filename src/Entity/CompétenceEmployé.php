@@ -70,16 +70,16 @@ class CompétenceEmployé
         return $this;
     }
 
-    #[ORM\OneToOne(targetEntity: Employé::class, inversedBy: 'compétenceEmployé')]
+    #[ORM\OneToOne(targetEntity: Employe::class, inversedBy: 'compétenceEmployé')]
     #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe', unique: true)]
-    private ?Employé $employé = null;
+    private ?Employe $employé = null;
 
-    public function getEmployé(): ?Employé
+    public function getEmployé(): ?Employe
     {
         return $this->employé;
     }
 
-    public function setEmployé(?Employé $employé): self
+    public function setEmployé(?Employe $employé): self
     {
         $this->employé = $employé;
         return $this;

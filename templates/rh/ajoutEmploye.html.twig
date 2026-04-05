@@ -1,0 +1,78 @@
+{# templates/rh/ajoutEmploye.html.twig #}
+
+{% if form is defined %}
+<div class="modal fade {% if show_ajout is defined and show_ajout %}show{% endif %}"
+     id="addEmployeeModal"
+     tabindex="-1"
+     {% if show_ajout is defined and show_ajout %}style="display:block;"{% endif %}>
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+
+      <div class="modal-header mt-3">
+        <div>
+          <h2 class="h2 modal-title">Ajouter un nouvel employé</h2>
+          <small class="text-muted">Remplissez les informations ci-dessous</small>
+        </div>
+        <a href="{{ path('RH_Home') }}" class="btn-close" aria-label="Fermer"></a>
+      </div>
+      
+
+      {{ form_start(form, {action: path('employe_ajouter'),method: 'POST',attr: {class: 'row g-0', novalidate: 'novalidate'}}) }}
+
+        <div class="modal-body p-4">
+        {{ include('components/controleSaisieAlert.html.twig', {'form': form}) }}
+          <div class="row g-3">
+
+            <div class="col-md-6">
+              {{ form_label(form.nom, 'Nom', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.nom, {'attr': {'class': 'form-control', 'placeholder': 'Nom'}}) }}
+            </div>
+
+            <div class="col-md-6">
+              {{ form_label(form.prenom, 'Prénom', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.prenom, {'attr': {'class': 'form-control', 'placeholder': 'Prénom'}}) }}
+            </div>
+
+            <div class="col-md-6">
+              {{ form_label(form.e_mail, 'Email', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.e_mail, {'attr': {'class': 'form-control', 'placeholder': 'Email'}}) }}
+            </div>
+
+            <div class="col-md-6">
+              {{ form_label(form.telephone, 'Téléphone', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.telephone, {'attr': {'class': 'form-control', 'placeholder': 'Téléphone'}}) }}
+            </div>
+
+            <div class="col-md-6">
+              {{ form_label(form.poste, 'Poste', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.poste, {'attr': {'class': 'form-control', 'placeholder': 'Ex: Développeur, Manager...'}}) }}
+            </div>
+
+            <div class="col-md-6">
+              {{ form_label(form.role, 'Rôle', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.role, {'attr': {'class': 'form-select'}}) }}
+            </div>
+
+            <div class="col-md-6">
+              {{ form_label(form.date_embauche, "Date d'embauche", {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.date_embauche, {'attr': {'class': 'form-control'}}) }}
+            </div>
+
+          </div>
+        </div>
+
+        {# Footer INSIDE the form #}
+        <div class="modal-footer bg-white">
+          <button type="submit" class="btn btn-sm  text-white px-5 py-2" style="background:#4254D6;">Ajouter</button>
+        </div>
+
+      {{ form_end(form) }}
+
+    </div>
+  </div>
+</div>
+
+{% if show_ajout is defined and show_ajout %}
+<div class="modal-backdrop fade show"></div>
+{% endif %}
+{% endif %}

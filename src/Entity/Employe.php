@@ -7,11 +7,11 @@ use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
-use App\Repository\EmployéRepository;
+use App\Repository\EmployeRepository;
 
-#[ORM\Entity(repositoryClass: EmployéRepository::class)]
+#[ORM\Entity(repositoryClass: EmployeRepository::class)]
 #[ORM\Table(name: 'employé')]
-class Employé
+class Employe
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
