@@ -1,0 +1,317 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Suivre ma candidature | Momentum{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .tracking-page {
+            background: #f5f7fb;
+            min-height: 100vh;
+            padding-bottom: 2.5rem;
+        }
+
+        .tracking-hero,
+        .tracking-result,
+        .tracking-empty,
+        .tracking-search {
+            border-radius: 10px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: #fff;
+        }
+
+        .tracking-hero {
+            overflow: hidden;
+        }
+
+        .tracking-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            border: 1px solid rgba(15, 23, 42, 0.10);
+            border-radius: 999px;
+            padding: .35rem .8rem;
+            background: #fff;
+            color: #334155;
+            font-size: .8rem;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        .tracking-search {
+            padding: 1rem;
+        }
+
+        .tracking-search .form-control {
+            height: 48px;
+        }
+
+        .tracking-search .btn {
+            height: 48px;
+        }
+
+        .tracking-result .steps {
+            margin-top: 1.5rem;
+        }
+
+        .tracking-result .step-item {
+            color: #64748b;
+        }
+
+        .tracking-result .step-item.active {
+            color: #1f6feb;
+            font-weight: 700;
+        }
+
+        .tracking-result .step-item.completed {
+            color: #16a34a;
+            font-weight: 700;
+        }
+
+        .tracking-result .step-item.is-accepted {
+            color: #16a34a;
+            font-weight: 700;
+        }
+
+        .tracking-result .step-item.is-refused {
+            color: #dc2626;
+            font-weight: 700;
+        }
+
+        .tracking-state-box {
+            border-radius: 10px;
+            padding: 1rem;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .tracking-state-box.is-review {
+            background: #eaf2ff;
+        }
+
+        .tracking-state-box.is-accepted {
+            background: #eaf7ef;
+        }
+
+        .tracking-state-box.is-refused {
+            background: #fdecec;
+        }
+
+        .tracking-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: .75rem;
+            margin-top: 1rem;
+        }
+
+        .tracking-meta-item {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 8px;
+            padding: .75rem;
+            background: #f8fafc;
+        }
+
+        .tracking-meta-label {
+            display: block;
+            font-size: .72rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 700;
+            margin-bottom: .15rem;
+        }
+
+        .tracking-meta-value {
+            display: block;
+            font-size: .95rem;
+            font-weight: 600;
+            color: #182433;
+        }
+
+        @media (max-width: 991.98px) {
+            .tracking-meta-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+
+{% set trackingCode = app.request.query.get('code')|default('') %}
+
+{% set trackingJob = app.request.query.get('job')|default('UX / UI Designer') %}
+{% set trackingState = app.request.query.get('state')|default('submitted') %}
+{% set trackingDate = app.request.query.get('date')|default('2024-06-01') %}
+{% set trackingEmail = app.request.query.get('email')|default('john.doe@example.com') %}
+
+{% set hasTracking = trackingCode is not empty %}
+
+{% set submittedClass = hasTracking ? (trackingState == 'En attente' ? 'active' : 'completed') : '' %}
+{% set preselectionClass = hasTracking and trackingState in ['Présélectionné', 'Entretien', 'Accepté', 'Refusé'] ? (trackingState == 'preselection' ? 'active' : 'completed') : '' %}
+{% set interviewClass = hasTracking and trackingState in ['Entretien', 'Accepté', 'Refusé'] ? (trackingState == 'interview' ? 'active' : 'completed') : '' %}
+{% set decisionClass = hasTracking and trackingState in ['Accepté', 'Refusé'] ? 'active ' ~ (trackingState == 'accepted' ? 'is-accepted' : 'is-refused') : '' %}
+
+{% for candidature in candidatures %}
+
+{% if candidature.code_candidature == trackingCode %}
+    {% set trackingCode = candidature.code_candidature %}
+    {% set trackingJob = candidature.offre.titre_poste %}
+    {% set trackingState = candidature.etat %}
+    {% set trackingDate = candidature.date_candidature %}
+    {% set trackingEmail = candidature.visiteur.e_mail %}
+
+    {% set hasTracking = true %}
+    {% set submittedClass = trackingState == 'En attente' ? 'active' : trackingState in ['Présélectionné', 'Entretien', 'Accepté', 'Refusé'] ? 'completed' : '' %}
+    {% set preselectionClass = trackingState == 'Présélectionné' ? 'active' : trackingState in ['Entretien', 'Accepté', 'Refusé'] ? 'completed' : '' %}
+    {% set interviewClass = trackingState == 'Entretien' ? 'active' : trackingState in ['Accepté', 'Refusé'] ? 'completed' : '' %}
+    {% set decisionClass = trackingState == 'Accepté' ? 'active is-accepted' : trackingState == 'Refusé' ? 'active is-refused' : '' %}
+{% endif %}
+
+{% endfor %}
+
+{% set isRefused = trackingState == 'Refusé' %}
+{% set refusedClass = isRefused ? ' is-refused' : '' %}
+{% if isRefused %}
+    {% set submittedClass = submittedClass ~ refusedClass %}
+    {% set preselectionClass = preselectionClass ~ refusedClass %}
+    {% set interviewClass = interviewClass ~ refusedClass %}
+{% endif %}
+
+<div class="tracking-page">
+    {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'candidature', logged_user: false } %}
+
+    <section class="container-xl mt-3">
+        <div class="card tracking-hero">
+            <div class="card-body p-4 p-xl-5">
+                <div class="row align-items-center g-4">
+                    <div class="col-12 col-lg-7">
+                        <h1 class="display-5 fw-bold mb-3">Suivre ma candidature</h1>
+                        <p class="text-secondary fs-4 mb-0">
+                            Entrez votre code de suivi pour voir l'avancement de votre dossier en temps reel.
+                            Les etapes sont affichees de maniere simple, dans le style Momentum.
+                        </p>
+                    </div>
+
+                    <div class="col-12 col-lg-5">
+                        <form method="get" action="{{ path('app_suivre_candidature') }}" class="tracking-search">
+                            <label class="form-label" for="code">Code de candidature</label>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-md-8">
+                                    <input
+                                        type="text"
+                                        id="code"
+                                        name="code"
+                                        class="form-control"
+                                        placeholder="MN3CIHFM"
+                                        value="{{ trackingCode }}"
+                                    >
+                                </div>
+                                <div class="col-12 col-md-4 d-grid">
+                                    <button type="submit" class="btn btn-primary">Verifier</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {% if hasTracking %}
+        <section class="container-xl mt-4">
+            <div class="card tracking-result">
+                <div class="card-body p-4 p-xl-5">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                        <div>
+                            <div class="text-secondary text-uppercase small fw-bold">Code de candidature</div>
+                            <h2 class="h2 mb-1">{{ trackingCode }}</h2>
+                            <p class="text-secondary mb-0">Candidature pour le poste: {{ trackingJob }}</p>
+                        </div>
+
+                        {% if trackingState == 'Accepté' %}
+                            <span class="badge bg-green-lt text-green">Acceptée</span>
+                        {% elseif trackingState == 'Refusé' %}
+                            <span class="badge bg-red-lt text-red">Refusée</span>
+                        {% else %}
+                            <span class="badge bg-blue-lt text-blue">En cours</span>
+                        {% endif %}
+                    </div>
+
+                    <ul class="steps steps-counter mt-4 tracking-steps">
+                        <li class="step-item {{ submittedClass }}">Soumis</li>
+                        <li class="step-item {{ preselectionClass }}">Preselection</li>
+                        <li class="step-item {{ interviewClass }}">Entretien</li>
+                        <li class="step-item {{ decisionClass }}">
+                            Decision
+                            {% if trackingState == 'Accepté' %}
+                                - Acceptee
+                            {% elseif trackingState == 'Refusé' %}
+                                - Refusee
+                            {% endif %}
+                        </li>
+                    </ul>
+
+                    <div class="tracking-state-box mt-4 {{ trackingState == 'Accepté' ? 'is-accepted' : trackingState == 'Refusé' ? 'is-refused' : 'is-review' }}">
+                        {% if trackingState == 'Accepté' %}
+                            <div class="fw-bold text-success">Votre candidature a ete acceptee</div>
+                            <div class="text-secondary mt-1">Votre dossier a termine le processus avec succes. Vous serez contacte prochainement.</div>
+                        {% elseif trackingState == 'Refusé' %}
+                            <div class="fw-bold text-danger">Votre candidature a ete refusee</div>
+                            <div class="text-secondary mt-1">La derniere etape atteinte est la decision finale. Le dossier est ferme pour cette offre.</div>
+                        {% elseif trackingState == 'Entretien' %}
+                            <div class="fw-bold text-primary">Votre candidature est en entretien</div>
+                            <div class="text-secondary mt-1">Verifier votre email pour les details.</div>
+                        {% elseif trackingState == 'Preselection' %}
+                            <div class="fw-bold text-primary">Votre candidature est en preselection</div>
+                            <div class="text-secondary mt-1">Votre dossier a passe la preselection et attend la prochaine etape.</div>
+                        {% else %}
+                            <div class="fw-bold text-primary">Votre candidature est en cours de revision</div>
+                            <div class="text-secondary mt-1">Notre equipe analyse votre profil par rapport aux exigences du poste.</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="tracking-meta-grid">
+                        <div class="tracking-meta-item">
+                            <span class="tracking-meta-label">Soumis le</span>
+                            <span class="tracking-meta-value">{{ trackingDate|date('d/m/Y') }}</span>
+                        </div>
+                        <div class="tracking-meta-item">
+                            <span class="tracking-meta-label">Poste</span>
+                            <span class="tracking-meta-value">{{ trackingJob }}</span>
+                        </div>
+                        <div class="tracking-meta-item">
+                            <span class="tracking-meta-label">Email</span>
+                            <span class="tracking-meta-value">{{ trackingEmail }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    {% else %}
+        <section class="container-xl mt-4">
+            <div class="card tracking-empty">
+                <div class="card-body">
+                    <div class="empty py-5">
+                        <div class="empty-img mb-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clipboard-text" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M9 5h6" />
+                                <path d="M12 5c-.987 0 -1.82 -.633 -2.15 -1.5a1.5 1.5 0 0 1 2.3 -1.5a1.5 1.5 0 0 1 2.3 1.5c-.33 .867 -1.163 1.5 -2.15 1.5z" />
+                                <path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" />
+                                <path d="M9 11h6" />
+                                <path d="M9 15h6" />
+                            </svg>
+                        </div>
+                        <div class="empty-title">Entrez votre code pour afficher le suivi</div>
+                        <div class="empty-subtitle text-secondary">
+                            Une fois le code saisi, la progression de la candidature apparaîtra ici avec les étapes Tabler.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    {% endif %}
+</div>
+
+{% endblock %}
