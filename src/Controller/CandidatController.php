@@ -2,12 +2,16 @@
 
 namespace App\Controller;
 
+use App\Entity\Candidat;
+use App\Form\PostulerType;
+use App\Repository\CandidatRepository;
+use App\Repository\OffreRepository;
+use App\Repository\VisiteurRepository;
+use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-
-use App\Repository\CandidatRepository;
-use App\Entity\Candidat;
 
 final class CandidatController extends AbstractController
 {
@@ -19,12 +23,85 @@ final class CandidatController extends AbstractController
         ]);
     }
 
-    //Candidatures
     #[Route('/candidature/suivre', name: 'app_suivre_candidature')]
-    public function suivre_candidature(CandidatRepository $candidat_repository){
+    public function suivre_candidature(CandidatRepository $candidat_repository): Response
+    {
         $candidatures = $candidat_repository->findAll();
-        return $this->render('candidat/suivre_candidature_page.html.twig' , [ //page
-            'candidatures' => $candidatures
+
+        return $this->render('candidat/suivre_candidature_page.html.twig', [
+            'candidatures' => $candidatures,
+        ]);
+    }
+
+    #[Route('/candidature/postuler/{offreId}/{visiteurId}', name: 'app_candidature_postuler', methods: ['GET', 'POST'])]
+    public function postuler(
+        Request $request,
+        ManagerRegistry $doctrine,
+        OffreRepository $offreRepository,
+        VisiteurRepository $visiteurRepository,
+        int $offreId,
+        int $visiteurId
+    ): Response {
+        $offre = $offreRepository->find($offreId);
+        $visiteur = $visiteurRepository->find($visiteurId);
+
+        if (!$offre || !$visiteur) {
+            return new Response('Offre ou visiteur introuvable.', Response::HTTP_NOT_FOUND);
+        }
+
+        $candidat = new Candidat();
+        $form = $this->createForm(PostulerType::class, $candidat, [
+            'action' => $this->generateUrl('app_candidature_postuler', [
+                'offreId' => $offreId,
+                'visiteurId' => $visiteurId,
+            ]),
+            'method' => 'POST',
+        ]);
+
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $cvFile = $form->get('cv_data')->getData();
+            $lettreFile = $form->get('lettre_motivation_data')->getData();
+
+            if (!$cvFile || !$lettreFile) {
+                $this->addFlash('error', 'CV et lettre de motivation sont requis.');
+                return $this->redirectToRoute('app_offre_list');
+            }
+
+            $cvContent = file_get_contents($cvFile->getPathname());
+            $lettreContent = file_get_contents($lettreFile->getPathname());
+
+            if ($cvContent === false || $lettreContent === false) {
+                $this->addFlash('error', 'Impossible de lire les fichiers uploades.');
+                return $this->redirectToRoute('app_offre_list');
+            }
+
+            $code = strtoupper(base_convert((string) round(microtime(true) * 1000), 10, 36));
+
+            $candidat
+                ->setCode_candidature($code)
+                ->setEtat('En attente')
+                ->setNote(null)
+                ->setDate_candidature(new \DateTime())
+                ->setCv_nom($cvFile->getClientOriginalName())
+                ->setCv_data($cvContent)
+                ->setLettre_motivation_nom($lettreFile->getClientOriginalName())
+                ->setLettre_motivation_data($lettreContent)
+                ->setOffre($offre)
+                ->setVisiteur($visiteur);
+
+            $entityManager = $doctrine->getManager();
+            $entityManager->persist($candidat);
+            $entityManager->flush();
+
+            $this->addFlash('success', 'Votre candidature a ete envoyee avec succes. Code de suivi: ' . $code);
+
+            return $this->redirectToRoute('app_offre_list');
+        }
+
+        return $this->render('candidat/_postuler.html.twig', [
+            'form' => $form->createView(),
         ]);
     }
 }
