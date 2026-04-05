@@ -28,16 +28,16 @@ class Projet
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Employé::class, inversedBy: 'projets')]
+    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'projets')]
     #[ORM\JoinColumn(name: 'responsable_id', referencedColumnName: 'id_employe')]
-    private ?Employé $employé = null;
+    private ?Employe $employé = null;
 
-    public function getEmployé(): ?Employé
+    public function getEmployé(): ?Employe
     {
         return $this->employé;
     }
 
-    public function setEmployé(?Employé $employé): self
+    public function setEmployé(?Employe $employé): self
     {
         $this->employé = $employé;
         return $this;
@@ -169,7 +169,7 @@ class Projet
         return $this;
     }
 
-    #[ORM\ManyToMany(targetEntity: Employé::class, inversedBy: 'projets')]
+    #[ORM\ManyToMany(targetEntity: Employe::class, inversedBy: 'projets')]
     #[ORM\JoinTable(
         name: 'equipe_projet',
         joinColumns: [
@@ -192,7 +192,7 @@ class Projet
         return $this->employés;
     }
 
-    public function addEmployé(Employé $employé): self
+    public function addEmployé(Employe $employé): self
     {
         if (!$this->getEmployés()->contains($employé)) {
             $this->getEmployés()->add($employé);
@@ -200,7 +200,7 @@ class Projet
         return $this;
     }
 
-    public function removeEmployé(Employé $employé): self
+    public function removeEmployé(Employe $employé): self
     {
         $this->getEmployés()->removeElement($employé);
         return $this;

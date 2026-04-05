@@ -84,16 +84,16 @@ class Post
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Employé::class, inversedBy: 'posts')]
+    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'posts')]
     #[ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe')]
-    private ?Employé $employé = null;
+    private ?Employe $employé = null;
 
-    public function getEmployé(): ?Employé
+    public function getEmployé(): ?Employe
     {
         return $this->employé;
     }
 
-    public function setEmployé(?Employé $employé): self
+    public function setEmployé(?Employe $employé): self
     {
         $this->employé = $employé;
         return $this;
@@ -295,7 +295,7 @@ class Post
         return $this;
     }
 
-    #[ORM\ManyToMany(targetEntity: Employé::class, inversedBy: 'posts')]
+    #[ORM\ManyToMany(targetEntity: Employe::class, inversedBy: 'posts')]
     #[ORM\JoinTable(
         name: 'like_post',
         joinColumns: [
@@ -318,7 +318,7 @@ class Post
         return $this->employés;
     }
 
-    public function addEmployé(Employé $employé): self
+    public function addEmployé(Employe $employé): self
     {
         if (!$this->getEmployés()->contains($employé)) {
             $this->getEmployés()->add($employé);
@@ -326,7 +326,7 @@ class Post
         return $this;
     }
 
-    public function removeEmployé(Employé $employé): self
+    public function removeEmployé(Employe $employé): self
     {
         $this->getEmployés()->removeElement($employé);
         return $this;

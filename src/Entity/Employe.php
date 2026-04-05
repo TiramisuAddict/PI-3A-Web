@@ -2,16 +2,14 @@
 
 namespace App\Entity;
 
-use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use App\Repository\EmployeRepository;
 
-use App\Repository\EmployéRepository;
-
-#[ORM\Entity(repositoryClass: EmployéRepository::class)]
+#[ORM\Entity(repositoryClass: EmployeRepository::class)]
 #[ORM\Table(name: 'employé')]
-class Employé
+class Employe
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -156,7 +154,7 @@ class Employé
         return $this;
     }
 
-    #[ORM\Column(type: 'blob', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     private ?string $cv_data = null;
 
     public function getCv_data(): ?string
@@ -181,21 +179,6 @@ class Employé
     public function setCv_nom(?string $cv_nom): self
     {
         $this->cv_nom = $cv_nom;
-        return $this;
-    }
-
-    #[ORM\ManyToOne(targetEntity: Candidat::class, inversedBy: 'employés')]
-    #[ORM\JoinColumn(name: 'id_candidat', referencedColumnName: 'id')]
-    private ?Candidat $candidat = null;
-
-    public function getCandidat(): ?Candidat
-    {
-        return $this->candidat;
-    }
-
-    public function setCandidat(?Candidat $candidat): self
-    {
-        $this->candidat = $candidat;
         return $this;
     }
 
@@ -255,19 +238,6 @@ class Employé
         return $this;
     }
 
-    #[ORM\OneToOne(targetEntity: CompétenceEmployé::class, mappedBy: 'employé')]
-    private ?CompétenceEmployé $compétenceEmployé = null;
-
-    public function getCompétenceEmployé(): ?CompétenceEmployé
-    {
-        return $this->compétenceEmployé;
-    }
-
-    public function setCompétenceEmployé(?CompétenceEmployé $compétenceEmployé): self
-    {
-        $this->compétenceEmployé = $compétenceEmployé;
-        return $this;
-    }
 
     #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employé')]
     private Collection $demandes;
@@ -340,12 +310,12 @@ class Employé
     }
 
     #[ORM\OneToMany(targetEntity: Post::class, mappedBy: 'employé')]
-    private Collection $posts1;
+    private Collection $posts;
 
     /**
      * @return Collection<int, Post>
      */
-    public function getPosts1(): Collection
+    public function getPosts(): Collection
     {
         if (!$this->posts instanceof Collection) {
             $this->posts = new ArrayCollection();
@@ -353,7 +323,7 @@ class Employé
         return $this->posts;
     }
 
-    public function addPost1(Post $post): self
+    public function addPost(Post $post): self
     {
         if (!$this->getPosts()->contains($post)) {
             $this->getPosts()->add($post);
@@ -361,19 +331,19 @@ class Employé
         return $this;
     }
 
-    public function removePost1(Post $post): self
+    public function removePost(Post $post): self
     {
         $this->getPosts()->removeElement($post);
         return $this;
     }
 
     #[ORM\OneToMany(targetEntity: Projet::class, mappedBy: 'employé')]
-    private Collection $projets1;
+    private Collection $projets;
 
     /**
      * @return Collection<int, Projet>
      */
-    public function getProjets1(): Collection
+    public function getProjets(): Collection
     {
         if (!$this->projets instanceof Collection) {
             $this->projets = new ArrayCollection();
@@ -381,7 +351,7 @@ class Employé
         return $this->projets;
     }
 
-    public function addProjet1(Projet $projet): self
+    public function addProjet(Projet $projet): self
     {
         if (!$this->getProjets()->contains($projet)) {
             $this->getProjets()->add($projet);
@@ -389,7 +359,7 @@ class Employé
         return $this;
     }
 
-    public function removeProjet1(Projet $projet): self
+    public function removeProjet(Projet $projet): self
     {
         $this->getProjets()->removeElement($projet);
         return $this;
@@ -433,12 +403,12 @@ class Employé
             new ORM\JoinColumn(name: 'id_projet', referencedColumnName: 'id_projet')
         ]
     )]
-    private Collection $projets;
+    private Collection $projets1;
 
     /**
      * @return Collection<int, Projet>
      */
-    public function getProjets(): Collection
+    public function getProjets1(): Collection
     {
         if (!$this->projets instanceof Collection) {
             $this->projets = new ArrayCollection();
@@ -446,17 +416,17 @@ class Employé
         return $this->projets;
     }
 
-    public function addProjet(Projet $projet): self
+    public function addProjet1(Projet $projet): self
     {
-        if (!$this->getProjets()->contains($projet)) {
-            $this->getProjets()->add($projet);
+        if (!$this->getProjets1()->contains($projet)) {
+            $this->getProjets1()->add($projet);
         }
         return $this;
     }
 
-    public function removeProjet(Projet $projet): self
+    public function removeProjet1(Projet $projet): self
     {
-        $this->getProjets()->removeElement($projet);
+        $this->getProjets1()->removeElement($projet);
         return $this;
     }
 
@@ -470,25 +440,12 @@ class Employé
             new ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post')
         ]
     )]
-    private Collection $posts;
-
-    public function __construct()
-    {
-        $this->commentaires = new ArrayCollection();
-        $this->comptes = new ArrayCollection();
-        $this->demandes = new ArrayCollection();
-        $this->notifications = new ArrayCollection();
-        $this->posts1 = new ArrayCollection();
-        $this->projets1 = new ArrayCollection();
-        $this->taches = new ArrayCollection();
-        $this->projets = new ArrayCollection();
-        $this->posts = new ArrayCollection();
-    }
+    private Collection $posts1;
 
     /**
      * @return Collection<int, Post>
      */
-    public function getPosts(): Collection
+    public function getPosts1(): Collection
     {
         if (!$this->posts instanceof Collection) {
             $this->posts = new ArrayCollection();
@@ -496,149 +453,17 @@ class Employé
         return $this->posts;
     }
 
-    public function addPost(Post $post): self
+    public function addPost1(Post $post): self
     {
-        if (!$this->getPosts()->contains($post)) {
-            $this->getPosts()->add($post);
+        if (!$this->getPosts1()->contains($post)) {
+            $this->getPosts1()->add($post);
         }
         return $this;
     }
 
-    public function removePost(Post $post): self
+    public function removePost1(Post $post): self
     {
-        $this->getPosts()->removeElement($post);
+        $this->getPosts1()->removeElement($post);
         return $this;
     }
-
-    public function getIdEmploye(): ?int
-    {
-        return $this->id_employe;
-    }
-
-    public function getEMail(): ?string
-    {
-        return $this->e_mail;
-    }
-
-    public function setEMail(string $e_mail): static
-    {
-        $this->e_mail = $e_mail;
-
-        return $this;
-    }
-
-    public function getDateEmbauche(): ?\DateTime
-    {
-        return $this->date_embauche;
-    }
-
-    public function setDateEmbauche(?\DateTime $date_embauche): static
-    {
-        $this->date_embauche = $date_embauche;
-
-        return $this;
-    }
-
-    public function getImageProfil(): ?string
-    {
-        return $this->image_profil;
-    }
-
-    public function setImageProfil(?string $image_profil): static
-    {
-        $this->image_profil = $image_profil;
-
-        return $this;
-    }
-
-    public function getCvData(): mixed
-    {
-        return $this->cv_data;
-    }
-
-    public function setCvData(mixed $cv_data): static
-    {
-        $this->cv_data = $cv_data;
-
-        return $this;
-    }
-
-    public function getCvNom(): ?string
-    {
-        return $this->cv_nom;
-    }
-
-    public function setCvNom(?string $cv_nom): static
-    {
-        $this->cv_nom = $cv_nom;
-
-        return $this;
-    }
-
-    public function addPosts1(Post $posts1): static
-    {
-        if (!$this->posts1->contains($posts1)) {
-            $this->posts1->add($posts1);
-            $posts1->setEmployé($this);
-        }
-
-        return $this;
-    }
-
-    public function removePosts1(Post $posts1): static
-    {
-        if ($this->posts1->removeElement($posts1)) {
-            // set the owning side to null (unless already changed)
-            if ($posts1->getEmployé() === $this) {
-                $posts1->setEmployé(null);
-            }
-        }
-
-        return $this;
-    }
-
-    public function addProjets1(Projet $projets1): static
-    {
-        if (!$this->projets1->contains($projets1)) {
-            $this->projets1->add($projets1);
-            $projets1->setEmployé($this);
-        }
-
-        return $this;
-    }
-
-    public function removeProjets1(Projet $projets1): static
-    {
-        if ($this->projets1->removeElement($projets1)) {
-            // set the owning side to null (unless already changed)
-            if ($projets1->getEmployé() === $this) {
-                $projets1->setEmployé(null);
-            }
-        }
-
-        return $this;
-    }
-
-    public function addTach(Tache $tach): static
-    {
-        if (!$this->taches->contains($tach)) {
-            $this->taches->add($tach);
-            $tach->setEmployé($this);
-        }
-
-        return $this;
-    }
-
-    public function removeTach(Tache $tach): static
-    {
-        if ($this->taches->removeElement($tach)) {
-            // set the owning side to null (unless already changed)
-            if ($tach->getEmployé() === $this) {
-                $tach->setEmployé(null);
-            }
-        }
-
-        return $this;
-    }
-
 }

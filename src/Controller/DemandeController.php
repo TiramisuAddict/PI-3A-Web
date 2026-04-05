@@ -5,7 +5,7 @@ namespace App\Controller;
 use App\Entity\Demande;
 use App\Entity\DemandeDetail;
 use App\Entity\HistoriqueDemande;
-use App\Entity\Employé;
+use App\Entity\Employe;
 use App\Repository\DemandeRepository;
 use App\Service\DemandeFormHelper;
 use Doctrine\ORM\EntityManagerInterface;
@@ -42,12 +42,14 @@ class DemandeController extends AbstractController
             'search' => $request->query->get('search'),
         ];
 
-        $demandes = $this->demandeRepository->findWithFilters(array_filter($filters));
+        $demandes = method_exists($this->demandeRepository, 'findWithFilters')
+            ? $this->demandeRepository->findWithFilters(array_filter($filters))
+            : $this->demandeRepository->findAll();
 
         $stats = [
-            'total' => $this->demandeRepository->countAll(),
-            'byStatus' => $this->demandeRepository->countGroupByStatus(),
-            'byPriorite' => $this->demandeRepository->countGroupByPriorite(),
+            'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll() : count($demandes),
+            'byStatus' => method_exists($this->demandeRepository, 'countGroupByStatus') ? $this->demandeRepository->countGroupByStatus() : [],
+            'byPriorite' => method_exists($this->demandeRepository, 'countGroupByPriorite') ? $this->demandeRepository->countGroupByPriorite() : [],
         ];
 
         return $this->render('demande/index.html.twig', [
@@ -98,17 +100,24 @@ class DemandeController extends AbstractController
             }
 
             $employeeId = $data['idEmploye'] ?? $this->getEmployeeId();
-            if (!$employeeId || !$this->isValidEmployeeId((int)$employeeId)) {
+            if (!$employeeId || !$this->isValidEmployeeId((int) $employeeId)) {
                 return new JsonResponse([
                     'success' => false,
                     'message' => 'ID employe invalide. Veuillez selectionner un employe valide.'
                 ], 400);
             }
 
-            $employe = $this->em->getRepository(Employé::class)->find((int)$employeeId);
+            $employe = $this->em->getRepository(Employe::class)->find((int) $employeeId);
+
+            if (!$employe) {
+                return new JsonResponse([
+                    'success' => false,
+                    'message' => 'Employe non trouve.'
+                ], 404);
+            }
 
             $demande = new Demande();
-            $demande->setEmployé($employe);
+            $demande->setEmploye($employe);
             $demande->setCategorie($data['categorie'] ?? '');
             $demande->setTypeDemande($data['typeDemande'] ?? '');
             $demande->setTitre($data['titre'] ?? '');
@@ -131,7 +140,7 @@ class DemandeController extends AbstractController
             $historique = new HistoriqueDemande();
             $historique->setDemande($demande);
             $historique->setNouveauStatut('Nouvelle');
-            $historique->setActeur($this->getEmployeeName());
+            $historique->setActeur($this->getEmployeeName($employe));
             $historique->setCommentaire('Demande creee');
             $historique->setDateAction(new \DateTime());
 
@@ -143,7 +152,6 @@ class DemandeController extends AbstractController
                 'id' => $demande->getIdDemande(),
                 'message' => 'Demande creee avec succes'
             ]);
-
         } catch (\Exception $e) {
             return new JsonResponse([
                 'success' => false,
@@ -254,7 +262,7 @@ class DemandeController extends AbstractController
                 $historique->setDemande($demande);
                 $historique->setAncienStatut($oldStatus);
                 $historique->setNouveauStatut($data['status']);
-                $historique->setActeur($this->getEmployeeName());
+                $historique->setActeur($this->getEmployeeName($demande->getEmploye()));
                 $historique->setCommentaire($data['commentaire'] ?? 'Statut modifie');
                 $historique->setDateAction(new \DateTime());
 
@@ -281,7 +289,6 @@ class DemandeController extends AbstractController
                 'success' => true,
                 'message' => 'Demande mise a jour avec succes'
             ]);
-
         } catch (\Exception $e) {
             return new JsonResponse([
                 'success' => false,
@@ -297,7 +304,10 @@ class DemandeController extends AbstractController
             $demande = $this->demandeRepository->find($id);
 
             if (!$demande) {
-                return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
+                return new JsonResponse([
+                    'success' => false,
+                    'message' => 'Demande non trouvee'
+                ], 404);
             }
 
             $data = json_decode($request->getContent(), true);
@@ -305,7 +315,10 @@ class DemandeController extends AbstractController
             $commentaire = $data['commentaire'] ?? '';
 
             if (!$newStatus) {
-                return new JsonResponse(['success' => false, 'message' => 'Statut requis'], 400);
+                return new JsonResponse([
+                    'success' => false,
+                    'message' => 'Statut requis'
+                ], 400);
             }
 
             $oldStatus = $demande->getStatus();
@@ -315,7 +328,7 @@ class DemandeController extends AbstractController
             $historique->setDemande($demande);
             $historique->setAncienStatut($oldStatus);
             $historique->setNouveauStatut($newStatus);
-            $historique->setActeur($this->getEmployeeName());
+            $historique->setActeur($this->getEmployeeName($demande->getEmploye()));
             $historique->setCommentaire($commentaire);
             $historique->setDateAction(new \DateTime());
 
@@ -326,7 +339,6 @@ class DemandeController extends AbstractController
                 'success' => true,
                 'message' => 'Statut mis a jour avec succes'
             ]);
-
         } catch (\Exception $e) {
             return new JsonResponse([
                 'success' => false,
@@ -342,7 +354,10 @@ class DemandeController extends AbstractController
             $demande = $this->demandeRepository->find($id);
 
             if (!$demande) {
-                return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
+                return new JsonResponse([
+                    'success' => false,
+                    'message' => 'Demande non trouvee'
+                ], 404);
             }
 
             $this->em->remove($demande);
@@ -352,7 +367,6 @@ class DemandeController extends AbstractController
                 'success' => true,
                 'message' => 'Demande supprimee avec succes'
             ]);
-
         } catch (\Exception $e) {
             return new JsonResponse([
                 'success' => false,
@@ -365,11 +379,11 @@ class DemandeController extends AbstractController
     public function statistics(): Response
     {
         $stats = [
-            'total' => $this->demandeRepository->countAll(),
-            'byStatus' => $this->demandeRepository->countGroupByStatus(),
-            'byPriorite' => $this->demandeRepository->countGroupByPriorite(),
-            'byType' => $this->demandeRepository->countGroupByType(),
-            'byCategorie' => $this->demandeRepository->countGroupByCategorie(),
+            'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll() : 0,
+            'byStatus' => method_exists($this->demandeRepository, 'countGroupByStatus') ? $this->demandeRepository->countGroupByStatus() : [],
+            'byPriorite' => method_exists($this->demandeRepository, 'countGroupByPriorite') ? $this->demandeRepository->countGroupByPriorite() : [],
+            'byType' => method_exists($this->demandeRepository, 'countGroupByType') ? $this->demandeRepository->countGroupByType() : [],
+            'byCategorie' => method_exists($this->demandeRepository, 'countGroupByCategorie') ? $this->demandeRepository->countGroupByCategorie() : [],
         ];
 
         return $this->render('demande/statistics.html.twig', [
@@ -422,19 +436,19 @@ class DemandeController extends AbstractController
             $required = $field['required'] ?? false;
             $value = $details[$key] ?? null;
 
-            if ($required && ($value === null || trim((string)$value) === '')) {
+            if ($required && ($value === null || trim((string) $value) === '')) {
                 $errors[] = 'Le champ "' . $label . '" est obligatoire.';
                 continue;
             }
 
-            if ($value === null || trim((string)$value) === '') {
+            if ($value === null || trim((string) $value) === '') {
                 continue;
             }
 
-            if ($field['type'] === 'number') {
+            if (($field['type'] ?? null) === 'number') {
                 if (!is_numeric($value)) {
                     $errors[] = 'Le champ "' . $label . '" doit etre numerique.';
-                } elseif ((float)$value < 0) {
+                } elseif ((float) $value < 0) {
                     $errors[] = 'Le champ "' . $label . '" ne peut pas etre negatif.';
                 } elseif (
                     str_contains(strtolower($key), 'montant') ||
@@ -442,13 +456,13 @@ class DemandeController extends AbstractController
                     str_contains(strtolower($key), 'quantite') ||
                     str_contains(strtolower($key), 'cout')
                 ) {
-                    if ((float)$value <= 0) {
+                    if ((float) $value <= 0) {
                         $errors[] = 'Le champ "' . $label . '" doit etre superieur a 0.';
                     }
                 }
             }
 
-            if ($field['type'] === 'date') {
+            if (($field['type'] ?? null) === 'date') {
                 try {
                     $date = new \DateTime($value);
                     $date->setTime(0, 0, 0);
@@ -519,11 +533,16 @@ class DemandeController extends AbstractController
             }
         } catch (\Exception $e) {
         }
+
         return $this->getFirstEmployeeId();
     }
 
-    private function getEmployeeName(): string
+    private function getEmployeeName(?Employe $employe = null): string
     {
+        if ($employe) {
+            return trim(($employe->getNom() ?? '') . ' ' . ($employe->getPrenom() ?? ''));
+        }
+
         try {
             $session = $this->container->get('request_stack')->getSession();
             $name = $session->get('employee_name');
@@ -532,6 +551,7 @@ class DemandeController extends AbstractController
             }
         } catch (\Exception $e) {
         }
+
         return 'Systeme';
     }
 
@@ -545,6 +565,7 @@ class DemandeController extends AbstractController
             }
         } catch (\Exception $e) {
         }
+
         return null;
     }
 
@@ -556,6 +577,7 @@ class DemandeController extends AbstractController
                 "SELECT id_employe FROM `employé` WHERE id_employe = ?",
                 [$id]
             )->fetchAssociative();
+
             return $result !== false;
         } catch (\Exception $e) {
             return false;
@@ -566,8 +588,9 @@ class DemandeController extends AbstractController
     {
         try {
             $conn = $this->em->getConnection();
+
             return $conn->executeQuery(
-                "SELECT id_employe, CONCAT(COALESCE(nom, ''), ' ', COALESCE(prenom, '')) as nom_complet FROM `employé` ORDER BY nom, prenom"
+                "SELECT id_employe, CONCAT(COALESCE(nom, ''), ' ', COALESCE(prenom, '')) AS nom_complet FROM `employé` ORDER BY nom, prenom"
             )->fetchAllAssociative();
         } catch (\Exception $e) {
             return [];

@@ -184,32 +184,4 @@ class Candidat
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Employé::class, mappedBy: 'candidat')]
-    private Collection $employés;
-
-    /**
-     * @return Collection<int, Employé>
-     */
-    public function getEmployés(): Collection
-    {
-        if (!$this->employés instanceof Collection) {
-            $this->employés = new ArrayCollection();
-        }
-        return $this->employés;
-    }
-
-    public function addEmployé(Employé $employé): self
-    {
-        if (!$this->getEmployés()->contains($employé)) {
-            $this->getEmployés()->add($employé);
-        }
-        return $this;
-    }
-
-    public function removeEmployé(Employé $employé): self
-    {
-        $this->getEmployés()->removeElement($employé);
-        return $this;
-    }
-
 }

@@ -2,11 +2,7 @@
 
 namespace App\Entity;
 
-use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-
 use App\Repository\DemandeDetailRepository;
 
 #[ORM\Entity(repositoryClass: DemandeDetailRepository::class)]
@@ -18,20 +14,17 @@ class DemandeDetail
     #[ORM\Column(type: 'integer')]
     private ?int $id_details = null;
 
-    public function getId_details(): ?int
-    {
-        return $this->id_details;
-    }
-
-    public function setId_details(int $id_details): self
-    {
-        $this->id_details = $id_details;
-        return $this;
-    }
-
     #[ORM\ManyToOne(targetEntity: Demande::class, inversedBy: 'demandeDetails')]
     #[ORM\JoinColumn(name: 'id_demande', referencedColumnName: 'id_demande')]
     private ?Demande $demande = null;
+
+    #[ORM\Column(type: 'text', nullable: false)]
+    private ?string $details = null;
+
+    public function getIdDetails(): ?int
+    {
+        return $this->id_details;
+    }
 
     public function getDemande(): ?Demande
     {
@@ -44,9 +37,6 @@ class DemandeDetail
         return $this;
     }
 
-    #[ORM\Column(type: 'text', nullable: false)]
-    private ?string $details = null;
-
     public function getDetails(): ?string
     {
         return $this->details;
@@ -57,10 +47,4 @@ class DemandeDetail
         $this->details = $details;
         return $this;
     }
-
-    public function getIdDetails(): ?int
-    {
-        return $this->id_details;
-    }
-
 }
