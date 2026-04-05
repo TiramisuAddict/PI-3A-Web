@@ -13,97 +13,10 @@ class DemandeRepository extends ServiceEntityRepository
         parent::__construct($registry, Demande::class);
     }
 
-    public function findByEmploye(int $idEmploye): array
+    public function findWithFilters(array $filters): array
     {
-        return $this->createQueryBuilder('d')
-            ->andWhere('d.idEmploye = :idEmploye')
-            ->setParameter('idEmploye', $idEmploye)
-            ->orderBy('d.dateCreation', 'DESC')
-            ->getQuery()
-            ->getResult();
-    }
-
-    public function countAll(): int
-    {
-        return (int) $this->createQueryBuilder('d')
-            ->select('COUNT(d.idDemande)')
-            ->getQuery()
-            ->getSingleScalarResult();
-    }
-
-    public function countByStatus(string $status): int
-    {
-        return (int) $this->createQueryBuilder('d')
-            ->select('COUNT(d.idDemande)')
-            ->andWhere('d.status = :status')
-            ->setParameter('status', $status)
-            ->getQuery()
-            ->getSingleScalarResult();
-    }
-
-    public function countGroupByStatus(): array
-    {
-        $result = $this->createQueryBuilder('d')
-            ->select('d.status, COUNT(d.idDemande) as cnt')
-            ->groupBy('d.status')
-            ->getQuery()
-            ->getResult();
-
-        $grouped = [];
-        foreach ($result as $row) {
-            $grouped[$row['status']] = (int)$row['cnt'];
-        }
-        return $grouped;
-    }
-
-    public function countGroupByPriorite(): array
-    {
-        $result = $this->createQueryBuilder('d')
-            ->select('d.priorite, COUNT(d.idDemande) as cnt')
-            ->groupBy('d.priorite')
-            ->getQuery()
-            ->getResult();
-
-        $grouped = [];
-        foreach ($result as $row) {
-            $grouped[$row['priorite']] = (int)$row['cnt'];
-        }
-        return $grouped;
-    }
-
-    public function countGroupByType(): array
-    {
-        $result = $this->createQueryBuilder('d')
-            ->select('d.typeDemande, COUNT(d.idDemande) as cnt')
-            ->groupBy('d.typeDemande')
-            ->getQuery()
-            ->getResult();
-
-        $grouped = [];
-        foreach ($result as $row) {
-            $grouped[$row['typeDemande']] = (int)$row['cnt'];
-        }
-        return $grouped;
-    }
-
-    public function countGroupByCategorie(): array
-    {
-        $result = $this->createQueryBuilder('d')
-            ->select('d.categorie, COUNT(d.idDemande) as cnt')
-            ->groupBy('d.categorie')
-            ->getQuery()
-            ->getResult();
-
-        $grouped = [];
-        foreach ($result as $row) {
-            $grouped[$row['categorie']] = (int)$row['cnt'];
-        }
-        return $grouped;
-    }
-
-    public function findWithFilters(array $filters = []): array
-    {
-        $qb = $this->createQueryBuilder('d');
+        $qb = $this->createQueryBuilder('d')
+            ->orderBy('d.date_creation', 'DESC');
 
         if (!empty($filters['categorie'])) {
             $qb->andWhere('d.categorie = :categorie')
@@ -120,23 +33,79 @@ class DemandeRepository extends ServiceEntityRepository
                ->setParameter('priorite', $filters['priorite']);
         }
 
-        if (!empty($filters['typeDemande'])) {
-            $qb->andWhere('d.typeDemande = :typeDemande')
-               ->setParameter('typeDemande', $filters['typeDemande']);
-        }
-
-        if (!empty($filters['idEmploye'])) {
-            $qb->andWhere('d.idEmploye = :idEmploye')
-               ->setParameter('idEmploye', $filters['idEmploye']);
-        }
-
         if (!empty($filters['search'])) {
             $qb->andWhere('d.titre LIKE :search OR d.description LIKE :search')
                ->setParameter('search', '%' . $filters['search'] . '%');
         }
 
-        return $qb->orderBy('d.dateCreation', 'DESC')
-                  ->getQuery()
-                  ->getResult();
+        return $qb->getQuery()->getResult();
+    }
+
+    public function countAll(): int
+    {
+        return $this->createQueryBuilder('d')
+            ->select('COUNT(d.id_demande)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function countGroupByStatus(): array
+    {
+        $results = $this->createQueryBuilder('d')
+            ->select('d.status, COUNT(d.id_demande) as count')
+            ->groupBy('d.status')
+            ->getQuery()
+            ->getResult();
+
+        $grouped = [];
+        foreach ($results as $result) {
+            $grouped[$result['status']] = (int) $result['count'];
+        }
+        return $grouped;
+    }
+
+    public function countGroupByPriorite(): array
+    {
+        $results = $this->createQueryBuilder('d')
+            ->select('d.priorite, COUNT(d.id_demande) as count')
+            ->groupBy('d.priorite')
+            ->getQuery()
+            ->getResult();
+
+        $grouped = [];
+        foreach ($results as $result) {
+            $grouped[$result['priorite'] ?? 'Non definie'] = (int) $result['count'];
+        }
+        return $grouped;
+    }
+
+    public function countGroupByType(): array
+    {
+        $results = $this->createQueryBuilder('d')
+            ->select('d.type_demande, COUNT(d.id_demande) as count')
+            ->groupBy('d.type_demande')
+            ->getQuery()
+            ->getResult();
+
+        $grouped = [];
+        foreach ($results as $result) {
+            $grouped[$result['type_demande']] = (int) $result['count'];
+        }
+        return $grouped;
+    }
+
+    public function countGroupByCategorie(): array
+    {
+        $results = $this->createQueryBuilder('d')
+            ->select('d.categorie, COUNT(d.id_demande) as count')
+            ->groupBy('d.categorie')
+            ->getQuery()
+            ->getResult();
+
+        $grouped = [];
+        foreach ($results as $result) {
+            $grouped[$result['categorie']] = (int) $result['count'];
+        }
+        return $grouped;
     }
 }

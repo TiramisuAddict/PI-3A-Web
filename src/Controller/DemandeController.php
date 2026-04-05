@@ -3,8 +3,9 @@
 namespace App\Controller;
 
 use App\Entity\Demande;
-use App\Entity\DemandeDetails;
+use App\Entity\DemandeDetail;
 use App\Entity\HistoriqueDemande;
+use App\Entity\Employé;
 use App\Repository\DemandeRepository;
 use App\Service\DemandeFormHelper;
 use Doctrine\ORM\EntityManagerInterface;
@@ -97,7 +98,6 @@ class DemandeController extends AbstractController
             }
 
             $employeeId = $data['idEmploye'] ?? $this->getEmployeeId();
-
             if (!$employeeId || !$this->isValidEmployeeId((int)$employeeId)) {
                 return new JsonResponse([
                     'success' => false,
@@ -105,8 +105,10 @@ class DemandeController extends AbstractController
                 ], 400);
             }
 
+            $employe = $this->em->getRepository(Employé::class)->find((int)$employeeId);
+
             $demande = new Demande();
-            $demande->setIdEmploye((int)$employeeId);
+            $demande->setEmployé($employe);
             $demande->setCategorie($data['categorie'] ?? '');
             $demande->setTypeDemande($data['typeDemande'] ?? '');
             $demande->setTitre($data['titre'] ?? '');
@@ -119,12 +121,11 @@ class DemandeController extends AbstractController
             $this->em->flush();
 
             if (!empty($data['details']) && is_array($data['details'])) {
-                $detailsEntity = new DemandeDetails();
+                $detailsEntity = new DemandeDetail();
                 $detailsEntity->setDemande($demande);
-                $detailsEntity->setDetails($data['details']);
+                $detailsEntity->setDetails(json_encode($data['details']));
                 $this->em->persist($detailsEntity);
                 $this->em->flush();
-                $demande->setDetails($detailsEntity);
             }
 
             $historique = new HistoriqueDemande();
@@ -139,7 +140,7 @@ class DemandeController extends AbstractController
 
             return new JsonResponse([
                 'success' => true,
-                'id' => $demande->getId(),
+                'id' => $demande->getIdDemande(),
                 'message' => 'Demande creee avec succes'
             ]);
 
@@ -162,9 +163,13 @@ class DemandeController extends AbstractController
 
         $detailsData = [];
         $fieldLabels = [];
+        $demandeDetails = $demande->getDemandeDetails();
 
-        if ($demande->getDetails() !== null) {
-            $detailsData = $demande->getDetails()->getDetails();
+        if ($demandeDetails->count() > 0) {
+            $firstDetail = $demandeDetails->first();
+            $detailsJson = $firstDetail->getDetails();
+            $detailsData = json_decode($detailsJson, true) ?? [];
+
             foreach ($detailsData as $key => $value) {
                 $fieldLabels[$key] = $this->formHelper->getFieldLabel($demande->getTypeDemande(), $key);
             }
@@ -187,7 +192,13 @@ class DemandeController extends AbstractController
             throw $this->createNotFoundException('Demande non trouvee');
         }
 
-        $existingDetails = $demande->getDetails() ? $demande->getDetails()->getDetails() : [];
+        $existingDetails = [];
+        $demandeDetails = $demande->getDemandeDetails();
+
+        if ($demandeDetails->count() > 0) {
+            $firstDetail = $demandeDetails->first();
+            $existingDetails = json_decode($firstDetail->getDetails(), true) ?? [];
+        }
 
         return $this->render('demande/edit.html.twig', [
             'demande' => $demande,
@@ -246,17 +257,22 @@ class DemandeController extends AbstractController
                 $historique->setActeur($this->getEmployeeName());
                 $historique->setCommentaire($data['commentaire'] ?? 'Statut modifie');
                 $historique->setDateAction(new \DateTime());
+
                 $this->em->persist($historique);
             }
 
             if (isset($data['details']) && is_array($data['details'])) {
-                $details = $demande->getDetails();
-                if (!$details) {
-                    $details = new DemandeDetails();
+                $demandeDetails = $demande->getDemandeDetails();
+
+                if ($demandeDetails->count() > 0) {
+                    $details = $demandeDetails->first();
+                } else {
+                    $details = new DemandeDetail();
                     $details->setDemande($demande);
                     $this->em->persist($details);
                 }
-                $details->setDetails($data['details']);
+
+                $details->setDetails(json_encode($data['details']));
             }
 
             $this->em->flush();
@@ -302,8 +318,8 @@ class DemandeController extends AbstractController
             $historique->setActeur($this->getEmployeeName());
             $historique->setCommentaire($commentaire);
             $historique->setDateAction(new \DateTime());
-            $this->em->persist($historique);
 
+            $this->em->persist($historique);
             $this->em->flush();
 
             return new JsonResponse([
@@ -436,7 +452,6 @@ class DemandeController extends AbstractController
                 try {
                     $date = new \DateTime($value);
                     $date->setTime(0, 0, 0);
-
                     $lowerKey = strtolower($key);
                     $lowerLabel = strtolower($label);
 
@@ -455,8 +470,7 @@ class DemandeController extends AbstractController
                         $errors[] = 'Le champ "' . $label . '" ne peut pas etre inferieur a la date actuelle.';
                     }
 
-                    $isEndDate =
-                        str_contains($lowerKey, 'datefin') ||
+                    $isEndDate = str_contains($lowerKey, 'datefin') ||
                         str_contains($lowerLabel, 'date de fin');
 
                     if ($isEndDate) {
@@ -479,7 +493,6 @@ class DemandeController extends AbstractController
                         if ($startValue) {
                             $startDate = new \DateTime($startValue);
                             $startDate->setTime(0, 0, 0);
-
                             if ($date < $startDate) {
                                 $errors[] = 'Le champ "' . $label . '" doit etre superieur ou egal a la date de debut.';
                             }
@@ -487,7 +500,6 @@ class DemandeController extends AbstractController
                             $errors[] = 'Le champ "' . $label . '" ne peut pas etre inferieur a la date actuelle.';
                         }
                     }
-
                 } catch (\Exception $e) {
                     $errors[] = 'Le champ "' . $label . '" contient une date invalide.';
                 }
@@ -507,7 +519,6 @@ class DemandeController extends AbstractController
             }
         } catch (\Exception $e) {
         }
-
         return $this->getFirstEmployeeId();
     }
 
@@ -521,7 +532,6 @@ class DemandeController extends AbstractController
             }
         } catch (\Exception $e) {
         }
-
         return 'Systeme';
     }
 
@@ -535,7 +545,6 @@ class DemandeController extends AbstractController
             }
         } catch (\Exception $e) {
         }
-
         return null;
     }
 
@@ -547,7 +556,6 @@ class DemandeController extends AbstractController
                 "SELECT id_employe FROM `employé` WHERE id_employe = ?",
                 [$id]
             )->fetchAssociative();
-
             return $result !== false;
         } catch (\Exception $e) {
             return false;

@@ -2,79 +2,50 @@
 
 namespace App\Entity;
 
-use App\Repository\DemandeRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+
+use App\Repository\DemandeRepository;
 
 #[ORM\Entity(repositoryClass: DemandeRepository::class)]
 #[ORM\Table(name: 'demande')]
 class Demande
 {
     #[ORM\Id]
-    #[ORM\GeneratedValue(strategy: 'IDENTITY')]
-    #[ORM\Column(name: 'id_demande', type: 'integer')]
-    private ?int $idDemande = null;
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
+    private ?int $id_demande = null;
 
-    #[ORM\Column(name: 'id_employe', type: 'integer')]
-    private ?int $idEmploye = null;
-
-    #[ORM\Column(name: 'categorie', length: 100)]
-    private ?string $categorie = null;
-
-    #[ORM\Column(name: 'titre', length: 255)]
-    private ?string $titre = null;
-
-    #[ORM\Column(name: 'description', type: 'text', nullable: true)]
-    private ?string $description = null;
-
-    #[ORM\Column(name: 'priorite', length: 50)]
-    private ?string $priorite = null;
-
-    #[ORM\Column(name: 'status', length: 50)]
-    private ?string $status = null;
-
-    #[ORM\Column(name: 'date_creation', type: 'date')]
-    private ?\DateTimeInterface $dateCreation = null;
-
-    #[ORM\Column(name: 'type_demande', length: 100)]
-    private ?string $typeDemande = null;
-
-    #[ORM\OneToOne(mappedBy: 'demande', targetEntity: DemandeDetails::class, cascade: ['persist', 'remove'], fetch: 'EAGER')]
-    private ?DemandeDetails $details = null;
-
-    #[ORM\OneToMany(mappedBy: 'demande', targetEntity: HistoriqueDemande::class, cascade: ['persist', 'remove'], fetch: 'EAGER')]
-    #[ORM\OrderBy(['dateAction' => 'DESC'])]
-    private Collection $historiques;
-
-    public function __construct()
+    public function getId_demande(): ?int
     {
-        $this->historiques = new ArrayCollection();
-        $this->dateCreation = new \DateTime();
-        $this->status = 'Nouvelle';
-        $this->priorite = 'NORMALE';
+        return $this->id_demande;
     }
 
-    public function getId(): ?int
+    public function setId_demande(int $id_demande): self
     {
-        return $this->idDemande;
-    }
-
-    public function getIdDemande(): ?int
-    {
-        return $this->idDemande;
-    }
-
-    public function getIdEmploye(): ?int
-    {
-        return $this->idEmploye;
-    }
-
-    public function setIdEmploye(int $idEmploye): self
-    {
-        $this->idEmploye = $idEmploye;
+        $this->id_demande = $id_demande;
         return $this;
     }
+
+    #[ORM\ManyToOne(targetEntity: Employé::class, inversedBy: 'demandes')]
+    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
+    private ?Employé $employé = null;
+
+    public function getEmployé(): ?Employé
+    {
+        return $this->employé;
+    }
+
+    public function setEmployé(?Employé $employé): self
+    {
+        $this->employé = $employé;
+        return $this;
+    }
+
+    #[ORM\Column(type: 'string', nullable: false)]
+    private ?string $categorie = null;
 
     public function getCategorie(): ?string
     {
@@ -87,6 +58,9 @@ class Demande
         return $this;
     }
 
+    #[ORM\Column(type: 'string', nullable: false)]
+    private ?string $titre = null;
+
     public function getTitre(): ?string
     {
         return $this->titre;
@@ -98,27 +72,36 @@ class Demande
         return $this;
     }
 
+    #[ORM\Column(type: 'string', nullable: false)]
+    private ?string $description = null;
+
     public function getDescription(): ?string
     {
         return $this->description;
     }
 
-    public function setDescription(?string $description): self
+    public function setDescription(string $description): self
     {
         $this->description = $description;
         return $this;
     }
+
+    #[ORM\Column(type: 'string', nullable: true)]
+    private ?string $priorite = null;
 
     public function getPriorite(): ?string
     {
         return $this->priorite;
     }
 
-    public function setPriorite(string $priorite): self
+    public function setPriorite(?string $priorite): self
     {
         $this->priorite = $priorite;
         return $this;
     }
+
+    #[ORM\Column(type: 'string', nullable: false)]
+    private ?string $status = null;
 
     public function getStatus(): ?string
     {
@@ -131,53 +114,123 @@ class Demande
         return $this;
     }
 
-    public function getDateCreation(): ?\DateTimeInterface
+    #[ORM\Column(type: 'date', nullable: false)]
+    private ?\DateTimeInterface $date_creation = null;
+
+    public function getDate_creation(): ?\DateTimeInterface
     {
-        return $this->dateCreation;
+        return $this->date_creation;
     }
 
-    public function setDateCreation(\DateTimeInterface $dateCreation): self
+    public function setDate_creation(\DateTimeInterface $date_creation): self
     {
-        $this->dateCreation = $dateCreation;
+        $this->date_creation = $date_creation;
+        return $this;
+    }
+
+    #[ORM\Column(type: 'string', nullable: false)]
+    private ?string $type_demande = null;
+
+    public function getType_demande(): ?string
+    {
+        return $this->type_demande;
+    }
+
+    public function setType_demande(string $type_demande): self
+    {
+        $this->type_demande = $type_demande;
+        return $this;
+    }
+
+    #[ORM\OneToMany(targetEntity: DemandeDetail::class, mappedBy: 'demande')]
+    private Collection $demandeDetails;
+
+    /**
+     * @return Collection<int, DemandeDetail>
+     */
+    public function getDemandeDetails(): Collection
+    {
+        if (!$this->demandeDetails instanceof Collection) {
+            $this->demandeDetails = new ArrayCollection();
+        }
+        return $this->demandeDetails;
+    }
+
+    public function addDemandeDetail(DemandeDetail $demandeDetail): self
+    {
+        if (!$this->getDemandeDetails()->contains($demandeDetail)) {
+            $this->getDemandeDetails()->add($demandeDetail);
+        }
+        return $this;
+    }
+
+    public function removeDemandeDetail(DemandeDetail $demandeDetail): self
+    {
+        $this->getDemandeDetails()->removeElement($demandeDetail);
+        return $this;
+    }
+
+    #[ORM\OneToMany(targetEntity: HistoriqueDemande::class, mappedBy: 'demande')]
+    private Collection $historiqueDemandes;
+
+    public function __construct()
+    {
+        $this->demandeDetails = new ArrayCollection();
+        $this->historiqueDemandes = new ArrayCollection();
+    }
+
+    /**
+     * @return Collection<int, HistoriqueDemande>
+     */
+    public function getHistoriqueDemandes(): Collection
+    {
+        if (!$this->historiqueDemandes instanceof Collection) {
+            $this->historiqueDemandes = new ArrayCollection();
+        }
+        return $this->historiqueDemandes;
+    }
+
+    public function addHistoriqueDemande(HistoriqueDemande $historiqueDemande): self
+    {
+        if (!$this->getHistoriqueDemandes()->contains($historiqueDemande)) {
+            $this->getHistoriqueDemandes()->add($historiqueDemande);
+        }
+        return $this;
+    }
+
+    public function removeHistoriqueDemande(HistoriqueDemande $historiqueDemande): self
+    {
+        $this->getHistoriqueDemandes()->removeElement($historiqueDemande);
+        return $this;
+    }
+
+    public function getIdDemande(): ?int
+    {
+        return $this->id_demande;
+    }
+
+    public function getDateCreation(): ?\DateTime
+    {
+        return $this->date_creation;
+    }
+
+    public function setDateCreation(\DateTime $date_creation): static
+    {
+        $this->date_creation = $date_creation;
+
         return $this;
     }
 
     public function getTypeDemande(): ?string
     {
-        return $this->typeDemande;
+        return $this->type_demande;
     }
 
-    public function setTypeDemande(string $typeDemande): self
+    public function setTypeDemande(string $type_demande): static
     {
-        $this->typeDemande = $typeDemande;
+        $this->type_demande = $type_demande;
+
         return $this;
     }
 
-    public function getDetails(): ?DemandeDetails
-    {
-        return $this->details;
-    }
-
-    public function setDetails(?DemandeDetails $details): self
-    {
-        if ($details !== null && $details->getDemande() !== $this) {
-            $details->setDemande($this);
-        }
-        $this->details = $details;
-        return $this;
-    }
-
-    public function getHistoriques(): Collection
-    {
-        return $this->historiques;
-    }
-
-    public function addHistorique(HistoriqueDemande $historique): self
-    {
-        if (!$this->historiques->contains($historique)) {
-            $this->historiques->add($historique);
-            $historique->setDemande($this);
-        }
-        return $this;
-    }
 }
