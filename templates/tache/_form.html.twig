@@ -1,0 +1,86 @@
+{% set titreClass = 'form-control' ~ (form.titre.vars.errors|length ? ' is-invalid' : '') %}
+{% set descriptionClass = 'form-control' ~ (form.description.vars.errors|length ? ' is-invalid' : '') %}
+{% set prioriteClass = 'form-select' ~ (form.priorite.vars.errors|length ? ' is-invalid' : '') %}
+{% set dateDebClass = 'form-control' ~ (form.date_deb.vars.errors|length ? ' is-invalid' : '') %}
+{% set dateLimiteClass = 'form-control' ~ (form.date_limite.vars.errors|length ? ' is-invalid' : '') %}
+{% set statutClass = 'form-select' ~ (form.statut_tache.vars.errors|length ? ' is-invalid' : '') %}
+{% set progressionClass = 'form-control' ~ (form.progression.vars.errors|length ? ' is-invalid' : '') %}
+{% set employeClass = 'form-select' ~ (form.employe.vars.errors|length ? ' is-invalid' : '') %}
+
+{{ form_start(form, {'attr': {'class': 'workspace-form', 'novalidate': 'novalidate'}}) }}
+    {% if form.vars.errors|length > 0 %}
+        <div class="alert alert-danger mb-3" role="alert">Merci de corriger les erreurs indiquees dans le formulaire.</div>
+    {% endif %}
+
+    <div class="card workspace-card">
+        <div class="card-body p-4">
+            <div class="row g-3">
+                <div class="col-12">
+                    {{ form_label(form.titre, null, {'label_attr': {'class': 'form-label'}}) }}
+                    {{ form_widget(form.titre, {'attr': {'class': titreClass, 'placeholder': 'Ex: Corriger le flux de validation'}}) }}
+                    {% for error in form.titre.vars.errors %}
+                        <div class="invalid-feedback d-block">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-12">
+                    {{ form_label(form.description, null, {'label_attr': {'class': 'form-label'}}) }}
+                    {{ form_widget(form.description, {'attr': {'class': descriptionClass, 'placeholder': 'Description de la tache...'}}) }}
+                    {% for error in form.description.vars.errors %}
+                        <div class="invalid-feedback d-block">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-md-4">
+                    {{ form_label(form.priorite, null, {'label_attr': {'class': 'form-label'}}) }}
+                    {{ form_widget(form.priorite, {'attr': {'class': prioriteClass}}) }}
+                    {% for error in form.priorite.vars.errors %}
+                        <div class="invalid-feedback d-block">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-md-4">
+                    {{ form_label(form.date_deb, null, {'label_attr': {'class': 'form-label'}}) }}
+                    {{ form_widget(form.date_deb, {'attr': {'class': dateDebClass}}) }}
+                    {% if form.date_deb.vars.disabled %}
+                        <div class="form-hint">La date de debut ne peut pas etre modifiee en edition.</div>
+                    {% endif %}
+                    {% for error in form.date_deb.vars.errors %}
+                        <div class="invalid-feedback d-block">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-md-4">
+                    {{ form_label(form.date_limite, null, {'label_attr': {'class': 'form-label'}}) }}
+                    {{ form_widget(form.date_limite, {'attr': {'class': dateLimiteClass}}) }}
+                    {% for error in form.date_limite.vars.errors %}
+                        <div class="invalid-feedback d-block">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-md-6">
+                    {{ form_label(form.statut_tache, null, {'label_attr': {'class': 'form-label'}}) }}
+                    {{ form_widget(form.statut_tache, {'attr': {'class': statutClass}}) }}
+                    {% for error in form.statut_tache.vars.errors %}
+                        <div class="invalid-feedback d-block">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-md-6">
+                    {{ form_label(form.progression, null, {'label_attr': {'class': 'form-label'}}) }}
+                    {{ form_widget(form.progression, {'attr': {'class': progressionClass}}) }}
+                    {% for error in form.progression.vars.errors %}
+                        <div class="invalid-feedback d-block">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-12">
+                    {{ form_label(form.employe, null, {'label_attr': {'class': 'form-label'}}) }}
+                    {{ form_widget(form.employe, {'attr': {'class': employeClass}}) }}
+                    <div class="form-hint">Seuls les membres de l'equipe projet sont proposes.</div>
+                    {% for error in form.employe.vars.errors %}
+                        <div class="invalid-feedback d-block">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-primary" type="submit">{{ button_label|default('Enregistrer') }}</button>
+        <a href="{{ path('app_projet_index', {'projet': projet.idProjet}) }}" class="btn btn-outline-secondary">Annuler</a>
+    </div>
+{{ form_end(form) }}

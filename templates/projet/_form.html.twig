@@ -1,7 +1,16 @@
-{{ form_start(form) }}
+{% set nomClass = 'form-control' ~ (form.nom.vars.errors|length ? ' is-invalid' : '') %}
+{% set descriptionClass = 'form-control' ~ (form.description.vars.errors|length ? ' is-invalid' : '') %}
+{% set dateDebutClass = 'form-control' ~ (form.date_debut.vars.errors|length ? ' is-invalid' : '') %}
+{% set dateFinPrevueClass = 'form-control' ~ (form.date_fin_prevue.vars.errors|length ? ' is-invalid' : '') %}
+{% set dateFinReelleClass = 'form-control' ~ (form.date_fin_reelle.vars.errors|length ? ' is-invalid' : '') %}
+{% set statutClass = 'form-select' ~ (form.statut.vars.errors|length ? ' is-invalid' : '') %}
+{% set prioriteClass = 'form-select' ~ (form.priorite.vars.errors|length ? ' is-invalid' : '') %}
+{% set responsableClass = 'form-select' ~ (form.responsable.vars.errors|length ? ' is-invalid' : '') %}
+
+{{ form_start(form, {'attr': {'id': 'projet-form', 'class': 'workspace-form', 'novalidate': 'novalidate'}}) }}
     {% if form.vars.errors|length > 0 %}
-        <div class="alert alert-danger mb-3">
-            {{ form_errors(form) }}
+        <div class="alert alert-danger mb-3" role="alert">
+            Merci de corriger les erreurs indiquees dans le formulaire.
         </div>
     {% endif %}
 
@@ -14,13 +23,19 @@
                 <div class="card-body">
                     <div class="mb-3">
                         {{ form_label(form.nom, null, {'label_attr': {'class': 'form-label'}}) }}
-                        {{ form_widget(form.nom, {'attr': {'class': 'form-control', 'placeholder': 'Ex: Refonte espace collaborateur'}}) }}
-                        {{ form_errors(form.nom) }}
+                        {{ form_widget(form.nom, {'attr': {'class': nomClass, 'placeholder': 'Ex: Refonte espace collaborateur', 'data-field-id': 'nom'}}) }}
+                        <div class="invalid-feedback" id="nom-live-error"></div>
+                        {% for error in form.nom.vars.errors %}
+                            <div class="invalid-feedback d-block">{{ error.message }}</div>
+                        {% endfor %}
                     </div>
                     <div>
                         {{ form_label(form.description, null, {'label_attr': {'class': 'form-label'}}) }}
-                        {{ form_widget(form.description, {'attr': {'class': 'form-control', 'rows': 6, 'placeholder': 'Objectifs, contexte, livrables et perimetre du projet...'}}) }}
-                        {{ form_errors(form.description) }}
+                        {{ form_widget(form.description, {'attr': {'class': descriptionClass, 'rows': 6, 'placeholder': 'Objectifs, contexte, livrables et perimetre du projet...', 'data-field-id': 'description'}}) }}
+                        <div class="invalid-feedback" id="description-live-error"></div>
+                        {% for error in form.description.vars.errors %}
+                            <div class="invalid-feedback d-block">{{ error.message }}</div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
@@ -33,29 +48,44 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             {{ form_label(form.date_debut, null, {'label_attr': {'class': 'form-label'}}) }}
-                            {{ form_widget(form.date_debut, {'attr': {'class': 'form-control'}}) }}
-                            {{ form_errors(form.date_debut) }}
+                            {{ form_widget(form.date_debut, {'attr': {'class': dateDebutClass, 'data-field-id': 'date_debut'}}) }}
+                            <div class="invalid-feedback" id="date-debut-live-error"></div>
+                            {% for error in form.date_debut.vars.errors %}
+                                <div class="invalid-feedback d-block">{{ error.message }}</div>
+                            {% endfor %}
                         </div>
                         <div class="col-md-6">
                             {{ form_label(form.date_fin_prevue, null, {'label_attr': {'class': 'form-label'}}) }}
-                            {{ form_widget(form.date_fin_prevue, {'attr': {'class': 'form-control'}}) }}
-                            {{ form_errors(form.date_fin_prevue) }}
+                            {{ form_widget(form.date_fin_prevue, {'attr': {'class': dateFinPrevueClass, 'data-field-id': 'date_fin_prevue'}}) }}
+                            <div class="invalid-feedback" id="date-fin-prevue-live-error"></div>
+                            {% for error in form.date_fin_prevue.vars.errors %}
+                                <div class="invalid-feedback d-block">{{ error.message }}</div>
+                            {% endfor %}
                         </div>
                         <div class="col-md-6">
                             {{ form_label(form.date_fin_reelle, null, {'label_attr': {'class': 'form-label'}}) }}
-                            {{ form_widget(form.date_fin_reelle, {'attr': {'class': 'form-control'}}) }}
+                            {{ form_widget(form.date_fin_reelle, {'attr': {'class': dateFinReelleClass, 'data-field-id': 'date_fin_reelle'}}) }}
+                            <div class="invalid-feedback" id="date-fin-reelle-live-error"></div>
                             <div class="form-hint">Optionnel: a renseigner a la cloture du projet.</div>
-                            {{ form_errors(form.date_fin_reelle) }}
+                            {% for error in form.date_fin_reelle.vars.errors %}
+                                <div class="invalid-feedback d-block">{{ error.message }}</div>
+                            {% endfor %}
                         </div>
                         <div class="col-md-3">
                             {{ form_label(form.statut, null, {'label_attr': {'class': 'form-label'}}) }}
-                            {{ form_widget(form.statut, {'attr': {'class': 'form-select'}}) }}
-                            {{ form_errors(form.statut) }}
+                            {{ form_widget(form.statut, {'attr': {'class': statutClass, 'data-field-id': 'statut'}}) }}
+                            <div class="invalid-feedback" id="statut-live-error"></div>
+                            {% for error in form.statut.vars.errors %}
+                                <div class="invalid-feedback d-block">{{ error.message }}</div>
+                            {% endfor %}
                         </div>
                         <div class="col-md-3">
                             {{ form_label(form.priorite, null, {'label_attr': {'class': 'form-label'}}) }}
-                            {{ form_widget(form.priorite, {'attr': {'class': 'form-select'}}) }}
-                            {{ form_errors(form.priorite) }}
+                            {{ form_widget(form.priorite, {'attr': {'class': prioriteClass, 'data-field-id': 'priorite'}}) }}
+                            <div class="invalid-feedback" id="priorite-live-error"></div>
+                            {% for error in form.priorite.vars.errors %}
+                                <div class="invalid-feedback d-block">{{ error.message }}</div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -70,14 +100,34 @@
                 <div class="card-body">
                     <div class="mb-3">
                         {{ form_label(form.responsable, null, {'label_attr': {'class': 'form-label'}}) }}
-                        {{ form_widget(form.responsable, {'attr': {'class': 'form-select'}}) }}
-                        {{ form_errors(form.responsable) }}
+                        {{ form_widget(form.responsable, {'attr': {'class': responsableClass, 'data-field-id': 'responsable'}}) }}
+                        <div class="invalid-feedback" id="responsable-live-error"></div>
+                        {% for error in form.responsable.vars.errors %}
+                            <div class="invalid-feedback d-block">{{ error.message }}</div>
+                        {% endfor %}
                     </div>
                     <div>
                         {{ form_label(form.membresEquipe, null, {'label_attr': {'class': 'form-label'}}) }}
-                        {{ form_widget(form.membresEquipe, {'attr': {'class': 'form-select', 'size': 9}}) }}
-                        <div class="form-hint">Selection multiple: Ctrl (Windows) / Cmd (Mac).</div>
-                        {{ form_errors(form.membresEquipe) }}
+                        <div class="input-icon mb-2">
+                            <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                            <input type="text" id="member-search" class="form-control" placeholder="Rechercher un employe...">
+                        </div>
+                        <div id="member-checkbox-list" class="border rounded p-2 bg-body-secondary" style="max-height: 280px; overflow:auto; border-color:#e3e8f3 !important;">
+                            {% for choice in form.membresEquipe %}
+                                {% set label = choice.vars.label|default('') %}
+                                <label class="member-option d-flex align-items-center gap-2 px-2 py-2 rounded mb-2 bg-white border" data-member-label="{{ label|lower }}" style="border-color:#e8edf7 !important; cursor:pointer;">
+                                    {{ form_widget(choice, {'attr': {'class': 'form-check-input mt-0 member-checkbox'}}) }}
+                                    <span class="form-check-label fw-medium text-truncate">{{ label }}</span>
+                                </label>
+                            {% else %}
+                                <div class="workspace-subtle small">Aucun employe disponible.</div>
+                            {% endfor %}
+                        </div>
+                        <div id="member-search-empty" class="workspace-subtle small mt-2" style="display:none;">Aucun employe ne correspond a la recherche.</div>
+                        <div class="form-hint">Selectionnez les membres de l'equipe via les cases a cocher.</div>
+                        {% for error in form.membresEquipe.vars.errors %}
+                            <div class="invalid-feedback d-block">{{ error.message }}</div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
@@ -93,3 +143,5 @@
         </div>
     </div>
 {{ form_end(form) }}
+
+<script src="{{ asset('js/projet-form-validation.js') }}"></script>

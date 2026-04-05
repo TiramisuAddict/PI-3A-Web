@@ -14,8 +14,10 @@
                 <div class="workspace-subtle">Ajustez les dates, le statut, la priorite et la composition de l'equipe.</div>
             </div>
             <div class="col-auto ms-auto d-print-none">
-                <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary me-2">Retour</a>
+                <div class="d-flex align-items-center gap-2">
+                <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary">Retour</a>
                 {{ include('projet/_delete_form.html.twig') }}
+                </div>
             </div>
         </div>
     </div>
