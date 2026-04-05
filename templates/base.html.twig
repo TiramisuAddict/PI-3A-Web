@@ -176,6 +176,48 @@
                     color: var(--workspace-muted);
                 }
 
+                .filter-panel {
+                    background: linear-gradient(180deg, #f8fbff 0%, #f2f6fd 100%);
+                    border: 1px solid #e0e8f6;
+                    border-radius: 12px;
+                    padding: 10px;
+                    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+                }
+
+                .filter-panel-title {
+                    font-size: 11px;
+                    letter-spacing: .08em;
+                    text-transform: uppercase;
+                    font-weight: 800;
+                    color: #466190;
+                    margin-bottom: 8px;
+                }
+
+                .filter-field-label {
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #4a5f86;
+                    margin-bottom: 4px;
+                }
+
+                .filter-control {
+                    border-color: #d3deef;
+                    border-radius: 10px;
+                    background: #fff;
+                    box-shadow: none;
+                    transition: border-color .15s ease, box-shadow .15s ease;
+                }
+
+                .filter-control:focus {
+                    border-color: #5e83c5;
+                    box-shadow: 0 0 0 3px rgba(64, 122, 216, 0.16);
+                }
+
+                .filter-reset {
+                    border-radius: 10px;
+                    font-weight: 700;
+                }
+
                 @media (max-width: 991px) {
                     .workspace-layout {
                         grid-template-columns: 1fr;
@@ -346,15 +388,21 @@
 
                     <div id="sidebar-filtres" class="collapse show workspace-sublist">
                         {% if route == 'app_projet_index' %}
-                            <form id="project-filter-form" method="get" action="{{ path('app_projet_index') }}" class="px-2 pb-1">
+                            <form id="project-filter-form" method="get" action="{{ path('app_projet_index') }}" class="px-2 pb-1 filter-panel">
                                 {% if sidebarSelectedProjetId is defined and sidebarSelectedProjetId %}
                                     <input type="hidden" name="projet" value="{{ sidebarSelectedProjetId }}">
                                 {% endif %}
+                                <div class="filter-panel-title">Affiner la liste</div>
                                 <div class="mb-2">
-                                    <input type="text" name="search" value="{{ filters.search|default('') }}" class="form-control form-control-sm" placeholder="Recherche...">
+                                    <div class="filter-field-label">Recherche</div>
+                                    <div class="input-icon">
+                                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                                        <input type="text" name="search" value="{{ filters.search|default('') }}" class="form-control form-control-sm filter-control" placeholder="Nom, description...">
+                                    </div>
                                 </div>
                                 <div class="mb-2">
-                                    <select name="statut" class="form-select form-select-sm">
+                                    <div class="filter-field-label">Statut</div>
+                                    <select name="statut" class="form-select form-select-sm filter-control">
                                         <option value="">Statut: tous</option>
                                         <option value="PLANIFIE" {{ filters.statut|default('') == 'PLANIFIE' ? 'selected' : '' }}>Planifie</option>
                                         <option value="EN_COURS" {{ filters.statut|default('') == 'EN_COURS' ? 'selected' : '' }}>En cours</option>
@@ -364,7 +412,8 @@
                                     </select>
                                 </div>
                                 <div class="mb-2">
-                                    <select name="priorite" class="form-select form-select-sm">
+                                    <div class="filter-field-label">Priorite</div>
+                                    <select name="priorite" class="form-select form-select-sm filter-control">
                                         <option value="">Priorite: toutes</option>
                                         <option value="BASSE" {{ filters.priorite|default('') == 'BASSE' ? 'selected' : '' }}>Basse</option>
                                         <option value="MOYENNE" {{ filters.priorite|default('') == 'MOYENNE' ? 'selected' : '' }}>Moyenne</option>
@@ -372,7 +421,8 @@
                                     </select>
                                 </div>
                                 <div class="mb-2">
-                                    <select name="chef_projet" class="form-select form-select-sm">
+                                    <div class="filter-field-label">Chef projet</div>
+                                    <select name="chef_projet" class="form-select form-select-sm filter-control">
                                         <option value="">Chef projet: tous</option>
                                         {% for chefProjet in chefProjets|default([]) %}
                                             <option value="{{ chefProjet.idEmploye|default('') }}" {{ filters.chef_projet|default(filters.responsable|default('')) == chefProjet.idEmploye|default('') ? 'selected' : '' }}>
@@ -381,7 +431,7 @@
                                         {% endfor %}
                                     </select>
                                 </div>
-                                <a href="{{ path('app_projet_index') }}" class="btn btn-link btn-sm px-0">Reinitialiser</a>
+                                <a href="{{ path('app_projet_index') }}" class="btn btn-outline-primary btn-sm w-100 filter-reset">Reinitialiser</a>
                             </form>
                         {% else %}
                             <div class="px-2 py-2 small workspace-subtle">Les filtres sont disponibles sur la liste des projets.</div>
