@@ -205,7 +205,7 @@ class Entreprise
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Employé::class, mappedBy: 'entreprise')]
+    #[ORM\OneToMany(targetEntity: Employe::class, mappedBy: 'entreprise')]
     private Collection $employés;
 
     public function __construct()
@@ -224,7 +224,7 @@ class Entreprise
         return $this->employés;
     }
 
-    public function addEmployé(Employé $employé): self
+    public function addEmployé(Employe $employé): self
     {
         if (!$this->getEmployés()->contains($employé)) {
             $this->getEmployés()->add($employé);
@@ -232,7 +232,7 @@ class Entreprise
         return $this;
     }
 
-    public function removeEmployé(Employé $employé): self
+    public function removeEmployé(Employe $employé): self
     {
         $this->getEmployés()->removeElement($employé);
         return $this;
@@ -303,7 +303,7 @@ class Entreprise
         return $this;
     }
 
-    public function addEmploy(Employé $employ): static
+    public function addEmploy(Employe $employ): static
     {
         if (!$this->employés->contains($employ)) {
             $this->employés->add($employ);
@@ -313,7 +313,7 @@ class Entreprise
         return $this;
     }
 
-    public function removeEmploy(Employé $employ): static
+    public function removeEmploy(Employe $employ): static
     {
         if ($this->employés->removeElement($employ)) {
             // set the owning side to null (unless already changed)

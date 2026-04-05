@@ -25,7 +25,7 @@ final class EntrepriseController extends AbstractController
             $em->persist($entreprise);
             $em->flush();
 
-            $this->addFlash('success', 'demande envoyée avec succès !');
+            
             return $this->redirectToRoute('compteEntreprise');
         }
 

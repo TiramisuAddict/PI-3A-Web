@@ -5,7 +5,7 @@ namespace App\Controller;
 use App\Entity\AdministrateurSysteme;
 use App\Form\LoginType;
 use App\Entity\Entreprise;
-use App\Entity\Employé; 
+use App\Entity\Employe; 
 use App\Entity\Compte;
 use App\Services\PasswordGenerator;
 use App\Repository\AdministrateurSystemeRepository;
@@ -27,22 +27,10 @@ final class AdminController extends AbstractController
         }
         $entreprises = $entrepriseRepo->findAll();
 
-        $search = $request->query->get('search');
-        $status = $request->query->get('status');
+        $search = $request->query->get('search', '');
+        $status = $request->query->get('status', '');
 
-        if ($search || $status) {
-            $filtered = [];
-            foreach ($entreprises as $e) {
-                if ($search && stripos($e->getNomEntreprise(), $search) === false) {
-                    continue;
-                }
-                if ($status && $e->getStatut() !== $status) {
-                    continue;
-                }
-                $filtered[] = $e;
-            }
-            $entreprises = $filtered;
-        }
+        $entreprises = $entrepriseRepo->findByFilters($search, $status);
 
         if ($request->isMethod('POST')) {
             $id = $request->request->get('id_entreprise');
@@ -52,8 +40,7 @@ final class AdminController extends AbstractController
             if ($entreprise) {
                if ($action === 'accepter') {
                     $entreprise->setStatut('acceptée');
-
-                    $employe = new Employé();
+                    $employe = new Employe();
                     $employe->setNom($entreprise->getNom());
                     $employe->setPrenom($entreprise->getPrenom());
                     $employe->setTelephone($entreprise->getTelephone());
@@ -61,7 +48,6 @@ final class AdminController extends AbstractController
                     $employe->setRole('administrateur entreprise');
                     $employe->setPoste('CEO');
                     $employe->setEntreprise($entreprise);
-
                     $em->persist($employe);
                     $compte = new Compte();
                     $compte->setMot_de_passe($passwordGenerator->generate());

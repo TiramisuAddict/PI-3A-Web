@@ -12,6 +12,8 @@ use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\UrlType;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Form\Extension\Core\Type\FileType;
+use Symfony\Component\Validator\Constraints\File;
 
 class EntrepriseType extends AbstractType
 {
@@ -44,9 +46,22 @@ class EntrepriseType extends AbstractType
             ->add('site_web', UrlType::class, [
                 'required' => false,
             ])
-            ->add('logo', TextType::class, [
-                'required' => false,
-            ])
+            ->add('logo', FileType::class, [
+            'label' => 'Logo',
+            'mapped' => false, 
+            'required' => false,
+            'constraints' => [
+                new File([
+                    'maxSize' => '2M',
+                    'mimeTypes' => [
+                        'image/jpeg',
+                        'image/png',
+                        'image/webp',
+                    ],
+                    'mimeTypesMessage' => 'Veuillez uploader une image valide',
+                ])
+            ],
+        ])
             ->add('Soumettre', SubmitType::class)
         ;
     }
