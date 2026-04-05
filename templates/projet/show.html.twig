@@ -37,9 +37,11 @@
             <div class="col-auto ms-auto d-print-none">
                 <div class="btn-list">
                     <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary">Retour</a>
-                    <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-primary">Modifier</a>
                     <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary">Voir les taches</a>
-                    <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-outline-secondary">Gerer l'equipe</a>
+                    {% if canManageProjects|default(false) %}
+                        <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-primary">Modifier</a>
+                        <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-outline-secondary">Gerer l'equipe</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -118,7 +120,7 @@
                 </div>
                 <div class="card-body">
                     <div class="mb-2">
-                        <div class="text-secondary">Responsable</div>
+                        <div class="text-secondary">Chef projet</div>
                         {% if projet.responsable %}
                             <div class="fw-semibold mt-1">{{ projet.responsable.nom }} {{ projet.responsable.prenom }}</div>
                         {% else %}
@@ -138,9 +140,11 @@
                 </div>
             </div>
 
-            <div class="d-flex justify-content-end">
-                {{ include('projet/_delete_form.html.twig') }}
-            </div>
+            {% if canManageProjects|default(false) %}
+                <div class="d-flex justify-content-end">
+                    {{ include('projet/_delete_form.html.twig') }}
+                </div>
+            {% endif %}
         </div>
     </div>
 {% endblock %}

@@ -19,7 +19,7 @@ class ProjetRepository extends ServiceEntityRepository
     /**
      * @return Projet[]
      */
-    public function findByFilters(?string $search = null, ?string $statut = null, ?string $priorite = null, ?int $responsableId = null, ?\DateTimeInterface $dateFrom = null, ?\DateTimeInterface $dateTo = null): array
+    public function findByFilters(?string $search = null, ?string $statut = null, ?string $priorite = null, ?int $chefProjetId = null, ?\DateTimeInterface $dateFrom = null, ?\DateTimeInterface $dateTo = null): array
     {
         $qb = $this->createQueryBuilder('p')
             ->leftJoin('p.responsable', 'r')
@@ -41,8 +41,8 @@ class ProjetRepository extends ServiceEntityRepository
             $qb->andWhere('p.priorite = :priorite')->setParameter('priorite', $priorite);
         }
 
-        if ($responsableId !== null && $responsableId > 0) {
-            $qb->andWhere('IDENTITY(p.responsable) = :responsableId')->setParameter('responsableId', $responsableId);
+        if ($chefProjetId !== null && $chefProjetId > 0) {
+            $qb->andWhere('IDENTITY(p.responsable) = :chefProjetId')->setParameter('chefProjetId', $chefProjetId);
         }
 
         if ($dateFrom !== null) {
