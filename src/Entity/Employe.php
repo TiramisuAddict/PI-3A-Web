@@ -2,7 +2,6 @@
 
 namespace App\Entity;
 
-use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -10,7 +9,7 @@ use Doctrine\Common\Collections\Collection;
 use App\Repository\EmployeRepository;
 
 #[ORM\Entity(repositoryClass: EmployeRepository::class)]
-#[ORM\Table(name: 'employé')]
+#[ORM\Table(name: 'employe')]
 class Employe
 {
     #[ORM\Id]
@@ -240,19 +239,6 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToOne(targetEntity: CompétenceEmployé::class, mappedBy: 'employé')]
-    private ?CompétenceEmployé $compétenceEmployé = null;
-
-    public function getCompétenceEmployé(): ?CompétenceEmployé
-    {
-        return $this->compétenceEmployé;
-    }
-
-    public function setCompétenceEmployé(?CompétenceEmployé $compétenceEmployé): self
-    {
-        $this->compétenceEmployé = $compétenceEmployé;
-        return $this;
-    }
 
     #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employé')]
     private Collection $demandes;
@@ -352,6 +338,34 @@ class Employe
         return $this;
     }
 
+    #[ORM\OneToMany(targetEntity: Projet::class, mappedBy: 'employé')]
+    private Collection $projets;
+
+    /**
+     * @return Collection<int, Projet>
+     */
+    public function getProjets(): Collection
+    {
+        if (!$this->projets instanceof Collection) {
+            $this->projets = new ArrayCollection();
+        }
+        return $this->projets;
+    }
+
+    public function addProjet(Projet $projet): self
+    {
+        if (!$this->getProjets()->contains($projet)) {
+            $this->getProjets()->add($projet);
+        }
+        return $this;
+    }
+
+    public function removeProjet(Projet $projet): self
+    {
+        $this->getProjets()->removeElement($projet);
+        return $this;
+    }
+
     #[ORM\OneToMany(targetEntity: Tache::class, mappedBy: 'employé')]
     private Collection $taches;
 
@@ -390,23 +404,12 @@ class Employe
             new ORM\JoinColumn(name: 'id_projet', referencedColumnName: 'id_projet')
         ]
     )]
-    private Collection $projets;
-
-    public function __construct()
-    {
-        $this->commentaires = new ArrayCollection();
-        $this->comptes = new ArrayCollection();
-        $this->demandes = new ArrayCollection();
-        $this->notifications = new ArrayCollection();
-        $this->posts = new ArrayCollection();
-        $this->taches = new ArrayCollection();
-        $this->projets = new ArrayCollection();
-    }
+    private Collection $projets1;
 
     /**
      * @return Collection<int, Projet>
      */
-    public function getProjets(): Collection
+    public function getProjets1(): Collection
     {
         if (!$this->projets instanceof Collection) {
             $this->projets = new ArrayCollection();
@@ -414,106 +417,54 @@ class Employe
         return $this->projets;
     }
 
-    public function addProjet(Projet $projet): self
+    public function addProjet1(Projet $projet): self
     {
-        if (!$this->getProjets()->contains($projet)) {
-            $this->getProjets()->add($projet);
+        if (!$this->getProjets1()->contains($projet)) {
+            $this->getProjets1()->add($projet);
         }
         return $this;
     }
 
-    public function removeProjet(Projet $projet): self
+    public function removeProjet1(Projet $projet): self
     {
-        $this->getProjets()->removeElement($projet);
+        $this->getProjets1()->removeElement($projet);
         return $this;
     }
 
-    public function getIdEmploye(): ?int
+    #[ORM\ManyToMany(targetEntity: Post::class, inversedBy: 'employés')]
+    #[ORM\JoinTable(
+        name: 'like_post',
+        joinColumns: [
+            new ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe')
+        ],
+        inverseJoinColumns: [
+            new ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post')
+        ]
+    )]
+    private Collection $posts1;
+
+    /**
+     * @return Collection<int, Post>
+     */
+    public function getPosts1(): Collection
     {
-        return $this->id_employe;
-    }
-
-    public function getEMail(): ?string
-    {
-        return $this->e_mail;
-    }
-
-    public function setEMail(string $e_mail): static
-    {
-        $this->e_mail = $e_mail;
-
-        return $this;
-    }
-
-    public function getDateEmbauche(): ?\DateTime
-    {
-        return $this->date_embauche;
-    }
-
-    public function setDateEmbauche(?\DateTime $date_embauche): static
-    {
-        $this->date_embauche = $date_embauche;
-
-        return $this;
-    }
-
-    public function getImageProfil(): ?string
-    {
-        return $this->image_profil;
-    }
-
-    public function setImageProfil(?string $image_profil): static
-    {
-        $this->image_profil = $image_profil;
-
-        return $this;
-    }
-
-    public function getCvData(): ?string
-    {
-        return $this->cv_data;
-    }
-
-    public function setCvData(?string $cv_data): static
-    {
-        $this->cv_data = $cv_data;
-
-        return $this;
-    }
-
-    public function getCvNom(): ?string
-    {
-        return $this->cv_nom;
-    }
-
-    public function setCvNom(?string $cv_nom): static
-    {
-        $this->cv_nom = $cv_nom;
-
-        return $this;
-    }
-
-    public function addTach(Tache $tach): static
-    {
-        if (!$this->taches->contains($tach)) {
-            $this->taches->add($tach);
-            $tach->setEmployé($this);
+        if (!$this->posts instanceof Collection) {
+            $this->posts = new ArrayCollection();
         }
-
-        return $this;
+        return $this->posts;
     }
 
-    public function removeTach(Tache $tach): static
+    public function addPost1(Post $post): self
     {
-        if ($this->taches->removeElement($tach)) {
-            // set the owning side to null (unless already changed)
-            if ($tach->getEmployé() === $this) {
-                $tach->setEmployé(null);
-            }
+        if (!$this->getPosts1()->contains($post)) {
+            $this->getPosts1()->add($post);
         }
-
         return $this;
     }
 
-
+    public function removePost1(Post $post): self
+    {
+        $this->getPosts1()->removeElement($post);
+        return $this;
+    }
 }
