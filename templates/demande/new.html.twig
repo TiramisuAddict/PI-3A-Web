@@ -107,7 +107,7 @@
                 </div>
             </div>
 
-            <div class="surface-card mb-4" id="dynamicFieldsCard" style="display: none;">
+            <div class="surface-card mb-4" id="dynamicFieldsCard" style="display:none;">
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="ti ti-forms me-2"></i>Informations specifiques
@@ -323,27 +323,23 @@
 
         fetch("/demande/api/fields/" + encodeURIComponent(type))
             .then(function(response) {
-                if (!response.ok) {
-                    throw new Error("HTTP error " + response.status);
-                }
+                if (!response.ok) throw new Error("HTTP error " + response.status);
                 return response.json();
             })
             .then(function(fields) {
                 if (fields && fields.length > 0) {
-                    renderDynamicFields(fields);
+                    renderDynamicFields(fields, {});
                     dynamicFieldsCard.style.display = "block";
                 } else {
                     dynamicFieldsCard.style.display = "none";
-                    dynamicFieldsContainer.innerHTML = "";
                 }
             })
             .catch(function(error) {
-                console.error("Error fetching fields:", error);
-                dynamicFieldsCard.style.display = "none";
+                console.error(error);
             });
     }
 
-    function renderDynamicFields(fields) {
+    function renderDynamicFields(fields, existingValues) {
         dynamicFieldsContainer.innerHTML = "";
 
         for (var i = 0; i < fields.length; i++) {
@@ -357,6 +353,7 @@
             col.appendChild(label);
 
             var input;
+            var value = existingValues[field.key] || "";
 
             switch (field.type) {
                 case "text":
@@ -364,10 +361,10 @@
                     input.type = "text";
                     input.className = "form-control dynamic-field";
                     input.name = "details[" + field.key + "]";
+                    input.value = value;
                     input.dataset.fieldKey = field.key;
                     input.dataset.fieldLabel = field.label;
                     input.dataset.requiredField = field.required ? "1" : "0";
-                    input.placeholder = "Entrez " + field.label.toLowerCase();
                     col.appendChild(input);
                     attachDynamicValidation(input, field);
                     break;
@@ -377,11 +374,11 @@
                     input.type = "number";
                     input.className = "form-control dynamic-field";
                     input.name = "details[" + field.key + "]";
+                    input.value = value;
+                    input.min = "0";
                     input.dataset.fieldKey = field.key;
                     input.dataset.fieldLabel = field.label;
                     input.dataset.requiredField = field.required ? "1" : "0";
-                    input.placeholder = "0";
-                    input.min = "0";
                     col.appendChild(input);
                     attachDynamicValidation(input, field);
                     break;
@@ -391,6 +388,7 @@
                     input.type = "date";
                     input.className = "form-control dynamic-field";
                     input.name = "details[" + field.key + "]";
+                    input.value = value;
                     input.dataset.fieldKey = field.key;
                     input.dataset.fieldLabel = field.label;
                     input.dataset.requiredField = field.required ? "1" : "0";
@@ -407,7 +405,7 @@
                     input.dataset.fieldKey = field.key;
                     input.dataset.fieldLabel = field.label;
                     input.dataset.requiredField = field.required ? "1" : "0";
-                    input.placeholder = "Entrez " + field.label.toLowerCase();
+                    input.value = value;
                     col.appendChild(input);
                     attachDynamicValidation(input, field);
                     break;
@@ -425,11 +423,14 @@
                     defOpt.textContent = "Selectionnez...";
                     input.appendChild(defOpt);
 
-                    if (field.options && field.options.length > 0) {
+                    if (field.options) {
                         for (var j = 0; j < field.options.length; j++) {
                             var opt = document.createElement("option");
                             opt.value = field.options[j];
                             opt.textContent = field.options[j];
+                            if (value === field.options[j]) {
+                                opt.selected = true;
+                            }
                             input.appendChild(opt);
                         }
                     }
@@ -445,9 +446,9 @@
                     locInput.type = "text";
                     locInput.className = "form-control dynamic-field";
                     locInput.name = "details[" + field.key + "]";
-                    locInput.readOnly = true;
-                    locInput.placeholder = "Cliquez sur le bouton pour selectionner";
                     locInput.id = "location-" + field.key;
+                    locInput.readOnly = true;
+                    locInput.value = value;
                     locInput.dataset.fieldKey = field.key;
                     locInput.dataset.fieldLabel = field.label;
                     locInput.dataset.requiredField = field.required ? "1" : "0";
@@ -471,12 +472,14 @@
                     latInput.type = "hidden";
                     latInput.name = "details[" + field.key + "Lat]";
                     latInput.id = "lat-" + field.key;
+                    latInput.value = existingValues[field.key + "Lat"] || "";
                     col.appendChild(latInput);
 
                     var lonInput = document.createElement("input");
                     lonInput.type = "hidden";
                     lonInput.name = "details[" + field.key + "Lon]";
                     lonInput.id = "lon-" + field.key;
+                    lonInput.value = existingValues[field.key + "Lon"] || "";
                     col.appendChild(lonInput);
 
                     attachDynamicValidation(locInput, field);
@@ -627,10 +630,10 @@
         var valid = true;
 
         var requiredFields = [
-            { id: "idEmploye", message: "Veuillez selectionner un employe" },
             { id: "categorie", message: "Veuillez selectionner une categorie" },
             { id: "typeDemande", message: "Veuillez selectionner un type de demande" },
             { id: "priorite", message: "Veuillez selectionner une priorite" },
+            { id: "status", message: "Veuillez selectionner un statut" },
             { id: "titre", message: "Veuillez saisir un titre" }
         ];
 
@@ -693,20 +696,14 @@
         }
 
         var formData = new FormData(form);
-        var idEmploye = formData.get("idEmploye");
-
-        if (!idEmploye) {
-            alert("Veuillez selectionner un employe");
-            return;
-        }
-
         var data = {
-            idEmploye: parseInt(idEmploye),
             categorie: formData.get("categorie"),
             typeDemande: formData.get("typeDemande"),
             titre: formData.get("titre"),
             description: formData.get("description") || "",
             priorite: formData.get("priorite"),
+            status: formData.get("status"),
+            commentaire: formData.get("commentaire") || "",
             details: {}
         };
 
@@ -715,7 +712,6 @@
         while (!entry.done) {
             var key = entry.value[0];
             var value = entry.value[1];
-
             if (key.indexOf("details[") === 0) {
                 var match = key.match(/details\[(.+)\]/);
                 if (match && value !== null && value !== "") {
@@ -727,9 +723,9 @@
 
         var submitBtn = document.getElementById("submitBtn");
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="ti ti-loader me-1"></i>Creation...';
+        submitBtn.innerHTML = '<i class="ti ti-loader me-1"></i>Enregistrement...';
 
-        fetch("/demande/api/create", {
+        fetch("/demande/api/" + DEMANDE_ID + "/update", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data)
@@ -739,18 +735,18 @@
         })
         .then(function(result) {
             if (result.success) {
-                window.location.href = "/demande/" + result.id;
+                window.location.href = "/demande/" + DEMANDE_ID;
             } else {
                 alert("Erreur: " + result.message);
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Creer la demande';
+                submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
             }
         })
         .catch(function(error) {
-            console.error("Error:", error);
+            console.error(error);
             alert("Erreur de connexion");
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Creer la demande';
+            submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
         });
     }
 
@@ -783,9 +779,7 @@
     }
 
     function onMapClick(e) {
-        if (marker) {
-            map.removeLayer(marker);
-        }
+        if (marker) map.removeLayer(marker);
 
         marker = L.marker(e.latlng).addTo(map);
         selectedLocation = {
@@ -801,9 +795,6 @@
                     selectedLocation.name = data.display_name;
                     marker.bindPopup(data.display_name).openPopup();
                 }
-            })
-            .catch(function(err) {
-                console.error("Geocode error:", err);
             });
     }
 
@@ -816,27 +807,16 @@
                 if (results.length > 0) {
                     var result = results[0];
                     var latlng = L.latLng(parseFloat(result.lat), parseFloat(result.lon));
-
                     map.setView(latlng, 14);
-
-                    if (marker) {
-                        map.removeLayer(marker);
-                    }
-
+                    if (marker) map.removeLayer(marker);
                     marker = L.marker(latlng).addTo(map);
                     marker.bindPopup(result.display_name).openPopup();
-
                     selectedLocation = {
                         lat: parseFloat(result.lat),
                         lon: parseFloat(result.lon),
                         name: result.display_name
                     };
-                } else {
-                    alert("Aucun resultat trouve");
                 }
-            })
-            .catch(function(err) {
-                console.error("Search error:", err);
             });
     }
 
@@ -852,9 +832,10 @@
 
             var field = {
                 key: currentLocationField.key,
-                label: currentLocationField.key,
+                label: currentLocationField.input.dataset.fieldLabel || currentLocationField.key,
                 required: currentLocationField.input.dataset.requiredField === "1"
             };
+
             validateDynamicInput(currentLocationField.input, field);
         }
 

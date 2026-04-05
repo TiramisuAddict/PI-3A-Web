@@ -1,10 +1,32 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Modifier Demande #{{ demande.id }}{% endblock %}
+{% block title %}Modifier Demande{% endblock %}
 
 {% block stylesheets %}
 {{ parent() }}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+    .field-error {
+        color: #dc2626;
+        font-size: .85rem;
+        margin-top: .4rem;
+        font-weight: 600;
+    }
+
+    .is-invalid-custom {
+        border-color: #dc2626 !important;
+        box-shadow: 0 0 0 .2rem rgba(220, 38, 38, 0.12) !important;
+    }
+
+    .is-valid-custom {
+        border-color: #16a34a !important;
+    }
+
+    .section-note {
+        font-size: .88rem;
+        color: #64748b;
+    }
+</style>
 {% endblock %}
 
 {% block body %}
@@ -15,16 +37,16 @@
         </a>
     </div>
     <div class="col">
-        <div class="page-pretitle">Demande #{{ demande.id }}</div>
+        <div class="page-pretitle">Demandes</div>
         <h2 class="page-title">
             <i class="ti ti-edit me-2"></i>Modifier la demande
         </h2>
     </div>
 </div>
 
-<form id="demandeForm">
+<form id="demandeForm" novalidate>
     <input type="hidden" id="demandeId" value="{{ demande.id }}">
-    
+
     <div class="row">
         <div class="col-lg-8">
             <div class="surface-card mb-4">
@@ -39,18 +61,16 @@
                             <label class="form-label required">Categorie</label>
                             <select class="form-select" id="categorie" name="categorie" required>
                                 <option value="">-- Choisir une categorie --</option>
-                                <option value="Ressources Humaines" {{ demande.categorie == 'Ressources Humaines' ? 'selected' : '' }}>Ressources Humaines</option>
-                                <option value="Administrative" {{ demande.categorie == 'Administrative' ? 'selected' : '' }}>Administrative</option>
-                                <option value="Informatique" {{ demande.categorie == 'Informatique' ? 'selected' : '' }}>Informatique</option>
-                                <option value="Formation" {{ demande.categorie == 'Formation' ? 'selected' : '' }}>Formation</option>
-                                <option value="Organisation du travail" {{ demande.categorie == 'Organisation du travail' ? 'selected' : '' }}>Organisation du travail</option>
                             </select>
+                            <div class="field-error" id="error-categorie"></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label required">Type de demande</label>
                             <select class="form-select" id="typeDemande" name="typeDemande" required>
                                 <option value="">-- Choisir un type --</option>
                             </select>
+                            <div class="field-error" id="error-typeDemande"></div>
+                            <small class="section-note" id="typeInfo"></small>
                         </div>
                     </div>
 
@@ -62,6 +82,7 @@
                                 <option value="NORMALE" {{ demande.priorite == 'NORMALE' ? 'selected' : '' }}>NORMALE</option>
                                 <option value="BASSE" {{ demande.priorite == 'BASSE' ? 'selected' : '' }}>BASSE</option>
                             </select>
+                            <div class="field-error" id="error-priorite"></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label required">Statut</label>
@@ -70,12 +91,14 @@
                                     <option value="{{ status }}" {{ demande.status == status ? 'selected' : '' }}>{{ status }}</option>
                                 {% endfor %}
                             </select>
+                            <div class="field-error" id="error-status"></div>
                         </div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label required">Titre</label>
                         <input type="text" class="form-control" id="titre" name="titre" required value="{{ demande.titre }}">
+                        <div class="field-error" id="error-titre"></div>
                     </div>
 
                     <div class="mb-3">
@@ -85,62 +108,14 @@
                 </div>
             </div>
 
-            <div class="surface-card mb-4" id="dynamicFieldsCard" style="display: {% if fields|length > 0 %}block{% else %}none{% endif %};">
+            <div class="surface-card mb-4" id="dynamicFieldsCard" style="display:block;">
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="ti ti-forms me-2"></i>Informations specifiques
                     </h3>
                 </div>
                 <div class="card-body">
-                    <div class="row g-3" id="dynamicFields">
-                        {% for field in fields %}
-                        <div class="{{ field.type == 'textarea' ? 'col-12' : 'col-md-6' }}">
-                            <label class="form-label{{ field.required ? ' required' : '' }}">{{ field.label }}</label>
-                            
-                            {% if field.type == 'text' %}
-                                <input type="text" class="form-control" name="details[{{ field.key }}]" 
-                                       value="{{ existingDetails[field.key] | default('') }}"
-                                       {{ field.required ? 'required' : '' }}>
-                            
-                            {% elseif field.type == 'number' %}
-                                <input type="number" class="form-control" name="details[{{ field.key }}]" 
-                                       value="{{ existingDetails[field.key] | default('') }}"
-                                       {{ field.required ? 'required' : '' }}>
-                            
-                            {% elseif field.type == 'date' %}
-                                <input type="date" class="form-control" name="details[{{ field.key }}]" 
-                                       value="{{ existingDetails[field.key] | default('') }}"
-                                       {{ field.required ? 'required' : '' }}>
-                            
-                            {% elseif field.type == 'textarea' %}
-                                <textarea class="form-control" name="details[{{ field.key }}]" rows="3" 
-                                          {{ field.required ? 'required' : '' }}>{{ existingDetails[field.key] | default('') }}</textarea>
-                            
-                            {% elseif field.type == 'select' %}
-                                <select class="form-select" name="details[{{ field.key }}]" {{ field.required ? 'required' : '' }}>
-                                    <option value="">Selectionnez...</option>
-                                    {% for opt in field.options %}
-                                        <option value="{{ opt }}" {{ existingDetails[field.key] | default('') == opt ? 'selected' : '' }}>{{ opt }}</option>
-                                    {% endfor %}
-                                </select>
-                            
-                            {% elseif field.type == 'location' %}
-                                <div class="input-group">
-                                    <input type="text" class="form-control" 
-                                           name="details[{{ field.key }}]" 
-                                           id="location-{{ field.key }}"
-                                           value="{{ existingDetails[field.key] | default('') }}"
-                                           readonly {{ field.required ? 'required' : '' }}>
-                                    <button type="button" class="btn btn-primary btn-map" data-field="{{ field.key }}">
-                                        <i class="ti ti-map-pin"></i>
-                                    </button>
-                                </div>
-                                <input type="hidden" name="details[{{ field.key }}Lat]" id="lat-{{ field.key }}" value="{{ existingDetails[field.key ~ 'Lat'] | default('') }}">
-                                <input type="hidden" name="details[{{ field.key }}Lon]" id="lon-{{ field.key }}" value="{{ existingDetails[field.key ~ 'Lon'] | default('') }}">
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
+                    <div class="row g-3" id="dynamicFields"></div>
                 </div>
             </div>
         </div>
@@ -154,19 +129,12 @@
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
-                        <div class="form-label">Date de creation</div>
-                        <span class="mini-muted">{{ demande.dateCreation|date('d/m/Y H:i') }}</span>
+                        <div class="form-label">Commentaire de modification</div>
+                        <textarea class="form-control" id="commentaire" name="commentaire" rows="4" placeholder="Ajoutez un commentaire (optionnel)"></textarea>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Commentaire de modification</label>
-                        <textarea class="form-control" id="commentaire" name="commentaire" rows="2" placeholder="Commentaire (optionnel)"></textarea>
-                    </div>
-                    
                     <hr>
-                    
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary" id="btnSubmit">
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
                             <i class="ti ti-check me-1"></i>Enregistrer
                         </button>
                         <a href="{{ path('demande_show', {id: demande.id}) }}" class="btn btn-outline-secondary">Annuler</a>
@@ -208,11 +176,12 @@
 <script>
 (function() {
     "use strict";
-    
+
     var DEMANDE_ID = {{ demande.id }};
-    var CURRENT_TYPE = "{{ demande.typeDemande }}";
-    var CURRENT_CATEGORIE = "{{ demande.categorie }}";
-    
+    var CURRENT_CATEGORIE = {{ demande.categorie|json_encode|raw }};
+    var CURRENT_TYPE = {{ demande.typeDemande|json_encode|raw }};
+    var EXISTING_DETAILS = {{ existingDetails|json_encode|raw }};
+
     var CATEGORIES = {
         "Ressources Humaines": [
             "Conge",
@@ -246,54 +215,65 @@
             "Heures supplementaires"
         ]
     };
-    
+
     var currentLocationField = null;
     var map = null;
     var marker = null;
     var selectedLocation = null;
     var mapModal = null;
-    
+
+    var categorieSelect;
+    var typeSelect;
+    var typeInfo;
+    var dynamicFieldsCard;
+    var dynamicFieldsContainer;
+    var form;
+
     document.addEventListener("DOMContentLoaded", init);
-    
+
     function init() {
-        console.log("Edit form init - Demande ID:", DEMANDE_ID);
-        console.log("Current categorie:", CURRENT_CATEGORIE);
-        console.log("Current type:", CURRENT_TYPE);
-        
+        categorieSelect = document.getElementById("categorie");
+        typeSelect = document.getElementById("typeDemande");
+        typeInfo = document.getElementById("typeInfo");
+        dynamicFieldsCard = document.getElementById("dynamicFieldsCard");
+        dynamicFieldsContainer = document.getElementById("dynamicFields");
+        form = document.getElementById("demandeForm");
+
+        populateCategories();
+        categorieSelect.value = CURRENT_CATEGORIE;
         populateTypes(CURRENT_CATEGORIE, CURRENT_TYPE);
-        
-        document.getElementById("categorie").addEventListener("change", function() {
-            populateTypes(this.value, null);
+        loadDynamicFields(CURRENT_TYPE);
+
+        categorieSelect.addEventListener("change", onCategoryChange);
+        typeSelect.addEventListener("change", onTypeChange);
+        form.addEventListener("submit", onFormSubmit);
+
+        ["categorie", "typeDemande", "priorite", "status", "titre"].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) {
+                el.addEventListener("input", function() { clearError(id); });
+                el.addEventListener("change", function() { clearError(id); });
+            }
         });
-        
-        document.getElementById("demandeForm").addEventListener("submit", onFormSubmit);
-        
+
         var mapModalEl = document.getElementById("mapModal");
         if (mapModalEl) {
             mapModal = new bootstrap.Modal(mapModalEl);
             mapModalEl.addEventListener("shown.bs.modal", initMap);
         }
-        
-        document.querySelectorAll(".btn-map").forEach(function(btn) {
-            btn.addEventListener("click", function() {
-                var fieldKey = this.getAttribute("data-field");
-                var inputField = document.getElementById("location-" + fieldKey);
-                openMapPicker(inputField, fieldKey);
-            });
-        });
-        
+
         var confirmBtn = document.getElementById("confirmLocation");
         if (confirmBtn) {
             confirmBtn.addEventListener("click", confirmLocationSelection);
         }
-        
+
         var searchBtn = document.getElementById("searchBtn");
         if (searchBtn) {
             searchBtn.addEventListener("click", function() {
                 searchLocation(document.getElementById("mapSearch").value);
             });
         }
-        
+
         var mapSearchInput = document.getElementById("mapSearch");
         if (mapSearchInput) {
             mapSearchInput.addEventListener("keypress", function(e) {
@@ -304,34 +284,431 @@
             });
         }
     }
-    
+
+    function populateCategories() {
+        categorieSelect.innerHTML = '<option value="">-- Choisir une categorie --</option>';
+        for (var cat in CATEGORIES) {
+            if (CATEGORIES.hasOwnProperty(cat)) {
+                var opt = document.createElement("option");
+                opt.value = cat;
+                opt.textContent = cat;
+                categorieSelect.appendChild(opt);
+            }
+        }
+    }
+
     function populateTypes(category, selectedType) {
-        var typeSelect = document.getElementById("typeDemande");
         typeSelect.innerHTML = '<option value="">-- Choisir un type --</option>';
-        
         if (category && CATEGORIES[category]) {
             var types = CATEGORIES[category];
             for (var i = 0; i < types.length; i++) {
                 var opt = document.createElement("option");
                 opt.value = types[i];
                 opt.textContent = types[i];
-                if (selectedType && types[i] === selectedType) {
+                if (selectedType && selectedType === types[i]) {
                     opt.selected = true;
                 }
                 typeSelect.appendChild(opt);
             }
+            typeInfo.textContent = types.length + " types disponibles";
+            typeInfo.style.color = "green";
+        } else {
+            typeInfo.textContent = "";
         }
     }
-    
+
+    function onCategoryChange() {
+        clearError("categorie");
+        clearError("typeDemande");
+        populateTypes(categorieSelect.value, null);
+        dynamicFieldsContainer.innerHTML = "";
+        dynamicFieldsCard.style.display = "none";
+    }
+
+    function onTypeChange() {
+        clearError("typeDemande");
+        loadDynamicFields(typeSelect.value);
+    }
+
+    function loadDynamicFields(type) {
+        if (!type) {
+            dynamicFieldsContainer.innerHTML = "";
+            dynamicFieldsCard.style.display = "none";
+            return;
+        }
+
+        fetch("/demande/api/fields/" + encodeURIComponent(type))
+            .then(function(response) {
+                if (!response.ok) throw new Error("HTTP " + response.status);
+                return response.json();
+            })
+            .then(function(fields) {
+                renderDynamicFields(fields);
+                dynamicFieldsCard.style.display = fields.length ? "block" : "none";
+            })
+            .catch(function(error) {
+                console.error(error);
+            });
+    }
+
+    function renderDynamicFields(fields) {
+        dynamicFieldsContainer.innerHTML = "";
+
+        for (var i = 0; i < fields.length; i++) {
+            var field = fields[i];
+            var col = document.createElement("div");
+            col.className = field.type === "textarea" ? "col-12" : "col-md-6";
+
+            var label = document.createElement("label");
+            label.className = "form-label" + (field.required ? " required" : "");
+            label.textContent = field.label;
+            col.appendChild(label);
+
+            var input;
+            var existingValue = EXISTING_DETAILS[field.key] || "";
+
+            switch (field.type) {
+                case "text":
+                    input = document.createElement("input");
+                    input.type = "text";
+                    input.className = "form-control dynamic-field";
+                    input.name = "details[" + field.key + "]";
+                    input.value = existingValue;
+                    input.dataset.fieldKey = field.key;
+                    input.dataset.fieldLabel = field.label;
+                    input.dataset.requiredField = field.required ? "1" : "0";
+                    col.appendChild(input);
+                    attachDynamicValidation(input, field);
+                    break;
+
+                case "number":
+                    input = document.createElement("input");
+                    input.type = "number";
+                    input.className = "form-control dynamic-field";
+                    input.name = "details[" + field.key + "]";
+                    input.value = existingValue;
+                    input.min = "0";
+                    input.dataset.fieldKey = field.key;
+                    input.dataset.fieldLabel = field.label;
+                    input.dataset.requiredField = field.required ? "1" : "0";
+                    col.appendChild(input);
+                    attachDynamicValidation(input, field);
+                    break;
+
+                case "date":
+                    input = document.createElement("input");
+                    input.type = "date";
+                    input.className = "form-control dynamic-field";
+                    input.name = "details[" + field.key + "]";
+                    input.value = existingValue;
+                    input.dataset.fieldKey = field.key;
+                    input.dataset.fieldLabel = field.label;
+                    input.dataset.requiredField = field.required ? "1" : "0";
+                    applyDateRules(input, field);
+                    col.appendChild(input);
+                    attachDynamicValidation(input, field);
+                    break;
+
+                case "textarea":
+                    input = document.createElement("textarea");
+                    input.className = "form-control dynamic-field";
+                    input.rows = 3;
+                    input.name = "details[" + field.key + "]";
+                    input.value = existingValue;
+                    input.dataset.fieldKey = field.key;
+                    input.dataset.fieldLabel = field.label;
+                    input.dataset.requiredField = field.required ? "1" : "0";
+                    input.textContent = existingValue;
+                    col.appendChild(input);
+                    attachDynamicValidation(input, field);
+                    break;
+
+                case "select":
+                    input = document.createElement("select");
+                    input.className = "form-select dynamic-field";
+                    input.name = "details[" + field.key + "]";
+                    input.dataset.fieldKey = field.key;
+                    input.dataset.fieldLabel = field.label;
+                    input.dataset.requiredField = field.required ? "1" : "0";
+
+                    var defOpt = document.createElement("option");
+                    defOpt.value = "";
+                    defOpt.textContent = "Selectionnez...";
+                    input.appendChild(defOpt);
+
+                    if (field.options) {
+                        for (var j = 0; j < field.options.length; j++) {
+                            var opt = document.createElement("option");
+                            opt.value = field.options[j];
+                            opt.textContent = field.options[j];
+                            if (existingValue === field.options[j]) {
+                                opt.selected = true;
+                            }
+                            input.appendChild(opt);
+                        }
+                    }
+
+                    col.appendChild(input);
+                    attachDynamicValidation(input, field);
+                    break;
+
+                case "location":
+                    var inputGroup = document.createElement("div");
+                    inputGroup.className = "input-group";
+
+                    var locInput = document.createElement("input");
+                    locInput.type = "text";
+                    locInput.className = "form-control dynamic-field";
+                    locInput.name = "details[" + field.key + "]";
+                    locInput.id = "location-" + field.key;
+                    locInput.readOnly = true;
+                    locInput.value = existingValue;
+                    locInput.dataset.fieldKey = field.key;
+                    locInput.dataset.fieldLabel = field.label;
+                    locInput.dataset.requiredField = field.required ? "1" : "0";
+
+                    var mapBtn = document.createElement("button");
+                    mapBtn.type = "button";
+                    mapBtn.className = "btn btn-primary";
+                    mapBtn.innerHTML = '<i class="ti ti-map-pin"></i>';
+                    (function(li, fk) {
+                        mapBtn.addEventListener("click", function() {
+                            openMapPicker(li, fk);
+                        });
+                    })(locInput, field.key);
+
+                    inputGroup.appendChild(locInput);
+                    inputGroup.appendChild(mapBtn);
+                    col.appendChild(inputGroup);
+
+                    var latInput = document.createElement("input");
+                    latInput.type = "hidden";
+                    latInput.name = "details[" + field.key + "Lat]";
+                    latInput.id = "lat-" + field.key;
+                    latInput.value = EXISTING_DETAILS[field.key + "Lat"] || "";
+                    col.appendChild(latInput);
+
+                    var lonInput = document.createElement("input");
+                    lonInput.type = "hidden";
+                    lonInput.name = "details[" + field.key + "Lon]";
+                    lonInput.id = "lon-" + field.key;
+                    lonInput.value = EXISTING_DETAILS[field.key + "Lon"] || "";
+                    col.appendChild(lonInput);
+
+                    attachDynamicValidation(locInput, field);
+                    break;
+            }
+
+            var error = document.createElement("div");
+            error.className = "field-error";
+            error.id = "error-dynamic-" + field.key;
+            col.appendChild(error);
+
+            dynamicFieldsContainer.appendChild(col);
+        }
+    }
+
+    function applyDateRules(input, field) {
+        var today = new Date().toISOString().split("T")[0];
+        var key = (field.key || "").toLowerCase();
+        var label = (field.label || "").toLowerCase();
+
+        if (
+            key.indexOf("datedebut") !== -1 ||
+            key.indexOf("datesouhaitee") !== -1 ||
+            key.indexOf("datedebutteletravail") !== -1 ||
+            key.indexOf("datedebuthoraires") !== -1 ||
+            key.indexOf("datepassage") !== -1 ||
+            key.indexOf("datedebutformation") !== -1 ||
+            label.indexOf("date de debut") !== -1 ||
+            label.indexOf("date souhaitee") !== -1 ||
+            label.indexOf("date de passage") !== -1
+        ) {
+            input.min = today;
+            input.dataset.futureOrToday = "1";
+        }
+
+        if (
+            key.indexOf("datefin") !== -1 ||
+            key.indexOf("datefinteletravail") !== -1 ||
+            label.indexOf("date de fin") !== -1
+        ) {
+            input.min = today;
+            input.dataset.endDate = "1";
+        }
+    }
+
+    function attachDynamicValidation(input, field) {
+        input.addEventListener("input", function() {
+            validateDynamicInput(input, field);
+        });
+        input.addEventListener("change", function() {
+            validateDynamicInput(input, field);
+        });
+    }
+
+    function validateDynamicInput(input, field) {
+        var key = field.key;
+        var value = input.value ? input.value.trim() : "";
+        var required = field.required === true;
+        var error = "";
+
+        if (required && value === "") {
+            error = "Ce champ est obligatoire";
+        }
+
+        if (!error && input.type === "number" && value !== "") {
+            var num = parseFloat(value);
+            if (isNaN(num)) {
+                error = "Veuillez saisir un nombre valide";
+            } else if (num < 0) {
+                error = "La valeur ne peut pas etre negative";
+            } else if (
+                key.toLowerCase().indexOf("montant") !== -1 ||
+                key.toLowerCase().indexOf("nombre") !== -1 ||
+                key.toLowerCase().indexOf("quantite") !== -1 ||
+                key.toLowerCase().indexOf("cout") !== -1
+            ) {
+                if (num <= 0) {
+                    error = "La valeur doit etre superieure a 0";
+                }
+            }
+        }
+
+        if (!error && input.type === "date" && value !== "") {
+            var today = new Date();
+            today.setHours(0,0,0,0);
+            var selectedDate = new Date(value + "T00:00:00");
+
+            if (input.dataset.futureOrToday === "1" && selectedDate < today) {
+                error = "La date ne peut pas etre inferieure a la date actuelle";
+            }
+
+            if (!error && input.dataset.endDate === "1") {
+                var relatedStart = findRelatedStartDate(field.key);
+                if (relatedStart && relatedStart.value) {
+                    var startDate = new Date(relatedStart.value + "T00:00:00");
+                    if (selectedDate < startDate) {
+                        error = "La date de fin doit etre superieure ou egale a la date de debut";
+                    }
+                } else if (selectedDate < today) {
+                    error = "La date ne peut pas etre inferieure a la date actuelle";
+                }
+            }
+        }
+
+        setFieldValidationState(input, "dynamic-" + key, error);
+        return error === "";
+    }
+
+    function findRelatedStartDate(endKey) {
+        var candidates = [
+            "details[dateDebut]",
+            "details[dateDebutTeletravail]",
+            "details[dateDebutHoraires]",
+            "details[dateSouhaiteeFormation]",
+            "details[datePassage]"
+        ];
+
+        if (endKey.toLowerCase().indexOf("datefin") !== -1) {
+            for (var i = 0; i < candidates.length; i++) {
+                var el = document.querySelector('[name="' + candidates[i] + '"]');
+                if (el && el.offsetParent !== null) {
+                    return el;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    function setFieldValidationState(input, errorIdSuffix, errorMessage) {
+        var errorEl = document.getElementById("error-" + errorIdSuffix);
+        if (!errorEl) return;
+
+        input.classList.remove("is-invalid-custom", "is-valid-custom");
+
+        if (errorMessage) {
+            errorEl.textContent = errorMessage;
+            input.classList.add("is-invalid-custom");
+        } else {
+            errorEl.textContent = "";
+            if (input.value && input.value.trim() !== "") {
+                input.classList.add("is-valid-custom");
+            }
+        }
+    }
+
+    function validateMainFields() {
+        var valid = true;
+
+        var requiredFields = [
+            { id: "categorie", message: "Veuillez selectionner une categorie" },
+            { id: "typeDemande", message: "Veuillez selectionner un type de demande" },
+            { id: "priorite", message: "Veuillez selectionner une priorite" },
+            { id: "status", message: "Veuillez selectionner un statut" },
+            { id: "titre", message: "Veuillez saisir un titre" }
+        ];
+
+        requiredFields.forEach(function(field) {
+            var el = document.getElementById(field.id);
+            var value = el.value ? el.value.trim() : "";
+            if (value === "") {
+                showError(field.id, field.message);
+                valid = false;
+            } else {
+                clearError(field.id);
+            }
+        });
+
+        return valid;
+    }
+
+    function validateDynamicFields() {
+        var valid = true;
+        var inputs = document.querySelectorAll(".dynamic-field");
+
+        inputs.forEach(function(input) {
+            var field = {
+                key: input.dataset.fieldKey || "",
+                label: input.dataset.fieldLabel || "",
+                required: input.dataset.requiredField === "1"
+            };
+
+            if (!validateDynamicInput(input, field)) {
+                valid = false;
+            }
+        });
+
+        return valid;
+    }
+
+    function showError(id, message) {
+        var errorEl = document.getElementById("error-" + id);
+        var inputEl = document.getElementById(id);
+        if (errorEl) errorEl.textContent = message;
+        if (inputEl) inputEl.classList.add("is-invalid-custom");
+    }
+
+    function clearError(id) {
+        var errorEl = document.getElementById("error-" + id);
+        var inputEl = document.getElementById(id);
+        if (errorEl) errorEl.textContent = "";
+        if (inputEl) inputEl.classList.remove("is-invalid-custom");
+    }
+
     function onFormSubmit(e) {
         e.preventDefault();
-        e.stopPropagation();
-        
-        console.log("Form submit triggered");
-        
-        var form = document.getElementById("demandeForm");
+
+        var mainValid = validateMainFields();
+        var dynamicValid = validateDynamicFields();
+
+        if (!mainValid || !dynamicValid) {
+            alert("Veuillez corriger les erreurs de saisie avant de continuer.");
+            return;
+        }
+
         var formData = new FormData(form);
-        
         var data = {
             categorie: formData.get("categorie"),
             typeDemande: formData.get("typeDemande"),
@@ -342,62 +719,50 @@
             commentaire: formData.get("commentaire") || "",
             details: {}
         };
-        
+
         var entries = formData.entries();
         var entry = entries.next();
         while (!entry.done) {
             var key = entry.value[0];
             var value = entry.value[1];
-            
             if (key.indexOf("details[") === 0) {
                 var match = key.match(/details\[(.+)\]/);
-                if (match && value) {
+                if (match && value !== null && value !== "") {
                     data.details[match[1]] = value;
                 }
             }
             entry = entries.next();
         }
-        
-        console.log("Data to send:", data);
-        
-        var btnSubmit = document.getElementById("btnSubmit");
-        btnSubmit.disabled = true;
-        btnSubmit.innerHTML = '<i class="ti ti-loader me-1"></i>Enregistrement...';
-        
+
+        var submitBtn = document.getElementById("submitBtn");
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="ti ti-loader me-1"></i>Enregistrement...';
+
         fetch("/demande/api/" + DEMANDE_ID + "/update", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data)
         })
         .then(function(response) {
-            console.log("Response status:", response.status);
             return response.json();
         })
         .then(function(result) {
-            console.log("Result:", result);
-            
             if (result.success) {
-                alert("Demande mise a jour avec succes!");
                 window.location.href = "/demande/" + DEMANDE_ID;
             } else {
                 alert("Erreur: " + result.message);
-                btnSubmit.disabled = false;
-                btnSubmit.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
             }
         })
         .catch(function(error) {
-            console.error("Error:", error);
-            alert("Erreur de connexion: " + error.message);
-            btnSubmit.disabled = false;
-            btnSubmit.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
+            console.error(error);
+            alert("Erreur de connexion");
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
         });
-        
-        return false;
     }
-    
+
     function openMapPicker(inputField, fieldKey) {
         currentLocationField = { input: inputField, key: fieldKey };
         selectedLocation = null;
@@ -405,11 +770,11 @@
             mapModal.show();
         }
     }
-    
+
     function initMap() {
         var mapContainer = document.getElementById("map");
         if (!mapContainer) return;
-        
+
         if (!map) {
             map = L.map("map").setView([36.8065, 10.1815], 8);
             L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -419,25 +784,23 @@
         } else {
             map.invalidateSize();
         }
-        
+
         if (marker) {
             map.removeLayer(marker);
             marker = null;
         }
     }
-    
+
     function onMapClick(e) {
-        if (marker) {
-            map.removeLayer(marker);
-        }
-        
+        if (marker) map.removeLayer(marker);
+
         marker = L.marker(e.latlng).addTo(map);
         selectedLocation = {
             lat: e.latlng.lat,
             lon: e.latlng.lng,
             name: e.latlng.lat.toFixed(4) + ", " + e.latlng.lng.toFixed(4)
         };
-        
+
         fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + e.latlng.lat + "&lon=" + e.latlng.lng)
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -445,61 +808,55 @@
                     selectedLocation.name = data.display_name;
                     marker.bindPopup(data.display_name).openPopup();
                 }
-            })
-            .catch(function(err) {
-                console.error("Geocode error:", err);
             });
     }
-    
+
     function searchLocation(query) {
         if (!query) return;
-        
+
         fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(query))
             .then(function(r) { return r.json(); })
             .then(function(results) {
                 if (results.length > 0) {
                     var result = results[0];
                     var latlng = L.latLng(parseFloat(result.lat), parseFloat(result.lon));
-                    
                     map.setView(latlng, 14);
-                    
-                    if (marker) {
-                        map.removeLayer(marker);
-                    }
-                    
+                    if (marker) map.removeLayer(marker);
                     marker = L.marker(latlng).addTo(map);
                     marker.bindPopup(result.display_name).openPopup();
-                    
                     selectedLocation = {
                         lat: parseFloat(result.lat),
                         lon: parseFloat(result.lon),
                         name: result.display_name
                     };
-                } else {
-                    alert("Aucun resultat trouve");
                 }
-            })
-            .catch(function(err) {
-                console.error("Search error:", err);
             });
     }
-    
+
     function confirmLocationSelection() {
         if (selectedLocation && currentLocationField) {
             currentLocationField.input.value = selectedLocation.name;
-            
+
             var latInput = document.getElementById("lat-" + currentLocationField.key);
             var lonInput = document.getElementById("lon-" + currentLocationField.key);
-            
+
             if (latInput) latInput.value = selectedLocation.lat;
             if (lonInput) lonInput.value = selectedLocation.lon;
+
+            var field = {
+                key: currentLocationField.key,
+                label: currentLocationField.input.dataset.fieldLabel || currentLocationField.key,
+                required: currentLocationField.input.dataset.requiredField === "1"
+            };
+
+            validateDynamicInput(currentLocationField.input, field);
         }
-        
+
         if (mapModal) {
             mapModal.hide();
         }
     }
-    
+
 })();
 </script>
 {% endblock %}
