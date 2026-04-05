@@ -1,0 +1,26 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Momentum | Dashboard RH{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .dashboard-hr {
+            background: #f5f7fb;
+            min-height: 100vh;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    {% include 'offre/_home_page_navbar.html.twig' with {'active_nav': 'dashboard'} %}
+
+    <div class="dashboard-hr">
+        <div class="container-xl py-4">
+            <h1 class="h2 mb-4">Bienvenue sur votre dashboard RH</h1>
+            <p class="text-secondary">Gérez vos offres d'emploi, suivez les candidatures et accédez à des outils de recrutement performants.</p>
+
+            <!-- Contenu du dashboard RH -->
+        </div>
+    </div>
+{% endblock %}

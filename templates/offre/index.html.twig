@@ -120,9 +120,6 @@
 {% block body %}
 {# filter parameters #}
 
-{% set logged_user_id = offres[0].candidats[0].visiteur.id_visiteur %}
-{{ logged_user_id }}
-
 {% set queryName = app.request.query.get('q')|default('') %}
 {% set queryCategory = app.request.query.get('category')|default('') %}
 {% set queryContract = app.request.query.get('contract')|default('') %}
