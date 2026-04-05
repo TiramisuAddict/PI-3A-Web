@@ -2,11 +2,127 @@
 
 {% block title %}Projets{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .kanban-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .kanban-summary {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .kanban-stat {
+            min-width: 96px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            background: #f4f7fc;
+            border: 1px solid #e7edf7;
+            text-align: center;
+        }
+
+        .kanban-stat strong {
+            display: block;
+            font-size: 24px;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .kanban-board {
+            align-items: stretch;
+        }
+
+        .kanban-lane {
+            border-radius: 14px;
+            border: 1px solid #e8edf7;
+            background: #f8fbff;
+            padding: 10px;
+            min-height: 68vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .kanban-lane-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-weight: 700;
+        }
+
+        .kanban-count {
+            border-radius: 999px;
+            font-size: 12px;
+            padding: 2px 8px;
+            background: rgba(255, 255, 255, 0.65);
+        }
+
+        .kanban-column {
+            margin-top: 10px;
+            flex: 1;
+            min-height: 140px;
+            max-height: 60vh;
+            overflow: auto;
+            border-radius: 10px;
+            transition: background-color .18s ease;
+            padding: 2px;
+        }
+
+        .kanban-task {
+            border-radius: 12px;
+            border: 1px solid #e9eef8;
+            background: #fff;
+            cursor: grab;
+            transition: box-shadow .2s ease, transform .2s ease;
+        }
+
+        .is-filter-hidden {
+            display: none !important;
+        }
+
+        .kanban-toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .kanban-search {
+            min-width: 240px;
+            flex: 1;
+        }
+
+        .kanban-filter {
+            min-width: 190px;
+        }
+    </style>
+{% endblock %}
+
 {% block body %}
     <div class="row g-3">
         <div class="col-12">
             {% if selectedProjet %}
-                <div class="workspace-card p-3 mb-3">
+                {% set totalTasks = selectedProjet.taches|length %}
+                {% set todoCount = 0 %}
+                {% set doingCount = 0 %}
+                {% set blockedCount = 0 %}
+                {% set doneCount = 0 %}
+                {% for tache in selectedProjet.taches %}
+                    {% set normalizedStatus = (tache.statut_tache ?? '')|upper|replace({' ': '_', '-': '_'}) %}
+                    {% if normalizedStatus == 'A_FAIRE' %}{% set todoCount = todoCount + 1 %}{% endif %}
+                    {% if normalizedStatus == 'EN_COURS' %}{% set doingCount = doingCount + 1 %}{% endif %}
+                    {% if normalizedStatus == 'BLOCQUEE' %}{% set blockedCount = blockedCount + 1 %}{% endif %}
+                    {% if normalizedStatus == 'TERMINEE' %}{% set doneCount = doneCount + 1 %}{% endif %}
+                {% endfor %}
+
+                <div class="workspace-card p-3 mb-3 kanban-shell">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
                         <div>
                             <h2 class="mb-1">{{ selectedProjet.nom }}</h2>
@@ -18,7 +134,29 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <a href="{{ path('app_projet_edit', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary-lt">Modifier le projet</a>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Nouvelle tache</a>
+                            <a href="{{ path('app_projet_edit', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary-lt">Modifier le projet</a>
+                        </div>
+                    </div>
+
+                    <div class="kanban-summary">
+                        <div class="kanban-stat">
+                            <strong>{{ totalTasks }}</strong>
+                            <span class="workspace-subtle small">Total</span>
+                        </div>
+                        <div class="kanban-stat" style="background:#ecfbf4;border-color:#ccf0df;color:#0b8f58;">
+                            <strong>{{ doneCount }}</strong>
+                            <span class="small">Terminees</span>
+                        </div>
+                        <div class="kanban-stat" style="background:#ecf3ff;border-color:#d2e3ff;color:#2f6dde;">
+                            <strong>{{ doingCount }}</strong>
+                            <span class="small">En cours</span>
+                        </div>
+                        <div class="kanban-stat" style="background:#fff0f0;border-color:#ffd9d9;color:#d14343;">
+                            <strong>{{ blockedCount }}</strong>
+                            <span class="small">Bloquees</span>
+                        </div>
                     </div>
 
                     <div class="mt-3">
@@ -36,16 +174,42 @@
                 {% set taskColumns = [
                     {'key':'A_FAIRE', 'label':'A faire', 'header':'bg-blue-lt text-blue'},
                     {'key':'EN_COURS', 'label':'En cours', 'header':'bg-azure-lt text-azure'},
-                    {'key':'TERMINE', 'label':'Termine', 'header':'bg-green-lt text-green'}
+                    {'key':'BLOCQUEE', 'label':'Bloquee', 'header':'bg-red-lt text-red'},
+                    {'key':'TERMINEE', 'label':'Terminee', 'header':'bg-green-lt text-green'}
                 ] %}
 
-                <div class="row g-3 align-items-start">
-                    {% for column in taskColumns %}
-                        <div class="col-12 col-md-4">
-                            <div class="workspace-card p-2 h-100">
-                                <div class="rounded p-2 fw-bold {{ column.header }}">{{ column.label }}</div>
+                <div class="row g-3 kanban-board">
+                    <div class="col-12">
+                        <div class="workspace-card p-2">
+                            <div class="kanban-toolbar">
+                                <div class="kanban-search">
+                                    <input type="text" class="form-control" placeholder="Rechercher..." data-task-search>
+                                </div>
+                                <div class="kanban-filter">
+                                    <select class="form-select" data-task-filter>
+                                        <option value="ALL">Toutes les taches</option>
+                                        <option value="A_FAIRE">A faire</option>
+                                        <option value="EN_COURS">En cours</option>
+                                        <option value="BLOCQUEE">Bloquees</option>
+                                        <option value="TERMINEE">Terminees</option>
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-primary-lt" data-task-filter-reset>
+                                    <i class="ti ti-rotate me-1"></i>Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
-                                <div class="mt-2" style="max-height: 60vh; overflow: auto;">
+                    {% for column in taskColumns %}
+                        <div class="col-12 col-lg-3 col-md-6">
+                            <div class="kanban-lane">
+                                <div class="kanban-lane-header {{ column.header }}">
+                                    <span>{{ column.label }}</span>
+                                    <span class="kanban-count" data-count-for="{{ column.key }}">0</span>
+                                </div>
+
+                                <div class="kanban-column" data-status="{{ column.key }}">
                                     {% set hasTasks = false %}
                                     {% for tache in selectedProjet.taches %}
                                         {% set normalizedStatus = (tache.statut_tache ?? '')|upper|replace({' ': '_', '-': '_'}) %}
@@ -56,26 +220,72 @@
                                             {% if tache.priorite == 'MOYENNE' %}{% set taskPrioriteColor = 'orange' %}{% endif %}
                                             {% if tache.priorite == 'BASSE' %}{% set taskPrioriteColor = 'green' %}{% endif %}
 
-                                            <article class="workspace-card p-3 mb-2">
+                                            <article class="workspace-card p-3 mb-2 kanban-task"
+                                                     draggable="true"
+                                                     data-task-id="{{ tache.idTache }}"
+                                                     data-edit-url="{{ path('app_tache_edit', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}"
+                                                     data-move-url="{{ path('app_tache_move', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}"
+                                                     data-csrf-token="{{ csrf_token('move_tache_' ~ tache.idTache) }}"
+                                                     style="cursor: grab; transition: box-shadow .2s ease, transform .2s ease;">
                                                 <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                                                    <div class="fw-semibold text-truncate">{{ tache.titre }}</div>
-                                                    <span class="badge bg-{{ taskPrioriteColor }}-lt">{{ tache.priorite is empty ? 'AUCUNE' : tache.priorite }}</span>
+                                                    <div class="d-flex align-items-center gap-2 min-w-0">
+                                                        <a href="{{ path('app_tache_edit', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}" class="fw-semibold text-truncate text-decoration-none text-reset">{{ tache.titre }}</a>
+                                                        <span class="badge bg-{{ taskPrioriteColor }}-lt">{{ tache.priorite is empty ? '-' : tache.priorite }}</span>
+                                                    </div>
+                                                    <div class="dropdown" data-bs-auto-close="outside">
+                                                        <button class="btn btn-ghost-secondary btn-sm btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                                                            <i class="ti ti-dots-vertical"></i>
+                                                        </button>
+                                                        <div class="dropdown-menu dropdown-menu-end">
+                                                            <a class="dropdown-item" href="{{ path('app_tache_show', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}">
+                                                                <i class="ti ti-eye me-2"></i>Voir les details
+                                                            </a>
+                                                            <a class="dropdown-item" href="{{ path('app_tache_edit', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}">
+                                                                <i class="ti ti-edit me-2"></i>Modifier
+                                                            </a>
+                                                            <div class="dropdown-divider"></div>
+                                                            <div class="dropdown-header">Deplacer vers</div>
+                                                            <button type="button" class="dropdown-item js-move-task" data-target-status="A_FAIRE">A faire</button>
+                                                            <button type="button" class="dropdown-item js-move-task" data-target-status="EN_COURS">En cours</button>
+                                                            <button type="button" class="dropdown-item js-move-task" data-target-status="BLOCQUEE">Bloquee</button>
+                                                            <button type="button" class="dropdown-item js-move-task" data-target-status="TERMINEE">Terminee</button>
+                                                            <div class="dropdown-divider"></div>
+                                                            <form method="post" action="{{ path('app_tache_delete', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}" onsubmit="return confirm('Supprimer cette tache ?');">
+                                                                <input type="hidden" name="_token" value="{{ csrf_token('delete_tache_' ~ tache.idTache) }}">
+                                                                <button type="submit" class="dropdown-item text-danger">
+                                                                    <i class="ti ti-trash me-2"></i>Supprimer
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div class="small workspace-subtle mb-2">
                                                     {{ tache.description|length > 80 ? tache.description|slice(0, 80) ~ '...' : tache.description }}
                                                 </div>
-                                                <div class="small workspace-subtle d-flex justify-content-between">
+                                                <div class="small workspace-subtle d-flex justify-content-between align-items-center">
                                                     <span><i class="ti ti-calendar me-1"></i>{{ tache.date_limite ? tache.date_limite|date('d/m/Y') : '-' }}</span>
-                                                    <span><i class="ti ti-chart-pie me-1"></i>{{ tache.progression is not null ? tache.progression ~ '%' : '0%' }}</span>
+                                                    <span><i class="ti ti-user me-1"></i>{{ tache.employe ? (tache.employe.nom ~ ' ' ~ tache.employe.prenom) : '-' }}</span>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2 mt-2 small workspace-subtle">
+                                                    <div class="progress flex-grow-1" style="height: 8px;">
+                                                        <div class="progress-bar bg-azure" role="progressbar" style="width: {{ tache.progression is not null ? tache.progression : 0 }}%;"></div>
+                                                    </div>
+                                                    <span>{{ tache.progression is not null ? tache.progression : 0 }}%</span>
                                                 </div>
                                             </article>
                                         {% endif %}
                                     {% endfor %}
 
                                     {% if not hasTasks %}
-                                        <div class="p-3 text-center workspace-subtle small">Aucune tache</div>
+                                        <div class="p-3 text-center workspace-subtle small kanban-empty">Aucune tache</div>
                                     {% endif %}
                                 </div>
+
+                                {% if column.key != 'TERMINEE' %}
+                                    <div class="text-center pt-2">
+                                        <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet, 'status': column.key}) }}" class="btn btn-link text-decoration-none">+ Ajouter une tache</a>
+                                    </div>
+                                {% endif %}
                             </div>
                         </div>
                     {% endfor %}
@@ -97,5 +307,243 @@
             {% endif %}
         </div>
     </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        window.addEventListener('DOMContentLoaded', function () {
+            const tasks = Array.from(document.querySelectorAll('.kanban-task'));
+            const columns = Array.from(document.querySelectorAll('.kanban-column'));
+            const counters = Array.from(document.querySelectorAll('[data-count-for]'));
+            const moveButtons = Array.from(document.querySelectorAll('.js-move-task'));
+            const searchInput = document.querySelector('[data-task-search]');
+            const statusFilter = document.querySelector('[data-task-filter]');
+            const resetFilterButton = document.querySelector('[data-task-filter-reset]');
+            let draggedTask = null;
+
+            if (tasks.length === 0 || columns.length === 0) {
+                return;
+            }
+
+            const refreshCounters = function () {
+                counters.forEach(function (counter) {
+                    const key = counter.getAttribute('data-count-for');
+                    const lane = document.querySelector('.kanban-column[data-status="' + key + '"]');
+                    if (!lane) {
+                        return;
+                    }
+
+                    const visibleTasks = Array.from(lane.querySelectorAll('.kanban-task')).filter(function (task) {
+                        return !task.classList.contains('is-filter-hidden');
+                    });
+
+                    counter.textContent = String(visibleTasks.length);
+                });
+            };
+
+            const ensureEmptyPlaceholder = function (column) {
+                if (!column) {
+                    return;
+                }
+
+                const hasTasks = Array.from(column.querySelectorAll('.kanban-task')).some(function (task) {
+                    return !task.classList.contains('is-filter-hidden');
+                });
+                const empty = column.querySelector('.kanban-empty');
+
+                if (hasTasks && empty) {
+                    empty.remove();
+                }
+
+                if (!hasTasks && !empty) {
+                    column.insertAdjacentHTML('beforeend', '<div class="p-3 text-center workspace-subtle small kanban-empty">Aucune tache</div>');
+                }
+            };
+
+            const applyTaskFilters = function () {
+                const query = (searchInput && searchInput.value ? searchInput.value : '').trim().toLowerCase();
+                const selectedStatus = (statusFilter && statusFilter.value ? statusFilter.value : 'ALL').toUpperCase();
+
+                tasks.forEach(function (task) {
+                    const lane = task.closest('.kanban-column');
+                    const taskStatus = lane ? (lane.getAttribute('data-status') || '').toUpperCase() : '';
+                    const text = (task.textContent || '').toLowerCase();
+
+                    const matchesStatus = selectedStatus === 'ALL' || taskStatus === selectedStatus;
+                    const matchesQuery = query === '' || text.includes(query);
+
+                    if (matchesStatus && matchesQuery) {
+                        task.classList.remove('is-filter-hidden');
+                    } else {
+                        task.classList.add('is-filter-hidden');
+                    }
+                });
+
+                columns.forEach(function (column) {
+                    ensureEmptyPlaceholder(column);
+                });
+                refreshCounters();
+            };
+
+            const moveTaskCard = async function (task, targetStatus) {
+                if (!task) {
+                    return;
+                }
+
+                const targetColumn = document.querySelector('.kanban-column[data-status="' + targetStatus + '"]');
+                if (!targetColumn) {
+                    return;
+                }
+
+                const moveUrl = task.getAttribute('data-move-url') || '';
+                const csrfToken = task.getAttribute('data-csrf-token') || '';
+                if (moveUrl === '' || csrfToken === '') {
+                    return;
+                }
+
+                const sourceColumn = task.closest('.kanban-column');
+                if (!sourceColumn || sourceColumn === targetColumn) {
+                    return;
+                }
+
+                targetColumn.prepend(task);
+                ensureEmptyPlaceholder(sourceColumn);
+                ensureEmptyPlaceholder(targetColumn);
+                refreshCounters();
+
+                try {
+                    const response = await fetch(moveUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            status: targetStatus,
+                            _token: csrfToken
+                        })
+                    });
+
+                    const payload = await response.json();
+                    if (!response.ok || payload.ok !== true) {
+                        throw new Error(payload.message || 'Mise a jour impossible.');
+                    }
+
+                    applyTaskFilters();
+                } catch (error) {
+                    sourceColumn.prepend(task);
+                    ensureEmptyPlaceholder(sourceColumn);
+                    ensureEmptyPlaceholder(targetColumn);
+                    refreshCounters();
+                    window.alert(error.message || 'Erreur lors du deplacement de la tache.');
+                }
+            };
+
+            tasks.forEach(function (task) {
+                let dragStarted = false;
+
+                task.addEventListener('dragstart', function () {
+                    dragStarted = true;
+                    draggedTask = task;
+                    task.style.opacity = '0.65';
+                    task.style.transform = 'scale(0.98)';
+                });
+
+                task.addEventListener('dragend', function () {
+                    task.style.opacity = '1';
+                    task.style.transform = 'none';
+                    task.style.cursor = 'grab';
+                    draggedTask = null;
+
+                    setTimeout(function () {
+                        dragStarted = false;
+                    }, 0);
+                });
+
+                task.addEventListener('mouseenter', function () {
+                    if (task !== draggedTask) {
+                        task.style.boxShadow = '0 10px 22px rgba(31, 41, 55, 0.08)';
+                    }
+                });
+
+                task.addEventListener('mouseleave', function () {
+                    if (task !== draggedTask) {
+                        task.style.boxShadow = 'none';
+                    }
+                });
+            });
+
+            columns.forEach(function (column) {
+                column.addEventListener('dragover', function (event) {
+                    event.preventDefault();
+                    column.style.background = 'rgba(13, 110, 253, 0.06)';
+                });
+
+                column.addEventListener('dragleave', function () {
+                    column.style.background = 'transparent';
+                });
+
+                column.addEventListener('drop', async function (event) {
+                    event.preventDefault();
+                    column.style.background = 'transparent';
+
+                    if (!draggedTask) {
+                        return;
+                    }
+
+                    const targetStatus = column.getAttribute('data-status') || '';
+                    if (targetStatus === '') {
+                        return;
+                    }
+
+                    await moveTaskCard(draggedTask, targetStatus);
+                });
+            });
+
+            moveButtons.forEach(function (button) {
+                button.addEventListener('click', async function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    const task = button.closest('.kanban-task');
+                    const targetStatus = button.getAttribute('data-target-status') || '';
+                    if (!task || targetStatus === '') {
+                        return;
+                    }
+
+                    await moveTaskCard(task, targetStatus);
+
+                    const menu = button.closest('.dropdown-menu');
+                    if (menu && menu.classList.contains('show')) {
+                        menu.classList.remove('show');
+                    }
+                });
+            });
+
+            if (searchInput) {
+                searchInput.addEventListener('input', applyTaskFilters);
+            }
+
+            if (statusFilter) {
+                statusFilter.addEventListener('change', applyTaskFilters);
+            }
+
+            if (resetFilterButton) {
+                resetFilterButton.addEventListener('click', function () {
+                    if (searchInput) {
+                        searchInput.value = '';
+                    }
+                    if (statusFilter) {
+                        statusFilter.value = 'ALL';
+                    }
+                    applyTaskFilters();
+                });
+            }
+
+            refreshCounters();
+            applyTaskFilters();
+        });
+    </script>
 {% endblock %}
 

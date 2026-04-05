@@ -3,11 +3,15 @@
 namespace App\Controller;
 
 use App\Entity\Projet;
+use App\Entity\Tache;
 use App\Form\ProjetType;
+use App\Form\TacheType;
 use App\Repository\EmployéRepository;
 use App\Repository\ProjetRepository;
+use App\Repository\TacheRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -23,30 +27,17 @@ final class ProjetController extends AbstractController
             'statut' => trim((string) $request->query->get('statut', '')),
             'priorite' => trim((string) $request->query->get('priorite', '')),
             'responsable' => trim((string) $request->query->get('responsable', '')),
-            'date_from' => trim((string) $request->query->get('date_from', '')),
-            'date_to' => trim((string) $request->query->get('date_to', '')),
         ];
 
         $responsableId = ctype_digit($filters['responsable']) ? (int) $filters['responsable'] : null;
-
-        $dateFrom = null;
-        $dateTo = null;
-
-        if ($filters['date_from'] !== '') {
-            $dateFrom = \DateTimeImmutable::createFromFormat('Y-m-d', $filters['date_from']) ?: null;
-        }
-
-        if ($filters['date_to'] !== '') {
-            $dateTo = \DateTimeImmutable::createFromFormat('Y-m-d', $filters['date_to']) ?: null;
-        }
 
         $projets = $projetRepository->findByFilters(
             $filters['search'] !== '' ? $filters['search'] : null,
             $filters['statut'] !== '' ? $filters['statut'] : null,
             $filters['priorite'] !== '' ? $filters['priorite'] : null,
             $responsableId,
-            $dateFrom,
-            $dateTo,
+            null,
+            null,
         );
 
         $selectedProjetId = ctype_digit((string) $request->query->get('projet', '')) ? (int) $request->query->get('projet') : null;
@@ -71,7 +62,7 @@ final class ProjetController extends AbstractController
             'sidebarProjets' => $projets,
             'sidebarSelectedProjetId' => $selectedProjet?->getIdProjet(),
             'filters' => $filters,
-            'hasActiveFilters' => $filters['search'] !== '' || $filters['statut'] !== '' || $filters['priorite'] !== '' || $filters['responsable'] !== '' || $filters['date_from'] !== '' || $filters['date_to'] !== '',
+            'hasActiveFilters' => $filters['search'] !== '' || $filters['statut'] !== '' || $filters['priorite'] !== '' || $filters['responsable'] !== '',
             'responsables' => $this->buildResponsablesForFilter($employeRepository),
         ]);
     }
@@ -84,6 +75,7 @@ final class ProjetController extends AbstractController
         $form = $this->createForm(ProjetType::class, $projet, [
             'responsables_choices' => $choices['responsables'],
             'membres_choices' => $choices['membres'],
+            'is_edit' => false,
         ]);
         $form->handleRequest($request);
 
@@ -119,6 +111,7 @@ final class ProjetController extends AbstractController
         $form = $this->createForm(ProjetType::class, $projet, [
             'responsables_choices' => $choices['responsables'],
             'membres_choices' => $choices['membres'],
+            'is_edit' => true,
         ]);
         $form->handleRequest($request);
 
@@ -145,6 +138,150 @@ final class ProjetController extends AbstractController
         }
 
         return $this->redirectToRoute('app_projet_index', [], Response::HTTP_SEE_OTHER);
+    }
+
+    #[Route('/{id_projet}/tache/new', name: 'app_tache_new', methods: ['GET', 'POST'])]
+    public function newTask(Request $request, Projet $projet, ProjetRepository $projetRepository, EntityManagerInterface $entityManager): Response
+    {
+        $requestedStatus = mb_strtoupper(trim((string) $request->query->get('status', '')));
+
+        $tache = new Tache();
+        $tache->setProjet($projet);
+        if (!in_array($requestedStatus, Tache::STATUT_VALUES, true) || $requestedStatus === Tache::STATUT_TERMINEE) {
+            $requestedStatus = Tache::STATUT_A_FAIRE;
+        }
+
+        $tache->setStatutTache($requestedStatus);
+        $tache->setProgression(0);
+        $tache->setDateDeb(new \DateTime('today'));
+
+        $teamChoices = $projet->getMembresEquipe()->toArray();
+
+        $form = $this->createForm(TacheType::class, $tache, [
+            'project_team_choices' => $teamChoices,
+            'allow_completed_status' => false,
+            'is_edit' => false,
+        ]);
+
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->synchronizeTaskProgressionAndStatus($tache);
+            $entityManager->persist($tache);
+            $entityManager->flush();
+
+            return $this->redirectToRoute('app_projet_index', ['projet' => $projet->getIdProjet()], Response::HTTP_SEE_OTHER);
+        }
+
+        return $this->render('tache/new.html.twig', [
+            'projet' => $projet,
+            'tache' => $tache,
+            'form' => $form,
+            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarSelectedProjetId' => $projet->getIdProjet(),
+        ]);
+    }
+
+    #[Route('/{id_projet}/tache/{id_tache}/edit', name: 'app_tache_edit', methods: ['GET', 'POST'])]
+    public function editTask(Request $request, Projet $projet, Tache $tache, ProjetRepository $projetRepository, EntityManagerInterface $entityManager): Response
+    {
+        if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
+            throw $this->createNotFoundException('Tache introuvable pour ce projet.');
+        }
+
+        $teamChoices = $projet->getMembresEquipe()->toArray();
+
+        $form = $this->createForm(TacheType::class, $tache, [
+            'project_team_choices' => $teamChoices,
+            'is_edit' => true,
+        ]);
+
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->synchronizeTaskProgressionAndStatus($tache);
+            $entityManager->flush();
+
+            return $this->redirectToRoute('app_projet_index', ['projet' => $projet->getIdProjet()], Response::HTTP_SEE_OTHER);
+        }
+
+        return $this->render('tache/edit.html.twig', [
+            'projet' => $projet,
+            'tache' => $tache,
+            'form' => $form,
+            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarSelectedProjetId' => $projet->getIdProjet(),
+        ]);
+    }
+
+    #[Route('/{id_projet}/tache/{id_tache}', name: 'app_tache_show', methods: ['GET'])]
+    public function showTask(Projet $projet, Tache $tache, ProjetRepository $projetRepository): Response
+    {
+        if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
+            throw $this->createNotFoundException('Tache introuvable pour ce projet.');
+        }
+
+        return $this->render('tache/show.html.twig', [
+            'projet' => $projet,
+            'tache' => $tache,
+            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarSelectedProjetId' => $projet->getIdProjet(),
+        ]);
+    }
+
+    #[Route('/{id_projet}/tache/{id_tache}/delete', name: 'app_tache_delete', methods: ['POST'])]
+    public function deleteTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager): Response
+    {
+        if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
+            throw $this->createNotFoundException('Tache introuvable pour ce projet.');
+        }
+
+        if ($this->isCsrfTokenValid('delete_tache_'.$tache->getIdTache(), (string) $request->request->get('_token'))) {
+            $entityManager->remove($tache);
+            $entityManager->flush();
+        }
+
+        return $this->redirectToRoute('app_projet_index', ['projet' => $projet->getIdProjet()], Response::HTTP_SEE_OTHER);
+    }
+
+    #[Route('/{id_projet}/tache/{id_tache}/move', name: 'app_tache_move', methods: ['POST'])]
+    public function moveTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager): JsonResponse
+    {
+        if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
+            return $this->json(['ok' => false, 'message' => 'Tache introuvable pour ce projet.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            return $this->json(['ok' => false, 'message' => 'Requete invalide.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $status = (string) ($payload['status'] ?? '');
+        $token = (string) ($payload['_token'] ?? '');
+
+        if (!$this->isCsrfTokenValid('move_tache_'.$tache->getIdTache(), $token)) {
+            return $this->json(['ok' => false, 'message' => 'Token CSRF invalide.'], Response::HTTP_FORBIDDEN);
+        }
+
+        if (!in_array($status, Tache::STATUT_VALUES, true)) {
+            return $this->json(['ok' => false, 'message' => 'Statut invalide.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $tache->setStatutTache($status);
+
+        if ($status === Tache::STATUT_TERMINEE) {
+            $tache->setProgression(100);
+        } elseif ($status === Tache::STATUT_A_FAIRE) {
+            $tache->setProgression(0);
+        }
+
+        $entityManager->flush();
+
+        return $this->json([
+            'ok' => true,
+            'status' => $status,
+            'progression' => $tache->getProgression(),
+        ]);
     }
 
     /**
@@ -199,5 +336,42 @@ final class ProjetController extends AbstractController
         });
 
         return $responsables;
+    }
+
+    private function statusToProgression(?string $status): int
+    {
+        return match ($status) {
+            Tache::STATUT_TERMINEE => 100,
+            Tache::STATUT_EN_COURS => 50,
+            Tache::STATUT_BLOQUEE => 50,
+            default => 0,
+        };
+    }
+
+    private function synchronizeTaskProgressionAndStatus(Tache $tache): void
+    {
+        if ($tache->getProgression() === null) {
+            $tache->setProgression($this->statusToProgression($tache->getStatutTache()));
+        }
+
+        $progression = $tache->getProgression() ?? 0;
+        $status = $tache->getStatutTache();
+
+        if ($progression >= 100) {
+            $tache->setProgression(100);
+            $tache->setStatutTache(Tache::STATUT_TERMINEE);
+
+            return;
+        }
+
+        if ($progression > 0) {
+            $tache->setStatutTache(Tache::STATUT_EN_COURS);
+
+            return;
+        }
+
+        if ($status !== Tache::STATUT_A_FAIRE) {
+            $tache->setStatutTache(Tache::STATUT_A_FAIRE);
+        }
     }
 }

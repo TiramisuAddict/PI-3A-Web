@@ -289,9 +289,7 @@
                                         search: filters.search|default(''),
                                         statut: filters.statut|default(''),
                                         priorite: filters.priorite|default(''),
-                                        responsable: filters.responsable|default(''),
-                                        date_from: filters.date_from|default(''),
-                                        date_to: filters.date_to|default('')
+                                        responsable: filters.responsable|default('')
                                     }) }}"
                                     class="text-decoration-none text-reset flex-grow-1 d-flex align-items-center gap-2 min-w-0"
                                 >
@@ -369,12 +367,6 @@
                                             </option>
                                         {% endfor %}
                                     </select>
-                                </div>
-                                <div class="mb-2">
-                                    <input type="date" name="date_from" value="{{ filters.date_from|default('') }}" class="form-control form-control-sm" title="Date de debut minimum">
-                                </div>
-                                <div class="mb-2">
-                                    <input type="date" name="date_to" value="{{ filters.date_to|default('') }}" class="form-control form-control-sm" title="Date de fin prevue maximum">
                                 </div>
                                 <a href="{{ path('app_projet_index') }}" class="btn btn-link btn-sm px-0">Reinitialiser</a>
                             </form>
