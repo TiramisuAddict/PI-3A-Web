@@ -1,0 +1,41 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Likes{% endblock %}
+
+{% block body %}
+<div class="surface-card p-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <h1 class="mb-0">Likes</h1>
+        <a class="btn btn-primary" href="{{ path('app_like_post_new') }}"><i class="ti ti-plus me-1"></i>Créer</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>id_like</th>
+                    <th>utilisateur_id</th>
+                    <th>date_like</th>
+                    <th>post</th>
+                    <th class="text-nowrap">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for like_post in like_posts %}
+                <tr>
+                    <td>{{ like_post.id_like }}</td>
+                    <td>{{ like_post.utilisateur_id }}</td>
+                    <td>{{ like_post.date_like ? like_post.date_like|date('Y-m-d H:i') : '' }}</td>
+                    <td>{% if like_post.post %}#{{ like_post.post.id_post }}{% endif %}</td>
+                    <td class="text-nowrap">
+                        <a class="btn btn-sm btn-primary" href="{{ path('app_like_post_show', { id_like: like_post.id_like }) }}"><i class="ti ti-eye"></i></a>
+                        <a class="btn btn-sm btn-warning" href="{{ path('app_like_post_edit', { id_like: like_post.id_like }) }}"><i class="ti ti-edit"></i></a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5" class="text-center text-secondary py-4">Aucun enregistrement</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

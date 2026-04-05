@@ -1,0 +1,15 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Modifier le commentaire{% endblock %}
+
+{% block body %}
+<div class="surface-card p-4">
+    <h1 class="mb-4">Modifier le commentaire</h1>
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            {{ include('commentaire/_form.html.twig', { cancel_path: path('app_commentaire_index'), submit_label: 'Mettre à jour' }) }}
+        </div>
+    </div>
+    <div class="mt-3">{{ include('commentaire/_delete_form.html.twig') }}</div>
+</div>
+{% endblock %}

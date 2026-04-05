@@ -1,0 +1,14 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Nouvelle notification{% endblock %}
+
+{% block body %}
+<div class="surface-card p-4">
+    <h1 class="mb-4">Créer une notification</h1>
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            {{ include('notification/_form.html.twig', { cancel_path: path('app_notification_index'), submit_label: 'Créer' }) }}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Modifier la participation{% endblock %}
+
+{% block body %}
+<div class="surface-card p-4">
+    <h1 class="mb-4">Modifier la participation</h1>
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            {{ include('participation/_form.html.twig', { cancel_path: path('app_participation_index'), submit_label: 'Mettre à jour' }) }}
+        </div>
+    </div>
+    <div class="mt-3">{{ include('participation/_delete_form.html.twig') }}</div>
+</div>
+{% endblock %}
