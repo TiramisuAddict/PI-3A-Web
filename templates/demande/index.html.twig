@@ -302,7 +302,7 @@
                     data-priorite="{{ demande.priorite }}"
                     data-status="{{ demande.status }}">
                     <td>
-                        <a href="{{ path('demande_show', {id: demande.id}) }}" class="titre-link">
+                        <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="titre-link">
                             {{ demande.titre }}
                         </a>
                     </td>
@@ -363,12 +363,12 @@
                     </td>
                     <td class="text-end">
                         <div class="btn-list flex-nowrap justify-content-end">
-                            <a href="{{ path('demande_show', {id: demande.id}) }}" 
+                            <a href="{{ path('demande_show', {id: demande.idDemande}) }}" 
                                class="action-btn btn btn-outline-primary" 
                                title="Voir">
                                 <i class="ti ti-eye"></i>
                             </a>
-                            <a href="{{ path('demande_edit', {id: demande.id}) }}" 
+                            <a href="{{ path('demande_edit', {id: demande.idDemande}) }}" 
                                class="action-btn btn btn-outline-warning" 
                                title="Modifier">
                                 <i class="ti ti-edit"></i>
@@ -378,7 +378,7 @@
                                     title="Supprimer" 
                                     data-bs-toggle="modal" 
                                     data-bs-target="#deleteModal" 
-                                    data-id="{{ demande.id }}">
+                                    data-id="{{ demande.idDemande }}">
                                 <i class="ti ti-trash"></i>
                             </button>
                         </div>

@@ -2,50 +2,36 @@
 
 namespace App\Entity;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 
-#[ORM\Entity]
+use App\Repository\HistoriqueDemandeRepository;
+
+#[ORM\Entity(repositoryClass: HistoriqueDemandeRepository::class)]
 #[ORM\Table(name: 'historique_demande')]
 class HistoriqueDemande
 {
     #[ORM\Id]
-    #[ORM\GeneratedValue(strategy: 'IDENTITY')]
-    #[ORM\Column(name: 'id_historique', type: 'integer')]
-    private ?int $idHistorique = null;
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
+    private ?int $id_historique = null;
 
-    #[ORM\ManyToOne(targetEntity: Demande::class, inversedBy: 'historiques')]
-    #[ORM\JoinColumn(name: 'id_demande', referencedColumnName: 'id_demande', nullable: false)]
+    public function getId_historique(): ?int
+    {
+        return $this->id_historique;
+    }
+
+    public function setId_historique(int $id_historique): self
+    {
+        $this->id_historique = $id_historique;
+        return $this;
+    }
+
+    #[ORM\ManyToOne(targetEntity: Demande::class, inversedBy: 'historiqueDemandes')]
+    #[ORM\JoinColumn(name: 'id_demande', referencedColumnName: 'id_demande')]
     private ?Demande $demande = null;
-
-    #[ORM\Column(name: 'ancien_statut', length: 50, nullable: true)]
-    private ?string $ancienStatut = null;
-
-    #[ORM\Column(name: 'nouveau_statut', length: 50)]
-    private ?string $nouveauStatut = null;
-
-    #[ORM\Column(name: 'date_action', type: 'datetime')]
-    private ?\DateTimeInterface $dateAction = null;
-
-    #[ORM\Column(name: 'acteur', length: 100)]
-    private ?string $acteur = null;
-
-    #[ORM\Column(name: 'commentaire', type: 'text', nullable: true)]
-    private ?string $commentaire = null;
-
-    public function __construct()
-    {
-        $this->dateAction = new \DateTime();
-    }
-
-    public function getId(): ?int
-    {
-        return $this->idHistorique;
-    }
-
-    public function getIdHistorique(): ?int
-    {
-        return $this->idHistorique;
-    }
 
     public function getDemande(): ?Demande
     {
@@ -58,49 +44,64 @@ class HistoriqueDemande
         return $this;
     }
 
-    public function getAncienStatut(): ?string
+    #[ORM\Column(type: 'string', nullable: true)]
+    private ?string $ancien_statut = null;
+
+    public function getAncien_statut(): ?string
     {
-        return $this->ancienStatut;
+        return $this->ancien_statut;
     }
 
-    public function setAncienStatut(?string $ancienStatut): self
+    public function setAncien_statut(?string $ancien_statut): self
     {
-        $this->ancienStatut = $ancienStatut;
+        $this->ancien_statut = $ancien_statut;
         return $this;
     }
 
-    public function getNouveauStatut(): ?string
+    #[ORM\Column(type: 'string', nullable: false)]
+    private ?string $nouveau_statut = null;
+
+    public function getNouveau_statut(): ?string
     {
-        return $this->nouveauStatut;
+        return $this->nouveau_statut;
     }
 
-    public function setNouveauStatut(string $nouveauStatut): self
+    public function setNouveau_statut(string $nouveau_statut): self
     {
-        $this->nouveauStatut = $nouveauStatut;
+        $this->nouveau_statut = $nouveau_statut;
         return $this;
     }
 
-    public function getDateAction(): ?\DateTimeInterface
+    #[ORM\Column(type: 'datetime', nullable: false)]
+    private ?\DateTimeInterface $date_action = null;
+
+    public function getDate_action(): ?\DateTimeInterface
     {
-        return $this->dateAction;
+        return $this->date_action;
     }
 
-    public function setDateAction(\DateTimeInterface $dateAction): self
+    public function setDate_action(\DateTimeInterface $date_action): self
     {
-        $this->dateAction = $dateAction;
+        $this->date_action = $date_action;
         return $this;
     }
+
+    #[ORM\Column(type: 'string', nullable: true)]
+    private ?string $acteur = null;
 
     public function getActeur(): ?string
     {
         return $this->acteur;
     }
 
-    public function setActeur(string $acteur): self
+    public function setActeur(?string $acteur): self
     {
         $this->acteur = $acteur;
         return $this;
     }
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $commentaire = null;
 
     public function getCommentaire(): ?string
     {
@@ -112,4 +113,46 @@ class HistoriqueDemande
         $this->commentaire = $commentaire;
         return $this;
     }
+
+    public function getIdHistorique(): ?int
+    {
+        return $this->id_historique;
+    }
+
+    public function getAncienStatut(): ?string
+    {
+        return $this->ancien_statut;
+    }
+
+    public function setAncienStatut(?string $ancien_statut): static
+    {
+        $this->ancien_statut = $ancien_statut;
+
+        return $this;
+    }
+
+    public function getNouveauStatut(): ?string
+    {
+        return $this->nouveau_statut;
+    }
+
+    public function setNouveauStatut(string $nouveau_statut): static
+    {
+        $this->nouveau_statut = $nouveau_statut;
+
+        return $this;
+    }
+
+    public function getDateAction(): ?\DateTime
+    {
+        return $this->date_action;
+    }
+
+    public function setDateAction(\DateTime $date_action): static
+    {
+        $this->date_action = $date_action;
+
+        return $this;
+    }
+
 }

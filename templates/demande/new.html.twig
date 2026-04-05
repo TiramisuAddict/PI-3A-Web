@@ -630,16 +630,16 @@
         var valid = true;
 
         var requiredFields = [
+            { id: "idEmploye", message: "Veuillez selectionner un employe" },
             { id: "categorie", message: "Veuillez selectionner une categorie" },
             { id: "typeDemande", message: "Veuillez selectionner un type de demande" },
             { id: "priorite", message: "Veuillez selectionner une priorite" },
-            { id: "status", message: "Veuillez selectionner un statut" },
             { id: "titre", message: "Veuillez saisir un titre" }
         ];
 
         requiredFields.forEach(function(field) {
             var el = document.getElementById(field.id);
-            var value = el.value ? el.value.trim() : "";
+            var value = el ? (el.value ? el.value.trim() : "") : "";
             if (value === "") {
                 showError(field.id, field.message);
                 valid = false;
@@ -697,13 +697,12 @@
 
         var formData = new FormData(form);
         var data = {
+            idEmploye: formData.get("idEmploye"),
             categorie: formData.get("categorie"),
             typeDemande: formData.get("typeDemande"),
             titre: formData.get("titre"),
             description: formData.get("description") || "",
             priorite: formData.get("priorite"),
-            status: formData.get("status"),
-            commentaire: formData.get("commentaire") || "",
             details: {}
         };
 
@@ -723,9 +722,9 @@
 
         var submitBtn = document.getElementById("submitBtn");
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="ti ti-loader me-1"></i>Enregistrement...';
+        submitBtn.innerHTML = '<i class="ti ti-loader me-1"></i>Creation...';
 
-        fetch("/demande/api/" + DEMANDE_ID + "/update", {
+        fetch("/demande/api/create", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data)
@@ -735,18 +734,18 @@
         })
         .then(function(result) {
             if (result.success) {
-                window.location.href = "/demande/" + DEMANDE_ID;
+                window.location.href = "/demande/" + result.id;
             } else {
                 alert("Erreur: " + result.message);
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
+                submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Creer la demande';
             }
         })
         .catch(function(error) {
             console.error(error);
             alert("Erreur de connexion");
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
+            submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Creer la demande';
         });
     }
 
