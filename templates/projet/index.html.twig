@@ -128,15 +128,19 @@
                             <h2 class="mb-1">{{ selectedProjet.nom }}</h2>
                             <div class="workspace-subtle">
                                 {% if selectedProjet.responsable %}
-                                    Responsable: {{ selectedProjet.responsable.nom }} {{ selectedProjet.responsable.prenom }}
+                                    Chef projet: {{ selectedProjet.responsable.nom }} {{ selectedProjet.responsable.prenom }}
                                 {% else %}
-                                    Responsable non defini
+                                    Chef projet non defini
                                 {% endif %}
                             </div>
                         </div>
                         <div class="d-flex flex-wrap gap-2">
-                            <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Nouvelle tache</a>
-                            <a href="{{ path('app_projet_edit', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary-lt">Modifier le projet</a>
+                            {% if canManageTasks|default(false) %}
+                                <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Nouvelle tache</a>
+                            {% endif %}
+                            {% if canManageProjects|default(false) %}
+                                <a href="{{ path('app_projet_edit', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary-lt">Modifier le projet</a>
+                            {% endif %}
                         </div>
                     </div>
 
@@ -215,18 +219,22 @@
                                         {% set normalizedStatus = (tache.statut_tache ?? '')|upper|replace({' ': '_', '-': '_'}) %}
                                         {% if normalizedStatus == column.key %}
                                             {% set hasTasks = true %}
+                                            {% set canUpdateTask = (canManageTasks|default(false)) or (currentEmployeId|default(null) is not null and tache.employe and tache.employe.idEmploye == currentEmployeId|default(null)) %}
                                             {% set taskPrioriteColor = 'secondary' %}
                                             {% if tache.priorite == 'HAUTE' %}{% set taskPrioriteColor = 'red' %}{% endif %}
                                             {% if tache.priorite == 'MOYENNE' %}{% set taskPrioriteColor = 'orange' %}{% endif %}
                                             {% if tache.priorite == 'BASSE' %}{% set taskPrioriteColor = 'green' %}{% endif %}
 
                                             <article class="workspace-card p-3 mb-2 kanban-task"
-                                                     draggable="true"
+                                                     draggable="{{ canUpdateTask ? 'true' : 'false' }}"
+                                                     data-can-move="{{ canUpdateTask ? '1' : '0' }}"
                                                      data-task-id="{{ tache.idTache }}"
                                                      data-edit-url="{{ path('app_tache_edit', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}"
                                                      data-move-url="{{ path('app_tache_move', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}"
                                                      data-csrf-token="{{ csrf_token('move_tache_' ~ tache.idTache) }}"
-                                                     style="cursor: grab; transition: box-shadow .2s ease, transform .2s ease;">
+                                                     data-progress-url="{{ path('app_tache_progress', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}"
+                                                     data-progress-csrf-token="{{ csrf_token('progress_tache_' ~ tache.idTache) }}"
+                                                     style="cursor: {{ canUpdateTask ? 'grab' : 'default' }}; transition: box-shadow .2s ease, transform .2s ease;">
                                                 <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
                                                     <div class="d-flex align-items-center gap-2 min-w-0">
                                                         <a href="{{ path('app_tache_edit', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}" class="fw-semibold text-truncate text-decoration-none text-reset">{{ tache.titre }}</a>
@@ -240,22 +248,26 @@
                                                             <a class="dropdown-item" href="{{ path('app_tache_show', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}">
                                                                 <i class="ti ti-eye me-2"></i>Voir les details
                                                             </a>
-                                                            <a class="dropdown-item" href="{{ path('app_tache_edit', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}">
-                                                                <i class="ti ti-edit me-2"></i>Modifier
-                                                            </a>
-                                                            <div class="dropdown-divider"></div>
-                                                            <div class="dropdown-header">Deplacer vers</div>
-                                                            <button type="button" class="dropdown-item js-move-task" data-target-status="A_FAIRE">A faire</button>
-                                                            <button type="button" class="dropdown-item js-move-task" data-target-status="EN_COURS">En cours</button>
-                                                            <button type="button" class="dropdown-item js-move-task" data-target-status="BLOCQUEE">Bloquee</button>
-                                                            <button type="button" class="dropdown-item js-move-task" data-target-status="TERMINEE">Terminee</button>
-                                                            <div class="dropdown-divider"></div>
-                                                            <form method="post" action="{{ path('app_tache_delete', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}" onsubmit="return confirm('Supprimer cette tache ?');">
-                                                                <input type="hidden" name="_token" value="{{ csrf_token('delete_tache_' ~ tache.idTache) }}">
-                                                                <button type="submit" class="dropdown-item text-danger">
-                                                                    <i class="ti ti-trash me-2"></i>Supprimer
-                                                                </button>
-                                                            </form>
+                                                            {% if canUpdateTask %}
+                                                                <a class="dropdown-item" href="{{ path('app_tache_edit', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}">
+                                                                    <i class="ti ti-edit me-2"></i>Modifier
+                                                                </a>
+                                                                <div class="dropdown-divider"></div>
+                                                                <div class="dropdown-header">Deplacer vers</div>
+                                                                <button type="button" class="dropdown-item js-move-task" data-target-status="A_FAIRE">A faire</button>
+                                                                <button type="button" class="dropdown-item js-move-task" data-target-status="EN_COURS">En cours</button>
+                                                                <button type="button" class="dropdown-item js-move-task" data-target-status="BLOCQUEE">Bloquee</button>
+                                                                <button type="button" class="dropdown-item js-move-task" data-target-status="TERMINEE">Terminee</button>
+                                                            {% endif %}
+                                                            {% if canManageTasks|default(false) %}
+                                                                <div class="dropdown-divider"></div>
+                                                                <form method="post" action="{{ path('app_tache_delete', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}" onsubmit="return confirm('Supprimer cette tache ?');">
+                                                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_tache_' ~ tache.idTache) }}">
+                                                                    <button type="submit" class="dropdown-item text-danger">
+                                                                        <i class="ti ti-trash me-2"></i>Supprimer
+                                                                    </button>
+                                                                </form>
+                                                            {% endif %}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -266,12 +278,27 @@
                                                     <span><i class="ti ti-calendar me-1"></i>{{ tache.date_limite ? tache.date_limite|date('d/m/Y') : '-' }}</span>
                                                     <span><i class="ti ti-user me-1"></i>{{ tache.employe ? (tache.employe.nom ~ ' ' ~ tache.employe.prenom) : '-' }}</span>
                                                 </div>
-                                                <div class="d-flex align-items-center gap-2 mt-2 small workspace-subtle">
-                                                    <div class="progress flex-grow-1" style="height: 8px;">
-                                                        <div class="progress-bar bg-azure" role="progressbar" style="width: {{ tache.progression is not null ? tache.progression : 0 }}%;"></div>
+                                                {% if canUpdateTask %}
+                                                    <div class="d-flex align-items-center gap-2 mt-2 small workspace-subtle">
+                                                        <input
+                                                            type="range"
+                                                            class="form-range flex-grow-1 js-progress-input"
+                                                            min="0"
+                                                            max="100"
+                                                            step="1"
+                                                            value="{{ tache.progression is not null ? tache.progression : 0 }}"
+                                                            aria-label="Progression"
+                                                        >
+                                                        <span class="js-progress-value">{{ tache.progression is not null ? tache.progression : 0 }}%</span>
                                                     </div>
-                                                    <span>{{ tache.progression is not null ? tache.progression : 0 }}%</span>
-                                                </div>
+                                                {% else %}
+                                                    <div class="d-flex align-items-center gap-2 mt-2 small workspace-subtle">
+                                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                                            <div class="progress-bar bg-azure" role="progressbar" style="width: {{ tache.progression is not null ? tache.progression : 0 }}%;"></div>
+                                                        </div>
+                                                        <span>{{ tache.progression is not null ? tache.progression : 0 }}%</span>
+                                                    </div>
+                                                {% endif %}
                                             </article>
                                         {% endif %}
                                     {% endfor %}
@@ -281,7 +308,7 @@
                                     {% endif %}
                                 </div>
 
-                                {% if column.key != 'TERMINEE' %}
+                                {% if column.key != 'TERMINEE' and canManageTasks|default(false) %}
                                     <div class="text-center pt-2">
                                         <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet, 'status': column.key}) }}" class="btn btn-link text-decoration-none">+ Ajouter une tache</a>
                                     </div>
@@ -299,9 +326,14 @@
                     </div>
                 {% else %}
                     <div class="workspace-card p-4 text-center">
-                        <div class="h3 mb-2">Aucun projet pour le moment</div>
-                        <div class="workspace-subtle mb-3">Commencez par creer votre premier projet.</div>
-                        <a href="{{ path('app_projet_new') }}" class="btn btn-primary">Nouveau projet</a>
+                        {% if canManageProjects|default(false) %}
+                            <div class="h3 mb-2">Aucun projet pour le moment</div>
+                            <div class="workspace-subtle mb-3">Commencez par creer votre premier projet.</div>
+                            <a href="{{ path('app_projet_new') }}" class="btn btn-primary">Nouveau projet</a>
+                        {% else %}
+                            <div class="h3 mb-2">Aucun projet assigne</div>
+                            <div class="workspace-subtle mb-3">Vous ne faites partie d'aucun projet pour le moment.</div>
+                        {% endif %}
                     </div>
                 {% endif %}
             {% endif %}
@@ -317,6 +349,7 @@
             const columns = Array.from(document.querySelectorAll('.kanban-column'));
             const counters = Array.from(document.querySelectorAll('[data-count-for]'));
             const moveButtons = Array.from(document.querySelectorAll('.js-move-task'));
+            const progressInputs = Array.from(document.querySelectorAll('.js-progress-input'));
             const searchInput = document.querySelector('[data-task-search]');
             const statusFilter = document.querySelector('[data-task-filter]');
             const resetFilterButton = document.querySelector('[data-task-filter-reset]');
@@ -391,6 +424,10 @@
                     return;
                 }
 
+                if ((task.getAttribute('data-can-move') || '0') !== '1') {
+                    return;
+                }
+
                 const targetColumn = document.querySelector('.kanban-column[data-status="' + targetStatus + '"]');
                 if (!targetColumn) {
                     return;
@@ -440,8 +477,53 @@
                 }
             };
 
+            const updateTaskProgress = async function (task, nextValue) {
+                if (!task) {
+                    return;
+                }
+
+                const progressUrl = task.getAttribute('data-progress-url') || '';
+                const progressCsrfToken = task.getAttribute('data-progress-csrf-token') || '';
+                if (progressUrl === '' || progressCsrfToken === '') {
+                    return;
+                }
+
+                const response = await fetch(progressUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        progression: nextValue,
+                        _token: progressCsrfToken
+                    })
+                });
+
+                const payload = await response.json();
+                if (!response.ok || payload.ok !== true) {
+                    throw new Error(payload.message || 'Mise a jour de progression impossible.');
+                }
+
+                const normalizedStatus = (payload.status || '').toUpperCase();
+                const currentColumn = task.closest('.kanban-column');
+                const targetColumn = document.querySelector('.kanban-column[data-status="' + normalizedStatus + '"]');
+                if (currentColumn && targetColumn && currentColumn !== targetColumn) {
+                    targetColumn.prepend(task);
+                    ensureEmptyPlaceholder(currentColumn);
+                    ensureEmptyPlaceholder(targetColumn);
+                }
+
+                applyTaskFilters();
+            };
+
             tasks.forEach(function (task) {
                 let dragStarted = false;
+                const canMove = (task.getAttribute('data-can-move') || '0') === '1';
+
+                if (!canMove) {
+                    return;
+                }
 
                 task.addEventListener('dragstart', function () {
                     dragStarted = true;
@@ -517,6 +599,33 @@
                     const menu = button.closest('.dropdown-menu');
                     if (menu && menu.classList.contains('show')) {
                         menu.classList.remove('show');
+                    }
+                });
+            });
+
+            progressInputs.forEach(function (input) {
+                const task = input.closest('.kanban-task');
+                const valueLabel = task ? task.querySelector('.js-progress-value') : null;
+                let lastSavedValue = input.value;
+
+                input.addEventListener('input', function () {
+                    if (valueLabel) {
+                        valueLabel.textContent = input.value + '%';
+                    }
+                });
+
+                input.addEventListener('change', async function () {
+                    const previousValue = lastSavedValue;
+
+                    try {
+                        await updateTaskProgress(task, input.value);
+                        lastSavedValue = input.value;
+                    } catch (error) {
+                        input.value = previousValue;
+                        if (valueLabel) {
+                            valueLabel.textContent = previousValue + '%';
+                        }
+                        window.alert(error.message || 'Erreur lors de la mise a jour de progression.');
                     }
                 });
             });

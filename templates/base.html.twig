@@ -18,7 +18,7 @@
                     --workspace-border: #e7ebf2;
                     --workspace-text: #20293a;
                     --workspace-muted: #64748b;
-                    --workspace-topbar: linear-gradient(90deg, #5b2bd8 0%, #6c3ff0 55%, #5f30de 100%);
+                    --workspace-topbar: linear-gradient(90deg, #0f3a8a 0%, #1d4fa8 55%, #2258b8 100%);
                 }
 
                 body {
@@ -40,7 +40,7 @@
                     align-items: center;
                     justify-content: space-between;
                     padding: 0 20px;
-                    box-shadow: 0 10px 24px rgba(72, 32, 164, 0.28);
+                    box-shadow: 0 10px 24px rgba(18, 49, 106, 0.28);
                     position: sticky;
                     top: 0;
                     z-index: 30;
@@ -70,8 +70,8 @@
 
                 .workspace-topbar-link.is-active {
                     background: #fff;
-                    color: #4a26b8;
-                    box-shadow: 0 8px 16px rgba(35, 12, 94, 0.24);
+                    color: #16448f;
+                    box-shadow: 0 8px 16px rgba(15, 40, 88, 0.24);
                 }
 
                 .workspace-layout {
@@ -260,15 +260,26 @@
                 <nav class="workspace-topbar-menu">
                     <a href="{{ path('app_projet_index') }}" class="workspace-topbar-link {{ route starts with 'app_projet_' ? 'is-active' : '' }}"><i class="ti ti-layout-kanban me-1"></i>Projets</a>
                 </nav>
+                <div class="d-flex align-items-center gap-2">
+                    {% if currentEmploye is defined and currentEmploye %}
+                        <span class="badge bg-blue-lt">{{ currentEmploye.nom }} {{ currentEmploye.prenom }} | {{ currentEmploye.role|default('-') }}</span>
+                    {% endif %}
+                    <a href="{{ path('app_auth_login_id') }}" class="btn btn-sm btn-light">Changer utilisateur</a>
+                    <form method="post" action="{{ path('app_auth_logout') }}" class="m-0">
+                        <button type="submit" class="btn btn-sm btn-light text-danger">Se deconnecter</button>
+                    </form>
+                </div>
             </header>
 
             <div class="workspace-layout">
                 <aside class="workspace-sidebar">
                     <div class="d-flex justify-content-between align-items-center mb-3 px-2">
                         <h2 class="workspace-sidebar-title">Projets</h2>
-                        <a href="{{ path('app_projet_new') }}" class="btn btn-sm btn-primary btn-icon" title="Nouveau projet">
-                            <i class="ti ti-plus"></i>
-                        </a>
+                        {% if canManageProjects|default(false) %}
+                            <a href="{{ path('app_projet_new') }}" class="btn btn-sm btn-primary btn-icon" title="Nouveau projet">
+                                <i class="ti ti-plus"></i>
+                            </a>
+                        {% endif %}
                     </div>
 
                     <a href="#sidebar-projets" class="workspace-side-link" data-bs-toggle="collapse" aria-expanded="true" aria-controls="sidebar-projets">
@@ -289,7 +300,7 @@
                                         search: filters.search|default(''),
                                         statut: filters.statut|default(''),
                                         priorite: filters.priorite|default(''),
-                                        responsable: filters.responsable|default('')
+                                        chef_projet: filters.chef_projet|default(filters.responsable|default(''))
                                     }) }}"
                                     class="text-decoration-none text-reset flex-grow-1 d-flex align-items-center gap-2 min-w-0"
                                 >
@@ -308,16 +319,18 @@
                                         <a class="dropdown-item" href="{{ path('app_projet_show', {'id_projet': p.idProjet}) }}">
                                             <i class="ti ti-eye me-2"></i>Détails
                                         </a>
-                                        <a class="dropdown-item" href="{{ path('app_projet_edit', {'id_projet': p.idProjet}) }}">
-                                            <i class="ti ti-pencil me-2"></i>Modifier
-                                        </a>
-                                        <div class="dropdown-divider"></div>
-                                        <form method="post" action="{{ path('app_projet_delete', {'id_projet': p.idProjet}) }}" onsubmit="return confirm('Voulez-vous vraiment supprimer ce projet ?');">
-                                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ p.idProjet) }}">
-                                            <button class="dropdown-item text-danger" type="submit">
-                                                <i class="ti ti-trash me-2"></i>Supprimer
-                                            </button>
-                                        </form>
+                                        {% if canManageProjects|default(false) %}
+                                            <a class="dropdown-item" href="{{ path('app_projet_edit', {'id_projet': p.idProjet}) }}">
+                                                <i class="ti ti-pencil me-2"></i>Modifier
+                                            </a>
+                                            <div class="dropdown-divider"></div>
+                                            <form method="post" action="{{ path('app_projet_delete', {'id_projet': p.idProjet}) }}" onsubmit="return confirm('Voulez-vous vraiment supprimer ce projet ?');">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ p.idProjet) }}">
+                                                <button class="dropdown-item text-danger" type="submit">
+                                                    <i class="ti ti-trash me-2"></i>Supprimer
+                                                </button>
+                                            </form>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
@@ -359,11 +372,11 @@
                                     </select>
                                 </div>
                                 <div class="mb-2">
-                                    <select name="responsable" class="form-select form-select-sm">
-                                        <option value="">Responsable: tous</option>
-                                        {% for responsable in responsables|default([]) %}
-                                            <option value="{{ responsable.idEmploye|default('') }}" {{ filters.responsable|default('') == responsable.idEmploye|default('') ? 'selected' : '' }}>
-                                                {{ responsable.nom }} {{ responsable.prenom }}
+                                    <select name="chef_projet" class="form-select form-select-sm">
+                                        <option value="">Chef projet: tous</option>
+                                        {% for chefProjet in chefProjets|default([]) %}
+                                            <option value="{{ chefProjet.idEmploye|default('') }}" {{ filters.chef_projet|default(filters.responsable|default('')) == chefProjet.idEmploye|default('') ? 'selected' : '' }}>
+                                                {{ chefProjet.nom }} {{ chefProjet.prenom }}
                                             </option>
                                         {% endfor %}
                                     </select>

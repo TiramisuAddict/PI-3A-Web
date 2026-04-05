@@ -22,6 +22,11 @@ class ProjetType extends AbstractType
     {
         $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
         $isEdit = $options['is_edit'] ?? false;
+        $chefProjetChoices = $options['chef_projets_choices'];
+
+        if ($chefProjetChoices === [] && isset($options['responsables_choices']) && is_array($options['responsables_choices'])) {
+            $chefProjetChoices = $options['responsables_choices'];
+        }
 
         $builder
             ->add('nom', TextType::class, [
@@ -68,10 +73,11 @@ class ProjetType extends AbstractType
             ])
             ->add('responsable', EntityType::class, [
                 'class' => Employé::class,
-                'choices' => $options['responsables_choices'],
+                'choices' => $chefProjetChoices,
                 'choice_label' => static fn (Employé $employe): string => trim(sprintf('%s %s', $employe->getNom() ?? '', $employe->getPrenom() ?? '')),
                 'required' => true,
-                'placeholder' => 'Choisir un responsable',
+                'label' => 'Chef projet',
+                'placeholder' => 'Choisir un chef projet',
             ])
             ->add('membresEquipe', EntityType::class, [
                 'class' => Employé::class,
@@ -105,11 +111,13 @@ class ProjetType extends AbstractType
     {
         $resolver->setDefaults([
             'data_class' => Projet::class,
+            'chef_projets_choices' => [],
             'responsables_choices' => [],
             'membres_choices' => [],
             'is_edit' => false,
         ]);
 
+        $resolver->setAllowedTypes('chef_projets_choices', 'array');
         $resolver->setAllowedTypes('responsables_choices', 'array');
         $resolver->setAllowedTypes('membres_choices', 'array');
         $resolver->setAllowedTypes('is_edit', 'bool');

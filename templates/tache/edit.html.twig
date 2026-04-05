@@ -8,7 +8,11 @@
             <div>
                 <div class="workspace-subtle text-uppercase fw-semibold" style="letter-spacing:.08em; font-size:11px;">Kanban</div>
                 <h2 class="mb-1">Modifier tache</h2>
-                <div class="workspace-subtle">Projet: {{ projet.nom }}</div>
+                {% if canManageTasks|default(false) %}
+                    <div class="workspace-subtle">Projet: {{ projet.nom }}</div>
+                {% else %}
+                    <div class="workspace-subtle">Mise a jour autorisee: statut et progression uniquement.</div>
+                {% endif %}
             </div>
         </div>
     </div>

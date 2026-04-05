@@ -2,13 +2,13 @@
 
 namespace App\Controller;
 
+use App\Entity\Employé;
 use App\Entity\Projet;
 use App\Entity\Tache;
 use App\Form\ProjetType;
 use App\Form\TacheType;
 use App\Repository\EmployéRepository;
 use App\Repository\ProjetRepository;
-use App\Repository\TacheRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -22,23 +22,34 @@ final class ProjetController extends AbstractController
     #[Route(name: 'app_projet_index', methods: ['GET'])]
     public function index(Request $request, ProjetRepository $projetRepository, EmployéRepository $employeRepository): Response
     {
+        $currentEmploye = $this->getCurrentEmployeFromSession($request, $employeRepository);
+        if (!$currentEmploye instanceof Employé) {
+            return $this->redirectToRoute('app_auth_login_id');
+        }
+
+        $canManageProjects = $this->canManageProjectsAndTasks($currentEmploye);
+
         $filters = [
             'search' => trim((string) $request->query->get('search', '')),
             'statut' => trim((string) $request->query->get('statut', '')),
             'priorite' => trim((string) $request->query->get('priorite', '')),
-            'responsable' => trim((string) $request->query->get('responsable', '')),
+            'chef_projet' => trim((string) $request->query->get('chef_projet', (string) $request->query->get('responsable', ''))),
         ];
 
-        $responsableId = ctype_digit($filters['responsable']) ? (int) $filters['responsable'] : null;
+        $chefProjetId = ctype_digit($filters['chef_projet']) ? (int) $filters['chef_projet'] : null;
 
         $projets = $projetRepository->findByFilters(
             $filters['search'] !== '' ? $filters['search'] : null,
             $filters['statut'] !== '' ? $filters['statut'] : null,
             $filters['priorite'] !== '' ? $filters['priorite'] : null,
-            $responsableId,
+            $chefProjetId,
             null,
             null,
         );
+
+        if (!$canManageProjects) {
+            $projets = array_values(array_filter($projets, fn (Projet $projet): bool => $projet->getMembresEquipe()->contains($currentEmploye)));
+        }
 
         $selectedProjetId = ctype_digit((string) $request->query->get('projet', '')) ? (int) $request->query->get('projet') : null;
         $selectedProjet = null;
@@ -62,18 +73,31 @@ final class ProjetController extends AbstractController
             'sidebarProjets' => $projets,
             'sidebarSelectedProjetId' => $selectedProjet?->getIdProjet(),
             'filters' => $filters,
-            'hasActiveFilters' => $filters['search'] !== '' || $filters['statut'] !== '' || $filters['priorite'] !== '' || $filters['responsable'] !== '',
-            'responsables' => $this->buildResponsablesForFilter($employeRepository),
+            'hasActiveFilters' => $filters['search'] !== '' || $filters['statut'] !== '' || $filters['priorite'] !== '' || $filters['chef_projet'] !== '',
+            'chefProjets' => $this->buildChefProjetsForFilter($employeRepository),
+            'currentEmploye' => $currentEmploye,
+            'currentEmployeId' => $currentEmploye->getIdEmploye(),
+            'canManageProjects' => $canManageProjects,
+            'canManageTasks' => $canManageProjects,
         ]);
     }
 
     #[Route('/new', name: 'app_projet_new', methods: ['GET', 'POST'])]
     public function new(Request $request, EntityManagerInterface $entityManager, EmployéRepository $employeRepository, ProjetRepository $projetRepository): Response
     {
+        $currentEmploye = $this->getCurrentEmployeFromSession($request, $employeRepository);
+        if (!$currentEmploye instanceof Employé) {
+            return $this->redirectToRoute('app_auth_login_id');
+        }
+
+        if (!$this->canManageProjectsAndTasks($currentEmploye)) {
+            return $this->redirectToRoute('app_projet_index');
+        }
+
         $projet = new Projet();
         $choices = $this->buildEmployeChoices($employeRepository);
         $form = $this->createForm(ProjetType::class, $projet, [
-            'responsables_choices' => $choices['responsables'],
+            'chef_projets_choices' => $choices['chefProjets'],
             'membres_choices' => $choices['membres'],
             'is_edit' => false,
         ]);
@@ -89,27 +113,55 @@ final class ProjetController extends AbstractController
         return $this->render('projet/new.html.twig', [
             'projet' => $projet,
             'form' => $form,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $this->getSidebarProjectsForEmployee($currentEmploye, $projetRepository),
             'sidebarSelectedProjetId' => null,
+            'currentEmploye' => $currentEmploye,
+            'currentEmployeId' => $currentEmploye->getIdEmploye(),
+            'canManageProjects' => true,
+            'canManageTasks' => true,
         ]);
     }
 
     #[Route('/{id_projet}', name: 'app_projet_show', methods: ['GET'])]
-    public function show(Projet $projet, ProjetRepository $projetRepository): Response
+    public function show(Request $request, Projet $projet, ProjetRepository $projetRepository, EmployéRepository $employeRepository): Response
     {
+        $currentEmploye = $this->getCurrentEmployeFromSession($request, $employeRepository);
+        if (!$currentEmploye instanceof Employé) {
+            return $this->redirectToRoute('app_auth_login_id');
+        }
+
+        if (!$this->canAccessProject($currentEmploye, $projet)) {
+            return $this->redirectToRoute('app_projet_index');
+        }
+
+        $canManage = $this->canManageProjectsAndTasks($currentEmploye);
+
         return $this->render('projet/show.html.twig', [
             'projet' => $projet,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $this->getSidebarProjectsForEmployee($currentEmploye, $projetRepository),
             'sidebarSelectedProjetId' => $projet->getIdProjet(),
+            'currentEmploye' => $currentEmploye,
+            'currentEmployeId' => $currentEmploye->getIdEmploye(),
+            'canManageProjects' => $canManage,
+            'canManageTasks' => $canManage,
         ]);
     }
 
     #[Route('/{id_projet}/edit', name: 'app_projet_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, Projet $projet, EntityManagerInterface $entityManager, EmployéRepository $employeRepository, ProjetRepository $projetRepository): Response
     {
+        $currentEmploye = $this->getCurrentEmployeFromSession($request, $employeRepository);
+        if (!$currentEmploye instanceof Employé) {
+            return $this->redirectToRoute('app_auth_login_id');
+        }
+
+        if (!$this->canManageProjectsAndTasks($currentEmploye)) {
+            return $this->redirectToRoute('app_projet_index');
+        }
+
         $choices = $this->buildEmployeChoices($employeRepository);
         $form = $this->createForm(ProjetType::class, $projet, [
-            'responsables_choices' => $choices['responsables'],
+            'chef_projets_choices' => $choices['chefProjets'],
             'membres_choices' => $choices['membres'],
             'is_edit' => true,
         ]);
@@ -124,14 +176,27 @@ final class ProjetController extends AbstractController
         return $this->render('projet/edit.html.twig', [
             'projet' => $projet,
             'form' => $form,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $this->getSidebarProjectsForEmployee($currentEmploye, $projetRepository),
             'sidebarSelectedProjetId' => $projet->getIdProjet(),
+            'currentEmploye' => $currentEmploye,
+            'currentEmployeId' => $currentEmploye->getIdEmploye(),
+            'canManageProjects' => true,
+            'canManageTasks' => true,
         ]);
     }
 
     #[Route('/{id_projet}', name: 'app_projet_delete', methods: ['POST'])]
-    public function delete(Request $request, Projet $projet, EntityManagerInterface $entityManager): Response
+    public function delete(Request $request, Projet $projet, EntityManagerInterface $entityManager, EmployéRepository $employeRepository): Response
     {
+        $currentEmploye = $this->getCurrentEmployeFromSession($request, $employeRepository);
+        if (!$currentEmploye instanceof Employé) {
+            return $this->redirectToRoute('app_auth_login_id');
+        }
+
+        if (!$this->canManageProjectsAndTasks($currentEmploye)) {
+            return $this->redirectToRoute('app_projet_index');
+        }
+
         if ($this->isCsrfTokenValid('delete'.$projet->getIdProjet(), (string) $request->request->get('_token'))) {
             $entityManager->remove($projet);
             $entityManager->flush();
@@ -141,8 +206,17 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/new', name: 'app_tache_new', methods: ['GET', 'POST'])]
-    public function newTask(Request $request, Projet $projet, ProjetRepository $projetRepository, EntityManagerInterface $entityManager): Response
+    public function newTask(Request $request, Projet $projet, ProjetRepository $projetRepository, EntityManagerInterface $entityManager, EmployéRepository $employeRepository): Response
     {
+        $currentEmploye = $this->getCurrentEmployeFromSession($request, $employeRepository);
+        if (!$currentEmploye instanceof Employé) {
+            return $this->redirectToRoute('app_auth_login_id');
+        }
+
+        if (!$this->canManageProjectsAndTasks($currentEmploye) || !$this->canAccessProject($currentEmploye, $projet)) {
+            return $this->redirectToRoute('app_projet_index');
+        }
+
         $requestedStatus = mb_strtoupper(trim((string) $request->query->get('status', '')));
 
         $tache = new Tache();
@@ -177,16 +251,36 @@ final class ProjetController extends AbstractController
             'projet' => $projet,
             'tache' => $tache,
             'form' => $form,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $this->getSidebarProjectsForEmployee($currentEmploye, $projetRepository),
             'sidebarSelectedProjetId' => $projet->getIdProjet(),
+            'currentEmploye' => $currentEmploye,
+            'currentEmployeId' => $currentEmploye->getIdEmploye(),
+            'canManageProjects' => true,
+            'canManageTasks' => true,
         ]);
     }
 
     #[Route('/{id_projet}/tache/{id_tache}/edit', name: 'app_tache_edit', methods: ['GET', 'POST'])]
-    public function editTask(Request $request, Projet $projet, Tache $tache, ProjetRepository $projetRepository, EntityManagerInterface $entityManager): Response
+    public function editTask(Request $request, Projet $projet, Tache $tache, ProjetRepository $projetRepository, EntityManagerInterface $entityManager, EmployéRepository $employeRepository): Response
     {
+        $currentEmploye = $this->getCurrentEmployeFromSession($request, $employeRepository);
+        if (!$currentEmploye instanceof Employé) {
+            return $this->redirectToRoute('app_auth_login_id');
+        }
+
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             throw $this->createNotFoundException('Tache introuvable pour ce projet.');
+        }
+
+        if (!$this->canAccessProject($currentEmploye, $projet)) {
+            return $this->redirectToRoute('app_projet_index');
+        }
+
+        $canManageTasks = $this->canManageProjectsAndTasks($currentEmploye);
+        $canUpdateAssignedTask = $tache->getEmploye()?->getIdEmploye() === $currentEmploye->getIdEmploye();
+
+        if (!$canManageTasks && !$canUpdateAssignedTask) {
+            return $this->redirectToRoute('app_projet_index', ['projet' => $projet->getIdProjet()]);
         }
 
         $teamChoices = $projet->getMembresEquipe()->toArray();
@@ -194,6 +288,7 @@ final class ProjetController extends AbstractController
         $form = $this->createForm(TacheType::class, $tache, [
             'project_team_choices' => $teamChoices,
             'is_edit' => true,
+            'employee_self_update' => !$canManageTasks,
         ]);
 
         $form->handleRequest($request);
@@ -209,29 +304,63 @@ final class ProjetController extends AbstractController
             'projet' => $projet,
             'tache' => $tache,
             'form' => $form,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $this->getSidebarProjectsForEmployee($currentEmploye, $projetRepository),
             'sidebarSelectedProjetId' => $projet->getIdProjet(),
+            'currentEmploye' => $currentEmploye,
+            'currentEmployeId' => $currentEmploye->getIdEmploye(),
+            'canManageProjects' => $canManageTasks,
+            'canManageTasks' => $canManageTasks,
         ]);
     }
 
     #[Route('/{id_projet}/tache/{id_tache}', name: 'app_tache_show', methods: ['GET'])]
-    public function showTask(Projet $projet, Tache $tache, ProjetRepository $projetRepository): Response
+    public function showTask(Request $request, Projet $projet, Tache $tache, ProjetRepository $projetRepository, EmployéRepository $employeRepository): Response
     {
+        $currentEmploye = $this->getCurrentEmployeFromSession($request, $employeRepository);
+        if (!$currentEmploye instanceof Employé) {
+            return $this->redirectToRoute('app_auth_login_id');
+        }
+
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             throw $this->createNotFoundException('Tache introuvable pour ce projet.');
+        }
+
+        if (!$this->canAccessProject($currentEmploye, $projet)) {
+            return $this->redirectToRoute('app_projet_index');
+        }
+
+        $canManageTasks = $this->canManageProjectsAndTasks($currentEmploye);
+        $canUpdateAssignedTask = $tache->getEmploye()?->getIdEmploye() === $currentEmploye->getIdEmploye();
+
+        if (!$canManageTasks && !$canUpdateAssignedTask) {
+            return $this->redirectToRoute('app_projet_index', ['projet' => $projet->getIdProjet()]);
         }
 
         return $this->render('tache/show.html.twig', [
             'projet' => $projet,
             'tache' => $tache,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $this->getSidebarProjectsForEmployee($currentEmploye, $projetRepository),
             'sidebarSelectedProjetId' => $projet->getIdProjet(),
+            'currentEmploye' => $currentEmploye,
+            'currentEmployeId' => $currentEmploye->getIdEmploye(),
+            'canManageProjects' => $canManageTasks,
+            'canManageTasks' => $canManageTasks,
+            'canEditTask' => $canManageTasks || $canUpdateAssignedTask,
         ]);
     }
 
     #[Route('/{id_projet}/tache/{id_tache}/delete', name: 'app_tache_delete', methods: ['POST'])]
-    public function deleteTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager): Response
+    public function deleteTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager, EmployéRepository $employeRepository): Response
     {
+        $currentEmploye = $this->getCurrentEmployeFromSession($request, $employeRepository);
+        if (!$currentEmploye instanceof Employé) {
+            return $this->redirectToRoute('app_auth_login_id');
+        }
+
+        if (!$this->canManageProjectsAndTasks($currentEmploye)) {
+            return $this->redirectToRoute('app_projet_index', ['projet' => $projet->getIdProjet()]);
+        }
+
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             throw $this->createNotFoundException('Tache introuvable pour ce projet.');
         }
@@ -245,10 +374,25 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/{id_tache}/move', name: 'app_tache_move', methods: ['POST'])]
-    public function moveTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager): JsonResponse
+    public function moveTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager, EmployéRepository $employeRepository): JsonResponse
     {
+        $currentEmploye = $this->getCurrentEmployeFromSession($request, $employeRepository);
+        if (!$currentEmploye instanceof Employé) {
+            return $this->json(['ok' => false, 'message' => 'Session invalide.'], Response::HTTP_UNAUTHORIZED);
+        }
+
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             return $this->json(['ok' => false, 'message' => 'Tache introuvable pour ce projet.'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (!$this->canAccessProject($currentEmploye, $projet)) {
+            return $this->json(['ok' => false, 'message' => 'Acces refuse.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $canManageTasks = $this->canManageProjectsAndTasks($currentEmploye);
+        $canUpdateAssignedTask = $tache->getEmploye()?->getIdEmploye() === $currentEmploye->getIdEmploye();
+        if (!$canManageTasks && !$canUpdateAssignedTask) {
+            return $this->json(['ok' => false, 'message' => 'Vous ne pouvez modifier que vos taches assignees.'], Response::HTTP_FORBIDDEN);
         }
 
         $payload = json_decode($request->getContent(), true);
@@ -284,8 +428,57 @@ final class ProjetController extends AbstractController
         ]);
     }
 
+    #[Route('/{id_projet}/tache/{id_tache}/progress', name: 'app_tache_progress', methods: ['POST'])]
+    public function updateTaskProgress(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager, EmployéRepository $employeRepository): JsonResponse
+    {
+        $currentEmploye = $this->getCurrentEmployeFromSession($request, $employeRepository);
+        if (!$currentEmploye instanceof Employé) {
+            return $this->json(['ok' => false, 'message' => 'Session invalide.'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
+            return $this->json(['ok' => false, 'message' => 'Tache introuvable pour ce projet.'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (!$this->canAccessProject($currentEmploye, $projet)) {
+            return $this->json(['ok' => false, 'message' => 'Acces refuse.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $canManageTasks = $this->canManageProjectsAndTasks($currentEmploye);
+        $canUpdateAssignedTask = $tache->getEmploye()?->getIdEmploye() === $currentEmploye->getIdEmploye();
+        if (!$canManageTasks && !$canUpdateAssignedTask) {
+            return $this->json(['ok' => false, 'message' => 'Vous ne pouvez modifier que vos taches assignees.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            return $this->json(['ok' => false, 'message' => 'Requete invalide.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $token = (string) ($payload['_token'] ?? '');
+        if (!$this->isCsrfTokenValid('progress_tache_'.$tache->getIdTache(), $token)) {
+            return $this->json(['ok' => false, 'message' => 'Token CSRF invalide.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $progression = $payload['progression'] ?? null;
+        if (!is_numeric($progression)) {
+            return $this->json(['ok' => false, 'message' => 'Progression invalide.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $progressionValue = max(0, min(100, (int) $progression));
+        $tache->setProgression($progressionValue);
+        $this->synchronizeTaskProgressionAndStatus($tache);
+        $entityManager->flush();
+
+        return $this->json([
+            'ok' => true,
+            'progression' => $tache->getProgression(),
+            'status' => $tache->getStatutTache(),
+        ]);
+    }
+
     /**
-     * @return array{responsables: array<int, \App\Entity\Employé>, membres: array<int, \App\Entity\Employé>}
+     * @return array{chefProjets: array<int, \App\Entity\Employé>, membres: array<int, \App\Entity\Employé>}
      */
     private function buildEmployeChoices(EmployéRepository $employeRepository): array
     {
@@ -298,14 +491,12 @@ final class ProjetController extends AbstractController
             return $nomA <=> $nomB;
         });
 
-        $responsables = [];
+        $chefProjets = [];
         $membres = [];
 
         foreach ($employes as $employe) {
-            $role = mb_strtolower((string) $employe->getRole());
-
-            if ($role === 'responsable') {
-                $responsables[] = $employe;
+            if ($this->isChefProjetRole($employe->getRole())) {
+                $chefProjets[] = $employe;
                 continue;
             }
 
@@ -313,7 +504,7 @@ final class ProjetController extends AbstractController
         }
 
         return [
-            'responsables' => $responsables,
+            'chefProjets' => $chefProjets,
             'membres' => $membres,
         ];
     }
@@ -321,21 +512,21 @@ final class ProjetController extends AbstractController
     /**
      * @return array<int, \App\Entity\Employé>
      */
-    private function buildResponsablesForFilter(EmployéRepository $employeRepository): array
+    private function buildChefProjetsForFilter(EmployéRepository $employeRepository): array
     {
-        $responsables = [];
+        $chefProjets = [];
 
         foreach ($employeRepository->findAll() as $employe) {
-            if (mb_strtolower((string) $employe->getRole()) === 'responsable') {
-                $responsables[] = $employe;
+            if ($this->isChefProjetRole($employe->getRole())) {
+                $chefProjets[] = $employe;
             }
         }
 
-        usort($responsables, static function ($a, $b): int {
+        usort($chefProjets, static function ($a, $b): int {
             return mb_strtolower((string) $a->getNom()) <=> mb_strtolower((string) $b->getNom());
         });
 
-        return $responsables;
+        return $chefProjets;
     }
 
     private function statusToProgression(?string $status): int
@@ -373,5 +564,64 @@ final class ProjetController extends AbstractController
         if ($status !== Tache::STATUT_A_FAIRE) {
             $tache->setStatutTache(Tache::STATUT_A_FAIRE);
         }
+    }
+
+    private function isChefProjetRole(?string $role): bool
+    {
+        $normalizedRole = mb_strtolower(trim((string) $role));
+
+        return in_array($normalizedRole, ['chef projet', 'chef_projet', 'chefprojet', 'responsable'], true);
+    }
+
+    private function getCurrentEmployeFromSession(Request $request, EmployéRepository $employeRepository): ?Employé
+    {
+        if (!$request->hasSession()) {
+            return null;
+        }
+
+        $employeeId = $request->getSession()->get('employee_id');
+        if (!is_int($employeeId) && !ctype_digit((string) $employeeId)) {
+            return null;
+        }
+
+        $employe = $employeRepository->find((int) $employeeId);
+
+        return $employe instanceof Employé ? $employe : null;
+    }
+
+    private function canManageProjectsAndTasks(Employé $employe): bool
+    {
+        return !$this->isEmployeRole($employe->getRole());
+    }
+
+    private function canAccessProject(Employé $employe, Projet $projet): bool
+    {
+        if ($this->canManageProjectsAndTasks($employe)) {
+            return true;
+        }
+
+        return $projet->getMembresEquipe()->contains($employe);
+    }
+
+    /**
+     * @return array<int, Projet>
+     */
+    private function getSidebarProjectsForEmployee(Employé $employe, ProjetRepository $projetRepository): array
+    {
+        $allProjects = $projetRepository->findAll();
+
+        if ($this->canManageProjectsAndTasks($employe)) {
+            return $allProjects;
+        }
+
+        return array_values(array_filter($allProjects, fn (Projet $projet): bool => $projet->getMembresEquipe()->contains($employe)));
+    }
+
+    private function isEmployeRole(?string $role): bool
+    {
+        $normalizedRole = mb_strtolower(trim((string) $role));
+        $normalizedRole = str_replace(['é', 'è', 'ê', 'ë'], 'e', $normalizedRole);
+
+        return in_array($normalizedRole, ['employe', 'employee'], true);
     }
 }

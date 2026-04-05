@@ -11,7 +11,9 @@
                 <div class="workspace-subtle">Projet: {{ projet.nom }}</div>
             </div>
             <div class="d-flex gap-2">
-                <a href="{{ path('app_tache_edit', {'id_projet': projet.idProjet, 'id_tache': tache.idTache}) }}" class="btn btn-primary-lt">Modifier</a>
+                {% if canEditTask|default(false) %}
+                    <a href="{{ path('app_tache_edit', {'id_projet': projet.idProjet, 'id_tache': tache.idTache}) }}" class="btn btn-primary-lt">Modifier</a>
+                {% endif %}
                 <a href="{{ path('app_projet_index', {'projet': projet.idProjet}) }}" class="btn btn-outline-secondary">Retour</a>
             </div>
         </div>

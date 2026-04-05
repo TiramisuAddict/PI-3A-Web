@@ -56,7 +56,7 @@ class Projet
 
     #[ORM\ManyToOne(targetEntity: Employé::class, inversedBy: 'projetsResponsables')]
     #[ORM\JoinColumn(name: 'responsable_id', referencedColumnName: 'id_employe', nullable: false)]
-    #[Assert\NotNull(message: 'Veuillez choisir un responsable.')]
+    #[Assert\NotNull(message: 'Veuillez choisir un chef projet.')]
     private ?Employé $responsable = null;
 
     public function getResponsable(): ?Employé
