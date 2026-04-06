@@ -33,6 +33,21 @@ final class CandidatController extends AbstractController
         ]);
     }
 
+    #[Route('/candidature/confirmation/{code}', name: 'app_candidature_confirmation', methods: ['GET'])]
+    public function confirmation(CandidatRepository $candidatRepository, string $code): Response
+    {
+        $candidature = $candidatRepository->findOneBy(['code_candidature' => $code]);
+
+        if (!$candidature) {
+            throw $this->createNotFoundException('Candidature introuvable.');
+        }
+
+        return $this->render('candidat/confirmation_candidature.html.twig', [
+            'code' => $code,
+            'candidature' => $candidature,
+        ]);
+    }
+
     #[Route('/candidature/postuler/{offreId}/{visiteurId}', name: 'app_candidature_postuler', methods: ['GET', 'POST'])]
     public function postuler(
         Request $request,
@@ -95,9 +110,9 @@ final class CandidatController extends AbstractController
             $entityManager->persist($candidat);
             $entityManager->flush();
 
-            $this->addFlash('success', 'Votre candidature a ete envoyee avec succes. Code de suivi: ' . $code);
-
-            return $this->redirectToRoute('app_offre_list');
+            return $this->redirectToRoute('app_candidature_confirmation', [
+                'code' => $code,
+            ]);
         }
 
         return $this->render('candidat/_postuler.html.twig', [

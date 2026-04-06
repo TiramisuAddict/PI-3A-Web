@@ -39,6 +39,7 @@ class CreeOffreType extends AbstractType
 
             ->add('date_limite', DateType::class, [
                 'label' => 'Date limite',
+                'widget' => 'single_text',
                 'required' => false,
             ])
 
