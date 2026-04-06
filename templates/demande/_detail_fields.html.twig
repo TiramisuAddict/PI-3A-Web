@@ -1,0 +1,43 @@
+{% if detailForm is defined and detailForm is not null %}
+    {% for field in detailForm %}
+        {% set fieldName = field.vars.name %}
+        {% set blockPrefixes = field.vars.block_prefixes %}
+        {% set isHidden = 'hidden' in blockPrefixes %}
+        {% set isTextarea = 'textarea' in blockPrefixes %}
+        {% set isChoice = 'choice' in blockPrefixes %}
+        {% set isLocation = field.vars.attr['data-location'] is defined and field.vars.attr['data-location'] == 'true' %}
+        
+        {% if not isHidden %}
+            <div class="{{ isTextarea ? 'col-12' : 'col-md-6' }} mb-3">
+                <label class="form-label{{ field.vars.required ? ' required' : '' }}" for="{{ field.vars.id }}">
+                    {{ field.vars.label }}
+                </label>
+                
+                {% if isLocation %}
+                    <div class="input-group">
+                        {{ form_widget(field, {'attr': {'class': 'form-control' ~ (field.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                        <button type="button" class="btn btn-primary btn-map-picker" data-field-id="{{ field.vars.id }}">
+                            <i class="ti ti-map-pin"></i>
+                        </button>
+                    </div>
+                {% elseif isChoice %}
+                    {{ form_widget(field, {'attr': {'class': 'form-select' ~ (field.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                {% elseif isTextarea %}
+                    {{ form_widget(field, {'attr': {'class': 'form-control' ~ (field.vars.errors|length > 0 ? ' is-invalid' : ''), 'rows': 3}}) }}
+                {% else %}
+                    {{ form_widget(field, {'attr': {'class': 'form-control' ~ (field.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                {% endif %}
+                
+                {% if field.vars.errors|length > 0 %}
+                    <div class="invalid-feedback d-block">
+                        {% for error in field.vars.errors %}
+                            {{ error.message }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        {% else %}
+            {{ form_widget(field) }}
+        {% endif %}
+    {% endfor %}
+{% endif %}

@@ -1,0 +1,51 @@
+<div class="modal fade" id="mapPickerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 18px; overflow: hidden;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #eef4ff, #f8fbff);">
+                <div>
+                    <h5 class="modal-title mb-1">
+                        <i class="ti ti-map-pin me-2 text-primary"></i>Choisir une destination
+                    </h5>
+                    <div class="text-muted small">Cliquez sur la carte, recherchez une ville, puis confirmez</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="p-3 border-bottom bg-white">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-8">
+                        <div class="input-group">
+                            <input type="text" id="mapSearchInput" class="form-control" placeholder="Rechercher une ville ou une adresse...">
+                            <button class="btn btn-primary" type="button" id="mapSearchButton">
+                                <i class="ti ti-search me-1"></i>Rechercher
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <small class="text-muted">Glissez pour naviguer • Molette pour zoomer</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="position-relative">
+                <div id="mapPickerInfo"
+                     style="position:absolute; z-index:1000; top:12px; left:50%; transform:translateX(-50%);
+                            background:#fff; padding:8px 16px; border-radius:999px; font-weight:600;
+                            box-shadow:0 6px 20px rgba(0,0,0,.12);">
+                    Cliquez pour choisir un lieu
+                </div>
+
+                <div id="mapPicker" style="height: 500px;"></div>
+            </div>
+
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    Annuler
+                </button>
+                <button type="button" class="btn btn-primary" id="mapConfirmButton" disabled>
+                    <i class="ti ti-check me-1"></i>Confirmer cette destination
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
