@@ -57,8 +57,7 @@ final class CandidatController extends AbstractController
         }
 
         $candidats = $selectedOffre
-            ? $candidatRepository->findBy(['offre' => $selectedOffre], ['date_candidature' => 'DESC'])
-            : [];
+            ? $candidatRepository->findByOffreId((int) $selectedOffre->getId()) : [];
 
         $selectedCandidat = null;
         foreach ($candidats as $candidat) {

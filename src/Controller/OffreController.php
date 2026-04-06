@@ -5,7 +5,6 @@ namespace App\Controller;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 use App\Entity\Offre;
@@ -36,8 +35,13 @@ final class OffreController extends AbstractController
 
     //Liste des offres
     #[Route('/offre/list', name: 'app_offre_list')]
-    public function listOffres(OffreRepository $offre_repository){
-        $offres = $offre_repository->findAll();
+    public function listOffres(Request $request, OffreRepository $offre_repository){
+        $q = $request->query->get('q');
+        $category = $request->query->get('category');
+        $contract = $request->query->get('contract');
+
+        $offres = $offre_repository->findByFilters($q, $category, $contract, null);
+
         return $this->render('offre/index.html.twig' , [ //page
             'offres' => $offres
         ]);
@@ -45,14 +49,25 @@ final class OffreController extends AbstractController
 
     // dashboard_offre_hr
     #[Route('/offre/dashboard', name: 'app_offre_dashboard')]
-    public function dashboard(OffreRepository $offre_repository): Response
+    public function dashboard(Request $request, OffreRepository $offre_repository): Response
     {
-        $offres = $offre_repository->findAll();
+        $q = $request->query->get('q');
+        $contract = $request->query->get('contract');
+        $etat = $request->query->get('etat');
+        $category = $request->query->get('category');
+
+        $offres = $offre_repository->findByFilters($q, $category, $contract, $etat);
         $form = $this->createForm(OffreType::class, new Offre());
 
         return $this->render('offre/dashboard_offre_hr.html.twig', [
             'offres' => $offres,
             'form' => $form->createView(),
+            'filters' => [
+                'q' => $q,
+                'contract' => $contract,
+                'etat' => $etat,
+                'category' => $category,
+            ],
         ]);
     }
 

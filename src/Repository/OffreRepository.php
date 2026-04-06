@@ -16,6 +16,41 @@ class OffreRepository extends ServiceEntityRepository
         parent::__construct($registry, Offre::class);
     }
 
+    /**
+     * @return Offre[]
+     */
+    public function findByFilters(?string $query, ?string $category, ?string $contract, ?string $etat): array
+    {
+        $qb = $this->createQueryBuilder('o');
+
+        $query = trim((string) $query);
+        $category = trim((string) $category);
+        $contract = trim((string) $contract);
+        $etat = trim((string) $etat);
+
+        if ($query !== '') {
+            $qb->andWhere('LOWER(o.titre_poste) LIKE :query')
+                ->setParameter('query', '%'.mb_strtolower($query).'%');
+        }
+
+        if ($category !== '') {
+            $qb->andWhere('o.categorie = :category')
+                ->setParameter('category', $category);
+        }
+
+        if ($contract !== '') {
+            $qb->andWhere('o.type_contrat = :contract')
+                ->setParameter('contract', $contract);
+        }
+
+        if ($etat !== '') {
+            $qb->andWhere('o.etat = :etat')
+                ->setParameter('etat', $etat);
+        }
+
+        return $qb->orderBy('o.id', 'DESC')->getQuery()->getResult();
+    }
+
 //    /**
 //     * @return Offre[] Returns an array of Offre objects
 //     */
