@@ -1,18 +1,84 @@
-{{ form_start(form, { attr: { class: 'crud-form' } }) }}
+{# Type « événement » = 2 (aligné sur FeedController / post_type_evenement) #}
+{% set post_type_evenement = 2 %}
+{% set current_type = form.vars.data is not null and form.vars.data.typePost is not null ? form.vars.data.typePost : 1 %}
+
+{{ form_start(form, { attr: { class: 'crud-form post-crud-form', novalidate: 'novalidate' } }) }}
 {% if form.vars.submitted and not form.vars.valid %}
     <div class="alert alert-danger d-flex align-items-start gap-2 mb-4" role="alert">
         <i class="ti ti-alert-circle fs-4 flex-shrink-0"></i>
-        <div>
+        <div class="flex-grow-1">
             <strong>Formulaire invalide.</strong>
-            <div class="small mb-0">Corrigez les champs signalés ci-dessous.</div>
+            <div class="small mb-2">Corrigez les champs signalés ci-dessous.</div>
+            <ul class="small mb-0 ps-3">
+                {% for field in form %}
+                    {% for error in field.vars.errors %}
+                        <li><strong>{{ field.vars.label|default(field.vars.name) }} :</strong> {{ error.message }}</li>
+                    {% endfor %}
+                {% endfor %}
+                {% for error in form.vars.errors %}
+                    <li>{{ error.message }}</li>
+                {% endfor %}
+            </ul>
         </div>
     </div>
 {% endif %}
-{% for field in form %}
-    {{ form_row(field, { row_attr: { class: 'mb-3' } }) }}
-{% endfor %}
+
+{{ form_row(form.titre, { row_attr: { class: 'mb-3' } }) }}
+{{ form_row(form.contenu, { row_attr: { class: 'mb-3' } }) }}
+
+<div class="row align-items-end g-3 mb-3">
+    <div class="col-md-8">
+        {{ form_row(form.type_post, { row_attr: { class: 'mb-0' } }) }}
+    </div>
+    <div class="col-md-4 d-md-flex justify-content-md-end align-items-end">
+        <div class="w-100 w-md-auto">
+            {{ form_row(form.active) }}
+        </div>
+    </div>
+</div>
+
+<p class="text-secondary small mb-3{{ current_type == post_type_evenement ? ' d-none' : '' }}" id="post-type-hint">Choisissez « Événement » pour afficher les dates, le lieu, la capacité et les coordonnées GPS.</p>
+
+<div id="post-event-fields" class="post-event-fields border rounded-3 p-3 mb-4 bg-azure-lt{{ current_type != post_type_evenement ? ' d-none' : '' }}" data-event-type-value="{{ post_type_evenement }}" style="--tblr-border-opacity: .2;">
+    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-azure">
+        <i class="ti ti-calendar-event text-azure"></i>
+        <span class="fw-semibold">Détails de l’événement</span>
+    </div>
+    {{ form_row(form.date_evenement) }}
+    {{ form_row(form.date_fin_evenement) }}
+    {{ form_row(form.lieu) }}
+    {{ form_row(form.capacite_max) }}
+    {{ form_row(form.latitude) }}
+    {{ form_row(form.longitude) }}
+</div>
+
+{{ form_rest(form) }}
+
 <div class="d-flex flex-wrap gap-2 justify-content-end mt-4 pt-3 border-top">
     <a href="{{ cancel_path }}" class="btn btn-outline-secondary">Annuler</a>
     <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>{{ submit_label|default('Enregistrer') }}</button>
 </div>
 {{ form_end(form) }}
+
+<script>
+(function () {
+    var ef = document.getElementById('post-event-fields');
+    var EVENT = parseInt((ef && ef.getAttribute('data-event-type-value')) || '2', 10);
+    var select = document.querySelector('.post-crud-form select[name="post[type_post]"]');
+    var block = document.getElementById('post-event-fields');
+    var hint = document.getElementById('post-type-hint');
+    function sync() {
+        if (!select || !block) return;
+        var v = parseInt(select.value, 10);
+        var isEvent = v === EVENT;
+        block.classList.toggle('d-none', !isEvent);
+        if (hint) {
+            hint.classList.toggle('d-none', isEvent);
+        }
+    }
+    if (select) {
+        select.addEventListener('change', sync);
+        sync();
+    }
+})();
+</script>

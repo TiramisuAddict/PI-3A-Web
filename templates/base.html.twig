@@ -131,6 +131,16 @@
                     line-height: 1;
                 }
 
+                .btn.btn-icon {
+                    width: 2.35rem;
+                    height: 2.35rem;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0;
+                    border-radius: 0.5rem;
+                }
+
                 .table > :not(caption) > * > * {
                     padding-top: .95rem;
                     padding-bottom: .95rem;
@@ -143,6 +153,49 @@
                 .mini-muted {
                     color: #6b7280;
                     font-size: .92rem;
+                }
+
+                .app-nav-section {
+                    border-radius: 12px;
+                    padding: 0.35rem 0.5rem;
+                }
+
+                .app-nav-link {
+                    border-radius: 10px;
+                    padding: 0.45rem 0.75rem !important;
+                    margin: 0.1rem 0;
+                    transition: background-color 0.15s ease, color 0.15s ease;
+                }
+
+                .app-nav-link:hover {
+                    background: rgba(13, 110, 253, 0.09);
+                    color: #0d6efd !important;
+                }
+
+                .app-nav-link.active {
+                    background: rgba(13, 110, 253, 0.14);
+                    color: #0d6efd !important;
+                    font-weight: 700;
+                }
+
+                .app-nav-label {
+                    font-size: 0.65rem;
+                    letter-spacing: 0.08em;
+                    font-weight: 800;
+                    color: #94a3b8;
+                    text-transform: uppercase;
+                    margin-bottom: 0.15rem;
+                    padding-left: 0.35rem;
+                }
+
+                .admin-dash-card {
+                    transition: transform 0.15s ease, box-shadow 0.15s ease;
+                    border-color: var(--app-border) !important;
+                }
+
+                a:hover .admin-dash-card {
+                    transform: translateY(-3px);
+                    box-shadow: var(--app-shadow) !important;
                 }
             </style>
         {% endblock %}
@@ -174,30 +227,42 @@
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#app-main-nav" aria-controls="app-main-nav" aria-expanded="false" aria-label="Menu">
                         <span class="navbar-toggler-icon"></span>
                     </button>
+                    {% set _route = app.request.attributes.get('_route') %}
                     <div class="collapse navbar-collapse order-md-last" id="app-main-nav">
-                        <div class="navbar-nav ms-md-auto flex-wrap align-items-md-center gap-md-1">
-                            <span class="nav-link text-muted small text-uppercase fw-bold px-2 d-none d-md-inline">Front office</span>
-                            <a class="nav-link fw-semibold" href="{{ path('app_employe_feed') }}">
-                                <i class="ti ti-news me-1"></i>
-                                <span class="nav-link-title">Fil d'actualité</span>
-                            </a>
-                            <span class="nav-link text-muted small text-uppercase fw-bold px-2 ms-md-2 d-none d-md-inline">Back office</span>
-                            <a class="nav-link fw-semibold" href="{{ path('app_post_index') }}">
-                                <i class="ti ti-file-text me-1"></i>
-                                <span class="nav-link-title">Gestion des Posts</span>
-                            </a>
-                            <a class="nav-link fw-semibold" href="{{ path('app_commentaire_index') }}">
-                                <i class="ti ti-message me-1"></i>
-                                <span class="nav-link-title">Commentaires</span>
-                            </a>
-                            <a class="nav-link fw-semibold" href="{{ path('app_participation_index') }}">
-                                <i class="ti ti-users me-1"></i>
-                                <span class="nav-link-title">Participations</span>
-                            </a>
-                            <a class="nav-link fw-semibold" href="{{ path('app_notification_index') }}">
-                                <i class="ti ti-bell me-1"></i>
-                                <span class="nav-link-title">Notifications</span>
-                            </a>
+                        <div class="navbar-nav ms-md-auto flex-wrap align-items-stretch align-items-md-center gap-2 gap-md-3 py-2 py-md-0">
+                            <div class="app-nav-section d-flex flex-column">
+                                <span class="app-nav-label d-none d-md-block">FRONT OFFICE</span>
+                                <a class="nav-link fw-semibold app-nav-link {{ _route == 'app_employe_feed' ? 'active' : '' }}" href="{{ path('app_employe_feed') }}">
+                                    <i class="ti ti-news me-1"></i>
+                                    <span class="nav-link-title">Fil d'actualité</span>
+                                </a>
+                            </div>
+                            <div class="vr d-none d-md-block align-self-stretch my-2 opacity-25"></div>
+                            <div class="app-nav-section d-flex flex-column flex-grow-1">
+                                <span class="app-nav-label d-none d-md-block">BACK OFFICE (ADMIN)</span>
+                                <div class="d-flex flex-column flex-md-row flex-wrap gap-md-1">
+                                    <a class="nav-link fw-semibold app-nav-link {{ _route == 'app_admin_dashboard' ? 'active' : '' }}" href="{{ path('app_admin_dashboard') }}">
+                                        <i class="ti ti-layout-dashboard me-1"></i>
+                                        <span class="nav-link-title">Accueil Admin</span>
+                                    </a>
+                                    <a class="nav-link fw-semibold app-nav-link {{ _route starts with 'app_post_' ? 'active' : '' }}" href="{{ path('app_post_index') }}">
+                                        <i class="ti ti-file-text me-1"></i>
+                                        <span class="nav-link-title">Gestion des Posts</span>
+                                    </a>
+                                    <a class="nav-link fw-semibold app-nav-link {{ _route starts with 'app_commentaire_' ? 'active' : '' }}" href="{{ path('app_commentaire_index') }}">
+                                        <i class="ti ti-message me-1"></i>
+                                        <span class="nav-link-title">Commentaires</span>
+                                    </a>
+                                    <a class="nav-link fw-semibold app-nav-link {{ _route starts with 'app_participation_' ? 'active' : '' }}" href="{{ path('app_participation_index') }}">
+                                        <i class="ti ti-users me-1"></i>
+                                        <span class="nav-link-title">Participations</span>
+                                    </a>
+                                    <a class="nav-link fw-semibold app-nav-link {{ _route starts with 'app_notification_' ? 'active' : '' }}" href="{{ path('app_notification_index') }}">
+                                        <i class="ti ti-bell me-1"></i>
+                                        <span class="nav-link-title">Notifications</span>
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -206,6 +271,17 @@
             <div class="page-wrapper">
                 <div class="page-body">
                     <div class="container-xl app-shell">
+                        {% for label, messages in app.flashes %}
+                            {% for message in messages %}
+                                {% set alert_class = label == 'error' ? 'danger' : label %}
+                                <div class="alert alert-{{ alert_class }} alert-dismissible mb-3" role="alert">
+                                    <div class="d-flex">
+                                        <div class="flex-grow-1">{{ message }}</div>
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% endfor %}
                         {% block body %}{% endblock %}
                     </div>
                 </div>

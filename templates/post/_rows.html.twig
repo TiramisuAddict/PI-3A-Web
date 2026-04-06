@@ -1,0 +1,30 @@
+{% for post in posts %}
+    <tr>
+        <td>{{ post.idPost }}</td>
+        <td>{{ post.titre }}</td>
+        <td>{{ post.contenu|length > 80 ? post.contenu|slice(0, 80) ~ '…' : post.contenu }}</td>
+        <td>{{ post.typePost }}</td>
+        <td>{{ post.dateCreation ? post.dateCreation|date('Y-m-d H:i') : '' }}</td>
+        <td>{{ post.utilisateurId }}</td>
+        <td>{{ post.active ? 'Oui' : 'Non' }}</td>
+        <td>{{ post.dateEvenement ? post.dateEvenement|date('Y-m-d') : '' }}</td>
+        <td>{{ post.dateFinEvenement ? post.dateFinEvenement|date('Y-m-d') : '' }}</td>
+        <td>{{ post.lieu }}</td>
+        <td>{{ post.capaciteMax }}</td>
+        <td>{{ post.latitude }}</td>
+        <td>{{ post.longitude }}</td>
+        <td class="text-end text-nowrap">
+            <div class="d-inline-flex align-items-center justify-content-end gap-1">
+                <a class="btn btn-sm btn-warning btn-icon" href="{{ path('app_post_edit', { id_post: post.idPost }) }}" title="Modifier"><i class="ti ti-edit"></i></a>
+                <form class="d-inline" method="post" action="{{ path('app_post_delete', { id_post: post.idPost }) }}" onsubmit="return confirm('Supprimer cette publication ?');">
+                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ post.idPost) }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger btn-icon" title="Supprimer"><i class="ti ti-trash"></i></button>
+                </form>
+            </div>
+        </td>
+    </tr>
+{% else %}
+    <tr>
+        <td colspan="14" class="text-center text-secondary py-4">Aucun enregistrement</td>
+    </tr>
+{% endfor %}

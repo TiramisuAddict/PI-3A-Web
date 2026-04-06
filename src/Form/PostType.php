@@ -5,13 +5,15 @@ namespace App\Form;
 use App\Entity\Post;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
-use Symfony\Component\Form\Extension\Core\Type\DateTimeType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
@@ -30,24 +32,20 @@ class PostType extends AbstractType
                 'label' => 'Contenu',
                 'attr' => ['class' => 'form-control', 'rows' => 6],
             ])
-            ->add('type_post', IntegerType::class, [
-                'label' => 'Type de publication (ex. 1 = annonce, 2 = événement)',
-                'attr' => ['class' => 'form-control', 'min' => 0],
-            ])
-            ->add('date_creation', DateTimeType::class, [
-                'label' => 'Date de création',
-                'widget' => 'single_text',
-                'attr' => ['class' => 'form-control'],
-            ])
-            ->add('utilisateur_id', IntegerType::class, [
-                'label' => 'ID utilisateur (auteur)',
-                'attr' => ['class' => 'form-control', 'min' => 0],
+            ->add('type_post', ChoiceType::class, [
+                'label' => 'Type de publication',
+                'choices' => [
+                    'Annonce' => 1,
+                    'Événement' => 2,
+                ],
+                'attr' => ['class' => 'form-select'],
             ])
             ->add('active', CheckboxType::class, [
                 'label' => 'Publication active',
                 'required' => false,
                 'attr' => ['class' => 'form-check-input'],
                 'label_attr' => ['class' => 'form-check-label'],
+                'row_attr' => ['class' => 'mb-0 form-check form-switch'],
             ])
             ->add('date_evenement', DateType::class, [
                 'label' => 'Date début événement',
@@ -55,6 +53,7 @@ class PostType extends AbstractType
                 'widget' => 'single_text',
                 'input' => 'datetime_immutable',
                 'attr' => ['class' => 'form-control'],
+                'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ])
             ->add('date_fin_evenement', DateType::class, [
                 'label' => 'Date fin événement',
@@ -62,29 +61,77 @@ class PostType extends AbstractType
                 'widget' => 'single_text',
                 'input' => 'datetime_immutable',
                 'attr' => ['class' => 'form-control'],
+                'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ])
             ->add('lieu', TextType::class, [
                 'label' => 'Lieu',
                 'required' => false,
                 'attr' => ['class' => 'form-control'],
+                'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ])
             ->add('capacite_max', IntegerType::class, [
                 'label' => 'Capacité maximale',
                 'required' => false,
                 'attr' => ['class' => 'form-control', 'min' => 1],
+                'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ])
             ->add('latitude', NumberType::class, [
                 'label' => 'Latitude',
                 'required' => false,
                 'scale' => 7,
                 'attr' => ['class' => 'form-control', 'step' => 'any'],
+                'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ])
             ->add('longitude', NumberType::class, [
                 'label' => 'Longitude',
                 'required' => false,
                 'scale' => 7,
                 'attr' => ['class' => 'form-control', 'step' => 'any'],
+                'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ]);
+
+        $builder->addEventListener(FormEvents::PRE_SUBMIT, function (FormEvent $event): void {
+            $data = $event->getData();
+            if (!\is_array($data)) {
+                return;
+            }
+
+            $type = isset($data['type_post']) ? (int) $data['type_post'] : 1;
+            $data['type_post'] = $type;
+
+            $eventKeys = ['date_evenement', 'date_fin_evenement', 'lieu', 'capacite_max', 'latitude', 'longitude'];
+            $dateKeys = ['date_evenement', 'date_fin_evenement'];
+
+            if ($type !== 2) {
+                foreach ($eventKeys as $key) {
+                    $data[$key] = \in_array($key, $dateKeys, true) ? '' : null;
+                }
+                $event->setData($data);
+
+                return;
+            }
+
+            foreach ($eventKeys as $key) {
+                if (!\array_key_exists($key, $data)) {
+                    $data[$key] = \in_array($key, $dateKeys, true) ? '' : null;
+
+                    continue;
+                }
+                $v = $data[$key];
+                if ($v === '' || $v === null) {
+                    $data[$key] = \in_array($key, $dateKeys, true) ? '' : null;
+
+                    continue;
+                }
+                if (\in_array($key, ['capacite_max'], true) && $v !== '') {
+                    $data[$key] = (int) $v;
+                }
+                if (\in_array($key, ['latitude', 'longitude'], true) && $v !== '' && is_numeric($v)) {
+                    $data[$key] = (float) $v;
+                }
+            }
+            $event->setData($data);
+        });
     }
 
     public function configureOptions(OptionsResolver $resolver): void

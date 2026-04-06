@@ -266,9 +266,9 @@
                 <i class="ti ti-filter me-1"></i> Tout voir
             </button>
             <div class="dropdown-menu dropdown-menu-end">
-                <a class="dropdown-item" href="{{ path(app.request.attributes.get('_route'), app.request.query.all|merge({'filter': 'all'})) }}">Toutes les publications</a>
-                <a class="dropdown-item" href="{{ path(app.request.attributes.get('_route'), app.request.query.all|merge({'filter': 'annonce'})) }}">Annonces uniquement</a>
-                <a class="dropdown-item" href="{{ path(app.request.attributes.get('_route'), app.request.query.all|merge({'filter': 'evenement'})) }}">Événements uniquement</a>
+                <a class="dropdown-item{% if filter|default('all') == 'all' %} active{% endif %}" href="{{ path('app_employe_feed', {filter: 'all'}) }}">Toutes les publications</a>
+                <a class="dropdown-item{% if filter|default('all') == 'annonce' %} active{% endif %}" href="{{ path('app_employe_feed', {filter: 'annonce'}) }}">Annonces uniquement</a>
+                <a class="dropdown-item{% if filter|default('all') == 'evenement' %} active{% endif %}" href="{{ path('app_employe_feed', {filter: 'evenement'}) }}">Événements uniquement</a>
             </div>
         </div>
     </div>
