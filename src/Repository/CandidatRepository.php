@@ -16,6 +16,18 @@ class CandidatRepository extends ServiceEntityRepository
         parent::__construct($registry, Candidat::class);
     }
 
+    /**
+     * @return Candidat[]
+     */
+    public function findByOffreId(int $offreId): array
+    {
+        return $this->createQueryBuilder('c')
+            ->andWhere('c.offre = :offreId')
+            ->setParameter('offreId', $offreId)
+            ->getQuery()
+            ->getResult();
+    }
+
 //    /**
 //     * @return Candidat[] Returns an array of Candidat objects
 //     */

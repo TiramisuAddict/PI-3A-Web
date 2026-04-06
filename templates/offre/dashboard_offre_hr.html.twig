@@ -272,41 +272,45 @@
 
             <div class="card dashboard-card mb-3">
                 <div class="card-body">
-                    <div class="row g-2">
+                    <form method="get" action="{{ path('app_offre_dashboard') }}" class="row g-2">
                         <div class="col-12 col-lg-5">
-                            <input type="text" class="form-control" placeholder="Rechercher par titre ou code...">
+                            <input type="text" name="q" class="form-control" placeholder="Rechercher par titre ou code..." value="{{ filters.q|default('') }}">
                         </div>
                         <div class="col-12 col-md-4 col-lg-2">
-                            <select class="form-select">
-                                <option>Tous les contrats</option>
-                                <option>CDI</option>
-                                <option>CDD</option>
-                                <option>STAGE</option>
-                                <option>CVP</option>
+                            <select class="form-select" name="contract">
+                                <option value="">Tous les contrats</option>
+                                <option value="CDI" {{ filters.contract|default('') == 'CDI' ? 'selected' : '' }}>CDI</option>
+                                <option value="CDD" {{ filters.contract|default('') == 'CDD' ? 'selected' : '' }}>CDD</option>
+                                <option value="STAGE" {{ filters.contract|default('') == 'STAGE' ? 'selected' : '' }}>STAGE</option>
+                                <option value="CVP" {{ filters.contract|default('') == 'CVP' ? 'selected' : '' }}>CVP</option>
                             </select>
                         </div>
                         <div class="col-12 col-md-4 col-lg-2">
-                            <select class="form-select">
-                                <option>Tous les états</option>
-                                <option>OUVERT</option>
-                                <option>FERMÉ</option>
+                            <select class="form-select" name="etat">
+                                <option value="">Tous les états</option>
+                                <option value="Ouvert" {{ filters.etat|default('') == 'Ouvert' ? 'selected' : '' }}>Ouvert</option>
+                                <option value="Fermé" {{ filters.etat|default('') == 'Fermé' ? 'selected' : '' }}>Fermé</option>
                             </select>
                         </div>
                         <div class="col-12 col-md-4 col-lg-3">
-                            <select class="form-select">
-                                <option>Toutes les catégories</option>
-                                <option>Informatique</option>
-                                <option>Marketing</option>
-                                <option>Vente</option>
-                                <option>Finance</option>
-                                <option>Ressources Humaines</option>
-                                <option>Santé</option>
-                                <option>Education</option>
-                                <option>Art et Design</option>
-                                <option>Autre</option>
+                            <select class="form-select" name="category">
+                                <option value="">Toutes les catégories</option>
+                                <option value="Informatique" {{ filters.category|default('') == 'Informatique' ? 'selected' : '' }}>Informatique</option>
+                                <option value="Marketing" {{ filters.category|default('') == 'Marketing' ? 'selected' : '' }}>Marketing</option>
+                                <option value="Vente" {{ filters.category|default('') == 'Vente' ? 'selected' : '' }}>Vente</option>
+                                <option value="Finance" {{ filters.category|default('') == 'Finance' ? 'selected' : '' }}>Finance</option>
+                                <option value="Ressources Humaines" {{ filters.category|default('') == 'Ressources Humaines' ? 'selected' : '' }}>Ressources Humaines</option>
+                                <option value="Santé" {{ filters.category|default('') == 'Santé' ? 'selected' : '' }}>Santé</option>
+                                <option value="Education" {{ filters.category|default('') == 'Education' ? 'selected' : '' }}>Education</option>
+                                <option value="Art et Design" {{ filters.category|default('') == 'Art et Design' ? 'selected' : '' }}>Art et Design</option>
+                                <option value="Autre" {{ filters.category|default('') == 'Autre' ? 'selected' : '' }}>Autre</option>
                             </select>
                         </div>
-                    </div>
+                        <div class="col-12 col-lg-12 d-flex justify-content-end gap-2 mt-2">
+                            <a href="{{ path('app_offre_dashboard') }}" class="btn btn-outline-secondary">Reinitialiser</a>
+                            <button type="submit" class="btn btn-primary">Filtrer</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
