@@ -1,0 +1,252 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Candidatures | Dashboard RH{% endblock %}
+
+{% block stylesheets %}
+	{{ parent() }}
+	<style>
+		.candidat-dashboard {
+			background: #f5f7fb;
+			min-height: 100vh;
+			padding: 1.25rem 0 2rem;
+		}
+
+		.panel-card {
+			border-radius: 10px;
+			border: 1px solid rgba(15, 23, 42, 0.08);
+			background: #fff;
+		}
+
+		.details-sticky {
+			position: sticky;
+			top: 1rem;
+		}
+
+		.candidate-row {
+			cursor: pointer;
+		}
+
+		.candidate-row.is-selected {
+			background: rgba(31, 111, 235, 0.08);
+		}
+
+		.details-section {
+			margin-bottom: 1.25rem;
+		}
+
+		.candidate-doc-btn {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			font-weight: 600;
+			min-height: 44px;
+			border-radius: 8px;
+			padding: .55rem .75rem;
+		}
+
+		.doc-actions {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: .5rem;
+		}
+
+		@media (max-width: 575.98px) {
+			.doc-actions {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		.details-form-wrapper .form-label {
+			font-weight: 600;
+		}
+
+		.details-form-wrapper .form-control,
+		.details-form-wrapper .form-select {
+			min-height: 44px;
+			border-color: #d1d5db;
+		}
+
+		.details-form-wrapper textarea.form-control {
+			min-height: 112px;
+		}
+
+		.details-divider {
+			margin: 1.25rem 0;
+			border-top: 1px solid rgba(15, 23, 42, 0.10);
+		}
+
+		@media (max-width: 991.98px) {
+			.details-sticky {
+				position: static;
+			}
+		}
+	</style>
+{% endblock %}
+
+{% block body %}
+<div class="candidat-dashboard">
+	<div class="container-xl">
+		{% for message in app.flashes('success') %}
+			<div class="alert alert-success alert-dismissible fade show" role="alert">
+				{{ message }}
+				<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+			</div>
+		{% endfor %}
+
+		{% for message in app.flashes('error') %}
+			<div class="alert alert-danger alert-dismissible fade show" role="alert">
+				{{ message }}
+				<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+			</div>
+		{% endfor %}
+
+		<div class="card panel-card mb-3">
+			<div class="card-body">
+				<form method="get" action="{{ path('app_candidat_dashboard') }}" id="offreSelectionForm" class="row g-3 align-items-end">
+					<div class="col-12 col-lg-8">
+						<label for="offreId" class="form-label mb-1">Selectionner une offre pour voir les candidats</label>
+						<select id="offreId" name="offreId" class="form-select">
+							{% if offres is empty %}
+								<option value="">Aucune offre disponible</option>
+							{% else %}
+								{% for offre in offres %}
+									<option value="{{ offre.id }}" {{ selectedOffreId == offre.id ? 'selected' : '' }}>
+										{{ offre.titrePoste }}
+									</option>
+								{% endfor %}
+							{% endif %}
+						</select>
+					</div>
+
+					<div class="col-12 col-lg-4 d-grid d-lg-flex justify-content-lg-end">
+						<button type="button" class="btn btn-primary" disabled>Lancer l'IA Matching</button>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		<div class="row g-3">
+			<div class="col-12 col-xl-8">
+				<div class="card panel-card h-100">
+					<div class="table-responsive">
+						<table class="table table-vcenter card-table mb-0">
+							<thead>
+								<tr>
+									<th>Candidat</th>
+									<th>Email</th>
+									<th>Score</th>
+									<th>Phase Actuelle</th>
+									<th>Date de Candidature</th>
+								</tr>
+							</thead>
+							<tbody>
+								{% if selectedOffre is null %}
+									<tr>
+										<td colspan="5" class="text-secondary">Aucune offre selectionnee.</td>
+									</tr>
+								{% elseif candidats is empty %}
+									<tr>
+										<td colspan="5" class="text-secondary">Aucun candidat pour cette offre.</td>
+									</tr>
+								{% else %}
+									{% for candidat in candidats %}
+										{% set isSelected = selectedCandidatId == candidat.id %}
+										<tr
+											class="candidate-row {{ isSelected ? 'is-selected' : '' }}"
+											data-open-url="{{ path('app_candidat_dashboard', { offreId: selectedOffreId, candidatId: candidat.id }) }}"
+										>
+											<td>{{ candidat.visiteur.nom }} {{ candidat.visiteur.prenom }}</td>
+											<td>{{ candidat.visiteur.eMail }}</td>
+											<td>{{ candidat.score is not null ? candidat.score|number_format(2, '.', '') : '-' }}</td>
+											<td>
+												{% if candidat.etat == 'Refusée' or candidat.etat == 'Refusé' %}
+													<span class="badge bg-red-lt text-red">{{ candidat.etat }}</span>
+												{% elseif candidat.etat == 'Acceptée' or candidat.etat == 'Accepté' %}
+													<span class="badge bg-green-lt text-green">{{ candidat.etat }}</span>
+												{% else %}
+													<span class="badge bg-blue-lt text-blue">{{ candidat.etat }}</span>
+												{% endif %}
+											</td>
+											<td>{{ candidat.dateCandidature ? candidat.dateCandidature|date('Y-m-d') : '-' }}</td>
+										</tr>
+									{% endfor %}
+								{% endif %}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+
+			<div class="col-12 col-xl-4">
+				<div class="card panel-card details-sticky">
+					<div class="card-body">
+						<h3 class="card-title mb-3 h2">Details du Candidat</h3>
+
+						{% if selectedCandidat %}
+							<div class="details-section">
+								<div class="fw-bold fs-3 text-dark mb-1">{{ selectedCandidat.visiteur.nom }} {{ selectedCandidat.visiteur.prenom }}</div>
+								<div class="text-secondary">{{ selectedCandidat.visiteur.eMail }}</div>
+								<div class="text-secondary">{{ selectedCandidat.visiteur.telephone }}</div>
+							</div>
+
+							<div class="details-section">
+								<div class="h3 mb-2">Documents</div>
+								<div class="doc-actions">
+									{% if selectedCandidat.cvData %}
+										<a href="{{ path('app_candidature_download_cv', { id: selectedCandidat.id }) }}" class="btn btn-primary" target="_blank" rel="noopener">
+											Telecharger CV
+										</a>
+									{% else %}
+										<button type="button" class="btn btn-outline-secondary candidate-doc-btn" disabled>CV indisponible</button>
+									{% endif %}
+
+									{% if selectedCandidat.lettreMotivationData %}
+										<a href="{{ path('app_candidature_download_lettre', { id: selectedCandidat.id }) }}" class="btn btn-outline-warning" target="_blank" rel="noopener">
+											Lettre de Motivation
+										</a>
+									{% else %}
+										<button type="button" class="btn btn-outline-secondary candidate-doc-btn" disabled>Lettre indisponible</button>
+									{% endif %}
+								</div>
+							</div>
+
+							<div class="details-divider"></div>
+
+							<div class="details-form-wrapper">
+								{{ render(controller('App\\Controller\\CandidatController::modifierCandidature', { id: selectedCandidat.id })) }}
+							</div>
+						{% else %}
+							<p class="text-secondary mb-0">Selectionnez un candidat dans le tableau pour afficher ses details et modifier sa phase.</p>
+						{% endif %}
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+	{{ parent() }}
+	<script>
+		document.addEventListener('DOMContentLoaded', function () {
+			const offerSelect = document.getElementById('offreId');
+			const offerForm = document.getElementById('offreSelectionForm');
+
+			if (offerSelect && offerForm) {
+				offerSelect.addEventListener('change', function () {
+					offerForm.submit();
+				});
+			}
+
+			document.querySelectorAll('.candidate-row[data-open-url]').forEach(function (row) {
+				row.addEventListener('click', function () {
+					const targetUrl = row.getAttribute('data-open-url');
+					if (targetUrl) {
+						window.location.href = targetUrl;
+					}
+				});
+			});
+		});
+	</script>
+{% endblock %}
