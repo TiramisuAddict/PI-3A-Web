@@ -1,20 +1,20 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Commentaire #{{ commentaire.id_commentaire }}{% endblock %}
+{% block title %}Commentaire #{{ commentaire.idCommentaire }}{% endblock %}
 
 {% block body %}
 <div class="surface-card p-4">
-    <h1 class="mb-4">Commentaire #{{ commentaire.id_commentaire }}</h1>
-    <div class="card shadow-sm">
+    <h1 class="mb-4">Commentaire #{{ commentaire.idCommentaire }}</h1>
+    <div class="card border shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-striped table-bordered mb-0">
                     <tbody>
-                        <tr><th class="w-25">id_commentaire</th><td>{{ commentaire.id_commentaire }}</td></tr>
-                        <tr><th>contenu</th><td class="text-break">{{ commentaire.contenu }}</td></tr>
-                        <tr><th>date_commentaire</th><td>{{ commentaire.date_commentaire ? commentaire.date_commentaire|date('Y-m-d H:i:s') : '' }}</td></tr>
-                        <tr><th>utilisateur_id</th><td>{{ commentaire.utilisateur_id }}</td></tr>
-                        <tr><th>post (id_post)</th><td>{% if commentaire.post %}{{ commentaire.post.id_post }}{% else %}—{% endif %}</td></tr>
+                        <tr><th class="w-25">ID</th><td>{{ commentaire.idCommentaire }}</td></tr>
+                        <tr><th>Contenu</th><td class="text-break">{{ commentaire.contenu }}</td></tr>
+                        <tr><th>Date commentaire</th><td>{{ commentaire.dateCommentaire ? commentaire.dateCommentaire|date('Y-m-d H:i:s') : '' }}</td></tr>
+                        <tr><th>Utilisateur</th><td>{{ commentaire.utilisateurId }}</td></tr>
+                        <tr><th>Post</th><td>{% if commentaire.post %}#{{ commentaire.post.idPost }}{% else %}—{% endif %}</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -22,7 +22,7 @@
     </div>
     <div class="d-flex flex-wrap gap-2 mt-4">
         <a class="btn btn-primary" href="{{ path('app_commentaire_index') }}"><i class="ti ti-list me-1"></i>Retour</a>
-        <a class="btn btn-warning" href="{{ path('app_commentaire_edit', { id_commentaire: commentaire.id_commentaire }) }}"><i class="ti ti-edit me-1"></i>Modifier</a>
+        <a class="btn btn-warning" href="{{ path('app_commentaire_edit', { id_commentaire: commentaire.idCommentaire }) }}"><i class="ti ti-edit me-1"></i>Modifier</a>
         {{ include('commentaire/_delete_form.html.twig') }}
     </div>
 </div>

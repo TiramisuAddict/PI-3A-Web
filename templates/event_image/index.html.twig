@@ -9,26 +9,26 @@
         <a class="btn btn-primary" href="{{ path('app_event_image_new') }}"><i class="ti ti-plus me-1"></i>Créer</a>
     </div>
     <div class="table-responsive">
-        <table class="table table-striped table-bordered align-middle">
+        <table class="table table-striped table-bordered align-middle table-vcenter">
             <thead class="table-light">
                 <tr>
-                    <th>id_image</th>
-                    <th>image_path</th>
-                    <th>ordre</th>
-                    <th>post</th>
+                    <th>ID</th>
+                    <th>Chemin</th>
+                    <th>Ordre</th>
+                    <th>Post</th>
                     <th class="text-nowrap">Actions</th>
                 </tr>
             </thead>
             <tbody>
             {% for event_image in event_images %}
                 <tr>
-                    <td>{{ event_image.id_image }}</td>
-                    <td class="text-break"><code>{{ event_image.image_path }}</code></td>
+                    <td>{{ event_image.idImage }}</td>
+                    <td class="text-break"><code>{{ event_image.imagePath }}</code></td>
                     <td>{{ event_image.ordre }}</td>
-                    <td>{% if event_image.post %}#{{ event_image.post.id_post }}{% endif %}</td>
+                    <td>{% if event_image.post %}#{{ event_image.post.idPost }}{% endif %}</td>
                     <td class="text-nowrap">
-                        <a class="btn btn-sm btn-primary" href="{{ path('app_event_image_show', { id_image: event_image.id_image }) }}"><i class="ti ti-eye"></i></a>
-                        <a class="btn btn-sm btn-warning" href="{{ path('app_event_image_edit', { id_image: event_image.id_image }) }}"><i class="ti ti-edit"></i></a>
+                        <a class="btn btn-sm btn-primary btn-icon" href="{{ path('app_event_image_show', { id_image: event_image.idImage }) }}" title="Voir"><i class="ti ti-eye"></i></a>
+                        <a class="btn btn-sm btn-warning btn-icon" href="{{ path('app_event_image_edit', { id_image: event_image.idImage }) }}" title="Modifier"><i class="ti ti-edit"></i></a>
                     </td>
                 </tr>
             {% else %}

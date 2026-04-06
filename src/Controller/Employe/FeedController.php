@@ -4,6 +4,7 @@ namespace App\Controller\Employe;
 
 use App\Repository\PostRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -21,12 +22,22 @@ class FeedController extends AbstractController
     }
 
     #[Route('/feed', name: 'app_employe_feed', methods: ['GET'])]
-    public function feed(): Response
+    public function feed(Request $request): Response
     {
-        $posts = $this->postRepository->findBy(['active' => true], ['date_creation' => 'DESC']);
+        $filter = $request->query->get('filter', 'all');
+
+        $criteria = ['active' => true];
+        if ('annonce' === $filter) {
+            $criteria['type_post'] = 1;
+        } elseif ('evenement' === $filter) {
+            $criteria['type_post'] = 2;
+        }
+
+        $posts = $this->postRepository->findBy($criteria, ['date_creation' => 'DESC']);
 
         return $this->render('employe/feed.html.twig', [
             'posts' => $posts,
+            'filter' => $filter,
             'post_type_annonce' => 1,
             'post_type_evenement' => 2,
             'likes_count' => [],

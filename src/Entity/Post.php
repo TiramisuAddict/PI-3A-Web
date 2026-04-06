@@ -76,10 +76,9 @@ class Post
         return $this;
     }
 
-    #[ORM\Column(type: 'datetime', nullable: false)]
+    #[ORM\Column(type: 'datetime_immutable', nullable: false)]
     #[Assert\NotNull(message: 'La date de création est obligatoire.')]
-    #[Assert\Type(\DateTimeInterface::class)]
-    #[Assert\DateTime(message: 'La date de création doit être une date/heure valide.')]
+    #[Assert\Type(\DateTimeInterface::class, message: 'La date de création doit être une date/heure valide.')]
     private ?\DateTimeInterface $date_creation = null;
 
     public function getDateCreation(): ?\DateTimeInterface
@@ -123,9 +122,8 @@ class Post
         return $this;
     }
 
-    #[ORM\Column(type: 'date', nullable: true)]
+    #[ORM\Column(type: 'date_immutable', nullable: true)]
     #[Assert\Type(\DateTimeInterface::class, message: 'La date de début d’événement doit être une date valide.')]
-    #[Assert\Date(message: 'La date de début d’événement doit être une date au format valide.')]
     private ?\DateTimeInterface $date_evenement = null;
 
     public function getDateEvenement(): ?\DateTimeInterface
@@ -139,9 +137,8 @@ class Post
         return $this;
     }
 
-    #[ORM\Column(type: 'date', nullable: true)]
+    #[ORM\Column(type: 'date_immutable', nullable: true)]
     #[Assert\Type(\DateTimeInterface::class, message: 'La date de fin d’événement doit être une date valide.')]
-    #[Assert\Date(message: 'La date de fin d’événement doit être une date au format valide.')]
     private ?\DateTimeInterface $date_fin_evenement = null;
 
     public function getDateFinEvenement(): ?\DateTimeInterface
