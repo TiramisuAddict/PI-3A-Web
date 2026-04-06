@@ -44,7 +44,7 @@ final class AdminController extends AbstractController
                     $employe->setNom($entreprise->getNom());
                     $employe->setPrenom($entreprise->getPrenom());
                     $employe->setTelephone($entreprise->getTelephone());
-                    $employe->setE_mail($entreprise->getE_mail());
+                    $employe->setEmail($entreprise->getE_mail());
                     $employe->setRole('administrateur entreprise');
                     $employe->setPoste('CEO');
                     $employe->setEntreprise($entreprise);

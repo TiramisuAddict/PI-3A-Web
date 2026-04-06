@@ -59,12 +59,12 @@ class Employe
     #[ORM\Column(type: 'string', nullable: false)]
     private ?string $e_mail = null;
 
-    public function getE_mail(): ?string
+    public function getEmail(): ?string
     {
         return $this->e_mail;
     }
 
-    public function setE_mail(string $e_mail): self
+    public function setEmail(string $e_mail): self
     {
         $this->e_mail = $e_mail;
         return $this;
@@ -115,12 +115,12 @@ class Employe
     #[ORM\Column(type: 'date', nullable: true)]
     private ?\DateTimeInterface $date_embauche = null;
 
-    public function getDate_embauche(): ?\DateTimeInterface
+    public function getDateEmbauche(): ?\DateTimeInterface
     {
         return $this->date_embauche;
     }
 
-    public function setDate_embauche(?\DateTimeInterface $date_embauche): self
+    public function setDateEmbauche(?\DateTimeInterface $date_embauche): self
     {
         $this->date_embauche = $date_embauche;
         return $this;

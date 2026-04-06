@@ -61,7 +61,7 @@ final class AuthController extends AbstractController
                 if ($compte) {
                     $session->set('employe_logged_in', true);
                     $session->set('employe_id', $employe->getId_employe());
-                    $session->set('employe_email', $employe->getE_mail());
+                    $session->set('employe_email', $employe->getEmail());
                     $session->set('employe_role', $employe->getRole());
                     $session->set('employe_id_entreprise', $employe->getEntreprise()->getId_entreprise());
                     return $this->redirectByRole($employe->getRole());
