@@ -2,11 +2,15 @@
 
 namespace App\Entity;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\OffreRepository;
+
+use App\Entity\Candidat;
+use App\Repository\CandidatRepository;
 
 #[ORM\Entity(repositoryClass: OffreRepository::class)]
 #[ORM\Table(name: 'offre')]
@@ -31,60 +35,60 @@ class Offre
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $id_employer = null;
 
-    public function getId_employer(): ?int
+    public function getIdEmployer(): ?int
     {
         return $this->id_employer;
     }
 
-    public function setId_employer(?int $id_employer): self
+    public function setIdEmployer(?int $idEmployer): self
     {
-        $this->id_employer = $id_employer;
+        $this->id_employer = $idEmployer;
         return $this;
     }
 
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $titre_poste = null;
 
-    public function getTitre_poste(): ?string
+    public function getTitrePoste(): ?string
     {
         return $this->titre_poste;
     }
 
-    public function setTitre_poste(?string $titre_poste): self
+    public function setTitrePoste(?string $titrePoste): self
     {
-        $this->titre_poste = $titre_poste;
+        $this->titre_poste = $titrePoste;
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'string', length: 100, nullable: true)]
     private ?string $type_contrat = null;
 
-    public function getType_contrat(): ?string
+    public function getTypeContrat(): ?string
     {
         return $this->type_contrat;
     }
 
-    public function setType_contrat(?string $type_contrat): self
+    public function setTypeContrat(?string $typeContrat): self
     {
-        $this->type_contrat = $type_contrat;
+        $this->type_contrat = $typeContrat;
         return $this;
     }
 
     #[ORM\Column(type: 'date', nullable: true)]
     private ?\DateTimeInterface $date_limite = null;
 
-    public function getDate_limite(): ?\DateTimeInterface
+    public function getDateLimite(): ?\DateTimeInterface
     {
         return $this->date_limite;
     }
 
-    public function setDate_limite(?\DateTimeInterface $date_limite): self
+    public function setDateLimite(?\DateTimeInterface $dateLimite): self
     {
-        $this->date_limite = $date_limite;
+        $this->date_limite = $dateLimite;
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'string', length: 50, nullable: true)]
     private ?string $etat = null;
 
     public function getEtat(): ?string
@@ -112,7 +116,7 @@ class Offre
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'string', length: 15, nullable: true)]
     private ?string $categorie = null;
 
     public function getCategorie(): ?string
@@ -128,6 +132,11 @@ class Offre
 
     #[ORM\OneToMany(targetEntity: Candidat::class, mappedBy: 'offre')]
     private Collection $candidats;
+
+    public function __construct()
+    {
+        $this->candidats = new ArrayCollection();
+    }
 
     /**
      * @return Collection<int, Candidat>
