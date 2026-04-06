@@ -1,4 +1,4 @@
-{{ form_start(form, { attr: { class: 'vstack gap-3 mb-0' } }) }}
+{{ form_start(form, { action: path('app_candidature_modifier', { id: id }), method: 'POST', attr: { class: 'vstack gap-3 mb-0' } }) }}
 
 {{ form_errors(form) }}
 
@@ -9,7 +9,7 @@
 	{{ form_widget(form.submit, { attr: { class: 'btn btn-primary w-100' } }) }}
 </div>
 
-{{ form_end(form, { render_rest: false }) }}
+{{ form_end(form) }}
 
 {% if message is defined and message %}
 	<div class="alert alert-success mt-3 mb-0" role="alert">{{ message }}</div>
