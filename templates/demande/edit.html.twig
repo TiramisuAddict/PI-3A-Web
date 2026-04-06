@@ -6,26 +6,27 @@
 {{ parent() }}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-    .field-error {
-        color: #dc2626;
-        font-size: .85rem;
-        margin-top: .4rem;
-        font-weight: 600;
-    }
-
-    .is-invalid-custom {
-        border-color: #dc2626 !important;
-        box-shadow: 0 0 0 .2rem rgba(220, 38, 38, 0.12) !important;
-    }
-
-    .is-valid-custom {
-        border-color: #16a34a !important;
-    }
-
-    .section-note {
-        font-size: .88rem;
-        color: #64748b;
-    }
+.field-error {
+    color: #dc2626;
+    font-size: .85rem;
+    margin-top: .4rem;
+    font-weight: 600;
+}
+.is-invalid-custom {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 .2rem rgba(220, 38, 38, 0.12) !important;
+}
+.is-valid-custom {
+    border-color: #16a34a !important;
+}
+.section-note {
+    font-size: .88rem;
+    color: #64748b;
+}
+.form-label.required::after {
+    content: " *";
+    color: #dc2626;
+}
 </style>
 {% endblock %}
 
@@ -44,106 +45,93 @@
     </div>
 </div>
 
-<form id="demandeForm" novalidate>
-    <input type="hidden" id="demandeId" value="{{ demande.idDemande }}">
+{% if form.vars.submitted %}
+    {% include 'demande/_form_errors.html.twig' with {'form': form, 'detailErrors': detailErrors} %}
+{% endif %}
 
-    <div class="row">
-        <div class="col-lg-8">
-            <div class="surface-card mb-4">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="ti ti-info-circle me-2"></i>Informations generales
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label required">Categorie</label>
-                            <select class="form-select" id="categorie" name="categorie" required>
-                                <option value="">-- Choisir une categorie --</option>
-                            </select>
-                            <div class="field-error" id="error-categorie"></div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label required">Type de demande</label>
-                            <select class="form-select" id="typeDemande" name="typeDemande" required>
-                                <option value="">-- Choisir un type --</option>
-                            </select>
-                            <div class="field-error" id="error-typeDemande"></div>
-                            <small class="section-note" id="typeInfo"></small>
-                        </div>
-                    </div>
+{{ form_start(form, {'attr': {'novalidate': 'novalidate', 'id': 'demandeForm'}}) }}
+<input type="hidden" id="demandeId" value="{{ demande.idDemande }}">
 
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label required">Priorite</label>
-                            <select class="form-select" id="priorite" name="priorite" required>
-                                <option value="HAUTE" {{ demande.priorite == 'HAUTE' ? 'selected' : '' }}>HAUTE</option>
-                                <option value="NORMALE" {{ demande.priorite == 'NORMALE' ? 'selected' : '' }}>NORMALE</option>
-                                <option value="BASSE" {{ demande.priorite == 'BASSE' ? 'selected' : '' }}>BASSE</option>
-                            </select>
-                            <div class="field-error" id="error-priorite"></div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label required">Statut</label>
-                            <select class="form-select" id="status" name="status" required>
-                                {% for status in statuses %}
-                                    <option value="{{ status }}" {{ demande.status == status ? 'selected' : '' }}>{{ status }}</option>
-                                {% endfor %}
-                            </select>
-                            <div class="field-error" id="error-status"></div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label required">Titre</label>
-                        <input type="text" class="form-control" id="titre" name="titre" required value="{{ demande.titre }}">
-                        <div class="field-error" id="error-titre"></div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control" id="description" name="description" rows="4">{{ demande.description }}</textarea>
-                    </div>
-                </div>
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-info-circle me-2"></i>Informations generales
+                </h3>
             </div>
-
-            <div class="surface-card mb-4" id="dynamicFieldsCard" style="display:block;">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="ti ti-forms me-2"></i>Informations specifiques
-                    </h3>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        {{ form_label(form.categorie, null, {'label_attr': {'class': 'form-label required'}}) }}
+                        {{ form_widget(form.categorie, {'attr': {'class': 'form-select' ~ (form.categorie.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form_label(form.typeDemande, null, {'label_attr': {'class': 'form-label required'}}) }}
+                        {{ form_widget(form.typeDemande, {'attr': {'class': 'form-select' ~ (form.typeDemande.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
+                        <small class="section-note" id="typeInfo"></small>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="row g-3" id="dynamicFields"></div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        {{ form_label(form.priorite, null, {'label_attr': {'class': 'form-label required'}}) }}
+                        {{ form_widget(form.priorite, {'attr': {'class': 'form-select' ~ (form.priorite.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form_label(form.status, null, {'label_attr': {'class': 'form-label required'}}) }}
+                        {{ form_widget(form.status, {'attr': {'class': 'form-select' ~ (form.status.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    {{ form_label(form.titre, null, {'label_attr': {'class': 'form-label required'}}) }}
+                    {{ form_widget(form.titre, {'attr': {'class': 'form-control' ~ (form.titre.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form_label(form.description, null, {'label_attr': {'class': 'form-label'}}) }}
+                    {{ form_widget(form.description, {'attr': {'class': 'form-control', 'rows': 4}}) }}
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-4">
-            <div class="surface-card">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="ti ti-send me-2"></i>Actions
-                    </h3>
+        <div class="card mb-4" id="dynamicFieldsCard" style="display:block;">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-forms me-2"></i>Informations specifiques
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-3" id="dynamicFields"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-send me-2"></i>Actions
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    {{ form_label(form.commentaire, null, {'label_attr': {'class': 'form-label'}}) }}
+                    {{ form_widget(form.commentaire, {'attr': {'class': 'form-control', 'rows': 4, 'placeholder': 'Ajoutez un commentaire (optionnel)'}}) }}
                 </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <div class="form-label">Commentaire de modification</div>
-                        <textarea class="form-control" id="commentaire" name="commentaire" rows="4" placeholder="Ajoutez un commentaire (optionnel)"></textarea>
-                    </div>
-                    <hr>
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary" id="submitBtn">
-                            <i class="ti ti-check me-1"></i>Enregistrer
-                        </button>
-                        <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="btn btn-outline-secondary">Annuler</a>
-                    </div>
+                <hr>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        <i class="ti ti-check me-1"></i>Enregistrer
+                    </button>
+                    <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="btn btn-outline-secondary">Annuler</a>
                 </div>
             </div>
         </div>
     </div>
-</form>
+</div>
+{{ form_end(form) }}
 
 <div class="modal modal-blur fade" id="mapModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -177,44 +165,11 @@
 (function() {
     "use strict";
 
-    var DEMANDE_ID = {{ demande.idDemande }};
+    var CATEGORIES = {{ categories|json_encode|raw }};
     var CURRENT_CATEGORIE = {{ demande.categorie|json_encode|raw }};
-    var CURRENT_TYPE = {{ demande.typeDemande|json_encode|raw }};
+    var CURRENT_TYPE = {{ submittedType|json_encode|raw }};
     var EXISTING_DETAILS = {{ existingDetails|json_encode|raw }};
-
-    var CATEGORIES = {
-        "Ressources Humaines": [
-            "Conge",
-            "Attestation de travail",
-            "Attestation de salaire",
-            "Certificat de travail",
-            "Mutation",
-            "Demission"
-        ],
-        "Administrative": [
-            "Avance sur salaire",
-            "Remboursement",
-            "Materiel de bureau",
-            "Badge acces",
-            "Carte de visite"
-        ],
-        "Informatique": [
-            "Materiel informatique",
-            "Acces systeme",
-            "Logiciel",
-            "Probleme technique"
-        ],
-        "Formation": [
-            "Formation interne",
-            "Formation externe",
-            "Certification"
-        ],
-        "Organisation du travail": [
-            "Teletravail",
-            "Changement horaires",
-            "Heures supplementaires"
-        ]
-    };
+    var DETAIL_ERRORS = {{ detailErrors|json_encode|raw }};
 
     var currentLocationField = null;
     var map = null;
@@ -227,34 +182,25 @@
     var typeInfo;
     var dynamicFieldsCard;
     var dynamicFieldsContainer;
-    var form;
 
     document.addEventListener("DOMContentLoaded", init);
 
     function init() {
-        categorieSelect = document.getElementById("categorie");
-        typeSelect = document.getElementById("typeDemande");
+        categorieSelect = document.getElementById("demande_categorie");
+        typeSelect = document.getElementById("demande_typeDemande");
         typeInfo = document.getElementById("typeInfo");
         dynamicFieldsCard = document.getElementById("dynamicFieldsCard");
         dynamicFieldsContainer = document.getElementById("dynamicFields");
-        form = document.getElementById("demandeForm");
 
-        populateCategories();
-        categorieSelect.value = CURRENT_CATEGORIE;
-        populateTypes(CURRENT_CATEGORIE, CURRENT_TYPE);
-        loadDynamicFields(CURRENT_TYPE);
+        if (!categorieSelect || !typeSelect) {
+            console.error("Form elements not found");
+            return;
+        }
+
+        loadDynamicFields(CURRENT_TYPE, EXISTING_DETAILS);
 
         categorieSelect.addEventListener("change", onCategoryChange);
         typeSelect.addEventListener("change", onTypeChange);
-        form.addEventListener("submit", onFormSubmit);
-
-        ["categorie", "typeDemande", "priorite", "status", "titre"].forEach(function(id) {
-            var el = document.getElementById(id);
-            if (el) {
-                el.addEventListener("input", function() { clearError(id); });
-                el.addEventListener("change", function() { clearError(id); });
-            }
-        });
 
         var mapModalEl = document.getElementById("mapModal");
         if (mapModalEl) {
@@ -285,29 +231,19 @@
         }
     }
 
-    function populateCategories() {
-        categorieSelect.innerHTML = '<option value="">-- Choisir une categorie --</option>';
-        for (var cat in CATEGORIES) {
-            if (CATEGORIES.hasOwnProperty(cat)) {
-                var opt = document.createElement("option");
-                opt.value = cat;
-                opt.textContent = cat;
-                categorieSelect.appendChild(opt);
-            }
-        }
-    }
-
-    function populateTypes(category, selectedType) {
+    function onCategoryChange() {
+        var category = categorieSelect.value;
+        
         typeSelect.innerHTML = '<option value="">-- Choisir un type --</option>';
+        dynamicFieldsContainer.innerHTML = "";
+        dynamicFieldsCard.style.display = "none";
+
         if (category && CATEGORIES[category]) {
             var types = CATEGORIES[category];
             for (var i = 0; i < types.length; i++) {
                 var opt = document.createElement("option");
                 opt.value = types[i];
                 opt.textContent = types[i];
-                if (selectedType && selectedType === types[i]) {
-                    opt.selected = true;
-                }
                 typeSelect.appendChild(opt);
             }
             typeInfo.textContent = types.length + " types disponibles";
@@ -317,20 +253,17 @@
         }
     }
 
-    function onCategoryChange() {
-        clearError("categorie");
-        clearError("typeDemande");
-        populateTypes(categorieSelect.value, null);
-        dynamicFieldsContainer.innerHTML = "";
-        dynamicFieldsCard.style.display = "none";
-    }
-
     function onTypeChange() {
-        clearError("typeDemande");
-        loadDynamicFields(typeSelect.value);
+        var type = typeSelect.value;
+        if (!type) {
+            dynamicFieldsCard.style.display = "none";
+            dynamicFieldsContainer.innerHTML = "";
+            return;
+        }
+        loadDynamicFields(type, {});
     }
 
-    function loadDynamicFields(type) {
+    function loadDynamicFields(type, existingValues) {
         if (!type) {
             dynamicFieldsContainer.innerHTML = "";
             dynamicFieldsCard.style.display = "none";
@@ -343,15 +276,24 @@
                 return response.json();
             })
             .then(function(fields) {
-                renderDynamicFields(fields);
+                renderDynamicFields(fields, existingValues);
                 dynamicFieldsCard.style.display = fields.length ? "block" : "none";
             })
             .catch(function(error) {
-                console.error(error);
+                console.error("Error loading fields:", error);
             });
     }
 
-    function renderDynamicFields(fields) {
+    function hasFieldError(fieldKey) {
+        for (var i = 0; i < DETAIL_ERRORS.length; i++) {
+            if (DETAIL_ERRORS[i].field === fieldKey) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function renderDynamicFields(fields, existingValues) {
         dynamicFieldsContainer.innerHTML = "";
 
         for (var i = 0; i < fields.length; i++) {
@@ -365,75 +307,56 @@
             col.appendChild(label);
 
             var input;
-            var existingValue = EXISTING_DETAILS[field.key] || "";
+            var existingValue = existingValues[field.key] || "";
+            var fieldHasError = hasFieldError(field.key);
+            var errorClass = fieldHasError ? " is-invalid-custom" : "";
 
             switch (field.type) {
                 case "text":
                     input = document.createElement("input");
                     input.type = "text";
-                    input.className = "form-control dynamic-field";
+                    input.className = "form-control" + errorClass;
                     input.name = "details[" + field.key + "]";
                     input.value = existingValue;
-                    input.dataset.fieldKey = field.key;
-                    input.dataset.fieldLabel = field.label;
-                    input.dataset.requiredField = field.required ? "1" : "0";
                     col.appendChild(input);
-                    attachDynamicValidation(input, field);
                     break;
 
                 case "number":
                     input = document.createElement("input");
                     input.type = "number";
-                    input.className = "form-control dynamic-field";
+                    input.className = "form-control" + errorClass;
                     input.name = "details[" + field.key + "]";
                     input.value = existingValue;
                     input.min = "0";
-                    input.dataset.fieldKey = field.key;
-                    input.dataset.fieldLabel = field.label;
-                    input.dataset.requiredField = field.required ? "1" : "0";
                     col.appendChild(input);
-                    attachDynamicValidation(input, field);
                     break;
 
                 case "date":
                     input = document.createElement("input");
                     input.type = "date";
-                    input.className = "form-control dynamic-field";
+                    input.className = "form-control" + errorClass;
                     input.name = "details[" + field.key + "]";
                     input.value = existingValue;
-                    input.dataset.fieldKey = field.key;
-                    input.dataset.fieldLabel = field.label;
-                    input.dataset.requiredField = field.required ? "1" : "0";
-                    applyDateRules(input, field);
                     col.appendChild(input);
-                    attachDynamicValidation(input, field);
                     break;
 
                 case "textarea":
                     input = document.createElement("textarea");
-                    input.className = "form-control dynamic-field";
+                    input.className = "form-control" + errorClass;
                     input.rows = 3;
                     input.name = "details[" + field.key + "]";
                     input.value = existingValue;
-                    input.dataset.fieldKey = field.key;
-                    input.dataset.fieldLabel = field.label;
-                    input.dataset.requiredField = field.required ? "1" : "0";
-                    input.textContent = existingValue;
                     col.appendChild(input);
-                    attachDynamicValidation(input, field);
                     break;
 
                 case "select":
                     input = document.createElement("select");
-                    input.className = "form-select dynamic-field";
+                    input.className = "form-select" + errorClass;
                     input.name = "details[" + field.key + "]";
-                    input.dataset.fieldKey = field.key;
-                    input.dataset.fieldLabel = field.label;
-                    input.dataset.requiredField = field.required ? "1" : "0";
 
                     var defOpt = document.createElement("option");
                     defOpt.value = "";
-                    defOpt.textContent = "Selectionnez...";
+                    defOpt.textContent = "-- Selectionnez --";
                     input.appendChild(defOpt);
 
                     if (field.options) {
@@ -447,9 +370,7 @@
                             input.appendChild(opt);
                         }
                     }
-
                     col.appendChild(input);
-                    attachDynamicValidation(input, field);
                     break;
 
                 case "location":
@@ -458,19 +379,17 @@
 
                     var locInput = document.createElement("input");
                     locInput.type = "text";
-                    locInput.className = "form-control dynamic-field";
+                    locInput.className = "form-control" + errorClass;
                     locInput.name = "details[" + field.key + "]";
                     locInput.id = "location-" + field.key;
                     locInput.readOnly = true;
                     locInput.value = existingValue;
-                    locInput.dataset.fieldKey = field.key;
-                    locInput.dataset.fieldLabel = field.label;
-                    locInput.dataset.requiredField = field.required ? "1" : "0";
 
                     var mapBtn = document.createElement("button");
                     mapBtn.type = "button";
                     mapBtn.className = "btn btn-primary";
                     mapBtn.innerHTML = '<i class="ti ti-map-pin"></i>';
+
                     (function(li, fk) {
                         mapBtn.addEventListener("click", function() {
                             openMapPicker(li, fk);
@@ -485,282 +404,20 @@
                     latInput.type = "hidden";
                     latInput.name = "details[" + field.key + "Lat]";
                     latInput.id = "lat-" + field.key;
-                    latInput.value = EXISTING_DETAILS[field.key + "Lat"] || "";
+                    latInput.value = existingValues[field.key + "Lat"] || "";
                     col.appendChild(latInput);
 
                     var lonInput = document.createElement("input");
                     lonInput.type = "hidden";
                     lonInput.name = "details[" + field.key + "Lon]";
                     lonInput.id = "lon-" + field.key;
-                    lonInput.value = EXISTING_DETAILS[field.key + "Lon"] || "";
+                    lonInput.value = existingValues[field.key + "Lon"] || "";
                     col.appendChild(lonInput);
-
-                    attachDynamicValidation(locInput, field);
                     break;
             }
 
-            var error = document.createElement("div");
-            error.className = "field-error";
-            error.id = "error-dynamic-" + field.key;
-            col.appendChild(error);
-
             dynamicFieldsContainer.appendChild(col);
         }
-    }
-
-    function applyDateRules(input, field) {
-        var today = new Date().toISOString().split("T")[0];
-        var key = (field.key || "").toLowerCase();
-        var label = (field.label || "").toLowerCase();
-
-        if (
-            key.indexOf("datedebut") !== -1 ||
-            key.indexOf("datesouhaitee") !== -1 ||
-            key.indexOf("datedebutteletravail") !== -1 ||
-            key.indexOf("datedebuthoraires") !== -1 ||
-            key.indexOf("datepassage") !== -1 ||
-            key.indexOf("datedebutformation") !== -1 ||
-            label.indexOf("date de debut") !== -1 ||
-            label.indexOf("date souhaitee") !== -1 ||
-            label.indexOf("date de passage") !== -1
-        ) {
-            input.min = today;
-            input.dataset.futureOrToday = "1";
-        }
-
-        if (
-            key.indexOf("datefin") !== -1 ||
-            key.indexOf("datefinteletravail") !== -1 ||
-            label.indexOf("date de fin") !== -1
-        ) {
-            input.min = today;
-            input.dataset.endDate = "1";
-        }
-    }
-
-    function attachDynamicValidation(input, field) {
-        input.addEventListener("input", function() {
-            validateDynamicInput(input, field);
-        });
-        input.addEventListener("change", function() {
-            validateDynamicInput(input, field);
-        });
-    }
-
-    function validateDynamicInput(input, field) {
-        var key = field.key;
-        var value = input.value ? input.value.trim() : "";
-        var required = field.required === true;
-        var error = "";
-
-        if (required && value === "") {
-            error = "Ce champ est obligatoire";
-        }
-
-        if (!error && input.type === "number" && value !== "") {
-            var num = parseFloat(value);
-            if (isNaN(num)) {
-                error = "Veuillez saisir un nombre valide";
-            } else if (num < 0) {
-                error = "La valeur ne peut pas etre negative";
-            } else if (
-                key.toLowerCase().indexOf("montant") !== -1 ||
-                key.toLowerCase().indexOf("nombre") !== -1 ||
-                key.toLowerCase().indexOf("quantite") !== -1 ||
-                key.toLowerCase().indexOf("cout") !== -1
-            ) {
-                if (num <= 0) {
-                    error = "La valeur doit etre superieure a 0";
-                }
-            }
-        }
-
-        if (!error && input.type === "date" && value !== "") {
-            var today = new Date();
-            today.setHours(0,0,0,0);
-            var selectedDate = new Date(value + "T00:00:00");
-
-            if (input.dataset.futureOrToday === "1" && selectedDate < today) {
-                error = "La date ne peut pas etre inferieure a la date actuelle";
-            }
-
-            if (!error && input.dataset.endDate === "1") {
-                var relatedStart = findRelatedStartDate(field.key);
-                if (relatedStart && relatedStart.value) {
-                    var startDate = new Date(relatedStart.value + "T00:00:00");
-                    if (selectedDate < startDate) {
-                        error = "La date de fin doit etre superieure ou egale a la date de debut";
-                    }
-                } else if (selectedDate < today) {
-                    error = "La date ne peut pas etre inferieure a la date actuelle";
-                }
-            }
-        }
-
-        setFieldValidationState(input, "dynamic-" + key, error);
-        return error === "";
-    }
-
-    function findRelatedStartDate(endKey) {
-        var candidates = [
-            "details[dateDebut]",
-            "details[dateDebutTeletravail]",
-            "details[dateDebutHoraires]",
-            "details[dateSouhaiteeFormation]",
-            "details[datePassage]"
-        ];
-
-        if (endKey.toLowerCase().indexOf("datefin") !== -1) {
-            for (var i = 0; i < candidates.length; i++) {
-                var el = document.querySelector('[name="' + candidates[i] + '"]');
-                if (el && el.offsetParent !== null) {
-                    return el;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    function setFieldValidationState(input, errorIdSuffix, errorMessage) {
-        var errorEl = document.getElementById("error-" + errorIdSuffix);
-        if (!errorEl) return;
-
-        input.classList.remove("is-invalid-custom", "is-valid-custom");
-
-        if (errorMessage) {
-            errorEl.textContent = errorMessage;
-            input.classList.add("is-invalid-custom");
-        } else {
-            errorEl.textContent = "";
-            if (input.value && input.value.trim() !== "") {
-                input.classList.add("is-valid-custom");
-            }
-        }
-    }
-
-    function validateMainFields() {
-        var valid = true;
-
-        var requiredFields = [
-            { id: "categorie", message: "Veuillez selectionner une categorie" },
-            { id: "typeDemande", message: "Veuillez selectionner un type de demande" },
-            { id: "priorite", message: "Veuillez selectionner une priorite" },
-            { id: "status", message: "Veuillez selectionner un statut" },
-            { id: "titre", message: "Veuillez saisir un titre" }
-        ];
-
-        requiredFields.forEach(function(field) {
-            var el = document.getElementById(field.id);
-            var value = el ? (el.value ? el.value.trim() : "") : "";
-            if (value === "") {
-                showError(field.id, field.message);
-                valid = false;
-            } else {
-                clearError(field.id);
-            }
-        });
-
-        return valid;
-    }
-
-    function validateDynamicFields() {
-        var valid = true;
-        var inputs = document.querySelectorAll(".dynamic-field");
-
-        inputs.forEach(function(input) {
-            var field = {
-                key: input.dataset.fieldKey || "",
-                label: input.dataset.fieldLabel || "",
-                required: input.dataset.requiredField === "1"
-            };
-
-            if (!validateDynamicInput(input, field)) {
-                valid = false;
-            }
-        });
-
-        return valid;
-    }
-
-    function showError(id, message) {
-        var errorEl = document.getElementById("error-" + id);
-        var inputEl = document.getElementById(id);
-        if (errorEl) errorEl.textContent = message;
-        if (inputEl) inputEl.classList.add("is-invalid-custom");
-    }
-
-    function clearError(id) {
-        var errorEl = document.getElementById("error-" + id);
-        var inputEl = document.getElementById(id);
-        if (errorEl) errorEl.textContent = "";
-        if (inputEl) inputEl.classList.remove("is-invalid-custom");
-    }
-
-    function onFormSubmit(e) {
-        e.preventDefault();
-
-        var mainValid = validateMainFields();
-        var dynamicValid = validateDynamicFields();
-
-        if (!mainValid || !dynamicValid) {
-            alert("Veuillez corriger les erreurs de saisie avant de continuer.");
-            return;
-        }
-
-        var formData = new FormData(form);
-        var data = {
-            categorie: formData.get("categorie"),
-            typeDemande: formData.get("typeDemande"),
-            titre: formData.get("titre"),
-            description: formData.get("description") || "",
-            priorite: formData.get("priorite"),
-            status: formData.get("status"),
-            commentaire: formData.get("commentaire") || "",
-            details: {}
-        };
-
-        var entries = formData.entries();
-        var entry = entries.next();
-        while (!entry.done) {
-            var key = entry.value[0];
-            var value = entry.value[1];
-            if (key.indexOf("details[") === 0) {
-                var match = key.match(/details\[(.+)\]/);
-                if (match && value !== null && value !== "") {
-                    data.details[match[1]] = value;
-                }
-            }
-            entry = entries.next();
-        }
-
-        var submitBtn = document.getElementById("submitBtn");
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="ti ti-loader me-1"></i>Enregistrement...';
-
-        fetch("/demande/api/" + DEMANDE_ID + "/update", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data)
-        })
-        .then(function(response) {
-            return response.json();
-        })
-        .then(function(result) {
-            if (result.success) {
-                window.location.href = "/demande/" + DEMANDE_ID;
-            } else {
-                alert("Erreur: " + result.message);
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
-            }
-        })
-        .catch(function(error) {
-            console.error(error);
-            alert("Erreur de connexion");
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
-        });
     }
 
     function openMapPicker(inputField, fieldKey) {
@@ -775,26 +432,28 @@
         var mapContainer = document.getElementById("map");
         if (!mapContainer) return;
 
-        if (!map) {
-            map = L.map("map").setView([36.8065, 10.1815], 8);
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                attribution: "OpenStreetMap"
-            }).addTo(map);
-            map.on("click", onMapClick);
-        } else {
-            map.invalidateSize();
-        }
+        setTimeout(function() {
+            if (!map) {
+                map = L.map("map").setView([36.8065, 10.1815], 8);
+                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    attribution: "OpenStreetMap"
+                }).addTo(map);
+                map.on("click", onMapClick);
+            } else {
+                map.invalidateSize();
+            }
 
-        if (marker) {
-            map.removeLayer(marker);
-            marker = null;
-        }
+            if (marker) {
+                map.removeLayer(marker);
+                marker = null;
+            }
+        }, 300);
     }
 
     function onMapClick(e) {
         if (marker) map.removeLayer(marker);
-
         marker = L.marker(e.latlng).addTo(map);
+
         selectedLocation = {
             lat: e.latlng.lat,
             lon: e.latlng.lng,
@@ -821,9 +480,11 @@
                     var result = results[0];
                     var latlng = L.latLng(parseFloat(result.lat), parseFloat(result.lon));
                     map.setView(latlng, 14);
+
                     if (marker) map.removeLayer(marker);
                     marker = L.marker(latlng).addTo(map);
                     marker.bindPopup(result.display_name).openPopup();
+
                     selectedLocation = {
                         lat: parseFloat(result.lat),
                         lon: parseFloat(result.lon),
@@ -842,21 +503,12 @@
 
             if (latInput) latInput.value = selectedLocation.lat;
             if (lonInput) lonInput.value = selectedLocation.lon;
-
-            var field = {
-                key: currentLocationField.key,
-                label: currentLocationField.input.dataset.fieldLabel || currentLocationField.key,
-                required: currentLocationField.input.dataset.requiredField === "1"
-            };
-
-            validateDynamicInput(currentLocationField.input, field);
         }
 
         if (mapModal) {
             mapModal.hide();
         }
     }
-
 })();
 </script>
 {% endblock %}

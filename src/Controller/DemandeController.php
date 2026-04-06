@@ -6,6 +6,7 @@ use App\Entity\Demande;
 use App\Entity\DemandeDetail;
 use App\Entity\HistoriqueDemande;
 use App\Entity\Employe;
+use App\Form\DemandeType;
 use App\Repository\DemandeRepository;
 use App\Service\DemandeFormHelper;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,7 +16,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
-#[Route('/demande')]
 class DemandeController extends AbstractController
 {
     private DemandeFormHelper $formHelper;
@@ -32,7 +32,7 @@ class DemandeController extends AbstractController
         $this->demandeRepository = $demandeRepository;
     }
 
-    #[Route('/', name: 'demande_index')]
+    #[Route('/demande', name: 'demande_index', methods: ['GET'])]
     public function index(Request $request): Response
     {
         $filters = [
@@ -62,105 +62,87 @@ class DemandeController extends AbstractController
         ]);
     }
 
-    #[Route('/nouvelle', name: 'demande_new')]
-    public function new(): Response
+    #[Route('/demande/nouvelle', name: 'demande_new', methods: ['GET', 'POST'])]
+    public function new(Request $request): Response
     {
+        $demande = new Demande();
+        $demande->setDateCreation(new \DateTime());
+        $demande->setStatus('Nouvelle');
+
+        $form = $this->createForm(DemandeType::class, $demande, ['is_edit' => false]);
+        $form->handleRequest($request);
+
+        $detailErrors = [];
+        $submittedDetails = [];
+        $submittedType = null;
+
+        if ($form->isSubmitted()) {
+            $formData = $request->request->all();
+            $submittedType = $formData['demande']['typeDemande'] ?? null;
+            $submittedDetails = $formData['details'] ?? [];
+
+            if ($submittedType) {
+                $detailErrors = $this->validateDetails($submittedType, $submittedDetails);
+            }
+
+            if ($form->isValid() && empty($detailErrors)) {
+                $this->em->persist($demande);
+                $this->em->flush();
+
+                if (!empty($submittedDetails)) {
+                    $demandeDetail = new DemandeDetail();
+                    $demandeDetail->setDemande($demande);
+                    $demandeDetail->setDetails(json_encode($submittedDetails));
+                    $this->em->persist($demandeDetail);
+                }
+
+                $historique = new HistoriqueDemande();
+                $historique->setDemande($demande);
+                $historique->setNouveauStatut('Nouvelle');
+                $historique->setActeur($this->getEmployeeName($demande->getEmploye()));
+                $historique->setCommentaire('Demande creee');
+                $historique->setDateAction(new \DateTime());
+                $this->em->persist($historique);
+
+                $this->em->flush();
+
+                $this->addFlash('success', 'Demande creee avec succes.');
+                return $this->redirectToRoute('demande_show', ['id' => $demande->getIdDemande()]);
+            }
+        }
+
         return $this->render('demande/new.html.twig', [
+            'form' => $form->createView(),
             'categories' => $this->formHelper->getCategoryTypes(),
-            'priorites' => $this->formHelper->getPriorites(),
-            'employees' => $this->getEmployeesList(),
+            'detailErrors' => $detailErrors,
+            'submittedDetails' => $submittedDetails,
+            'submittedType' => $submittedType,
         ]);
     }
 
-    #[Route('/api/fields/{type}', name: 'demande_api_fields', methods: ['GET'])]
+    #[Route('/demande/statistics', name: 'demande_statistics', methods: ['GET'])]
+    public function statistics(): Response
+    {
+        $stats = [
+            'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll() : 0,
+            'byStatus' => method_exists($this->demandeRepository, 'countGroupByStatus') ? $this->demandeRepository->countGroupByStatus() : [],
+            'byPriorite' => method_exists($this->demandeRepository, 'countGroupByPriorite') ? $this->demandeRepository->countGroupByPriorite() : [],
+            'byType' => method_exists($this->demandeRepository, 'countGroupByType') ? $this->demandeRepository->countGroupByType() : [],
+            'byCategorie' => method_exists($this->demandeRepository, 'countGroupByCategorie') ? $this->demandeRepository->countGroupByCategorie() : [],
+        ];
+
+        return $this->render('demande/statistics.html.twig', [
+            'stats' => $stats,
+        ]);
+    }
+
+    #[Route('/demande/api/fields/{type}', name: 'demande_api_fields', methods: ['GET'])]
     public function getFields(string $type): JsonResponse
     {
         return new JsonResponse($this->formHelper->getFieldsForType($type));
     }
 
-    #[Route('/api/create', name: 'demande_api_create', methods: ['POST'])]
-    public function create(Request $request): JsonResponse
-    {
-        try {
-            $data = json_decode($request->getContent(), true);
-
-            if (!$data) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Donnees invalides'
-                ], 400);
-            }
-
-            $validationErrors = $this->validateDemandePayload($data, false);
-            if (!empty($validationErrors)) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => implode(' ', $validationErrors)
-                ], 400);
-            }
-
-            $employeeId = $data['idEmploye'] ?? $this->getEmployeeId();
-            if (!$employeeId || !$this->isValidEmployeeId((int) $employeeId)) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'ID employe invalide. Veuillez selectionner un employe valide.'
-                ], 400);
-            }
-
-            $employe = $this->em->getRepository(Employe::class)->find((int) $employeeId);
-
-            if (!$employe) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Employe non trouve.'
-                ], 404);
-            }
-
-            $demande = new Demande();
-            $demande->setEmploye($employe);
-            $demande->setCategorie($data['categorie'] ?? '');
-            $demande->setTypeDemande($data['typeDemande'] ?? '');
-            $demande->setTitre($data['titre'] ?? '');
-            $demande->setDescription($data['description'] ?? '');
-            $demande->setPriorite($data['priorite'] ?? 'NORMALE');
-            $demande->setStatus('Nouvelle');
-            $demande->setDateCreation(new \DateTime());
-
-            $this->em->persist($demande);
-            $this->em->flush();
-
-            if (!empty($data['details']) && is_array($data['details'])) {
-                $detailsEntity = new DemandeDetail();
-                $detailsEntity->setDemande($demande);
-                $detailsEntity->setDetails(json_encode($data['details']));
-                $this->em->persist($detailsEntity);
-                $this->em->flush();
-            }
-
-            $historique = new HistoriqueDemande();
-            $historique->setDemande($demande);
-            $historique->setNouveauStatut('Nouvelle');
-            $historique->setActeur($this->getEmployeeName($employe));
-            $historique->setCommentaire('Demande creee');
-            $historique->setDateAction(new \DateTime());
-
-            $this->em->persist($historique);
-            $this->em->flush();
-
-            return new JsonResponse([
-                'success' => true,
-                'id' => $demande->getIdDemande(),
-                'message' => 'Demande creee avec succes'
-            ]);
-        } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Erreur: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    #[Route('/{id}', name: 'demande_show', requirements: ['id' => '\d+'])]
+    #[Route('/demande/{id}', name: 'demande_show', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function show(int $id): Response
     {
         $demande = $this->demandeRepository->find($id);
@@ -191,8 +173,8 @@ class DemandeController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'demande_edit', requirements: ['id' => '\d+'])]
-    public function edit(int $id): Response
+    #[Route('/demande/{id}/edit', name: 'demande_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
+    public function edit(int $id, Request $request): Response
     {
         $demande = $this->demandeRepository->find($id);
 
@@ -202,112 +184,80 @@ class DemandeController extends AbstractController
 
         $existingDetails = [];
         $demandeDetails = $demande->getDemandeDetails();
-
         if ($demandeDetails->count() > 0) {
             $firstDetail = $demandeDetails->first();
             $existingDetails = json_decode($firstDetail->getDetails(), true) ?? [];
         }
 
+        $form = $this->createForm(DemandeType::class, $demande, ['is_edit' => true]);
+        $form->handleRequest($request);
+
+        $detailErrors = [];
+        $submittedDetails = $existingDetails;
+        $submittedType = $demande->getTypeDemande();
+
+        if ($form->isSubmitted()) {
+            $formData = $request->request->all();
+            $submittedType = $formData['demande']['typeDemande'] ?? $demande->getTypeDemande();
+            $submittedDetails = $formData['details'] ?? [];
+
+            if ($submittedType) {
+                $detailErrors = $this->validateDetails($submittedType, $submittedDetails);
+            }
+
+            if ($form->isValid() && empty($detailErrors)) {
+                $oldStatus = $this->em->getUnitOfWork()->getOriginalEntityData($demande)['status'] ?? $demande->getStatus();
+                $newStatus = $demande->getStatus();
+                $commentaire = $form->get('commentaire')->getData();
+
+                if ($oldStatus !== $newStatus) {
+                    $historique = new HistoriqueDemande();
+                    $historique->setDemande($demande);
+                    $historique->setAncienStatut($oldStatus);
+                    $historique->setNouveauStatut($newStatus);
+                    $historique->setActeur($this->getEmployeeName($demande->getEmploye()));
+                    $historique->setCommentaire($commentaire ?? 'Statut modifie');
+                    $historique->setDateAction(new \DateTime());
+                    $this->em->persist($historique);
+                }
+
+                if (!empty($submittedDetails)) {
+                    if ($demandeDetails->count() > 0) {
+                        $detail = $demandeDetails->first();
+                    } else {
+                        $detail = new DemandeDetail();
+                        $detail->setDemande($demande);
+                        $this->em->persist($detail);
+                    }
+                    $detail->setDetails(json_encode($submittedDetails));
+                }
+
+                $this->em->flush();
+
+                $this->addFlash('success', 'Demande mise a jour avec succes.');
+                return $this->redirectToRoute('demande_show', ['id' => $demande->getIdDemande()]);
+            }
+        }
+
         return $this->render('demande/edit.html.twig', [
             'demande' => $demande,
+            'form' => $form->createView(),
             'categories' => $this->formHelper->getCategoryTypes(),
-            'priorites' => $this->formHelper->getPriorites(),
             'statuses' => $this->formHelper->getStatuses(),
-            'existingDetails' => $existingDetails,
+            'existingDetails' => $submittedDetails,
+            'detailErrors' => $detailErrors,
+            'submittedType' => $submittedType,
         ]);
     }
 
-    #[Route('/api/{id}/update', name: 'demande_api_update', methods: ['POST'])]
-    public function update(int $id, Request $request): JsonResponse
-    {
-        try {
-            $demande = $this->demandeRepository->find($id);
-
-            if (!$demande) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Demande non trouvee'
-                ], 404);
-            }
-
-            $data = json_decode($request->getContent(), true);
-
-            if (!$data) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Donnees invalides'
-                ], 400);
-            }
-
-            $validationErrors = $this->validateDemandePayload($data, true);
-            if (!empty($validationErrors)) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => implode(' ', $validationErrors)
-                ], 400);
-            }
-
-            $oldStatus = $demande->getStatus();
-
-            $demande->setCategorie($data['categorie'] ?? $demande->getCategorie());
-            $demande->setTypeDemande($data['typeDemande'] ?? $demande->getTypeDemande());
-            $demande->setTitre($data['titre'] ?? $demande->getTitre());
-            $demande->setDescription($data['description'] ?? $demande->getDescription());
-            $demande->setPriorite($data['priorite'] ?? $demande->getPriorite());
-
-            if (isset($data['status']) && $data['status'] !== $oldStatus) {
-                $demande->setStatus($data['status']);
-
-                $historique = new HistoriqueDemande();
-                $historique->setDemande($demande);
-                $historique->setAncienStatut($oldStatus);
-                $historique->setNouveauStatut($data['status']);
-                $historique->setActeur($this->getEmployeeName($demande->getEmploye()));
-                $historique->setCommentaire($data['commentaire'] ?? 'Statut modifie');
-                $historique->setDateAction(new \DateTime());
-
-                $this->em->persist($historique);
-            }
-
-            if (isset($data['details']) && is_array($data['details'])) {
-                $demandeDetails = $demande->getDemandeDetails();
-
-                if ($demandeDetails->count() > 0) {
-                    $details = $demandeDetails->first();
-                } else {
-                    $details = new DemandeDetail();
-                    $details->setDemande($demande);
-                    $this->em->persist($details);
-                }
-
-                $details->setDetails(json_encode($data['details']));
-            }
-
-            $this->em->flush();
-
-            return new JsonResponse([
-                'success' => true,
-                'message' => 'Demande mise a jour avec succes'
-            ]);
-        } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Erreur: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    #[Route('/api/{id}/status', name: 'demande_api_status', methods: ['POST'])]
+    #[Route('/demande/{id}/status', name: 'demande_update_status', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function updateStatus(int $id, Request $request): JsonResponse
     {
         try {
             $demande = $this->demandeRepository->find($id);
 
             if (!$demande) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Demande non trouvee'
-                ], 404);
+                return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
             }
 
             $data = json_decode($request->getContent(), true);
@@ -315,10 +265,7 @@ class DemandeController extends AbstractController
             $commentaire = $data['commentaire'] ?? '';
 
             if (!$newStatus) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Statut requis'
-                ], 400);
+                return new JsonResponse(['success' => false, 'message' => 'Statut requis'], 400);
             }
 
             $oldStatus = $demande->getStatus();
@@ -335,95 +282,32 @@ class DemandeController extends AbstractController
             $this->em->persist($historique);
             $this->em->flush();
 
-            return new JsonResponse([
-                'success' => true,
-                'message' => 'Statut mis a jour avec succes'
-            ]);
+            return new JsonResponse(['success' => true, 'message' => 'Statut mis a jour avec succes']);
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Erreur: ' . $e->getMessage()
-            ], 500);
+            return new JsonResponse(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()], 500);
         }
     }
 
-    #[Route('/api/{id}/delete', name: 'demande_api_delete', methods: ['DELETE'])]
+    #[Route('/demande/{id}/delete', name: 'demande_delete', requirements: ['id' => '\d+'], methods: ['DELETE', 'POST'])]
     public function delete(int $id): JsonResponse
     {
         try {
             $demande = $this->demandeRepository->find($id);
 
             if (!$demande) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Demande non trouvee'
-                ], 404);
+                return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
             }
 
             $this->em->remove($demande);
             $this->em->flush();
 
-            return new JsonResponse([
-                'success' => true,
-                'message' => 'Demande supprimee avec succes'
-            ]);
+            return new JsonResponse(['success' => true, 'message' => 'Demande supprimee avec succes']);
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Erreur: ' . $e->getMessage()
-            ], 500);
+            return new JsonResponse(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()], 500);
         }
     }
 
-    #[Route('/statistics', name: 'demande_statistics')]
-    public function statistics(): Response
-    {
-        $stats = [
-            'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll() : 0,
-            'byStatus' => method_exists($this->demandeRepository, 'countGroupByStatus') ? $this->demandeRepository->countGroupByStatus() : [],
-            'byPriorite' => method_exists($this->demandeRepository, 'countGroupByPriorite') ? $this->demandeRepository->countGroupByPriorite() : [],
-            'byType' => method_exists($this->demandeRepository, 'countGroupByType') ? $this->demandeRepository->countGroupByType() : [],
-            'byCategorie' => method_exists($this->demandeRepository, 'countGroupByCategorie') ? $this->demandeRepository->countGroupByCategorie() : [],
-        ];
-
-        return $this->render('demande/statistics.html.twig', [
-            'stats' => $stats,
-        ]);
-    }
-
-    private function validateDemandePayload(array $data, bool $isUpdate = false): array
-    {
-        $errors = [];
-
-        if (empty(trim($data['categorie'] ?? ''))) {
-            $errors[] = 'La categorie est obligatoire.';
-        }
-
-        if (empty(trim($data['typeDemande'] ?? ''))) {
-            $errors[] = 'Le type de demande est obligatoire.';
-        }
-
-        if (empty(trim($data['titre'] ?? ''))) {
-            $errors[] = 'Le titre est obligatoire.';
-        }
-
-        if (empty(trim($data['priorite'] ?? ''))) {
-            $errors[] = 'La priorite est obligatoire.';
-        }
-
-        if ($isUpdate && empty(trim($data['status'] ?? ''))) {
-            $errors[] = 'Le statut est obligatoire.';
-        }
-
-        if (isset($data['details']) && is_array($data['details'])) {
-            $detailErrors = $this->validateDetailFields($data['typeDemande'] ?? '', $data['details']);
-            $errors = array_merge($errors, $detailErrors);
-        }
-
-        return $errors;
-    }
-
-    private function validateDetailFields(string $typeDemande, array $details): array
+    private function validateDetails(string $typeDemande, array $details): array
     {
         $errors = [];
         $fields = $this->formHelper->getFieldsForType($typeDemande);
@@ -434,10 +318,15 @@ class DemandeController extends AbstractController
             $key = $field['key'];
             $label = $field['label'];
             $required = $field['required'] ?? false;
+            $type = $field['type'] ?? 'text';
             $value = $details[$key] ?? null;
 
             if ($required && ($value === null || trim((string) $value) === '')) {
-                $errors[] = 'Le champ "' . $label . '" est obligatoire.';
+                $errors[] = [
+                    'field' => $key,
+                    'message' => 'Le champ "' . $label . '" est obligatoire.',
+                    'type' => 'blank'
+                ];
                 continue;
             }
 
@@ -445,11 +334,19 @@ class DemandeController extends AbstractController
                 continue;
             }
 
-            if (($field['type'] ?? null) === 'number') {
+            if ($type === 'number') {
                 if (!is_numeric($value)) {
-                    $errors[] = 'Le champ "' . $label . '" doit etre numerique.';
+                    $errors[] = [
+                        'field' => $key,
+                        'message' => 'Le champ "' . $label . '" doit etre un nombre valide.',
+                        'type' => 'format'
+                    ];
                 } elseif ((float) $value < 0) {
-                    $errors[] = 'Le champ "' . $label . '" ne peut pas etre negatif.';
+                    $errors[] = [
+                        'field' => $key,
+                        'message' => 'Le champ "' . $label . '" ne peut pas etre negatif.',
+                        'type' => 'format'
+                    ];
                 } elseif (
                     str_contains(strtolower($key), 'montant') ||
                     str_contains(strtolower($key), 'nombre') ||
@@ -457,12 +354,16 @@ class DemandeController extends AbstractController
                     str_contains(strtolower($key), 'cout')
                 ) {
                     if ((float) $value <= 0) {
-                        $errors[] = 'Le champ "' . $label . '" doit etre superieur a 0.';
+                        $errors[] = [
+                            'field' => $key,
+                            'message' => 'Le champ "' . $label . '" doit etre superieur a 0.',
+                            'type' => 'format'
+                        ];
                     }
                 }
             }
 
-            if (($field['type'] ?? null) === 'date') {
+            if ($type === 'date') {
                 try {
                     $date = new \DateTime($value);
                     $date->setTime(0, 0, 0);
@@ -473,49 +374,42 @@ class DemandeController extends AbstractController
                         str_contains($lowerKey, 'datedebut') ||
                         str_contains($lowerKey, 'datesouhaitee') ||
                         str_contains($lowerKey, 'datepassage') ||
-                        str_contains($lowerKey, 'datedebutteletravail') ||
-                        str_contains($lowerKey, 'datedebuthoraires') ||
-                        str_contains($lowerKey, 'datedebutformation') ||
+                        str_contains($lowerKey, 'dateheuressup') ||
                         str_contains($lowerLabel, 'date de debut') ||
-                        str_contains($lowerLabel, 'date souhaitee') ||
-                        str_contains($lowerLabel, 'date de passage');
+                        str_contains($lowerLabel, 'date souhaitee');
 
                     if ($mustBeTodayOrFuture && $date < $today) {
-                        $errors[] = 'Le champ "' . $label . '" ne peut pas etre inferieur a la date actuelle.';
+                        $errors[] = [
+                            'field' => $key,
+                            'message' => 'Le champ "' . $label . '" ne peut pas etre dans le passe.',
+                            'type' => 'format'
+                        ];
                     }
 
-                    $isEndDate = str_contains($lowerKey, 'datefin') ||
-                        str_contains($lowerLabel, 'date de fin');
-
+                    $isEndDate = str_contains($lowerKey, 'datefin') || str_contains($lowerLabel, 'date de fin');
                     if ($isEndDate) {
-                        $relatedStartKeys = [
-                            'dateDebut',
-                            'dateDebutTeletravail',
-                            'dateDebutHoraires',
-                            'dateSouhaiteeFormation',
-                            'datePassage'
-                        ];
-
-                        $startValue = null;
-                        foreach ($relatedStartKeys as $startKey) {
+                        $startKeys = ['dateDebut', 'dateDebutTeletravail', 'dateDebutHoraires', 'dateDebutFormation'];
+                        foreach ($startKeys as $startKey) {
                             if (!empty($details[$startKey])) {
-                                $startValue = $details[$startKey];
+                                $startDate = new \DateTime($details[$startKey]);
+                                $startDate->setTime(0, 0, 0);
+                                if ($date < $startDate) {
+                                    $errors[] = [
+                                        'field' => $key,
+                                        'message' => 'Le champ "' . $label . '" doit etre superieur ou egal a la date de debut.',
+                                        'type' => 'format'
+                                    ];
+                                }
                                 break;
                             }
                         }
-
-                        if ($startValue) {
-                            $startDate = new \DateTime($startValue);
-                            $startDate->setTime(0, 0, 0);
-                            if ($date < $startDate) {
-                                $errors[] = 'Le champ "' . $label . '" doit etre superieur ou egal a la date de debut.';
-                            }
-                        } elseif ($date < $today) {
-                            $errors[] = 'Le champ "' . $label . '" ne peut pas etre inferieur a la date actuelle.';
-                        }
                     }
                 } catch (\Exception $e) {
-                    $errors[] = 'Le champ "' . $label . '" contient une date invalide.';
+                    $errors[] = [
+                        'field' => $key,
+                        'message' => 'Le champ "' . $label . '" contient une date invalide.',
+                        'type' => 'format'
+                    ];
                 }
             }
         }
@@ -523,77 +417,11 @@ class DemandeController extends AbstractController
         return $errors;
     }
 
-    private function getEmployeeId(): ?int
-    {
-        try {
-            $session = $this->container->get('request_stack')->getSession();
-            $id = $session->get('employee_id');
-            if ($id) {
-                return (int) $id;
-            }
-        } catch (\Exception $e) {
-        }
-
-        return $this->getFirstEmployeeId();
-    }
-
     private function getEmployeeName(?Employe $employe = null): string
     {
         if ($employe) {
             return trim(($employe->getNom() ?? '') . ' ' . ($employe->getPrenom() ?? ''));
         }
-
-        try {
-            $session = $this->container->get('request_stack')->getSession();
-            $name = $session->get('employee_name');
-            if ($name) {
-                return $name;
-            }
-        } catch (\Exception $e) {
-        }
-
         return 'Systeme';
-    }
-
-    private function getFirstEmployeeId(): ?int
-    {
-        try {
-            $conn = $this->em->getConnection();
-            $result = $conn->executeQuery("SELECT id_employe FROM `employé` LIMIT 1")->fetchAssociative();
-            if ($result && isset($result['id_employe'])) {
-                return (int) $result['id_employe'];
-            }
-        } catch (\Exception $e) {
-        }
-
-        return null;
-    }
-
-    private function isValidEmployeeId(int $id): bool
-    {
-        try {
-            $conn = $this->em->getConnection();
-            $result = $conn->executeQuery(
-                "SELECT id_employe FROM `employé` WHERE id_employe = ?",
-                [$id]
-            )->fetchAssociative();
-
-            return $result !== false;
-        } catch (\Exception $e) {
-            return false;
-        }
-    }
-
-    private function getEmployeesList(): array
-    {
-        try {
-            $conn = $this->em->getConnection();
-
-            return $conn->executeQuery(
-                "SELECT id_employe, CONCAT(COALESCE(nom, ''), ' ', COALESCE(prenom, '')) AS nom_complet FROM `employé` ORDER BY nom, prenom"
-            )->fetchAllAssociative();
-        } catch (\Exception $e) {
-            return [];
-        }
     }
 }
