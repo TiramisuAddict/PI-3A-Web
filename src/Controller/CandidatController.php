@@ -219,7 +219,12 @@ final class CandidatController extends AbstractController
             throw $this->createNotFoundException('Candidature introuvable.');
         }
 
-        $form = $this->createForm(CandidatType::class, $candidat);
+        $form = $this->createForm(CandidatType::class, $candidat, [
+            'action' => $this->generateUrl('app_candidature_modifier', [
+                'id' => $id,
+            ]),
+            'method' => 'POST',
+        ]);
        
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
@@ -239,6 +244,7 @@ final class CandidatController extends AbstractController
 
         return $this->render('candidat/_dashboard_form_candidat_hr.html.twig', [
             'form' => $form->createView(),
+            'id' => $id,
         ]);
     }
 
