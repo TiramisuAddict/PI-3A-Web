@@ -98,6 +98,44 @@ final class CandidatController extends AbstractController
         ]);
     }
 
+    #[Route('/candidature/{id}/cv', name: 'app_candidature_download_cv', methods: ['GET'])]
+    public function downloadCv(CandidatRepository $candidatRepository, int $id): Response
+    {
+        $candidat = $candidatRepository->find($id);
+        $cvData = $candidat?->getCvData();
+
+        if (!$candidat || !$cvData) {
+            throw $this->createNotFoundException('CV introuvable.');
+        }
+
+        $filename = $candidat->getCvNom() ?: ('cv-candidat-' . $id . '.pdf');
+
+        $response = new Response($cvData);
+        $response->headers->set('Content-Type', 'application/pdf');
+        $response->headers->set('Content-Disposition', 'attachment; filename="' . addslashes($filename) . '"');
+
+        return $response;
+    }
+
+    #[Route('/candidature/{id}/lettre-motivation', name: 'app_candidature_download_lettre', methods: ['GET'])]
+    public function downloadLettreMotivation(CandidatRepository $candidatRepository, int $id): Response
+    {
+        $candidat = $candidatRepository->find($id);
+        $lettreData = $candidat?->getLettreMotivationData();
+
+        if (!$candidat || !$lettreData) {
+            throw $this->createNotFoundException('Lettre de motivation introuvable.');
+        }
+
+        $filename = $candidat->getLettreMotivationNom() ?: ('lettre-motivation-candidat-' . $id . '.pdf');
+
+        $response = new Response($lettreData);
+        $response->headers->set('Content-Type', 'application/pdf');
+        $response->headers->set('Content-Disposition', 'attachment; filename="' . addslashes($filename) . '"');
+
+        return $response;
+    }
+
     #[Route('/candidature/postuler/{offreId}/{visiteurId}', name: 'app_candidature_postuler', methods: ['GET', 'POST'])]
     public function postuler(
         Request $request,

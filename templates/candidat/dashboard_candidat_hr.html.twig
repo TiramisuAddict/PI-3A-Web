@@ -30,26 +30,49 @@
 			background: rgba(31, 111, 235, 0.08);
 		}
 
-		.meta-label {
-			font-size: .75rem;
-			color: #6b7280;
-			text-transform: uppercase;
-			letter-spacing: .04em;
-			font-weight: 700;
-			margin-bottom: .2rem;
-		}
-
-		.meta-value {
-			font-weight: 600;
-			color: #182433;
+		.details-section {
+			margin-bottom: 1.25rem;
 		}
 
 		.candidate-doc-btn {
-			justify-content: flex-start;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			font-weight: 600;
+			min-height: 44px;
+			border-radius: 8px;
+			padding: .55rem .75rem;
+		}
+
+		.doc-actions {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: .5rem;
+		}
+
+		@media (max-width: 575.98px) {
+			.doc-actions {
+				grid-template-columns: 1fr;
+			}
 		}
 
 		.details-form-wrapper .form-label {
 			font-weight: 600;
+		}
+
+		.details-form-wrapper .form-control,
+		.details-form-wrapper .form-select {
+			min-height: 44px;
+			border-color: #d1d5db;
+		}
+
+		.details-form-wrapper textarea.form-control {
+			min-height: 112px;
+		}
+
+		.details-divider {
+			margin: 1.25rem 0;
+			border-top: 1px solid rgba(15, 23, 42, 0.10);
 		}
 
 		@media (max-width: 991.98px) {
@@ -157,33 +180,37 @@
 			<div class="col-12 col-xl-4">
 				<div class="card panel-card details-sticky">
 					<div class="card-body">
-						<h3 class="card-title mb-3">Details du Candidat</h3>
+						<h3 class="card-title mb-3 h2">Details du Candidat</h3>
 
 						{% if selectedCandidat %}
-							<div class="mb-3">
-								<div class="meta-value mb-1">{{ selectedCandidat.visiteur.nom }} {{ selectedCandidat.visiteur.prenom }}</div>
+							<div class="details-section">
+								<div class="fw-bold fs-3 text-dark mb-1">{{ selectedCandidat.visiteur.nom }} {{ selectedCandidat.visiteur.prenom }}</div>
 								<div class="text-secondary">{{ selectedCandidat.visiteur.eMail }}</div>
 								<div class="text-secondary">{{ selectedCandidat.visiteur.telephone }}</div>
 							</div>
 
-							<div class="mb-3">
-								<div class="meta-label">Documents</div>
-								<div class="d-grid gap-2">
+							<div class="details-section">
+								<div class="h3 mb-2">Documents</div>
+								<div class="doc-actions">
 									{% if selectedCandidat.cvData %}
-										<a href="{{ path('app_candidat_dashboard', { offreId: selectedOffreId, candidatId: selectedCandidat.id }) }}" class="btn btn-outline-secondary btn-sm candidate-doc-btn disabled" aria-disabled="true">Telecharger CV</a>
+										<a href="{{ path('app_candidature_download_cv', { id: selectedCandidat.id }) }}" class="btn btn-primary" target="_blank" rel="noopener">
+											Telecharger CV
+										</a>
 									{% else %}
-										<button type="button" class="btn btn-outline-secondary btn-sm candidate-doc-btn" disabled>CV indisponible</button>
+										<button type="button" class="btn btn-outline-secondary candidate-doc-btn" disabled>CV indisponible</button>
 									{% endif %}
 
 									{% if selectedCandidat.lettreMotivationData %}
-										<a href="{{ path('app_candidat_dashboard', { offreId: selectedOffreId, candidatId: selectedCandidat.id }) }}" class="btn btn-outline-secondary btn-sm candidate-doc-btn disabled" aria-disabled="true">Lettre de Motivation</a>
+										<a href="{{ path('app_candidature_download_lettre', { id: selectedCandidat.id }) }}" class="btn btn-outline-warning" target="_blank" rel="noopener">
+											Lettre de Motivation
+										</a>
 									{% else %}
-										<button type="button" class="btn btn-outline-secondary btn-sm candidate-doc-btn" disabled>Lettre indisponible</button>
+										<button type="button" class="btn btn-outline-secondary candidate-doc-btn" disabled>Lettre indisponible</button>
 									{% endif %}
 								</div>
 							</div>
 
-							<hr>
+							<div class="details-divider"></div>
 
 							<div class="details-form-wrapper">
 								{{ render(controller('App\\Controller\\CandidatController::modifierCandidature', { id: selectedCandidat.id })) }}
