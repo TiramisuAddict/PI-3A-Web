@@ -82,6 +82,13 @@
             gap: 1.25rem !important;
         }
 
+        #offreModal .form-control.is-invalid,
+        #offreModal .form-select.is-invalid,
+        #offreModal textarea.is-invalid {
+            background-image: none !important;
+            padding-right: 0.75rem;
+        }
+
         #offreModal .modal-footer {
             background-color: transparent !important;
         }
@@ -108,10 +115,6 @@
             const categorieInput = document.getElementById('{{ form.categorie.vars.id }}');
             const descriptionInput = document.getElementById('{{ form.description.vars.id }}');
 
-            if (descriptionInput) {
-                descriptionInput.classList.add('tinymce-editor');
-            }
-
             if (window.tinymce) {
                 tinymce.init({
                     selector: '.tinymce-editor',
@@ -124,9 +127,34 @@
             }
 
             if (modalForm) {
-                modalForm.addEventListener('submit', function () {
+                modalForm.addEventListener('submit', function (event) {
                     if (window.tinymce) {
                         tinymce.triggerSave();
+                    }
+
+                    const errors = [];
+
+                    [titreInput, contratInput, dateInput, etatInput, categorieInput].forEach(function (field) {
+                        if (!field) return;
+                        field.classList.remove('is-invalid');
+
+                        if (!String(field.value || '').trim()) {
+                            field.classList.add('is-invalid');
+                            errors.push('Veuillez remplir tous les champs obligatoires.');
+                        }
+                    });
+
+                    if (descriptionInput) {
+                        descriptionInput.classList.remove('is-invalid');
+                        if (!String(descriptionInput.value || '').trim()) {
+                            descriptionInput.classList.add('is-invalid');
+                            errors.push('La description est obligatoire.');
+                        }
+                    }
+
+                    if (errors.length > 0) {
+                        event.preventDefault();
+                        alert(Array.from(new Set(errors)).join('\n'));
                     }
                 });
             }
@@ -148,10 +176,16 @@
                 }
                 if (titreInput) titreInput.value = '';
                 if (contratInput) contratInput.value = '';
-                setDateFields('');
+                if (dateInput) dateInput.value = '';
                 if (etatInput) etatInput.value = '';
                 if (categorieInput) categorieInput.value = '';
                 setEditorValue('');
+
+                [titreInput, contratInput, dateInput, etatInput, categorieInput, descriptionInput].forEach(function (field) {
+                    if (field) {
+                        field.classList.remove('is-invalid');
+                    }
+                });
             }
 
             function normalizeContrat(value) {
@@ -165,12 +199,6 @@
                 return value || '';
             }
 
-            function setDateFields(dateValue) {
-                if (dateInput) {
-                    dateInput.value = dateValue || '';
-                }
-            }
-
             document.querySelectorAll('[data-offer-create]').forEach(function (btn) {
                 btn.addEventListener('click', function () {
                     modalTitle.textContent = 'Créer une Offre';
@@ -181,7 +209,6 @@
 
             document.querySelectorAll('[data-offer-edit]').forEach(function (btn) {
                 btn.addEventListener('click', function (event) {
-                    event.stopPropagation();
                     const card = btn.closest('[data-offer-card]');
                     
                     modalTitle.textContent = 'Modifier l\'Offre';
@@ -192,7 +219,7 @@
                     }
                     if (titreInput) titreInput.value = card.dataset.titre || '';
                     if (contratInput) contratInput.value = normalizeContrat(card.dataset.contrat);
-                    setDateFields(card.dataset.date || '');
+                    if (dateInput) dateInput.value = card.dataset.date || '';
                     if (etatInput) etatInput.value = normalizeEtat(card.dataset.etat);
                     if (categorieInput) categorieInput.value = card.dataset.categorie || '';
                     setEditorValue(card.dataset.description || '');
@@ -201,7 +228,6 @@
 
             document.querySelectorAll('[data-offer-delete]').forEach(function (btn) {
                 btn.addEventListener('click', function (event) {
-                    event.stopPropagation();
                     const offerId = btn.dataset.offerId;
                     
                     if (confirm('Êtes-vous sûr de vouloir supprimer cette offre ?')) {

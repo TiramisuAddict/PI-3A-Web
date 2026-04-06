@@ -167,15 +167,19 @@ final class CandidatController extends AbstractController
             $cvFile = $form->get('cv_data')->getData();
             $lettreFile = $form->get('lettre_motivation_data')->getData();
 
-            if (!$cvFile || !$lettreFile) {
-                $this->addFlash('error', 'CV et lettre de motivation sont requis.');
+            if (!$cvFile) {
+                $this->addFlash('error', 'Le CV est requis.');
                 return $this->redirectToRoute('app_offre_list');
             }
 
             $cvContent = file_get_contents($cvFile->getPathname());
-            $lettreContent = file_get_contents($lettreFile->getPathname());
+            $lettreContent = null;
 
-            if ($cvContent === false || $lettreContent === false) {
+            if ($lettreFile) {
+                $lettreContent = file_get_contents($lettreFile->getPathname());
+            }
+
+            if ($cvContent === false || ($lettreFile && $lettreContent === false)) {
                 $this->addFlash('error', 'Impossible de lire les fichiers uploades.');
                 return $this->redirectToRoute('app_offre_list');
             }
@@ -189,7 +193,7 @@ final class CandidatController extends AbstractController
                 ->setDateCandidature(new \DateTime())
                 ->setCvNom($cvFile->getClientOriginalName())
                 ->setCvData($cvContent)
-                ->setLettreMotivationNom($lettreFile->getClientOriginalName())
+                ->setLettreMotivationNom($lettreFile ? $lettreFile->getClientOriginalName() : null)
                 ->setLettreMotivationData($lettreContent)
                 ->setOffre($offre)
                 ->setVisiteur($visiteur);

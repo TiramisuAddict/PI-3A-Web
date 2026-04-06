@@ -1,4 +1,4 @@
-{{ form_start(form, { attr: { novalidate: 'novalidate' } }) }}
+{{ form_start(form, { attr: { novalidate: 'novalidate', 'data-postuler-validation': '1' } }) }}
 
 {{ form_errors(form) }}
 
@@ -38,3 +38,81 @@
 
 {{ form_rest(form) }}
 {{ form_end(form, { render_rest: false }) }}
+
+<style>
+	form[data-postuler-validation="1"] .form-control.is-invalid,
+	form[data-postuler-validation="1"] .form-select.is-invalid {
+		background-image: none !important;
+		padding-right: 0.75rem;
+	}
+</style>
+
+<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		document.querySelectorAll('form[data-postuler-validation="1"]').forEach(function (postulerForm) {
+			if (postulerForm.dataset.validationBound === '1') {
+				return;
+			}
+
+			postulerForm.dataset.validationBound = '1';
+
+			const cvInput = postulerForm.querySelector('input[type="file"][name$="[cv_data]"]');
+			const lettreInput = postulerForm.querySelector('input[type="file"][name$="[lettre_motivation_data]"]');
+			const maxSize = 8 * 1024 * 1024;
+
+			function validatePdf(file) {
+				if (!file) return null;
+				const isPdfType = file.type === 'application/pdf' || file.type === 'application/x-pdf';
+				const isPdfName = /\.pdf$/i.test(file.name || '');
+
+				if (!isPdfType && !isPdfName) {
+					return 'Seuls les fichiers PDF sont autorises.';
+				}
+
+				if (file.size > maxSize) {
+					return 'Chaque fichier doit etre inferieur ou egal a 8 MB.';
+				}
+
+				return null;
+			}
+
+			postulerForm.addEventListener('submit', function (event) {
+				let errors = [];
+
+				if (cvInput) {
+					cvInput.classList.remove('is-invalid');
+					const cvFile = cvInput.files && cvInput.files[0] ? cvInput.files[0] : null;
+
+					if (!cvFile) {
+						errors.push('Le CV est requis.');
+						cvInput.classList.add('is-invalid');
+					} else {
+						const cvError = validatePdf(cvFile);
+						if (cvError) {
+							errors.push('CV: ' + cvError);
+							cvInput.classList.add('is-invalid');
+						}
+					}
+				}
+
+				if (lettreInput) {
+					lettreInput.classList.remove('is-invalid');
+					const lettreFile = lettreInput.files && lettreInput.files[0] ? lettreInput.files[0] : null;
+
+					if (lettreFile) {
+						const lettreError = validatePdf(lettreFile);
+						if (lettreError) {
+							errors.push('Lettre de motivation: ' + lettreError);
+							lettreInput.classList.add('is-invalid');
+						}
+					}
+				}
+
+				if (errors.length > 0) {
+					event.preventDefault();
+					alert(errors.join('\n'));
+				}
+			});
+		});
+	});
+</script>
