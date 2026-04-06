@@ -19,7 +19,7 @@ class PostulerType extends AbstractType
             ->add('lettre_motivation_data', FileType::class, [
                 'label' => 'Lettre de motivation (PDF)',
                 'mapped' => false,
-                'required' => true,
+                'required' => false,
                 'constraints' => [
                     new File([
                         'maxSize' => '8M',
