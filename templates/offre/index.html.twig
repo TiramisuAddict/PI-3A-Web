@@ -239,15 +239,15 @@
                                 <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
                                     <div>
                                         <div class="offre-category">{{ offre.categorie }}</div>
-                                        <h3 class="offre-title">{{ offre.titre_poste }}</h3>
+                                        <h3 class="offre-title">{{ offre.titrePoste }}</h3>
                                     </div>
-                                    <span class="badge bg-blue-lt text-blue">{{ offre.type_contrat }}</span>
+                                    <span class="badge bg-blue-lt text-blue">{{ offre.typeContrat }}</span>
                                 </div>
 
                                 <div class="offre-info">
                                     <div class="offre-info-item">
                                         <span class="offre-info-label">Date limite</span>
-                                        <span class="offre-info-value">{{ offre.date_limite|date('Y-m-d') }}</span>
+                                        <span class="offre-info-value">{{ offre.dateLimite|date('Y-m-d') }}</span>
                                     </div>
 
                                     <div class="offre-info-item">
@@ -267,7 +267,7 @@
                                             <div class="modal-dialog modal-lg" role="document">
                                                 <div class="modal-content">
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title" id="{{ applyModalId }}Label">Postuler - {{ offre.titre_poste }}</h5>
+                                                        <h5 class="modal-title" id="{{ applyModalId }}Label">Postuler - {{ offre.titrePoste }}</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
                                                     <div class="modal-body">
@@ -291,7 +291,7 @@
                                             <div class="modal-dialog" role="document">
                                                 <div class="modal-content">
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title" id="{{ detailsModalId }}Label">Poste {{ offre.titre_poste }}</h5>
+                                                        <h5 class="modal-title" id="{{ detailsModalId }}Label">Poste {{ offre.titrePoste }}</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"
                                                         aria-label="Close"></button>
                                                     </div>

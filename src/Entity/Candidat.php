@@ -37,12 +37,12 @@ class Candidat
     #[ORM\Column(type: 'string', length: 50, nullable: false)]
     private ?string $code_candidature = null;
 
-    public function getCode_candidature(): ?string
+    public function getCodeCandidature(): ?string
     {
         return $this->code_candidature;
     }
 
-    public function setCode_candidature(string $code_candidature): self
+    public function setCodeCandidature(string $code_candidature): self
     {
         $this->code_candidature = $code_candidature;
         return $this;
@@ -51,22 +51,21 @@ class Candidat
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $cv_nom = null;
 
-    public function getCv_nom(): ?string
+    public function getCvNom(): ?string
     {
         return $this->cv_nom;
     }
 
-    public function setCv_nom(?string $cv_nom): self
+    public function setCvNom(?string $cv_nom): self
     {
         $this->cv_nom = $cv_nom;
         return $this;
     }
 
-    //=========================================================
     #[ORM\Column(type: 'blob', columnDefinition: 'MEDIUMBLOB DEFAULT NULL', nullable: true)]
     private  mixed $cv_data = null;
 
-    public function getCv_data(): ?string
+    public function getCvData(): ?string
     {
         if (is_resource($this->cv_data)) {
             $data = stream_get_contents($this->cv_data);
@@ -76,32 +75,30 @@ class Candidat
         return is_string($this->cv_data) ? $this->cv_data : null;
     }
 
-    public function setCv_data(?string $cv_data): self
+    public function setCvData(?string $cv_data): self
     {
         $this->cv_data = $cv_data;
         return $this;
     }
-    //=========================================================
 
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private mixed $lettre_motivation_nom = null;
 
-    public function getLettre_motivation_nom(): ?string
+    public function getLettreMotivationNom(): ?string
     {
         return $this->lettre_motivation_nom;
     }
 
-    public function setLettre_motivation_nom(?string $lettre_motivation_nom): self
+    public function setLettreMotivationNom(?string $lettre_motivation_nom): self
     {
         $this->lettre_motivation_nom = $lettre_motivation_nom;
         return $this;
     }
 
-    //=========================================================
     #[ORM\Column(type: 'blob', columnDefinition: 'MEDIUMBLOB DEFAULT NULL', nullable: true)]
     private  mixed $lettre_motivation_data = null;
 
-    public function getLettre_motivation_data(): ?string
+    public function getLettreMotivationData(): ?string
     {
         if (is_resource($this->lettre_motivation_data)) {
             $data = stream_get_contents($this->lettre_motivation_data);
@@ -111,12 +108,11 @@ class Candidat
         return is_string($this->lettre_motivation_data) ? $this->lettre_motivation_data : null;
     }
 
-    public function setLettre_motivation_data(?string $lettre_motivation_data): self
+    public function setLettreMotivationData(?string $lettre_motivation_data): self
     {
         $this->lettre_motivation_data = $lettre_motivation_data;
         return $this;
     }
-    //=========================================================
 
     #[ORM\Column(type: 'string', length: 50, nullable: true)]
     private ?string $etat = null;
@@ -149,12 +145,12 @@ class Candidat
     #[ORM\Column(type: 'date', nullable: true)]
     private ?\DateTimeInterface $date_candidature = null;
 
-    public function getDate_candidature(): ?\DateTimeInterface
+    public function getDateCandidature(): ?\DateTimeInterface
     {
         return $this->date_candidature;
     }
 
-    public function setDate_candidature(?\DateTimeInterface $date_candidature): self
+    public function setDateCandidature(?\DateTimeInterface $date_candidature): self
     {
         $this->date_candidature = $date_candidature;
         return $this;
