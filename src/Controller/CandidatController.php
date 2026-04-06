@@ -35,6 +35,54 @@ final class CandidatController extends AbstractController
         ]);
     }
 
+    #[Route('/candidats/dashboard', name: 'app_candidat_dashboard', methods: ['GET'])]
+    public function dashboard(Request $request, OffreRepository $offreRepository, CandidatRepository $candidatRepository): Response
+    {
+        $offres = $offreRepository->findAll();
+
+        $selectedOffreId = $request->query->getInt('offreId', 0);
+        $selectedCandidatId = $request->query->getInt('candidatId', 0);
+
+        $selectedOffre = null;
+        foreach ($offres as $offre) {
+            if ($offre->getId() === $selectedOffreId) {
+                $selectedOffre = $offre;
+                break;
+            }
+        }
+
+        if (!$selectedOffre && !empty($offres)) {
+            $selectedOffre = $offres[0];
+            $selectedOffreId = $selectedOffre->getId() ?? 0;
+        }
+
+        $candidats = $selectedOffre
+            ? $candidatRepository->findBy(['offre' => $selectedOffre], ['date_candidature' => 'DESC'])
+            : [];
+
+        $selectedCandidat = null;
+        foreach ($candidats as $candidat) {
+            if ($candidat->getId() === $selectedCandidatId) {
+                $selectedCandidat = $candidat;
+                break;
+            }
+        }
+
+        if (!$selectedCandidat && !empty($candidats)) {
+            $selectedCandidat = $candidats[0];
+            $selectedCandidatId = $selectedCandidat->getId() ?? 0;
+        }
+
+        return $this->render('candidat/dashboard_candidat_hr.html.twig', [
+            'offres' => $offres,
+            'selectedOffre' => $selectedOffre,
+            'selectedOffreId' => $selectedOffreId,
+            'candidats' => $candidats,
+            'selectedCandidat' => $selectedCandidat,
+            'selectedCandidatId' => $selectedCandidatId,
+        ]);
+    }
+
     #[Route('/candidature/confirmation/{code}', name: 'app_candidature_confirmation', methods: ['GET'])]
     public function confirmation(CandidatRepository $candidatRepository, string $code): Response
     {
@@ -126,6 +174,10 @@ final class CandidatController extends AbstractController
     public function modifierCandidature(Request $request, ManagerRegistry $doctrine, $id){
         $candidat = $doctrine->getRepository(Candidat::class)->find($id);
 
+        if (!$candidat) {
+            throw $this->createNotFoundException('Candidature introuvable.');
+        }
+
         $form = $this->createForm(CandidatType::class, $candidat);
        
         $form->handleRequest($request);
@@ -133,14 +185,18 @@ final class CandidatController extends AbstractController
             $candidat = $form->getData();
             $doctrine->getManager()->flush($candidat);
 
-            return $this->render('candidat/_test_form_candidat.html.twig', [
-                'form' => $form->createView(),
-                'message' => 'Candidature modifiée avec succès !',
-            ]);
+            $this->addFlash('success', 'Candidature modifiee avec succes.');
+
+            $referer = $request->headers->get('referer');
+            if ($referer) {
+                return $this->redirect($referer);
+            }
+
+            return $this->redirectToRoute('app_candidat_dashboard');
 
         }
 
-        return $this->render('candidat/_test_form_candidat.html.twig', [
+        return $this->render('candidat/_dashboard_form_candidat_hr.html.twig', [
             'form' => $form->createView(),
         ]);
     }
