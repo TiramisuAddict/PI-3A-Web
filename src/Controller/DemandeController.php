@@ -103,7 +103,6 @@ class DemandeController extends AbstractController
                 $historique->setCommentaire('Demande creee');
                 $historique->setDateAction(new \DateTime());
                 $this->em->persist($historique);
-
                 $this->em->flush();
 
                 $this->addFlash('success', 'Demande creee avec succes.');
@@ -142,6 +141,80 @@ class DemandeController extends AbstractController
         return new JsonResponse($this->formHelper->getFieldsForType($type));
     }
 
+    #[Route('/demande/action/status/{id}', name: 'demande_update_status', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function updateStatus(int $id, Request $request): JsonResponse
+    {
+        try {
+            $demande = $this->demandeRepository->find($id);
+
+            if (!$demande) {
+                return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
+            }
+
+            $data = json_decode($request->getContent(), true);
+            $newStatus = $data['status'] ?? null;
+            $commentaire = $data['commentaire'] ?? '';
+
+            if (!$newStatus) {
+                return new JsonResponse(['success' => false, 'message' => 'Statut requis'], 400);
+            }
+
+            $oldStatus = $demande->getStatus();
+            $demande->setStatus($newStatus);
+
+            $historique = new HistoriqueDemande();
+            $historique->setDemande($demande);
+            $historique->setAncienStatut($oldStatus);
+            $historique->setNouveauStatut($newStatus);
+            $historique->setActeur($this->getEmployeeName($demande->getEmploye()));
+            $historique->setCommentaire($commentaire);
+            $historique->setDateAction(new \DateTime());
+
+            $this->em->persist($historique);
+            $this->em->flush();
+
+            return new JsonResponse(['success' => true, 'message' => 'Statut mis a jour']);
+        } catch (\Exception $e) {
+            return new JsonResponse(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()], 500);
+        }
+    }
+
+    #[Route('/demande/action/delete/{id}', name: 'demande_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function delete(int $id): JsonResponse
+    {
+        try {
+            $demande = $this->demandeRepository->find($id);
+
+            if (!$demande) {
+                return new JsonResponse([
+                    'success' => false,
+                    'message' => 'Demande non trouvee'
+                ], 404);
+            }
+
+            foreach ($demande->getHistoriqueDemandes() as $historique) {
+                $this->em->remove($historique);
+            }
+
+            foreach ($demande->getDemandeDetails() as $detail) {
+                $this->em->remove($detail);
+            }
+
+            $this->em->remove($demande);
+            $this->em->flush();
+
+            return new JsonResponse([
+                'success' => true,
+                'message' => 'Demande supprimee'
+            ]);
+        } catch (\Exception $e) {
+            return new JsonResponse([
+                'success' => false,
+                'message' => 'Erreur: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     #[Route('/demande/{id}', name: 'demande_show', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function show(int $id): Response
     {
@@ -157,8 +230,7 @@ class DemandeController extends AbstractController
 
         if ($demandeDetails->count() > 0) {
             $firstDetail = $demandeDetails->first();
-            $detailsJson = $firstDetail->getDetails();
-            $detailsData = json_decode($detailsJson, true) ?? [];
+            $detailsData = json_decode($firstDetail->getDetails(), true) ?? [];
 
             foreach ($detailsData as $key => $value) {
                 $fieldLabels[$key] = $this->formHelper->getFieldLabel($demande->getTypeDemande(), $key);
@@ -198,7 +270,7 @@ class DemandeController extends AbstractController
 
         if ($form->isSubmitted()) {
             $formData = $request->request->all();
-            $submittedType = $formData['demande']['typeDemande'] ?? $demande->getTypeDemande();
+            $submittedType = $formData['demande']['typeDemande'] ?? null;
             $submittedDetails = $formData['details'] ?? [];
 
             if ($submittedType) {
@@ -229,6 +301,7 @@ class DemandeController extends AbstractController
                         $detail->setDemande($demande);
                         $this->em->persist($detail);
                     }
+
                     $detail->setDetails(json_encode($submittedDetails));
                 }
 
@@ -250,63 +323,6 @@ class DemandeController extends AbstractController
         ]);
     }
 
-    #[Route('/demande/{id}/status', name: 'demande_update_status', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function updateStatus(int $id, Request $request): JsonResponse
-    {
-        try {
-            $demande = $this->demandeRepository->find($id);
-
-            if (!$demande) {
-                return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
-            }
-
-            $data = json_decode($request->getContent(), true);
-            $newStatus = $data['status'] ?? null;
-            $commentaire = $data['commentaire'] ?? '';
-
-            if (!$newStatus) {
-                return new JsonResponse(['success' => false, 'message' => 'Statut requis'], 400);
-            }
-
-            $oldStatus = $demande->getStatus();
-            $demande->setStatus($newStatus);
-
-            $historique = new HistoriqueDemande();
-            $historique->setDemande($demande);
-            $historique->setAncienStatut($oldStatus);
-            $historique->setNouveauStatut($newStatus);
-            $historique->setActeur($this->getEmployeeName($demande->getEmploye()));
-            $historique->setCommentaire($commentaire);
-            $historique->setDateAction(new \DateTime());
-
-            $this->em->persist($historique);
-            $this->em->flush();
-
-            return new JsonResponse(['success' => true, 'message' => 'Statut mis a jour avec succes']);
-        } catch (\Exception $e) {
-            return new JsonResponse(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()], 500);
-        }
-    }
-
-    #[Route('/demande/{id}/delete', name: 'demande_delete', requirements: ['id' => '\d+'], methods: ['DELETE', 'POST'])]
-    public function delete(int $id): JsonResponse
-    {
-        try {
-            $demande = $this->demandeRepository->find($id);
-
-            if (!$demande) {
-                return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
-            }
-
-            $this->em->remove($demande);
-            $this->em->flush();
-
-            return new JsonResponse(['success' => true, 'message' => 'Demande supprimee avec succes']);
-        } catch (\Exception $e) {
-            return new JsonResponse(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()], 500);
-        }
-    }
-
     private function validateDetails(string $typeDemande, array $details): array
     {
         $errors = [];
@@ -322,11 +338,7 @@ class DemandeController extends AbstractController
             $value = $details[$key] ?? null;
 
             if ($required && ($value === null || trim((string) $value) === '')) {
-                $errors[] = [
-                    'field' => $key,
-                    'message' => 'Le champ "' . $label . '" est obligatoire.',
-                    'type' => 'blank'
-                ];
+                $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" est obligatoire.', 'type' => 'blank'];
                 continue;
             }
 
@@ -336,17 +348,9 @@ class DemandeController extends AbstractController
 
             if ($type === 'number') {
                 if (!is_numeric($value)) {
-                    $errors[] = [
-                        'field' => $key,
-                        'message' => 'Le champ "' . $label . '" doit etre un nombre valide.',
-                        'type' => 'format'
-                    ];
+                    $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" doit etre un nombre valide.', 'type' => 'format'];
                 } elseif ((float) $value < 0) {
-                    $errors[] = [
-                        'field' => $key,
-                        'message' => 'Le champ "' . $label . '" ne peut pas etre negatif.',
-                        'type' => 'format'
-                    ];
+                    $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" ne peut pas etre negatif.', 'type' => 'format'];
                 } elseif (
                     str_contains(strtolower($key), 'montant') ||
                     str_contains(strtolower($key), 'nombre') ||
@@ -354,11 +358,7 @@ class DemandeController extends AbstractController
                     str_contains(strtolower($key), 'cout')
                 ) {
                     if ((float) $value <= 0) {
-                        $errors[] = [
-                            'field' => $key,
-                            'message' => 'Le champ "' . $label . '" doit etre superieur a 0.',
-                            'type' => 'format'
-                        ];
+                        $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" doit etre superieur a 0.', 'type' => 'format'];
                     }
                 }
             }
@@ -370,20 +370,17 @@ class DemandeController extends AbstractController
                     $lowerKey = strtolower($key);
                     $lowerLabel = strtolower($label);
 
-                    $mustBeTodayOrFuture =
+                    $mustBeFuture =
                         str_contains($lowerKey, 'datedebut') ||
                         str_contains($lowerKey, 'datesouhaitee') ||
                         str_contains($lowerKey, 'datepassage') ||
                         str_contains($lowerKey, 'dateheuressup') ||
                         str_contains($lowerLabel, 'date de debut') ||
-                        str_contains($lowerLabel, 'date souhaitee');
+                        str_contains($lowerLabel, 'date souhaitee') ||
+                        str_contains($lowerLabel, 'date de depart');
 
-                    if ($mustBeTodayOrFuture && $date < $today) {
-                        $errors[] = [
-                            'field' => $key,
-                            'message' => 'Le champ "' . $label . '" ne peut pas etre dans le passe.',
-                            'type' => 'format'
-                        ];
+                    if ($mustBeFuture && $date < $today) {
+                        $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" ne peut pas etre dans le passe.', 'type' => 'format'];
                     }
 
                     $isEndDate = str_contains($lowerKey, 'datefin') || str_contains($lowerLabel, 'date de fin');
@@ -394,22 +391,14 @@ class DemandeController extends AbstractController
                                 $startDate = new \DateTime($details[$startKey]);
                                 $startDate->setTime(0, 0, 0);
                                 if ($date < $startDate) {
-                                    $errors[] = [
-                                        'field' => $key,
-                                        'message' => 'Le champ "' . $label . '" doit etre superieur ou egal a la date de debut.',
-                                        'type' => 'format'
-                                    ];
+                                    $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" doit etre superieur ou egal a la date de debut.', 'type' => 'format'];
                                 }
                                 break;
                             }
                         }
                     }
                 } catch (\Exception $e) {
-                    $errors[] = [
-                        'field' => $key,
-                        'message' => 'Le champ "' . $label . '" contient une date invalide.',
-                        'type' => 'format'
-                    ];
+                    $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" contient une date invalide.', 'type' => 'format'];
                 }
             }
         }
@@ -422,6 +411,7 @@ class DemandeController extends AbstractController
         if ($employe) {
             return trim(($employe->getNom() ?? '') . ' ' . ($employe->getPrenom() ?? ''));
         }
+
         return 'Systeme';
     }
 }

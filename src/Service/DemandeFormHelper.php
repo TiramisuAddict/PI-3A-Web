@@ -11,30 +11,35 @@ class DemandeFormHelper
             'Attestation de salaire',
             'Certificat de travail',
             'Mutation',
-            'Demission'
+            'Demission',
+            'Autre'
         ],
         'Administrative' => [
             'Avance sur salaire',
             'Remboursement',
             'Materiel de bureau',
             'Badge acces',
-            'Carte de visite'
+            'Carte de visite',
+            'Autre'
         ],
         'Informatique' => [
             'Materiel informatique',
             'Acces systeme',
             'Logiciel',
-            'Probleme technique'
+            'Probleme technique',
+            'Autre'
         ],
         'Formation' => [
             'Formation interne',
             'Formation externe',
-            'Certification'
+            'Certification',
+            'Autre'
         ],
         'Organisation du travail' => [
             'Teletravail',
             'Changement horaires',
-            'Heures supplementaires'
+            'Heures supplementaires',
+            'Autre'
         ]
     ];
 
@@ -792,6 +797,45 @@ class DemandeFormHelper
                         'Oui',
                         'En attente de validation'
                     ]
+                ]
+            ],
+
+            'Autre' => [
+                [
+                    'key' => 'besoinPersonnalise',
+                    'label' => 'Nom de votre demande',
+                    'type' => 'text',
+                    'required' => true
+                ],
+                [
+                    'key' => 'descriptionBesoin',
+                    'label' => 'Description detaillee du besoin',
+                    'type' => 'textarea',
+                    'required' => true
+                ],
+                [
+                    'key' => 'niveauUrgenceAutre',
+                    'label' => 'Niveau d urgence',
+                    'type' => 'select',
+                    'required' => true,
+                    'options' => [
+                        'Faible',
+                        'Normale',
+                        'Urgente',
+                        'Tres urgente'
+                    ]
+                ],
+                [
+                    'key' => 'dateSouhaiteeAutre',
+                    'label' => 'Date souhaitee',
+                    'type' => 'date',
+                    'required' => false
+                ],
+                [
+                    'key' => 'pieceOuContexte',
+                    'label' => 'Contexte ou precision supplementaire',
+                    'type' => 'textarea',
+                    'required' => false
                 ]
             ]
         ];

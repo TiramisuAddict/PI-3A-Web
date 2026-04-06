@@ -38,7 +38,7 @@ class Demande
     #[ORM\Column(type: 'date', nullable: false)]
     private ?\DateTimeInterface $date_creation = null;
 
-    #[ORM\Column(type: 'string', nullable: false)]
+    #[ORM\Column(type: 'string', nullable: true)]
     private ?string $type_demande = null;
 
     #[ORM\OneToMany(targetEntity: DemandeDetail::class, mappedBy: 'demande', cascade: ['remove'])]
@@ -74,7 +74,7 @@ class Demande
         return $this->categorie;
     }
 
-    public function setCategorie(string $categorie): self
+    public function setCategorie(?string $categorie): self
     {
         $this->categorie = $categorie;
         return $this;
@@ -85,7 +85,7 @@ class Demande
         return $this->titre;
     }
 
-    public function setTitre(string $titre): self
+    public function setTitre(?string $titre): self
     {
         $this->titre = $titre;
         return $this;
@@ -118,7 +118,7 @@ class Demande
         return $this->status;
     }
 
-    public function setStatus(string $status): self
+    public function setStatus(?string $status): self
     {
         $this->status = $status;
         return $this;
@@ -140,7 +140,7 @@ class Demande
         return $this->type_demande;
     }
 
-    public function setTypeDemande(string $type_demande): self
+    public function setTypeDemande(?string $type_demande): self
     {
         $this->type_demande = $type_demande;
         return $this;
@@ -157,7 +157,6 @@ class Demande
             $this->demandeDetails->add($demandeDetail);
             $demandeDetail->setDemande($this);
         }
-
         return $this;
     }
 
@@ -168,7 +167,6 @@ class Demande
                 $demandeDetail->setDemande(null);
             }
         }
-
         return $this;
     }
 
@@ -183,7 +181,6 @@ class Demande
             $this->historiqueDemandes->add($historiqueDemande);
             $historiqueDemande->setDemande($this);
         }
-
         return $this;
     }
 
@@ -194,7 +191,6 @@ class Demande
                 $historiqueDemande->setDemande(null);
             }
         }
-
         return $this;
     }
 }
