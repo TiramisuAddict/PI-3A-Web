@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 use App\Entity\Offre;
-use App\Form\CreeOffreType;
+use App\Form\OffreType;
 
 use App\Repository\OffreRepository;
 
@@ -48,7 +48,7 @@ final class OffreController extends AbstractController
     public function dashboard(OffreRepository $offre_repository): Response
     {
         $offres = $offre_repository->findAll();
-        $form = $this->createForm(CreeOffreType::class, new Offre());
+        $form = $this->createForm(OffreType::class, new Offre());
 
         return $this->render('offre/dashboard_offre_hr.html.twig', [
             'offres' => $offres,
@@ -60,7 +60,7 @@ final class OffreController extends AbstractController
     public function createOffreForm(Request $request, ManagerRegistry $doctrine) : Response {
         $offre = new Offre();
 
-        $form = $this->createForm(CreeOffreType::class, $offre);
+        $form = $this->createForm(OffreType::class, $offre);
 
         $form->handleRequest($request);
         if($form->isSubmitted() && $form->isValid()){
@@ -91,7 +91,7 @@ final class OffreController extends AbstractController
             return $this->redirectToRoute('app_offre_dashboard');
         }
 
-        $form = $this->createForm(CreeOffreType::class, $offre);
+        $form = $this->createForm(OffreType::class, $offre);
 
         $form->handleRequest($request);
         if($form->isSubmitted() && $form->isValid()){

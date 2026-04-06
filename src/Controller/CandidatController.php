@@ -13,6 +13,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
+use App\Form\CandidatType;
+
 final class CandidatController extends AbstractController
 {
     #[Route('/candidat', name: 'app_candidat')]
@@ -119,4 +121,29 @@ final class CandidatController extends AbstractController
             'form' => $form->createView(),
         ]);
     }
+
+    #[Route ('/candidature/modifier/{id}', name: 'app_candidature_modifier')]
+    public function modifierCandidature(Request $request, ManagerRegistry $doctrine, $id){
+        $candidat = $doctrine->getRepository(Candidat::class)->find($id);
+
+        $form = $this->createForm(CandidatType::class, $candidat);
+       
+        $form->handleRequest($request);
+        if ($form->isSubmitted() && $form->isValid()) {
+            $candidat = $form->getData();
+            $doctrine->getManager()->flush($candidat);
+
+            return $this->render('candidat/_test_form_candidat.html.twig', [
+                'form' => $form->createView(),
+                'message' => 'Candidature modifiée avec succès !',
+            ]);
+
+        }
+
+        return $this->render('candidat/_test_form_candidat.html.twig', [
+            'form' => $form->createView(),
+        ]);
+    }
+
+    #
 }
