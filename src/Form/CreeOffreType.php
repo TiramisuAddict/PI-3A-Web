@@ -12,21 +12,18 @@ use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
+use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 
 class CreeOffreType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
-            ->add('id', HiddenType::class, [
-                'required' => false,
-                'mapped' => false,
-            ])
 
             ->add('titre_poste' , TextType::class, [
                 'label' => 'Titre du poste',
                 'attr' => ['placeholder' => 'Entrez le titre du poste'],
-                'required' => true,
+                'required' => false,
             ])
 
             ->add('type_contrat', ChoiceType::class, [
@@ -35,40 +32,44 @@ class CreeOffreType extends AbstractType
                     'CDI' => 'CDI',
                     'CDD' => 'CDD',
                     'STAGE' => 'STAGE',
-                    'CIVP' => 'CIVP',
+                    'CVP' => 'CVP',
                 ],
-                'required' => true,
+                'required' => false,
             ])
 
             ->add('date_limite', DateType::class, [
                 'label' => 'Date limite',
-                'widget' => 'single_text',
-                'required' => true,
+                'required' => false,
             ])
 
             ->add('etat', ChoiceType::class, [
                 'label' => 'État',
                 'choices' => [
-                    'Ouvert' => 'OUVERT',
-                    'Fermé' => 'FERMÉ',
+                    'Ouvert' => 'Ouvert',
+                    'Fermé' => 'Fermé',
                 ],
-                'required' => true,
+                'required' => false,
             ])
 
             ->add('description', TextareaType::class, [
                 'label' => 'Description',
                 'attr' => ['placeholder' => 'Entrez la description de l\'offre'],
-                'required' => true,
+                'required' => false,
             ])
 
             ->add('categorie', ChoiceType::class, [
                 'label' => 'Catégorie',
                 'choices' => [
                     'Informatique' => 'Informatique',
+                    'Santé' => 'Santé',
                     'Marketing' => 'Marketing',
-                    'Sales' => 'Sales',
+                    'Art et Design' => 'Art et Design',
                 ],
-                'required' => true,
+                'required' => false,
+            ])
+
+            ->add('submit', SubmitType::class, [
+                'label' => 'Enregistrer',
             ])
         ;
     }
