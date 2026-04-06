@@ -1,0 +1,5 @@
+{% if form is defined and form is not null %}
+    {{ form(form) }}
+{% endif %}
+
+{{ message|default('') }}
