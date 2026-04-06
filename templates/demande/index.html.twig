@@ -88,16 +88,6 @@
     .action-btn:hover {
         transform: scale(1.1);
     }
-    .filter-badge {
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-    .filter-badge:hover {
-        transform: scale(1.05);
-    }
-    .filter-badge.active {
-        box-shadow: 0 0 0 3px var(--app-accent-soft);
-    }
     .empty-state {
         padding: 60px 20px;
         text-align: center;
@@ -139,12 +129,6 @@
         border-radius: 20px;
         font-size: 0.85rem;
         font-weight: 600;
-    }
-    .quick-filters {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-bottom: 20px;
     }
     .quick-filter-btn {
         padding: 8px 16px;
@@ -246,11 +230,7 @@
             <div class="col-lg-6 mb-3 mb-lg-0">
                 <div class="search-container">
                     <i class="ti ti-search search-icon"></i>
-                    <input type="text" 
-                           id="searchInput" 
-                           class="form-control" 
-                           placeholder="Rechercher par titre, categorie, type, statut..."
-                           autocomplete="off">
+                    <input type="text" id="searchInput" class="form-control" placeholder="Rechercher par titre, categorie, type, statut..." autocomplete="off">
                 </div>
             </div>
             <div class="col-lg-6">
@@ -295,7 +275,7 @@
             </thead>
             <tbody id="demandesBody">
                 {% for demande in demandes %}
-                <tr class="demande-row" 
+                <tr class="demande-row"
                     data-titre="{{ demande.titre|lower }}"
                     data-categorie="{{ demande.categorie|lower }}"
                     data-type="{{ demande.typeDemande|lower }}"
@@ -363,21 +343,17 @@
                     </td>
                     <td class="text-end">
                         <div class="btn-list flex-nowrap justify-content-end">
-                            <a href="{{ path('demande_show', {id: demande.idDemande}) }}" 
-                               class="action-btn btn btn-outline-primary" 
-                               title="Voir">
+                            <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="action-btn btn btn-outline-primary" title="Voir">
                                 <i class="ti ti-eye"></i>
                             </a>
-                            <a href="{{ path('demande_edit', {id: demande.idDemande}) }}" 
-                               class="action-btn btn btn-outline-warning" 
-                               title="Modifier">
+                            <a href="{{ path('demande_edit', {id: demande.idDemande}) }}" class="action-btn btn btn-outline-warning" title="Modifier">
                                 <i class="ti ti-edit"></i>
                             </a>
-                            <button type="button" 
-                                    class="action-btn btn btn-outline-danger" 
-                                    title="Supprimer" 
-                                    data-bs-toggle="modal" 
-                                    data-bs-target="#deleteModal" 
+                            <button type="button"
+                                    class="action-btn btn btn-outline-danger"
+                                    title="Supprimer"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#deleteModal"
                                     data-id="{{ demande.idDemande }}">
                                 <i class="ti ti-trash"></i>
                             </button>
@@ -401,7 +377,7 @@
             </tbody>
         </table>
     </div>
-    
+
     <div class="empty-state" id="noResults" style="display: none;">
         <i class="ti ti-search-off"></i>
         <h3>Aucun resultat</h3>
@@ -446,24 +422,29 @@
 <script>
 (function() {
     "use strict";
-    
+
     var deleteId = null;
-    var searchInput = document.getElementById("searchInput");
-    var resultsCount = document.getElementById("resultsCount");
-    var noResults = document.getElementById("noResults");
-    var tableBody = document.getElementById("demandesBody");
+    var searchInput;
+    var resultsCount;
+    var noResults;
     var currentFilter = "all";
-    
+
     document.addEventListener("DOMContentLoaded", init);
-    
+
     function init() {
-        searchInput.addEventListener("input", debounce(performSearch, 300));
-        searchInput.addEventListener("keyup", function(e) {
-            if (e.key === "Escape") {
-                clearSearch();
-            }
-        });
-        
+        searchInput = document.getElementById("searchInput");
+        resultsCount = document.getElementById("resultsCount");
+        noResults = document.getElementById("noResults");
+
+        if (searchInput) {
+            searchInput.addEventListener("input", debounce(performSearch, 300));
+            searchInput.addEventListener("keyup", function(e) {
+                if (e.key === "Escape") {
+                    clearSearch();
+                }
+            });
+        }
+
         document.querySelectorAll(".quick-filter-btn").forEach(function(btn) {
             btn.addEventListener("click", function() {
                 document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
@@ -474,7 +455,7 @@
                 performSearch();
             });
         });
-        
+
         var deleteModal = document.getElementById("deleteModal");
         if (deleteModal) {
             deleteModal.addEventListener("show.bs.modal", function(event) {
@@ -482,33 +463,36 @@
                 deleteId = button.getAttribute("data-id");
             });
         }
-        
-        document.getElementById("confirmDelete").addEventListener("click", deleteDemande);
+
+        var confirmDeleteBtn = document.getElementById("confirmDelete");
+        if (confirmDeleteBtn) {
+            confirmDeleteBtn.addEventListener("click", deleteDemande);
+        }
     }
-    
+
     function performSearch() {
         var searchTerm = searchInput.value.toLowerCase().trim();
         var rows = document.querySelectorAll(".demande-row");
         var visibleCount = 0;
-        
+
         rows.forEach(function(row) {
             var titre = row.getAttribute("data-titre") || "";
             var categorie = row.getAttribute("data-categorie") || "";
             var type = row.getAttribute("data-type") || "";
             var priorite = row.getAttribute("data-priorite") || "";
             var status = row.getAttribute("data-status") || "";
-            
-            var matchesSearch = searchTerm === "" || 
+
+            var matchesSearch = searchTerm === "" ||
                 titre.indexOf(searchTerm) !== -1 ||
                 categorie.indexOf(searchTerm) !== -1 ||
                 type.indexOf(searchTerm) !== -1 ||
                 priorite.toLowerCase().indexOf(searchTerm) !== -1 ||
                 status.toLowerCase().indexOf(searchTerm) !== -1;
-            
+
             var matchesFilter = currentFilter === "all" ||
                 priorite === currentFilter ||
                 status === currentFilter;
-            
+
             if (matchesSearch && matchesFilter) {
                 row.classList.remove("hidden");
                 visibleCount++;
@@ -516,72 +500,101 @@
                 row.classList.add("hidden");
             }
         });
-        
-        resultsCount.textContent = visibleCount + " demande" + (visibleCount !== 1 ? "s" : "");
-        
+
+        if (resultsCount) {
+            resultsCount.textContent = visibleCount + " demande" + (visibleCount !== 1 ? "s" : "");
+        }
+
+        var tableResponsive = document.querySelector(".table-responsive");
         if (visibleCount === 0 && rows.length > 0) {
-            noResults.style.display = "block";
-            tableBody.parentElement.style.display = "none";
+            if (noResults) noResults.style.display = "block";
+            if (tableResponsive) tableResponsive.style.display = "none";
         } else {
-            noResults.style.display = "none";
-            tableBody.parentElement.style.display = "table";
+            if (noResults) noResults.style.display = "none";
+            if (tableResponsive) tableResponsive.style.display = "block";
         }
     }
-    
+
     function clearSearch() {
-        searchInput.value = "";
+        if (searchInput) {
+            searchInput.value = "";
+        }
         currentFilter = "all";
+
         document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
             b.classList.remove("active");
         });
-        document.querySelector('.quick-filter-btn[data-filter="all"]').classList.add("active");
+
+        var allBtn = document.querySelector('.quick-filter-btn[data-filter="all"]');
+        if (allBtn) {
+            allBtn.classList.add("active");
+        }
+
         performSearch();
     }
-    
+
     function filterByStatus(status) {
-        searchInput.value = "";
+        if (searchInput) {
+            searchInput.value = "";
+        }
+
         currentFilter = status || "all";
-        
+
         document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
             b.classList.remove("active");
             if (b.getAttribute("data-filter") === currentFilter) {
                 b.classList.add("active");
             }
         });
-        
+
         performSearch();
     }
-    
+
     function deleteDemande() {
         if (!deleteId) return;
-        
+
         var btn = document.getElementById("confirmDelete");
         btn.disabled = true;
         btn.innerHTML = '<i class="ti ti-loader me-1"></i>Suppression...';
-        
-        fetch("/demande/api/" + deleteId + "/delete", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" }
-        })
-        .then(function(response) {
-            return response.json();
-        })
-        .then(function(result) {
-            if (result.success) {
-                window.location.reload();
-            } else {
-                alert("Erreur: " + result.message);
-                btn.disabled = false;
-                btn.innerHTML = '<i class="ti ti-trash me-1"></i>Supprimer';
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/demande/action/delete/" + deleteId, true);
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    try {
+                        var result = JSON.parse(xhr.responseText);
+                        if (result.success) {
+                            window.location.reload();
+                        } else {
+                            alert("Erreur: " + result.message);
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="ti ti-trash me-1"></i>Supprimer';
+                        }
+                    } catch (e) {
+                        alert("Erreur lors du traitement de la reponse");
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="ti ti-trash me-1"></i>Supprimer';
+                    }
+                } else {
+                    alert("Erreur serveur (" + xhr.status + ")");
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="ti ti-trash me-1"></i>Supprimer';
+                }
             }
-        })
-        .catch(function(error) {
+        };
+
+        xhr.onerror = function() {
             alert("Erreur de connexion");
             btn.disabled = false;
             btn.innerHTML = '<i class="ti ti-trash me-1"></i>Supprimer';
-        });
+        };
+
+        xhr.send(JSON.stringify({}));
     }
-    
+
     function debounce(func, wait) {
         var timeout;
         return function() {
@@ -593,10 +606,9 @@
             }, wait);
         };
     }
-    
+
     window.filterByStatus = filterByStatus;
     window.clearSearch = clearSearch;
-    
 })();
 </script>
 {% endblock %}

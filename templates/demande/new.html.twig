@@ -6,27 +6,37 @@
 {{ parent() }}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-.field-error {
-    color: #dc2626;
-    font-size: .85rem;
-    margin-top: .4rem;
-    font-weight: 600;
-}
-.is-invalid-custom {
-    border-color: #dc2626 !important;
-    box-shadow: 0 0 0 .2rem rgba(220, 38, 38, 0.12) !important;
-}
-.is-valid-custom {
-    border-color: #16a34a !important;
-}
-.section-note {
-    font-size: .88rem;
-    color: #64748b;
-}
-.form-label.required::after {
-    content: " *";
-    color: #dc2626;
-}
+.field-error { color: #dc2626; font-size: .85rem; margin-top: .4rem; font-weight: 600; }
+.is-invalid-custom { border-color: #dc2626 !important; box-shadow: 0 0 0 .2rem rgba(220,38,38,0.12) !important; }
+.is-valid-custom { border-color: #16a34a !important; }
+.section-note { font-size: .88rem; color: #64748b; }
+.form-label.required::after { content: " *"; color: #dc2626; }
+#map { height: 450px; width: 100%; border-radius: 10px; background: #aad3df; }
+.map-wrapper { position: relative; }
+.map-zoom-controls { position: absolute; top: 10px; left: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 4px; }
+.map-zoom-controls button { width: 32px; height: 32px; background: white; border: 1px solid #ddd; border-radius: 4px; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+.map-zoom-controls button:hover { background: #f0f0f0; }
+.map-info-bar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; background: white; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; color: #444; box-shadow: 0 2px 8px rgba(0,0,0,0.2); white-space: nowrap; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+.map-search-bar { display: flex; gap: 8px; margin-bottom: 10px; }
+.map-search-bar input { flex: 1; padding: 8px 15px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; }
+.map-search-bar button { padding: 8px 20px; background: #4A5DEF; color: white; border: none; border-radius: 20px; cursor: pointer; font-size: 14px; }
+.map-search-bar button:hover { background: #3a4ddf; }
+.location-input-group { display: flex; gap: 0; }
+.location-input-group input { border-radius: 0.375rem 0 0 0.375rem; flex: 1; background: #f8fafc; cursor: default; }
+.location-input-group button { border-radius: 0 0.375rem 0.375rem 0; padding: 0 14px; }
+.map-selected-info { font-size: .9rem; color: #475569; background: #f0f5ff; border: 1px solid #c0d0ff; padding: .65rem .85rem; border-radius: .5rem; margin-top: 8px; display: none; }
+.map-selected-info.visible { display: block; }
+.map-card { border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+.map-card-header { background: #f0f5ff; padding: 12px 16px; border-bottom: 1px solid #c0d0ff; display: flex; align-items: center; gap: 8px; font-weight: 600; color: #4A5DEF; }
+.map-card-body { padding: 16px; }
+.map-confirm-bar { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+.btn-confirm-location { background: #4A5DEF; color: white; border: none; padding: 10px 24px; border-radius: 25px; font-weight: 600; font-size: 14px; cursor: pointer; }
+.btn-confirm-location:disabled { background: #aaa; cursor: not-allowed; }
+.btn-confirm-location:not(:disabled):hover { background: #3a4ddf; }
+.btn-clear-location { background: #888; color: white; border: none; padding: 10px 20px; border-radius: 25px; font-size: 14px; cursor: pointer; }
+.btn-clear-location:hover { background: #666; }
+.inline-map-section { margin-top: 8px; border: 2px solid #4A5DEF; border-radius: 12px; overflow: hidden; display: none; }
+.inline-map-section.active { display: block; }
 </style>
 {% endblock %}
 
@@ -39,9 +49,7 @@
     </div>
     <div class="col">
         <div class="page-pretitle">Demandes</div>
-        <h2 class="page-title">
-            <i class="ti ti-file-plus me-2"></i>Nouvelle Demande
-        </h2>
+        <h2 class="page-title"><i class="ti ti-file-plus me-2"></i>Nouvelle Demande</h2>
     </div>
 </div>
 
@@ -50,13 +58,12 @@
 {% endif %}
 
 {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'id': 'demandeForm'}}) }}
+
 <div class="row">
     <div class="col-lg-8">
         <div class="card mb-4">
             <div class="card-header">
-                <h3 class="card-title">
-                    <i class="ti ti-info-circle me-2"></i>Informations generales
-                </h3>
+                <h3 class="card-title"><i class="ti ti-info-circle me-2"></i>Informations generales</h3>
             </div>
             <div class="card-body">
                 <div class="row mb-3">
@@ -69,7 +76,6 @@
                         {{ form_widget(form.categorie, {'attr': {'class': 'form-select' ~ (form.categorie.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
                     </div>
                 </div>
-
                 <div class="row mb-3">
                     <div class="col-md-6">
                         {{ form_label(form.typeDemande, null, {'label_attr': {'class': 'form-label required'}}) }}
@@ -81,12 +87,10 @@
                         {{ form_widget(form.priorite, {'attr': {'class': 'form-select' ~ (form.priorite.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
                     </div>
                 </div>
-
                 <div class="mb-3">
                     {{ form_label(form.titre, null, {'label_attr': {'class': 'form-label required'}}) }}
                     {{ form_widget(form.titre, {'attr': {'class': 'form-control' ~ (form.titre.vars.errors|length > 0 ? ' is-invalid-custom' : ''), 'placeholder': 'Titre de votre demande'}}) }}
                 </div>
-
                 <div class="mb-3">
                     {{ form_label(form.description, null, {'label_attr': {'class': 'form-label'}}) }}
                     {{ form_widget(form.description, {'attr': {'class': 'form-control', 'rows': 4, 'placeholder': 'Description detaillee (optionnel)'}}) }}
@@ -96,9 +100,7 @@
 
         <div class="card mb-4" id="dynamicFieldsCard" style="{{ submittedType ? 'display:block;' : 'display:none;' }}">
             <div class="card-header">
-                <h3 class="card-title">
-                    <i class="ti ti-forms me-2"></i>Informations specifiques
-                </h3>
+                <h3 class="card-title"><i class="ti ti-forms me-2"></i>Informations specifiques</h3>
             </div>
             <div class="card-body">
                 <div class="row g-3" id="dynamicFields"></div>
@@ -109,9 +111,7 @@
     <div class="col-lg-4">
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">
-                    <i class="ti ti-send me-2"></i>Actions
-                </h3>
+                <h3 class="card-title"><i class="ti ti-send me-2"></i>Actions</h3>
             </div>
             <div class="card-body">
                 <div class="mb-3">
@@ -129,38 +129,15 @@
         </div>
     </div>
 </div>
-{{ form_end(form) }}
 
-<div class="modal modal-blur fade" id="mapModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="ti ti-map-pin me-2"></i>Selectionner une localisation</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <div class="input-group">
-                        <input type="text" id="mapSearch" class="form-control" placeholder="Rechercher une adresse...">
-                        <button class="btn btn-primary" type="button" id="searchBtn">Rechercher</button>
-                    </div>
-                </div>
-                <div id="map" style="height: 400px; border-radius: 8px;"></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-primary" id="confirmLocation">Confirmer</button>
-            </div>
-        </div>
-    </div>
-</div>
+{{ form_end(form) }}
 {% endblock %}
 
 {% block javascripts %}
 {{ parent() }}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-(function() {
+(function () {
     "use strict";
 
     var CATEGORIES = {{ categories|json_encode|raw }};
@@ -168,31 +145,20 @@
     var SUBMITTED_TYPE = {{ submittedType|json_encode|raw }};
     var DETAIL_ERRORS = {{ detailErrors|json_encode|raw }};
 
-    var currentLocationField = null;
-    var map = null;
-    var marker = null;
-    var selectedLocation = null;
-    var mapModal = null;
+    var maps = {};
+    var markers = {};
+    var selectedLocations = {};
 
-    var categorieSelect;
-    var typeSelect;
-    var typeInfo;
-    var dynamicFieldsCard;
-    var dynamicFieldsContainer;
+    var categorieSelect, typeSelect, typeInfo, dynamicFieldsCard, dynamicFieldsContainer;
 
-    document.addEventListener("DOMContentLoaded", init);
-
-    function init() {
+    document.addEventListener("DOMContentLoaded", function () {
         categorieSelect = document.getElementById("demande_categorie");
         typeSelect = document.getElementById("demande_typeDemande");
         typeInfo = document.getElementById("typeInfo");
         dynamicFieldsCard = document.getElementById("dynamicFieldsCard");
         dynamicFieldsContainer = document.getElementById("dynamicFields");
 
-        if (!categorieSelect || !typeSelect) {
-            console.error("Form elements not found");
-            return;
-        }
+        if (!categorieSelect || !typeSelect) return;
 
         categorieSelect.addEventListener("change", onCategoryChange);
         typeSelect.addEventListener("change", onTypeChange);
@@ -200,42 +166,16 @@
         if (SUBMITTED_TYPE) {
             loadDynamicFields(SUBMITTED_TYPE, SUBMITTED_DETAILS);
         }
-
-        var mapModalEl = document.getElementById("mapModal");
-        if (mapModalEl) {
-            mapModal = new bootstrap.Modal(mapModalEl);
-            mapModalEl.addEventListener("shown.bs.modal", initMap);
-        }
-
-        var confirmBtn = document.getElementById("confirmLocation");
-        if (confirmBtn) {
-            confirmBtn.addEventListener("click", confirmLocationSelection);
-        }
-
-        var searchBtn = document.getElementById("searchBtn");
-        if (searchBtn) {
-            searchBtn.addEventListener("click", function() {
-                searchLocation(document.getElementById("mapSearch").value);
-            });
-        }
-
-        var mapSearchInput = document.getElementById("mapSearch");
-        if (mapSearchInput) {
-            mapSearchInput.addEventListener("keypress", function(e) {
-                if (e.key === "Enter") {
-                    e.preventDefault();
-                    searchLocation(this.value);
-                }
-            });
-        }
-    }
+    });
 
     function onCategoryChange() {
         var category = categorieSelect.value;
-        
         typeSelect.innerHTML = '<option value="">-- Choisir un type --</option>';
         dynamicFieldsCard.style.display = "none";
         dynamicFieldsContainer.innerHTML = "";
+        maps = {};
+        markers = {};
+        selectedLocations = {};
 
         if (category && CATEGORIES[category]) {
             var types = CATEGORIES[category];
@@ -254,6 +194,9 @@
 
     function onTypeChange() {
         var type = typeSelect.value;
+        maps = {};
+        markers = {};
+        selectedLocations = {};
         if (!type) {
             dynamicFieldsCard.style.display = "none";
             dynamicFieldsContainer.innerHTML = "";
@@ -264,11 +207,11 @@
 
     function loadDynamicFields(type, existingValues) {
         fetch("/demande/api/fields/" + encodeURIComponent(type))
-            .then(function(response) {
-                if (!response.ok) throw new Error("HTTP error " + response.status);
-                return response.json();
+            .then(function (r) {
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                return r.json();
             })
-            .then(function(fields) {
+            .then(function (fields) {
                 if (fields && fields.length > 0) {
                     renderDynamicFields(fields, existingValues);
                     dynamicFieldsCard.style.display = "block";
@@ -277,236 +220,411 @@
                     dynamicFieldsContainer.innerHTML = "";
                 }
             })
-            .catch(function(error) {
-                console.error("Error loading fields:", error);
-            });
+            .catch(function (e) { console.error(e); });
     }
 
-    function hasFieldError(fieldKey) {
+    function hasFieldError(key) {
         for (var i = 0; i < DETAIL_ERRORS.length; i++) {
-            if (DETAIL_ERRORS[i].field === fieldKey) {
-                return true;
-            }
+            if (DETAIL_ERRORS[i].field === key) return true;
         }
         return false;
     }
 
     function renderDynamicFields(fields, existingValues) {
         dynamicFieldsContainer.innerHTML = "";
+        maps = {};
+        markers = {};
+        selectedLocations = {};
 
         for (var i = 0; i < fields.length; i++) {
             var field = fields[i];
-            var col = document.createElement("div");
-            col.className = field.type === "textarea" ? "col-12" : "col-md-6";
-
-            var label = document.createElement("label");
-            label.className = "form-label" + (field.required ? " required" : "");
-            label.textContent = field.label;
-            col.appendChild(label);
-
-            var input;
             var existingValue = existingValues[field.key] || "";
-            var fieldHasError = hasFieldError(field.key);
-            var errorClass = fieldHasError ? " is-invalid-custom" : "";
+            var errClass = hasFieldError(field.key) ? " is-invalid-custom" : "";
 
-            switch (field.type) {
-                case "text":
-                    input = document.createElement("input");
-                    input.type = "text";
-                    input.className = "form-control" + errorClass;
-                    input.name = "details[" + field.key + "]";
-                    input.value = existingValue;
-                    col.appendChild(input);
-                    break;
-
-                case "number":
-                    input = document.createElement("input");
-                    input.type = "number";
-                    input.className = "form-control" + errorClass;
-                    input.name = "details[" + field.key + "]";
-                    input.value = existingValue;
-                    input.min = "0";
-                    col.appendChild(input);
-                    break;
-
-                case "date":
-                    input = document.createElement("input");
-                    input.type = "date";
-                    input.className = "form-control" + errorClass;
-                    input.name = "details[" + field.key + "]";
-                    input.value = existingValue;
-                    col.appendChild(input);
-                    break;
-
-                case "textarea":
-                    input = document.createElement("textarea");
-                    input.className = "form-control" + errorClass;
-                    input.rows = 3;
-                    input.name = "details[" + field.key + "]";
-                    input.value = existingValue;
-                    col.appendChild(input);
-                    break;
-
-                case "select":
-                    input = document.createElement("select");
-                    input.className = "form-select" + errorClass;
-                    input.name = "details[" + field.key + "]";
-
-                    var defOpt = document.createElement("option");
-                    defOpt.value = "";
-                    defOpt.textContent = "-- Selectionnez --";
-                    input.appendChild(defOpt);
-
-                    if (field.options) {
-                        for (var j = 0; j < field.options.length; j++) {
-                            var opt = document.createElement("option");
-                            opt.value = field.options[j];
-                            opt.textContent = field.options[j];
-                            if (existingValue === field.options[j]) {
-                                opt.selected = true;
-                            }
-                            input.appendChild(opt);
-                        }
-                    }
-                    col.appendChild(input);
-                    break;
-
-                case "location":
-                    var inputGroup = document.createElement("div");
-                    inputGroup.className = "input-group";
-
-                    var locInput = document.createElement("input");
-                    locInput.type = "text";
-                    locInput.className = "form-control" + errorClass;
-                    locInput.name = "details[" + field.key + "]";
-                    locInput.id = "location-" + field.key;
-                    locInput.readOnly = true;
-                    locInput.value = existingValue;
-
-                    var mapBtn = document.createElement("button");
-                    mapBtn.type = "button";
-                    mapBtn.className = "btn btn-primary";
-                    mapBtn.innerHTML = '<i class="ti ti-map-pin"></i>';
-
-                    (function(li, fk) {
-                        mapBtn.addEventListener("click", function() {
-                            openMapPicker(li, fk);
-                        });
-                    })(locInput, field.key);
-
-                    inputGroup.appendChild(locInput);
-                    inputGroup.appendChild(mapBtn);
-                    col.appendChild(inputGroup);
-
-                    var latInput = document.createElement("input");
-                    latInput.type = "hidden";
-                    latInput.name = "details[" + field.key + "Lat]";
-                    latInput.id = "lat-" + field.key;
-                    latInput.value = existingValues[field.key + "Lat"] || "";
-                    col.appendChild(latInput);
-
-                    var lonInput = document.createElement("input");
-                    lonInput.type = "hidden";
-                    lonInput.name = "details[" + field.key + "Lon]";
-                    lonInput.id = "lon-" + field.key;
-                    lonInput.value = existingValues[field.key + "Lon"] || "";
-                    col.appendChild(lonInput);
-                    break;
-            }
-
-            dynamicFieldsContainer.appendChild(col);
-        }
-    }
-
-    function openMapPicker(inputField, fieldKey) {
-        currentLocationField = { input: inputField, key: fieldKey };
-        selectedLocation = null;
-        if (mapModal) {
-            mapModal.show();
-        }
-    }
-
-    function initMap() {
-        var mapContainer = document.getElementById("map");
-        if (!mapContainer) return;
-
-        setTimeout(function() {
-            if (!map) {
-                map = L.map("map").setView([36.8065, 10.1815], 8);
-                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                    attribution: "OpenStreetMap"
-                }).addTo(map);
-                map.on("click", onMapClick);
+            if (field.type === "location") {
+                var fullCol = document.createElement("div");
+                fullCol.className = "col-12";
+                fullCol.appendChild(buildLocationField(field, existingValue, existingValues));
+                dynamicFieldsContainer.appendChild(fullCol);
             } else {
-                map.invalidateSize();
+                var col = document.createElement("div");
+                col.className = field.type === "textarea" ? "col-12" : "col-md-6";
+                col.appendChild(buildLabel(field));
+                col.appendChild(buildInput(field, existingValue, errClass));
+                dynamicFieldsContainer.appendChild(col);
             }
+        }
+    }
 
-            if (marker) {
-                map.removeLayer(marker);
-                marker = null;
-            }
+    function buildLabel(field) {
+        var lbl = document.createElement("label");
+        lbl.className = "form-label" + (field.required ? " required" : "");
+        lbl.textContent = field.label;
+        return lbl;
+    }
+
+    function buildInput(field, value, errClass) {
+        var inp;
+        switch (field.type) {
+            case "text":
+                inp = document.createElement("input");
+                inp.type = "text";
+                inp.className = "form-control" + errClass;
+                inp.name = "details[" + field.key + "]";
+                inp.value = value;
+                return inp;
+            case "number":
+                inp = document.createElement("input");
+                inp.type = "number";
+                inp.className = "form-control" + errClass;
+                inp.name = "details[" + field.key + "]";
+                inp.value = value;
+                inp.min = "0";
+                return inp;
+            case "date":
+                inp = document.createElement("input");
+                inp.type = "date";
+                inp.className = "form-control" + errClass;
+                inp.name = "details[" + field.key + "]";
+                inp.value = value;
+                return inp;
+            case "textarea":
+                inp = document.createElement("textarea");
+                inp.className = "form-control" + errClass;
+                inp.rows = 3;
+                inp.name = "details[" + field.key + "]";
+                inp.value = value;
+                return inp;
+            case "select":
+                inp = document.createElement("select");
+                inp.className = "form-select" + errClass;
+                inp.name = "details[" + field.key + "]";
+                var def = document.createElement("option");
+                def.value = "";
+                def.textContent = "-- Selectionnez --";
+                inp.appendChild(def);
+                if (field.options) {
+                    for (var j = 0; j < field.options.length; j++) {
+                        var o = document.createElement("option");
+                        o.value = field.options[j];
+                        o.textContent = field.options[j];
+                        if (value === field.options[j]) o.selected = true;
+                        inp.appendChild(o);
+                    }
+                }
+                return inp;
+            default:
+                inp = document.createElement("input");
+                inp.type = "text";
+                inp.className = "form-control" + errClass;
+                inp.name = "details[" + field.key + "]";
+                inp.value = value;
+                return inp;
+        }
+    }
+
+    function buildLocationField(field, existingValue, existingValues) {
+        var wrapper = document.createElement("div");
+        var errClass = hasFieldError(field.key) ? " is-invalid-custom" : "";
+
+        var lbl = buildLabel(field);
+        wrapper.appendChild(lbl);
+
+        var existingLat = existingValues[field.key + "Lat"] || "";
+        var existingLon = existingValues[field.key + "Lon"] || "";
+
+        var readonlyInput = document.createElement("input");
+        readonlyInput.type = "text";
+        readonlyInput.className = "form-control mb-2" + errClass;
+        readonlyInput.readOnly = true;
+        readonlyInput.name = "details[" + field.key + "]";
+        readonlyInput.id = "locval-" + field.key;
+        readonlyInput.placeholder = "Cliquez sur la carte ci-dessous pour choisir un lieu";
+        readonlyInput.value = existingValue;
+        wrapper.appendChild(readonlyInput);
+
+        var latInput = document.createElement("input");
+        latInput.type = "hidden";
+        latInput.name = "details[" + field.key + "Lat]";
+        latInput.id = "lat-" + field.key;
+        latInput.value = existingLat;
+        wrapper.appendChild(latInput);
+
+        var lonInput = document.createElement("input");
+        lonInput.type = "hidden";
+        lonInput.name = "details[" + field.key + "Lon]";
+        lonInput.id = "lon-" + field.key;
+        lonInput.value = existingLon;
+        wrapper.appendChild(lonInput);
+
+        var mapSection = document.createElement("div");
+        mapSection.className = "inline-map-section active";
+        mapSection.id = "mapsection-" + field.key;
+
+        var mapCardHeader = document.createElement("div");
+        mapCardHeader.className = "map-card-header";
+        mapCardHeader.innerHTML = '<svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right:6px"><path d="M8 0C5.24 0 3 2.24 3 5c0 3.75 5 11 5 11s5-7.25 5-11c0-2.76-2.24-5-5-5zm0 7.5C6.62 7.5 5.5 6.38 5.5 5S6.62 2.5 8 2.5 10.5 3.62 10.5 5 9.38 7.5 8 7.5z"/></svg>' + field.label + ' - Choisir sur la carte';
+        mapSection.appendChild(mapCardHeader);
+
+        var mapCardBody = document.createElement("div");
+        mapCardBody.className = "map-card-body";
+
+        var searchBar = document.createElement("div");
+        searchBar.className = "map-search-bar";
+        var searchInput = document.createElement("input");
+        searchInput.type = "text";
+        searchInput.placeholder = "Rechercher une ville ou adresse...";
+        searchInput.id = "mapsearch-" + field.key;
+        var searchBtn = document.createElement("button");
+        searchBtn.type = "button";
+        searchBtn.textContent = "Rechercher";
+        searchBtn.setAttribute("data-key", field.key);
+        searchBtn.onclick = (function (k) {
+            return function () {
+                var q = document.getElementById("mapsearch-" + k).value;
+                searchOnMap(k, q);
+            };
+        })(field.key);
+        searchInput.addEventListener("keypress", (function (k) {
+            return function (e) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    searchOnMap(k, document.getElementById("mapsearch-" + k).value);
+                }
+            };
+        })(field.key));
+        searchBar.appendChild(searchInput);
+        searchBar.appendChild(searchBtn);
+        mapCardBody.appendChild(searchBar);
+
+        var mapWrapper = document.createElement("div");
+        mapWrapper.className = "map-wrapper";
+
+        var infoBar = document.createElement("div");
+        infoBar.className = "map-info-bar";
+        infoBar.id = "mapinfo-" + field.key;
+        infoBar.textContent = "Cliquez sur la carte pour choisir un lieu";
+        mapWrapper.appendChild(infoBar);
+
+        var zoomBox = document.createElement("div");
+        zoomBox.className = "map-zoom-controls";
+        var zoomInBtn = document.createElement("button");
+        zoomInBtn.type = "button";
+        zoomInBtn.textContent = "+";
+        zoomInBtn.setAttribute("data-key", field.key);
+        zoomInBtn.onclick = (function (k) { return function () { if (maps[k]) maps[k].zoomIn(); }; })(field.key);
+        var zoomOutBtn = document.createElement("button");
+        zoomOutBtn.type = "button";
+        zoomOutBtn.textContent = "−";
+        zoomOutBtn.setAttribute("data-key", field.key);
+        zoomOutBtn.onclick = (function (k) { return function () { if (maps[k]) maps[k].zoomOut(); }; })(field.key);
+        zoomBox.appendChild(zoomInBtn);
+        zoomBox.appendChild(zoomOutBtn);
+        mapWrapper.appendChild(zoomBox);
+
+        var mapDiv = document.createElement("div");
+        mapDiv.id = "map-" + field.key;
+        mapDiv.style.height = "450px";
+        mapDiv.style.width = "100%";
+        mapDiv.style.borderRadius = "0 0 10px 10px";
+        mapDiv.style.background = "#aad3df";
+        mapWrapper.appendChild(mapDiv);
+        mapCardBody.appendChild(mapWrapper);
+
+        var infoSelected = document.createElement("div");
+        infoSelected.className = "map-selected-info";
+        infoSelected.id = "mapselected-" + field.key;
+        mapCardBody.appendChild(infoSelected);
+
+        var confirmBar = document.createElement("div");
+        confirmBar.className = "map-confirm-bar";
+        var clearBtn = document.createElement("button");
+        clearBtn.type = "button";
+        clearBtn.className = "btn-clear-location";
+        clearBtn.textContent = "Effacer";
+        clearBtn.setAttribute("data-key", field.key);
+        clearBtn.onclick = (function (k) {
+            return function () { clearLocation(k); };
+        })(field.key);
+        var confirmBtn = document.createElement("button");
+        confirmBtn.type = "button";
+        confirmBtn.className = "btn-confirm-location";
+        confirmBtn.id = "mapconfirm-" + field.key;
+        confirmBtn.textContent = "Confirmer cette destination";
+        confirmBtn.disabled = true;
+        confirmBtn.setAttribute("data-key", field.key);
+        confirmBtn.onclick = (function (k) {
+            return function () { confirmLocation(k); };
+        })(field.key);
+        confirmBar.appendChild(clearBtn);
+        confirmBar.appendChild(confirmBtn);
+        mapCardBody.appendChild(confirmBar);
+
+        mapSection.appendChild(mapCardBody);
+        wrapper.appendChild(mapSection);
+
+        setTimeout(function () {
+            initInlineMap(field.key, existingLat, existingLon, existingValue);
         }, 300);
+
+        return wrapper;
     }
 
-    function onMapClick(e) {
-        if (marker) map.removeLayer(marker);
-        marker = L.marker(e.latlng).addTo(map);
+    function initInlineMap(key, existingLat, existingLon, existingValue) {
+        var mapDiv = document.getElementById("map-" + key);
+        if (!mapDiv) return;
 
-        selectedLocation = {
-            lat: e.latlng.lat,
-            lon: e.latlng.lng,
-            name: e.latlng.lat.toFixed(4) + ", " + e.latlng.lng.toFixed(4)
-        };
+        var defaultLat = 36.8065;
+        var defaultLon = 10.1815;
+        var defaultZoom = 6;
 
-        fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + e.latlng.lat + "&lon=" + e.latlng.lng)
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.display_name) {
-                    selectedLocation.name = data.display_name;
-                    marker.bindPopup(data.display_name).openPopup();
-                }
+        var m = L.map("map-" + key, { zoomControl: false }).setView([defaultLat, defaultLon], defaultZoom);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "&copy; OpenStreetMap contributors",
+            maxZoom: 18
+        }).addTo(m);
+
+        maps[key] = m;
+        markers[key] = null;
+        selectedLocations[key] = null;
+
+        if (existingLat && existingLon) {
+            var lat = parseFloat(existingLat);
+            var lon = parseFloat(existingLon);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                m.setView([lat, lon], 13);
+                markers[key] = L.marker([lat, lon]).addTo(m);
+                selectedLocations[key] = { lat: lat, lon: lon, name: existingValue || (lat.toFixed(5) + ", " + lon.toFixed(5)) };
+                updateMapInfo(key, selectedLocations[key].name);
+                showSelectedInfo(key, selectedLocations[key]);
+                document.getElementById("mapconfirm-" + key).disabled = false;
+            }
+        }
+
+        m.on("click", (function (k) {
+            return function (e) {
+                pickLocationOnMap(k, e.latlng.lat, e.latlng.lng);
+            };
+        })(key));
+    }
+
+    function pickLocationOnMap(key, lat, lon) {
+        var m = maps[key];
+        if (!m) return;
+
+        if (markers[key]) m.removeLayer(markers[key]);
+        markers[key] = L.marker([lat, lon]).addTo(m);
+
+        var tempName = lat.toFixed(5) + ", " + lon.toFixed(5);
+        selectedLocations[key] = { lat: lat, lon: lon, name: tempName };
+        updateMapInfo(key, "Recherche en cours...");
+        document.getElementById("mapconfirm-" + key).disabled = true;
+
+        showSelectedInfo(key, { lat: lat, lon: lon, name: "Geocodage en cours..." });
+
+        fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lon + "&accept-language=fr")
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var name = data.display_name || tempName;
+                selectedLocations[key] = { lat: lat, lon: lon, name: name };
+                updateMapInfo(key, name);
+                showSelectedInfo(key, selectedLocations[key]);
+                if (markers[key]) markers[key].bindPopup(name).openPopup();
+                document.getElementById("mapconfirm-" + key).disabled = false;
+            })
+            .catch(function () {
+                selectedLocations[key] = { lat: lat, lon: lon, name: tempName };
+                updateMapInfo(key, tempName);
+                showSelectedInfo(key, selectedLocations[key]);
+                document.getElementById("mapconfirm-" + key).disabled = false;
             });
     }
 
-    function searchLocation(query) {
-        if (!query) return;
-
-        fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(query))
-            .then(function(r) { return r.json(); })
-            .then(function(results) {
-                if (results.length > 0) {
-                    var result = results[0];
-                    var latlng = L.latLng(parseFloat(result.lat), parseFloat(result.lon));
-                    map.setView(latlng, 14);
-
-                    if (marker) map.removeLayer(marker);
-                    marker = L.marker(latlng).addTo(map);
-                    marker.bindPopup(result.display_name).openPopup();
-
-                    selectedLocation = {
-                        lat: parseFloat(result.lat),
-                        lon: parseFloat(result.lon),
-                        name: result.display_name
-                    };
+    function searchOnMap(key, query) {
+        if (!query || !query.trim()) return;
+        updateMapInfo(key, "Recherche: " + query + "...");
+        fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(query.trim()) + "&limit=1&accept-language=fr")
+            .then(function (r) { return r.json(); })
+            .then(function (results) {
+                if (results && results.length > 0) {
+                    var r = results[0];
+                    var lat = parseFloat(r.lat);
+                    var lon = parseFloat(r.lon);
+                    var m = maps[key];
+                    if (m) {
+                        m.setView([lat, lon], 13);
+                        pickLocationOnMap(key, lat, lon);
+                    }
+                } else {
+                    updateMapInfo(key, "Aucun resultat trouve");
                 }
+            })
+            .catch(function () {
+                updateMapInfo(key, "Erreur de recherche");
             });
     }
 
-    function confirmLocationSelection() {
-        if (selectedLocation && currentLocationField) {
-            currentLocationField.input.value = selectedLocation.name;
-
-            var latInput = document.getElementById("lat-" + currentLocationField.key);
-            var lonInput = document.getElementById("lon-" + currentLocationField.key);
-
-            if (latInput) latInput.value = selectedLocation.lat;
-            if (lonInput) lonInput.value = selectedLocation.lon;
-        }
-
-        if (mapModal) {
-            mapModal.hide();
+    function updateMapInfo(key, text) {
+        var el = document.getElementById("mapinfo-" + key);
+        if (el) {
+            el.textContent = text.length > 60 ? text.substring(0, 57) + "..." : text;
         }
     }
+
+    function showSelectedInfo(key, loc) {
+        var el = document.getElementById("mapselected-" + key);
+        if (!el) return;
+        el.className = "map-selected-info visible";
+        el.innerHTML = "<strong>Lieu selectionne:</strong> " + loc.name +
+            "<br><small style='color:#888'>Lat: " + loc.lat.toFixed(6) + " | Lon: " + loc.lon.toFixed(6) + "</small>";
+    }
+
+    function confirmLocation(key) {
+        var loc = selectedLocations[key];
+        if (!loc) return;
+        var valInput = document.getElementById("locval-" + key);
+        var latInput = document.getElementById("lat-" + key);
+        var lonInput = document.getElementById("lon-" + key);
+        if (valInput) valInput.value = loc.name;
+        if (latInput) latInput.value = loc.lat;
+        if (lonInput) lonInput.value = loc.lon;
+
+        var infoEl = document.getElementById("mapselected-" + key);
+        if (infoEl) {
+            infoEl.innerHTML = "<strong style='color:#16a34a'>Destination confirmee:</strong> " + loc.name +
+                "<br><small style='color:#888'>Lat: " + loc.lat.toFixed(6) + " | Lon: " + loc.lon.toFixed(6) + "</small>";
+        }
+        var confirmBtn = document.getElementById("mapconfirm-" + key);
+        if (confirmBtn) {
+            confirmBtn.textContent = "Confirme";
+            confirmBtn.style.background = "#16a34a";
+        }
+    }
+
+    function clearLocation(key) {
+        var m = maps[key];
+        if (m && markers[key]) {
+            m.removeLayer(markers[key]);
+            markers[key] = null;
+        }
+        selectedLocations[key] = null;
+        var valInput = document.getElementById("locval-" + key);
+        var latInput = document.getElementById("lat-" + key);
+        var lonInput = document.getElementById("lon-" + key);
+        if (valInput) valInput.value = "";
+        if (latInput) latInput.value = "";
+        if (lonInput) lonInput.value = "";
+        updateMapInfo(key, "Cliquez sur la carte pour choisir un lieu");
+        var infoEl = document.getElementById("mapselected-" + key);
+        if (infoEl) { infoEl.className = "map-selected-info"; infoEl.innerHTML = ""; }
+        var confirmBtn = document.getElementById("mapconfirm-" + key);
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = "Confirmer cette destination";
+            confirmBtn.style.background = "";
+        }
+    }
+
 })();
 </script>
 {% endblock %}

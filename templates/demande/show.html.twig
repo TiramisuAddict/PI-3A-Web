@@ -1,321 +1,15 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Demande - {{ demande.titre }}{% endblock %}
+{% block title %}Demande #{{ demande.idDemande }}{% endblock %}
 
 {% block stylesheets %}
 {{ parent() }}
 <style>
-    .badge {
-        color: #ffffff !important;
-        font-weight: 700;
-    }
-
-    .badge.bg-yellow,
-    .badge.bg-warning,
-    .badge.text-dark,
-    .badge.bg-light,
-    .badge.bg-white {
-        color: #111827 !important;
-    }
-
-    .demande-header {
-        background: linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(255, 255, 255, 0.96));
-        border: 1px solid var(--app-border);
-        border-radius: 18px;
-        padding: 2rem;
-        margin-bottom: 1.5rem;
-        box-shadow: var(--app-shadow-soft);
-    }
-
-    .demande-title {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: #111827;
-        margin-bottom: 1rem;
-        line-height: 1.3;
-    }
-
-    .meta-badges {
-        display: flex;
-        flex-wrap: wrap;
-        gap: .75rem;
-        align-items: center;
-    }
-
-    .meta-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: .45rem;
-        padding: .55rem .95rem;
-        border-radius: 999px;
-        font-size: .9rem;
-        font-weight: 600;
-    }
-
-    .meta-badge.category {
-        background: rgba(13, 110, 253, 0.10);
-        color: #0b5ed7;
-    }
-
-    .meta-badge.type {
-        background: rgba(15, 23, 42, 0.08);
-        color: #1f2937;
-    }
-
-    .date-display {
-        background: rgba(13, 110, 253, 0.08);
-        border: 1px solid rgba(13, 110, 253, 0.14);
-        border-radius: 14px;
-        padding: 1rem 1.25rem;
-        text-align: center;
-        min-width: 120px;
-    }
-
-    .date-display .day {
-        font-size: 2rem;
-        font-weight: 800;
-        color: #0b5ed7;
-        line-height: 1;
-    }
-
-    .date-display .month-year {
-        font-size: .92rem;
-        color: #334155;
-        margin-top: .35rem;
-        font-weight: 600;
-    }
-
-    .section-card {
-        margin-bottom: 1.5rem;
-    }
-
-    .section-card .card-header {
-        background: transparent;
-        border-bottom: 1px solid var(--app-border);
-        padding: 1rem 1.25rem;
-    }
-
-    .section-card .card-header h3 {
-        margin: 0;
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: #111827;
-        display: flex;
-        align-items: center;
-        gap: .55rem;
-    }
-
-    .section-card .card-body {
-        padding: 1.25rem;
-    }
-
-    .description-box {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        padding: 1.15rem 1.25rem;
-        color: #111827;
-        line-height: 1.85;
-        font-size: 1rem;
-        font-weight: 500;
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
-
-    .details-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-        gap: 1rem;
-    }
-
-    .detail-card {
-        background: #ffffff;
-        border: 1px solid #dbe3ef;
-        border-radius: 14px;
-        padding: 1rem 1.1rem;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
-        transition: all .2s ease;
-        height: 100%;
-    }
-
-    .detail-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-        border-color: #cbd5e1;
-    }
-
-    .detail-card.full-width {
-        grid-column: 1 / -1;
-    }
-
-    .detail-head {
-        display: flex;
-        align-items: flex-start;
-        gap: .85rem;
-    }
-
-    .detail-icon {
-        width: 40px;
-        height: 40px;
-        min-width: 40px;
-        border-radius: 12px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(13, 110, 253, 0.12);
-        color: #0b5ed7;
-        font-size: 1rem;
-        margin-top: 2px;
-    }
-
-    .detail-content {
-        flex: 1;
-        min-width: 0;
-    }
-
-    .detail-label {
-        font-size: .8rem;
-        font-weight: 700;
-        color: #475569;
-        text-transform: uppercase;
-        letter-spacing: .45px;
-        margin: 0 0 .45rem 0;
-        line-height: 1.4;
-    }
-
-    .detail-value {
-        font-size: 1rem;
-        font-weight: 600;
-        color: #0f172a;
-        line-height: 1.75;
-        margin: 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-        overflow-wrap: anywhere;
-    }
-
-    .detail-card.long-text .detail-value {
-        background: #f8fafc;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        padding: .9rem 1rem;
-        margin-top: .35rem;
-    }
-
-    .empty-details {
-        text-align: center;
-        padding: 2.5rem 1rem;
-        color: #475569;
-    }
-
-    .empty-details i {
-        font-size: 2.8rem;
-        margin-bottom: .75rem;
-        display: block;
-        color: #94a3b8;
-    }
-
-    .timeline-card {
-        max-height: 680px;
-        overflow-y: auto;
-    }
-
-    .timeline-item {
-        position: relative;
-        padding-left: 1.8rem;
-        padding-bottom: 1.4rem;
-        border-left: 2px solid #cbd5e1;
-        margin-left: .5rem;
-    }
-
-    .timeline-item:last-child {
-        border-left-color: transparent;
-        padding-bottom: 0;
-    }
-
-    .timeline-item::before {
-        content: '';
-        position: absolute;
-        left: -8px;
-        top: 4px;
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        background: #2563eb;
-        border: 3px solid #fff;
-        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.14);
-    }
-
-    .timeline-date {
-        font-size: .9rem;
-        color: #111827;
-        margin-bottom: .5rem;
-        font-weight: 700;
-    }
-
-    .timeline-content {
-        background: #ffffff;
-        border: 1px solid #d1d5db;
-        border-radius: 12px;
-        padding: 1rem;
-        box-shadow: 0 3px 8px rgba(15, 23, 42, 0.04);
-    }
-
-    .status-change {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        flex-wrap: wrap;
-    }
-
-    .timeline-actor {
-        font-size: .95rem;
-        color: #111827;
-        margin-top: .75rem;
-        font-weight: 700;
-    }
-
-    .timeline-comment {
-        font-size: 1rem;
-        color: #000000;
-        margin-top: .8rem;
-        padding-top: .8rem;
-        border-top: 1px solid #d1d5db;
-        white-space: pre-wrap;
-        word-break: break-word;
-        line-height: 1.8;
-        font-weight: 600;
-    }
-
-    .timeline-content .badge {
-        padding: .45rem .8rem;
-        font-size: .82rem;
-        font-weight: 700;
-        color: #ffffff !important;
-    }
-
-    .timeline-content .badge.bg-yellow,
-    .timeline-content .badge.bg-warning {
-        color: #111827 !important;
-    }
-
-    @media (max-width: 767.98px) {
-        .demande-header {
-            padding: 1.25rem;
-        }
-
-        .demande-title {
-            font-size: 1.4rem;
-        }
-
-        .details-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .date-display {
-            margin-top: 1rem;
-        }
-    }
+.detail-label { font-weight: 600; color: #64748b; font-size: .85rem; text-transform: uppercase; letter-spacing: .5px; }
+.detail-value { font-size: .95rem; }
+.timeline-item { position: relative; padding-left: 2rem; padding-bottom: 1.5rem; border-left: 2px solid #e2e8f0; }
+.timeline-item:last-child { border-left: 2px solid transparent; }
+.timeline-item::before { content: ''; position: absolute; left: -6px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; border: 2px solid #fff; }
 </style>
 {% endblock %}
 
@@ -323,276 +17,294 @@
 <div class="row mb-4 align-items-center">
     <div class="col-auto">
         <a href="{{ path('demande_index') }}" class="btn btn-outline-secondary">
-            <i class="ti ti-arrow-left me-1"></i>Retour a la liste
+            <i class="ti ti-arrow-left me-1"></i>Retour
         </a>
     </div>
-    <div class="col"></div>
+    <div class="col">
+        <div class="page-pretitle">Demande #{{ demande.idDemande }}</div>
+        <h2 class="page-title">{{ demande.titre }}</h2>
+    </div>
     <div class="col-auto">
-        <div class="btn-list">
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#statusModal">
-                <i class="ti ti-refresh me-1"></i>Changer statut
-            </button>
-            <a href="{{ path('demande_edit', {id: demande.idDemande}) }}" class="btn btn-warning">
-                <i class="ti ti-edit me-1"></i>Modifier
-            </a>
-        </div>
+        <a href="{{ path('demande_edit', {id: demande.idDemande}) }}" class="btn btn-primary me-2">
+            <i class="ti ti-edit me-1"></i>Modifier
+        </a>
+        <button class="btn btn-danger" onclick="document.getElementById('deleteModal').classList.add('show'); document.getElementById('deleteModal').style.display='block';">
+            <i class="ti ti-trash me-1"></i>Supprimer
+        </button>
     </div>
 </div>
 
-<div class="demande-header">
-    <div class="row align-items-center">
-        <div class="col-lg-8">
-            <h1 class="demande-title">{{ demande.titre }}</h1>
-            <div class="meta-badges">
-                <span class="meta-badge category">
-                    <i class="ti ti-folder"></i>{{ demande.categorie }}
-                </span>
-                <span class="meta-badge type">
-                    <i class="ti ti-tag"></i>{{ demande.typeDemande }}
-                </span>
-
-                {% if demande.priorite == 'HAUTE' %}
-                    <span class="badge bg-red text-white px-3 py-2">
-                        <i class="ti ti-alert-triangle me-1"></i>{{ demande.priorite }}
-                    </span>
-                {% elseif demande.priorite == 'NORMALE' %}
-                    <span class="badge bg-blue text-white px-3 py-2">
-                        <i class="ti ti-minus me-1"></i>{{ demande.priorite }}
-                    </span>
-                {% else %}
-                    <span class="badge bg-green text-white px-3 py-2">
-                        <i class="ti ti-arrow-down me-1"></i>{{ demande.priorite }}
-                    </span>
-                {% endif %}
-
-                {% if demande.status == 'Nouvelle' %}
-                    <span class="badge bg-blue text-white px-3 py-2">
-                        <i class="ti ti-sparkles me-1"></i>{{ demande.status }}
-                    </span>
-                {% elseif demande.status == 'En cours' %}
-                    <span class="badge bg-yellow text-dark px-3 py-2">
-                        <i class="ti ti-loader me-1"></i>{{ demande.status }}
-                    </span>
-                {% elseif demande.status == 'En attente' %}
-                    <span class="badge bg-orange text-white px-3 py-2">
-                        <i class="ti ti-clock me-1"></i>{{ demande.status }}
-                    </span>
-                {% elseif demande.status == 'Resolue' %}
-                    <span class="badge bg-green text-white px-3 py-2">
-                        <i class="ti ti-check me-1"></i>{{ demande.status }}
-                    </span>
-                {% elseif demande.status == 'Annulee' %}
-                    <span class="badge bg-red text-white px-3 py-2">
-                        <i class="ti ti-x me-1"></i>{{ demande.status }}
-                    </span>
-                {% else %}
-                    <span class="badge bg-secondary text-white px-3 py-2">
-                        <i class="ti ti-lock me-1"></i>{{ demande.status }}
-                    </span>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
-            <div class="date-display d-inline-block">
-                <div class="day">{{ demande.dateCreation|date('d') }}</div>
-                <div class="month-year">{{ demande.dateCreation|date('M Y') }}</div>
-            </div>
-        </div>
+{% for message in app.flashes('success') %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="ti ti-check me-2"></i>{{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
-</div>
+{% endfor %}
 
 <div class="row">
     <div class="col-lg-8">
-        <div class="surface-card section-card">
+        <div class="card mb-4">
             <div class="card-header">
-                <h3>
-                    <i class="ti ti-file-description text-primary"></i>
-                    Description
-                </h3>
+                <h3 class="card-title"><i class="ti ti-info-circle me-2"></i>Informations generales</h3>
             </div>
             <div class="card-body">
-                {% if demande.description %}
-                    <div class="description-box">{{ demande.description|nl2br }}</div>
-                {% else %}
-                    <div class="empty-details">
-                        <i class="ti ti-notes-off"></i>
-                        <p class="mb-0">Aucune description fournie</p>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="detail-label">Categorie</div>
+                        <div class="detail-value">{{ demande.categorie }}</div>
                     </div>
-                {% endif %}
+                    <div class="col-md-6">
+                        <div class="detail-label">Type de demande</div>
+                        <div class="detail-value">{{ demande.typeDemande }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="detail-label">Priorite</div>
+                        <div class="detail-value">
+                            {% if demande.priorite == 'HAUTE' %}
+                                <span class="badge bg-danger">{{ demande.priorite }}</span>
+                            {% elseif demande.priorite == 'NORMALE' %}
+                                <span class="badge bg-warning">{{ demande.priorite }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ demande.priorite }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="detail-label">Statut</div>
+                        <div class="detail-value"><span class="badge bg-blue">{{ demande.status }}</span></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="detail-label">Employe</div>
+                        <div class="detail-value">
+                            {% if demande.employe %}
+                                {{ demande.employe.nom }} {{ demande.employe.prenom }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="detail-label">Date de creation</div>
+                        <div class="detail-value">{{ demande.dateCreation ? demande.dateCreation|date('d/m/Y') : 'N/A' }}</div>
+                    </div>
+                    {% if demande.description %}
+                    <div class="col-12">
+                        <div class="detail-label">Description</div>
+                        <div class="detail-value">{{ demande.description }}</div>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
 
-        <div class="surface-card section-card">
+        {% if detailsData|length > 0 %}
+        <div class="card mb-4">
             <div class="card-header">
-                <h3>
-                    <i class="ti ti-list-details text-primary"></i>
-                    Details specifiques
-                </h3>
+                <h3 class="card-title"><i class="ti ti-forms me-2"></i>Informations specifiques</h3>
             </div>
             <div class="card-body">
-                {% if detailsData is defined and detailsData|length > 0 %}
-                    <div class="details-grid">
-                        {% for key, value in detailsData %}
-                            {% if not (key ends with 'Lat') and not (key ends with 'Lon') and value is not empty %}
-                                {% set isLongText = value|length > 120 or '\n' in value %}
-                                <div class="detail-card {% if isLongText %}long-text full-width{% endif %}">
-                                    <div class="detail-head">
-                                        <div class="detail-icon">
-                                            {% if 'date' in key|lower %}
-                                                <i class="ti ti-calendar"></i>
-                                            {% elseif 'nombre' in key|lower or 'montant' in key|lower or 'cout' in key|lower or 'quantite' in key|lower %}
-                                                <i class="ti ti-calculator"></i>
-                                            {% elseif 'type' in key|lower %}
-                                                <i class="ti ti-category"></i>
-                                            {% elseif 'motif' in key|lower or 'justification' in key|lower or 'objectif' in key|lower or 'description' in key|lower or 'details' in key|lower %}
-                                                <i class="ti ti-message-circle"></i>
-                                            {% elseif 'lieu' in key|lower or 'adresse' in key|lower %}
-                                                <i class="ti ti-map-pin"></i>
-                                            {% elseif 'heure' in key|lower or 'horaire' in key|lower %}
-                                                <i class="ti ti-clock"></i>
-                                            {% elseif 'duree' in key|lower %}
-                                                <i class="ti ti-hourglass"></i>
-                                            {% elseif 'email' in key|lower %}
-                                                <i class="ti ti-mail"></i>
-                                            {% elseif 'telephone' in key|lower %}
-                                                <i class="ti ti-phone"></i>
-                                            {% else %}
-                                                <i class="ti ti-file-text"></i>
-                                            {% endif %}
-                                        </div>
-                                        <div class="detail-content">
-                                            <p class="detail-label">{{ fieldLabels[key] | default(key) }}</p>
-                                            <p class="detail-value">{{ value }}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="empty-details">
-                        <i class="ti ti-file-off"></i>
-                        <p class="mb-0">Aucun detail specifique pour cette demande</p>
-                    </div>
-                {% endif %}
+                <div class="row g-3">
+                    {% for key, value in detailsData %}
+                        {% if not (key ends with 'Lat' or key ends with 'Lon') %}
+                        <div class="col-md-6">
+                            <div class="detail-label">{{ fieldLabels[key] ?? key }}</div>
+                            <div class="detail-value">{{ value }}</div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
             </div>
         </div>
+        {% endif %}
+
+        {% if demande.historiqueDemandes|length > 0 %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title"><i class="ti ti-history me-2"></i>Historique</h3>
+            </div>
+            <div class="card-body">
+                {% for historique in demande.historiqueDemandes|reverse %}
+                <div class="timeline-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            {% if historique.ancienStatut %}
+                                <span class="badge bg-secondary">{{ historique.ancienStatut }}</span>
+                                <i class="ti ti-arrow-right mx-1"></i>
+                            {% endif %}
+                            <span class="badge bg-blue">{{ historique.nouveauStatut }}</span>
+                            {% if historique.commentaire %}
+                                <div class="text-muted mt-1" style="font-size:.85rem;">{{ historique.commentaire }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="text-end text-muted" style="font-size:.8rem;">
+                            <div>{{ historique.acteur }}</div>
+                            <div>{{ historique.dateAction|date('d/m/Y H:i') }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <div class="col-lg-4">
-        <div class="surface-card timeline-card">
+        <div class="card mb-4">
             <div class="card-header">
-                <h3 class="card-title mb-0">
-                    <i class="ti ti-history text-primary"></i>
-                    Historique
-                </h3>
+                <h3 class="card-title"><i class="ti ti-settings me-2"></i>Changer le statut</h3>
             </div>
             <div class="card-body">
-                {% if demande.historiqueDemandes|length > 0 %}
-                    {% for historique in demande.historiqueDemandes %}
-                        <div class="timeline-item">
-                            <div class="timeline-date">
-                                <i class="ti ti-calendar me-1"></i>{{ historique.dateAction|date('d/m/Y H:i') }}
-                            </div>
-                            <div class="timeline-content">
-                                <div class="status-change">
-                                    {% if historique.ancienStatut %}
-                                        <span class="badge bg-secondary">{{ historique.ancienStatut }}</span>
-                                        <i class="ti ti-arrow-right"></i>
-                                    {% endif %}
-                                    <span class="badge bg-primary">{{ historique.nouveauStatut }}</span>
-                                </div>
-                                <div class="timeline-actor">
-                                    <i class="ti ti-user me-1"></i>{{ historique.acteur }}
-                                </div>
-                                {% if historique.commentaire %}
-                                    <div class="timeline-comment">{{ historique.commentaire }}</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="empty-details">
-                        <i class="ti ti-history-off"></i>
-                        <p class="mb-0">Aucun historique</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal modal-blur fade" id="statusModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="ti ti-refresh me-2"></i>Changer le statut
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
                 <div class="mb-3">
                     <label class="form-label">Nouveau statut</label>
-                    <select class="form-select form-select-lg" id="newStatus">
+                    <select class="form-select" id="newStatus">
                         {% for status in statuses %}
-                            <option value="{{ status }}" {{ status == demande.status ? 'selected' : '' }}>{{ status }}</option>
+                            <option value="{{ status }}" {{ demande.status == status ? 'selected' : '' }}>{{ status }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Commentaire</label>
-                    <textarea class="form-control" id="statusComment" rows="3" placeholder="Ajouter un commentaire (optionnel)"></textarea>
+                    <textarea class="form-control" id="statusComment" rows="3" placeholder="Commentaire (optionnel)"></textarea>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-primary" id="saveStatus">
-                    <i class="ti ti-check me-1"></i>Enregistrer
+                <button class="btn btn-primary w-100" id="updateStatusBtn">
+                    <i class="ti ti-check me-1"></i>Mettre a jour
                 </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="ti ti-link me-2"></i>Actions rapides</h3>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ path('demande_edit', {id: demande.idDemande}) }}" class="btn btn-outline-primary">
+                        <i class="ti ti-edit me-1"></i>Modifier
+                    </a>
+                    <button class="btn btn-outline-danger" onclick="document.getElementById('deleteModal').classList.add('show'); document.getElementById('deleteModal').style.display='block';">
+                        <i class="ti ti-trash me-1"></i>Supprimer
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="deleteModal" tabindex="-1" style="display:none;">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmer la suppression</h5>
+                <button type="button" class="btn-close" onclick="document.getElementById('deleteModal').classList.remove('show'); document.getElementById('deleteModal').style.display='none';"></button>
+            </div>
+            <div class="modal-body">
+                <p>Etes-vous sur de vouloir supprimer cette demande ?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('deleteModal').classList.remove('show'); document.getElementById('deleteModal').style.display='none';">Annuler</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Supprimer</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop fade" id="modalBackdrop" style="display:none;"></div>
 {% endblock %}
 
 {% block javascripts %}
 {{ parent() }}
 <script>
-document.getElementById("saveStatus").addEventListener("click", function() {
-    var newStatus = document.getElementById("newStatus").value;
-    var comment = document.getElementById("statusComment").value;
-    var btn = this;
+(function() {
+    "use strict";
 
-    btn.disabled = true;
-    btn.innerHTML = '<i class="ti ti-loader me-1"></i>Enregistrement...';
+    var DELETE_URL = "{{ path('demande_delete', {id: demande.idDemande}) }}";
+    var STATUS_URL = "{{ path('demande_update_status', {id: demande.idDemande}) }}";
+    var INDEX_URL = "{{ path('demande_index') }}";
 
-    fetch("/demande/api/{{ demande.idDemande }}/status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            status: newStatus,
-            commentaire: comment
-        })
-    })
-    .then(function(response) {
-        return response.json();
-    })
-    .then(function(result) {
-        if (result.success) {
-            window.location.reload();
-        } else {
-            alert("Erreur: " + result.message);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
-        }
-    })
-    .catch(function() {
-        alert("Erreur de connexion");
-        btn.disabled = false;
-        btn.innerHTML = '<i class="ti ti-check me-1"></i>Enregistrer';
+    document.addEventListener("DOMContentLoaded", function() {
+
+        document.getElementById("confirmDeleteBtn").addEventListener("click", function() {
+            var btn = this;
+            btn.disabled = true;
+            btn.textContent = "Suppression...";
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", DELETE_URL, true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var result = JSON.parse(xhr.responseText);
+                            if (result.success) {
+                                window.location.href = INDEX_URL;
+                            } else {
+                                alert(result.message);
+                                btn.disabled = false;
+                                btn.textContent = "Supprimer";
+                            }
+                        } catch (e) {
+                            alert("Erreur lors du traitement de la reponse");
+                            btn.disabled = false;
+                            btn.textContent = "Supprimer";
+                        }
+                    } else {
+                        alert("Erreur serveur (code " + xhr.status + ")");
+                        btn.disabled = false;
+                        btn.textContent = "Supprimer";
+                    }
+                }
+            };
+            xhr.onerror = function() {
+                alert("Erreur de connexion au serveur");
+                btn.disabled = false;
+                btn.textContent = "Supprimer";
+            };
+            xhr.send(JSON.stringify({}));
+        });
+
+        document.getElementById("updateStatusBtn").addEventListener("click", function() {
+            var btn = this;
+            var newStatus = document.getElementById("newStatus").value;
+            var comment = document.getElementById("statusComment").value;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader me-1"></i>Mise a jour...';
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", STATUS_URL, true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var result = JSON.parse(xhr.responseText);
+                            if (result.success) {
+                                window.location.reload();
+                            } else {
+                                alert(result.message);
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="ti ti-check me-1"></i>Mettre a jour';
+                            }
+                        } catch (e) {
+                            alert("Erreur lors du traitement");
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="ti ti-check me-1"></i>Mettre a jour';
+                        }
+                    } else {
+                        alert("Erreur serveur (code " + xhr.status + ")");
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="ti ti-check me-1"></i>Mettre a jour';
+                    }
+                }
+            };
+            xhr.onerror = function() {
+                alert("Erreur de connexion au serveur");
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ti ti-check me-1"></i>Mettre a jour';
+            };
+            xhr.send(JSON.stringify({status: newStatus, commentaire: comment}));
+        });
     });
-});
+})();
 </script>
 {% endblock %}
