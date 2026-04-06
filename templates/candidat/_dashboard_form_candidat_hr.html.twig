@@ -1,0 +1,16 @@
+{{ form_start(form, { attr: { class: 'vstack gap-3' } }) }}
+
+{{ form_errors(form) }}
+
+{{ form_row(form.etat, { attr: { class: 'form-select mt-2' } }) }}
+{{ form_row(form.note, { attr: { class: 'form-control mt-2', rows: 4 } }) }}
+
+<div class="d-grid">
+	{{ form_widget(form.submit, { attr: { class: 'btn btn-primary' } }) }}
+</div>
+
+{{ form_end(form, { render_rest: false }) }}
+
+{% if message is defined and message %}
+	<div class="alert alert-success mt-3 mb-0" role="alert">{{ message }}</div>
+{% endif %}
