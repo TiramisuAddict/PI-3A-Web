@@ -154,12 +154,12 @@
 
 {% for candidature in candidatures %}
 
-{% if candidature.code_candidature == trackingCode %}
-    {% set trackingCode = candidature.code_candidature %}
-    {% set trackingJob = candidature.offre.titre_poste %}
+{% if candidature.codeCandidature == trackingCode %}
+    {% set trackingCode = candidature.codeCandidature %}
+    {% set trackingJob = candidature.offre.titrePoste %}
     {% set trackingState = candidature.etat %}
-    {% set trackingDate = candidature.date_candidature %}
-    {% set trackingEmail = candidature.visiteur.e_mail %}
+    {% set trackingDate = candidature.dateCandidature %}
+    {% set trackingEmail = candidature.visiteur.eMail %}
 
     {% set hasTracking = true %}
     {% set submittedClass = trackingState == 'En attente' ? 'active' : trackingState in ['Présélectionné', 'Entretien', 'Accepté', 'Refusé'] ? 'completed' : '' %}

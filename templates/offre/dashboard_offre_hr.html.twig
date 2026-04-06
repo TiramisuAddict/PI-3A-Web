@@ -8,19 +8,349 @@
         .dashboard-hr {
             background: #f5f7fb;
             min-height: 100vh;
+            padding: 1.5rem 0 2rem;
+        }
+
+        .offer-item {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 10px;
+            background: #fff;
+            transition: border-color .2s ease, box-shadow .2s ease;
+        }
+
+        .offer-item:hover {
+            border-color: rgba(31, 111, 235, 0.35);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+        }
+
+        .offer-meta {
+            font-size: .85rem;
+            color: #64748b;
+        }
+
+        .delete-mini-btn {
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .edit-mini-btn {
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-title-sub {
+            color: #64748b;
+            font-size: .9rem;
+            margin-bottom: 0.75rem;
+        }
+
+        #offreModal .modal-title{
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+            margin-top: 1.25rem;
+        }
+
+        .tox-tinymce {
+            border-radius: 8px !important;
+        }
+
+        .modal-body .form-group {
+            margin-bottom: 0;
+        }
+
+        .modal-body label {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: .95rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-body label.required::after {
+            content: ' *';
+            color: #ef4444;
+        }
+
+        .modal-body .vstack {
+            gap: 1.25rem !important;
+        }
+
+        #offreModal .modal-footer {
+            background-color: transparent !important;
         }
     </style>
 {% endblock %}
 
+{% block javascripts %}
+    {{ parent() }}
+    <script src="https://cdn.jsdelivr.net/npm/tinymce@7/tinymce.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const modalElement = document.getElementById('offreModal');
+            const modalTitle = document.getElementById('offreModalTitle');
+            const modalSubtitle = document.getElementById('offreModalSubtitle');
+
+            const idInput = document.getElementById('{{ form.id.vars.id }}');
+            const titreInput = document.getElementById('{{ form.titre_poste.vars.id }}');
+            const contratInput = document.getElementById('{{ form.type_contrat.vars.id }}');
+            const dateInput = document.getElementById('{{ form.date_limite.vars.id }}');
+            const etatInput = document.getElementById('{{ form.etat.vars.id }}');
+            const categorieInput = document.getElementById('{{ form.categorie.vars.id }}');
+            const descriptionInput = document.getElementById('{{ form.description.vars.id }}');
+
+            if (descriptionInput) {
+                descriptionInput.classList.add('tinymce-editor');
+            }
+
+            if (window.tinymce) {
+                tinymce.init({
+                    selector: '.tinymce-editor',
+                    menubar: false,
+                    height: 220,
+                    plugins: 'lists link code',
+                    toolbar: 'undo redo | bold italic underline | bullist numlist | link | code',
+                    branding: false
+                });
+            }
+
+            const modalForm = document.querySelector('#offreModal form');
+            if (modalForm) {
+                modalForm.addEventListener('submit', function () {
+                    if (window.tinymce) {
+                        tinymce.triggerSave();
+                    }
+                });
+            }
+
+            function setEditorValue(value) {
+                const editor = window.tinymce ? tinymce.get('{{ form.description.vars.id }}') : null;
+                if (editor) {
+                    editor.setContent(value || '');
+                    return;
+                }
+                if (descriptionInput) {
+                    descriptionInput.value = value || '';
+                }
+            }
+
+            function resetForm() {
+                if (idInput) idInput.value = '';
+                if (titreInput) titreInput.value = '';
+                if (contratInput) contratInput.value = '';
+                if (dateInput) dateInput.value = '';
+                if (etatInput) etatInput.value = '';
+                if (categorieInput) categorieInput.value = '';
+                setEditorValue('');
+            }
+
+            function normalizeContrat(value) {
+                if (value === 'CVP') return 'CIVP';
+                if (value === 'Stage') return 'STAGE';
+                return value || '';
+            }
+
+            function normalizeEtat(value) {
+                if (value === 'Ouvert') return 'OUVERT';
+                if (value === 'Fermé') return 'FERMÉ';
+                return value || '';
+            }
+
+            document.querySelectorAll('[data-offer-create]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    modalTitle.textContent = 'Créer une Offre';
+                    modalSubtitle.textContent = 'Complétez les informations de la nouvelle offre.';
+                    resetForm();
+                });
+            });
+
+            // edit button handler
+            document.querySelectorAll('[data-offer-edit]').forEach(function (btn) {
+                btn.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    const card = btn.closest('[data-offer-card]');
+                    
+                    modalTitle.textContent = 'Modifier l\'Offre';
+                    modalSubtitle.textContent = 'Mettez à jour les informations de cette offre.';
+
+                    if (idInput) idInput.value = card.dataset.offerId || '';
+                    if (titreInput) titreInput.value = card.dataset.titre || '';
+                    if (contratInput) contratInput.value = normalizeContrat(card.dataset.contrat);
+                    if (dateInput) dateInput.value = card.dataset.date || '';
+                    if (etatInput) etatInput.value = normalizeEtat(card.dataset.etat);
+                    if (categorieInput) categorieInput.value = card.dataset.categorie || '';
+                    setEditorValue(card.dataset.description || '');
+                });
+            });
+
+            // delete button handler
+            document.querySelectorAll('[data-offer-delete]').forEach(function (btn) {
+                btn.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    const offerId = btn.dataset.offerId;
+                    
+                    if (confirm('Êtes-vous sûr de vouloir supprimer cette offre ?')) {
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = '/offre/delete/' + offerId;
+                        document.body.appendChild(form);
+                        form.submit();
+                    }
+                });
+            });
+        });
+    </script>
+{% endblock %}
+
 {% block body %}
-    {% include 'offre/_home_page_navbar.html.twig' with {'active_nav': 'dashboard'} %}
-
     <div class="dashboard-hr">
-        <div class="container-xl py-4">
-            <h1 class="h2 mb-4">Bienvenue sur votre dashboard RH</h1>
-            <p class="text-secondary">Gérez vos offres d'emploi, suivez les candidatures et accédez à des outils de recrutement performants.</p>
+        <div class="container-xl">
+            {% for message in app.flashes('success') %}
+                <div class="alert alert-success" role="alert">{{ message }}</div>
+            {% endfor %}
 
-            <!-- Contenu du dashboard RH -->
+            {% for message in app.flashes('error') %}
+                <div class="alert alert-danger" role="alert">{{ message }}</div>
+            {% endfor %}
+
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <h1 class="h2 mb-1">Dashboard des Offres</h1>
+                    <p class="text-secondary mb-0">Visualisez et gérez vos opportunités de recrutement.</p>
+                </div>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#offreModal" data-offer-create>
+                    + Créer une Offre
+                </button>
+            </div>
+
+            <div class="card dashboard-card mb-3">
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-12 col-lg-5">
+                            <input type="text" class="form-control" placeholder="Rechercher par titre ou code...">
+                        </div>
+                        <div class="col-12 col-md-4 col-lg-2">
+                            <select class="form-select">
+                                <option>Tous les contrats</option>
+                                <option>CDI</option>
+                                <option>CDD</option>
+                                <option>STAGE</option>
+                                <option>CIVP</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4 col-lg-2">
+                            <select class="form-select">
+                                <option>Tous les états</option>
+                                <option>OUVERT</option>
+                                <option>FERMÉ</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4 col-lg-3">
+                            <select class="form-select">
+                                <option>Toutes les catégories</option>
+                                {% for offre in offres %}
+                                    {% if offre.categorie %}
+                                        <option>{{ offre.categorie }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="vstack gap-3">
+                {% for offre in offres %}
+                    <div
+                        class="offer-item p-3"
+                        data-offer-card
+                        data-offer-id="{{ offre.id }}"
+                        data-id-employer="{{ offre.idEmployer }}"
+                        data-titre="{{ offre.titrePoste }}"
+                        data-contrat="{{ offre.typeContrat }}"
+                        data-date="{{ offre.dateLimite ? offre.dateLimite|date('Y-m-d') : '' }}"
+                        data-etat="{{ offre.etat }}"
+                        data-categorie="{{ offre.categorie }}"
+                        data-description="{{ offre.description|default('')|e('html_attr') }}"
+                    >
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div>
+                                <h3 class="h5 mb-2">{{ offre.titrePoste }}</h3>
+                                <div class="offer-meta">
+                                    {% if offre.typeContrat %}{{ offre.typeContrat }} - {% endif %}
+                                    {% if offre.dateLimite %}Expire le {{ offre.dateLimite|date('d/m/Y') }}{% else %}Pas de date limite{% endif %}
+                                    {% if offre.idEmployer %} - Créé par: #{{ offre.idEmployer }}{% endif %}
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge {{ offre.etat == 'FERMÉ' ? 'bg-red-lt text-red' : 'bg-blue-lt text-blue' }}">{{ offre.etat|default('OUVERT') }}</span>
+                                <button type="button" class="btn btn-outline-primary edit-mini-btn" data-offer-edit data-offer-id="{{ offre.id }}" title="Modifier" data-bs-toggle="modal" data-bs-target="#offreModal">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"/></svg>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger delete-mini-btn" data-offer-delete data-offer-id="{{ offre.id }}" title="Supprimer">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="card dashboard-card">
+                        <div class="card-body">
+                            <div class="empty">
+                                <div class="empty-title">Aucune offre disponible</div>
+                                <div class="empty-subtitle text-secondary">Créez une offre pour la voir apparaître ici.</div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
         </div>
+        {# Modal ============================================================== #}
+        <div class="modal fade" id="offreModal" tabindex="-1" aria-labelledby="offreModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title" id="offreModalTitle">Créer une Offre</h5>
+                            <div class="modal-title-sub" id="offreModalSubtitle">Complétez les informations de la nouvelle offre.</div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        {{ form_start(form, {'action': path('app_offre_save'), 'method': 'POST'}) }}
+                        {{ form_widget(form.id) }}
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="vstack gap-3">
+                                    {{ form_row(form.titre_poste, {'attr': {'class': 'form-control'}}) }}
+                                    {{ form_row(form.type_contrat, {'attr': {'class': 'form-select'}}) }}
+                                    {{ form_row(form.date_limite, {'attr': {'class': 'form-control'}}) }}
+                                    {{ form_row(form.etat, {'attr': {'class': 'form-select'}}) }}
+                                    {{ form_row(form.categorie, {'attr': {'class': 'form-select'}}) }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                {{ form_row(form.description, {'attr': {'class': 'form-control tinymce-editor'}}) }}
+                            </div>
+                        </div>
+
+                        <div class="modal-footer px-0 pb-0 mt-4">
+                            <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Annuler</button>
+                            <button type="submit" class="btn btn-primary">Enregistrer</button>
+                        </div>
+                        {{ form_end(form) }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {# Modal ============================================================== #}
     </div>
 {% endblock %}

@@ -80,14 +80,14 @@ final class CandidatController extends AbstractController
             $code = strtoupper(base_convert((string) round(microtime(true) * 1000), 10, 36));
 
             $candidat
-                ->setCode_candidature($code)
+                ->setCodeCandidature($code)
                 ->setEtat('En attente')
                 ->setNote(null)
-                ->setDate_candidature(new \DateTime())
-                ->setCv_nom($cvFile->getClientOriginalName())
-                ->setCv_data($cvContent)
-                ->setLettre_motivation_nom($lettreFile->getClientOriginalName())
-                ->setLettre_motivation_data($lettreContent)
+                ->setDateCandidature(new \DateTime())
+                ->setCvNom($cvFile->getClientOriginalName())
+                ->setCvData($cvContent)
+                ->setLettreMotivationNom($lettreFile->getClientOriginalName())
+                ->setLettreMotivationData($lettreContent)
                 ->setOffre($offre)
                 ->setVisiteur($visiteur);
 
