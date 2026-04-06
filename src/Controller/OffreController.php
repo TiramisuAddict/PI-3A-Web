@@ -43,7 +43,20 @@ final class OffreController extends AbstractController
         ]);
     }
 
-    #[Route('/offre/createOffre', name: 'app_offre_create')]
+    // dashboard_offre_hr
+    #[Route('/offre/dashboard', name: 'app_offre_dashboard')]
+    public function dashboard(OffreRepository $offre_repository): Response
+    {
+        $offres = $offre_repository->findAll();
+        $form = $this->createForm(CreeOffreType::class, new Offre());
+
+        return $this->render('offre/dashboard_offre_hr.html.twig', [
+            'offres' => $offres,
+            'form' => $form->createView(),
+        ]);
+    }
+
+    #[Route('/offre/createOffre', name: 'app_offre_create', methods: ['GET', 'POST'])]
     public function createOffreForm(Request $request, ManagerRegistry $doctrine) : Response {
         $offre = new Offre();
 
@@ -58,20 +71,25 @@ final class OffreController extends AbstractController
             $doctrine->getManager()->persist($offre);
             $doctrine->getManager()->flush();
 
-            return $this->render('offre/_offre_dashboard_form.html.twig', [
-                'form' => $form->createView(),
-                'message' => 'Offre créée avec succès !',
-            ]);
+            $this->addFlash('success', 'Offre créée avec succès !');
+            return $this->redirectToRoute('app_offre_dashboard');
         }
 
-        return $this->render('offre/_offre_dashboard_form.html.twig', [
+        $offres = $doctrine->getRepository(Offre::class)->findAll();
+        return $this->render('offre/dashboard_offre_hr.html.twig', [
             'form' => $form->createView(),
+            'offres' => $offres,
         ]);
     }
 
-    #[Route('/offre/updateOffre/{id}', name: 'app_offre_update')]
+    #[Route('/offre/updateOffre/{id}', name: 'app_offre_update', methods: ['GET', 'POST'])]
     public function updateOffreForm(Request $request, ManagerRegistry $doctrine, int $id) : Response {
         $offre = $doctrine->getRepository(Offre::class)->find($id);
+
+        if (!$offre) {
+            $this->addFlash('error', 'Offre non trouvée.');
+            return $this->redirectToRoute('app_offre_dashboard');
+        }
 
         $form = $this->createForm(CreeOffreType::class, $offre);
 
@@ -84,18 +102,18 @@ final class OffreController extends AbstractController
             $doctrine->getManager()->persist($offre);
             $doctrine->getManager()->flush();
 
-            return $this->render('offre/_offre_dashboard_form.html.twig', [
-                'form' => $form->createView(),
-                'message' => 'Offre modifiée avec succès !',
-            ]);
+            $this->addFlash('success', 'Offre modifiée avec succès !');
+            return $this->redirectToRoute('app_offre_dashboard');
         }
 
-        return $this->render('offre/_offre_dashboard_form.html.twig', [
+        $offres = $doctrine->getRepository(Offre::class)->findAll();
+        return $this->render('offre/dashboard_offre_hr.html.twig', [
             'form' => $form->createView(),
+            'offres' => $offres,
         ]);
     }
 
-    #[Route('/offre/deleteOffre/{id}', name: 'app_offre_delete')]
+    #[Route('/offre/deleteOffre/{id}', name: 'app_offre_delete', methods: ['POST'])]
     public function deleteOffreForm(Request $request, ManagerRegistry $doctrine, int $id) : Response {
         $offre = $doctrine->getRepository(Offre::class)->find($id);
 
@@ -103,14 +121,12 @@ final class OffreController extends AbstractController
             $doctrine->getManager()->remove($offre);
             $doctrine->getManager()->flush();
 
-            return $this->render('offre/_offre_dashboard_form.html.twig', [
-                'message' => 'Offre supprimée avec succès !',
-            ]);
+            $this->addFlash('success', 'Offre supprimée avec succès !');
+            return $this->redirectToRoute('app_offre_dashboard');
         }
 
-        return $this->render('offre/_offre_dashboard_form.html.twig', [
-            'message' => 'Offre non trouvée.',
-        ]);
+        $this->addFlash('error', 'Offre non trouvée.');
+        return $this->redirectToRoute('app_offre_dashboard');
     }
 
 }

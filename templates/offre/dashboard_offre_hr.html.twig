@@ -93,11 +93,14 @@
     <script src="https://cdn.jsdelivr.net/npm/tinymce@7/tinymce.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const modalElement = document.getElementById('offreModal');
             const modalTitle = document.getElementById('offreModalTitle');
             const modalSubtitle = document.getElementById('offreModalSubtitle');
 
-            const idInput = document.getElementById('{{ form.id.vars.id }}');
+            const createAction = '{{ path('app_offre_create') }}';
+            const updateActionTemplate = '{{ path('app_offre_update', { id: '__ID__' }) }}';
+            const deleteActionTemplate = '{{ path('app_offre_delete', { id: '__ID__' }) }}';
+
+            const modalForm = document.querySelector('#offreModal form');
             const titreInput = document.getElementById('{{ form.titre_poste.vars.id }}');
             const contratInput = document.getElementById('{{ form.type_contrat.vars.id }}');
             const dateInput = document.getElementById('{{ form.date_limite.vars.id }}');
@@ -120,7 +123,6 @@
                 });
             }
 
-            const modalForm = document.querySelector('#offreModal form');
             if (modalForm) {
                 modalForm.addEventListener('submit', function () {
                     if (window.tinymce) {
@@ -141,10 +143,12 @@
             }
 
             function resetForm() {
-                if (idInput) idInput.value = '';
+                if (modalForm) {
+                    modalForm.action = createAction;
+                }
                 if (titreInput) titreInput.value = '';
                 if (contratInput) contratInput.value = '';
-                if (dateInput) dateInput.value = '';
+                setDateFields('');
                 if (etatInput) etatInput.value = '';
                 if (categorieInput) categorieInput.value = '';
                 setEditorValue('');
@@ -156,9 +160,15 @@
             }
 
             function normalizeEtat(value) {
-                if (value === 'Ouvert') return 'OUVERT';
-                if (value === 'Fermé') return 'FERMÉ';
+                if (value === 'OUVERT') return 'Ouvert';
+                if (value === 'FERMÉ' || value === 'FERME') return 'Fermé';
                 return value || '';
+            }
+
+            function setDateFields(dateValue) {
+                if (dateInput) {
+                    dateInput.value = dateValue || '';
+                }
             }
 
             document.querySelectorAll('[data-offer-create]').forEach(function (btn) {
@@ -169,7 +179,6 @@
                 });
             });
 
-            // edit button handler
             document.querySelectorAll('[data-offer-edit]').forEach(function (btn) {
                 btn.addEventListener('click', function (event) {
                     event.stopPropagation();
@@ -178,17 +187,18 @@
                     modalTitle.textContent = 'Modifier l\'Offre';
                     modalSubtitle.textContent = 'Mettez à jour les informations de cette offre.';
 
-                    if (idInput) idInput.value = card.dataset.offerId || '';
+                    if (modalForm) {
+                        modalForm.action = updateActionTemplate.replace('__ID__', card.dataset.offerId || '0');
+                    }
                     if (titreInput) titreInput.value = card.dataset.titre || '';
                     if (contratInput) contratInput.value = normalizeContrat(card.dataset.contrat);
-                    if (dateInput) dateInput.value = card.dataset.date || '';
+                    setDateFields(card.dataset.date || '');
                     if (etatInput) etatInput.value = normalizeEtat(card.dataset.etat);
                     if (categorieInput) categorieInput.value = card.dataset.categorie || '';
                     setEditorValue(card.dataset.description || '');
                 });
             });
 
-            // delete button handler
             document.querySelectorAll('[data-offer-delete]').forEach(function (btn) {
                 btn.addEventListener('click', function (event) {
                     event.stopPropagation();
@@ -197,7 +207,7 @@
                     if (confirm('Êtes-vous sûr de vouloir supprimer cette offre ?')) {
                         const form = document.createElement('form');
                         form.method = 'POST';
-                        form.action = '/offre/delete/' + offerId;
+                        form.action = deleteActionTemplate.replace('__ID__', offerId || '0');
                         document.body.appendChild(form);
                         form.submit();
                     }
@@ -211,11 +221,17 @@
     <div class="dashboard-hr">
         <div class="container-xl">
             {% for message in app.flashes('success') %}
-                <div class="alert alert-success" role="alert">{{ message }}</div>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
             {% endfor %}
 
             {% for message in app.flashes('error') %}
-                <div class="alert alert-danger" role="alert">{{ message }}</div>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
             {% endfor %}
 
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
@@ -324,8 +340,8 @@
                     </div>
 
                     <div class="modal-body">
-                        {{ form_start(form, {'action': path('app_offre_save'), 'method': 'POST'}) }}
-                        {{ form_widget(form.id) }}
+                        {{ form_start(form, {'action': path('app_offre_create'), 'method': 'POST'}) }}
+                        {{ form_widget(form._token) }}
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="vstack gap-3">
@@ -338,6 +354,7 @@
                             </div>
                             <div class="col-md-6">
                                 {{ form_row(form.description, {'attr': {'class': 'form-control tinymce-editor'}}) }}
+                                <div class="d-none">{{ form_row(form.submit) }}</div>
                             </div>
                         </div>
 
@@ -345,7 +362,7 @@
                             <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Annuler</button>
                             <button type="submit" class="btn btn-primary">Enregistrer</button>
                         </div>
-                        {{ form_end(form) }}
+                        {{ form_end(form, {'render_rest': false}) }}
                     </div>
                 </div>
             </div>
