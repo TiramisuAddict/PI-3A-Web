@@ -295,11 +295,15 @@
                         <div class="col-12 col-md-4 col-lg-3">
                             <select class="form-select">
                                 <option>Toutes les catégories</option>
-                                {% for offre in offres %}
-                                    {% if offre.categorie %}
-                                        <option>{{ offre.categorie }}</option>
-                                    {% endif %}
-                                {% endfor %}
+                                <option>Informatique</option>
+                                <option>Marketing</option>
+                                <option>Vente</option>
+                                <option>Finance</option>
+                                <option>Ressources Humaines</option>
+                                <option>Santé</option>
+                                <option>Education</option>
+                                <option>Art et Design</option>
+                                <option>Autre</option>
                             </select>
                         </div>
                     </div>

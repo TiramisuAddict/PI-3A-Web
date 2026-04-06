@@ -62,9 +62,14 @@ class OffreType extends AbstractType
                 'label' => 'Catégorie',
                 'choices' => [
                     'Informatique' => 'Informatique',
-                    'Santé' => 'Santé',
                     'Marketing' => 'Marketing',
+                    'Vente' => 'Vente',
+                    'Finance' => 'Finance',
+                    'Ressources Humaines' => 'Ressources Humaines',
+                    'Santé' => 'Santé',
+                    'Education' => 'Education',
                     'Art et Design' => 'Art et Design',
+                    'Autre' => 'Autre',
                 ],
                 'required' => false,
             ])

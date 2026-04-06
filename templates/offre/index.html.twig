@@ -124,13 +124,17 @@
 {% set queryCategory = app.request.query.get('category')|default('') %}
 {% set queryContract = app.request.query.get('contract')|default('') %}
 
-{# fill categories #}
-{% set categories = [] %}
-{% for offre in offres %}
-    {% if offre.categorie is not empty and offre.categorie not in categories %}
-        {% set categories = categories|merge([offre.categorie]) %}
-    {% endif %}
-{% endfor %}
+{% set categories = [
+    'Informatique',
+    'Marketing',
+    'Vente',
+    'Finance',
+    'Ressources Humaines',
+    'Santé',
+    'Education',
+    'Art et Design',
+    'Autre'
+] %}
 
 {# check flashes #}
 
