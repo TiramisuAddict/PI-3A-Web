@@ -1,0 +1,129 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Connexion{% endblock %}
+
+{% block body %}
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#f0f0f8;">
+  <div style="width:900px; max-width:98vw; min-height:500px; border-radius:18px; overflow:hidden; display:flex; box-shadow:0 8px 40px rgba(0,0,0,0.15);">
+
+    {# ── Colonne gauche : formulaire ── #}
+    <div style="flex:1; background:#fff; display:flex; align-items:center; justify-content:center; padding:3rem;">
+      <div style="width:100%; max-width:300px;">
+
+        <div class="mb-4">
+          <img src="/images/WKlogo.svg" height="32" alt="Logo">
+        </div>
+
+        <div class="text-muted  mb-4 text-secondary">Accédez à votre espace entreprise</div>
+
+        {# Erreurs flash #}
+        {% for message in app.flashes('error') %}
+          <div class="alert alert-danger" role="alert">
+            <div class="d-flex gap-2">
+              <div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  class="icon alert-icon">
+                  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/>
+                  <path d="M12 8v4"/>
+                  <path d="M12 16h.01"/>
+                </svg>
+              </div>
+              <div>
+                <h4 class="alert-heading">Erreur d'authentification</h4>
+                <div class="alert-description">{{ message }}</div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+
+        {{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
+
+          {# Email #}
+          <div class="mb-3">
+            {{ form_widget(form.email, {
+              'attr': {
+                'class': 'form-control ',
+                'placeholder': 'Email'
+              }
+            }) }}
+            {{ form_errors(form.email) }}
+          </div>
+
+          {# Mot de passe #}
+          <div class="mb-3">
+            <div class="input-group input-group-flat">
+              {{ form_widget(form.password, {
+                'attr': {
+                  'class': 'form-control ',
+                  'placeholder': 'Mot de passe',
+                  'id': 'password-input'
+                }
+              }) }}
+            </div>
+            {{ form_errors(form.password) }}
+          </div>
+
+
+          {# Bouton connexion #}
+          <div class="mb-3">
+            {{ form_widget(form.se_connecter, {
+              'attr': {
+                'class': 'btn w-100  fw-bold text-white',
+                'style': 'background:#4254D6; border:none; letter-spacing:1px;'
+              }
+            }) }}
+          </div>
+
+          {# Lien inscription entreprise #}
+          <div class="text-center small text-muted">
+            Vous n'avez pas un compte entreprise ?
+            <a href="{{ path('compteEntreprise') }}" class="fw-bold ms-1" style="color:#4254D6;">
+              Inscrivez-vous
+            </a>
+          </div>
+          <div class="text-center small text-muted mt-1">
+          <p>ou</p></div>
+          <div class="text-center small text-muted">
+            Vous souhaitez postuler ou avez vous déja postuler ?
+            <a href="{{ path('compteEntreprise') }}" class="fw-bold ms-1" style="color:#4254D6;">
+              Accédez à l'espace candidat
+            </a>
+          </div>
+
+        {{ form_end(form) }}
+      </div>
+    </div>
+
+    {# ── Colonne droite : image + dégradé ── #}
+    <div style="flex:1.2; position:relative; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; padding:3rem;">
+
+      {# Image de fond #}
+      <img src="/images/building1.jpg" alt=""
+        style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0;">
+
+      {# Dégradé #}
+      <div style="position:absolute; inset:0; background:linear-gradient(135deg, rgba(66,84,214,0.88) 0%, rgba(100,130,255,0.88) 100%); z-index:1;"></div>
+
+      {# Texte #}
+      <div style="position:relative; z-index:3;" class="text-white">
+        <h2 class="display-6 fw-bold mb-3">Welcome to <strong>Momentum</strong></h2>
+        <p style="color:rgba(255,255,255,0.6);">
+          Gérez vos équipes, suivez vos projets et collaborez efficacement depuis une seule plateforme.
+        </p>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+function togglePassword() {
+  var input = document.getElementById('password-input');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+</script>
+
+{% endblock %}
