@@ -1,4 +1,4 @@
-<header class="navbar navbar-expand-md navbar-light sticky-top border-bottom bg-white" style="height:56px;">
+<header class="navbar navbar-expand-md navbar-light mb-1 border-bottom bg-white" style="height:56px;">
   <div class="container-fluid">
     <a href="#" class="navbar-brand py-0">
       <img src="/images/WKlogo.svg" height="150"  width="150" alt="Logo">
@@ -9,8 +9,8 @@
           data-bs-toggle="dropdown">
           <span class="avatar avatar-sm" style="background-image:url(/static/avatars/044m.jpg)"></span>
           <div class="d-none d-xl-block">
-            <div style="font-size:0.875rem;">{{ email }}</div>
-            <div class="small text-secondary">{{ role }}</div>
+            <div style="font-size:0.875rem;">{{ email|default('') }}</div>
+            <div class="small text-secondary">{{ role|default('') }}</div>
           </div>
         </a>
         <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">

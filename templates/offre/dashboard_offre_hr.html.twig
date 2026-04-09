@@ -195,14 +195,14 @@
 
             function normalizeEtat(value) {
                 if (value === 'OUVERT') return 'Ouvert';
-                if (value === 'FERMÉ' || value === 'FERME') return 'Fermé';
+                if (value === 'FERMÃ‰' || value === 'FERME') return 'FermÃ©';
                 return value || '';
             }
 
             document.querySelectorAll('[data-offer-create]').forEach(function (btn) {
                 btn.addEventListener('click', function () {
-                    modalTitle.textContent = 'Créer une Offre';
-                    modalSubtitle.textContent = 'Complétez les informations de la nouvelle offre.';
+                    modalTitle.textContent = 'CrÃ©er une Offre';
+                    modalSubtitle.textContent = 'ComplÃ©tez les informations de la nouvelle offre.';
                     resetForm();
                 });
             });
@@ -212,7 +212,7 @@
                     const card = btn.closest('[data-offer-card]');
                     
                     modalTitle.textContent = 'Modifier l\'Offre';
-                    modalSubtitle.textContent = 'Mettez à jour les informations de cette offre.';
+                    modalSubtitle.textContent = 'Mettez Ã  jour les informations de cette offre.';
 
                     if (modalForm) {
                         modalForm.action = updateActionTemplate.replace('__ID__', card.dataset.offerId || '0');
@@ -230,7 +230,7 @@
                 btn.addEventListener('click', function (event) {
                     const offerId = btn.dataset.offerId;
                     
-                    if (confirm('Êtes-vous sûr de vouloir supprimer cette offre ?')) {
+                    if (confirm('ÃŠtes-vous sÃ»r de vouloir supprimer cette offre ?')) {
                         const form = document.createElement('form');
                         form.method = 'POST';
                         form.action = deleteActionTemplate.replace('__ID__', offerId || '0');
@@ -244,8 +244,15 @@
 {% endblock %}
 
 {% block body %}
-    <div class="dashboard-hr">
+    {{ include('components/navbar.html.twig') }}
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+    {{ include('components/sidebar.html.twig', {'active_page': 'offres','sidebar_role': 'RH'}) }}
+    
+    <div class="dashboard-hr flex-grow-1">
         <div class="container-xl">
+
+            {{ include('offre/_navigation_tab.html.twig') }}
+
             {% for message in app.flashes('success') %}
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     {{ message }}
@@ -400,7 +407,9 @@
                     </div>
                 </div>
             </div>
+            </div>
         </div>
         {# Modal ============================================================== #}
     </div>
 {% endblock %}
+
