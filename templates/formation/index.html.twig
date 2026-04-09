@@ -6,23 +6,30 @@
 {% block stylesheets %}
     {{ parent() }}
     <style>
-        .rh-hero .display-6 {
-            letter-spacing: -.02em;
+        .dashboard-formation {
+            background: #f5f7fb;
+            min-height: 100vh;
+            padding: 1.25rem 0 2rem;
         }
 
-        .rh-metrics .stat-card {
-            transition: transform .15s ease, box-shadow .15s ease;
+        .rh-shell {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 0 .75rem;
         }
 
-        .rh-metrics .stat-card:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        .rh-hero {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 10px;
+            background: #fff;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
         }
 
         .rh-toolbar {
             padding: 1rem 1.25rem;
-            background: rgba(248, 250, 255, 0.92);
-            border-bottom: 1px solid var(--app-border);
+            background: #fff;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
         }
 
         .rh-filter-grid {
@@ -33,37 +40,8 @@
             font-size: .78rem;
             text-transform: uppercase;
             letter-spacing: .05em;
-            color: #64748b;
+            color: #526070;
             margin-bottom: .35rem;
-        }
-
-        .rh-table thead th {
-            background: rgba(248, 250, 255, 0.95);
-            color: #64748b;
-            font-size: .74rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            border-bottom: 1px solid rgba(228, 233, 242, 0.95);
-        }
-
-        .rh-table tbody td {
-            vertical-align: middle;
-        }
-
-        .rh-table tbody tr:hover {
-            background: rgba(13, 110, 253, 0.02);
-        }
-
-        .rh-note-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .3rem;
-            padding: .2rem .55rem;
-            border-radius: 999px;
-            background: rgba(13, 110, 253, 0.10);
-            color: #0d6efd;
-            font-weight: 700;
-            font-size: .78rem;
         }
 
         .rh-offcanvas .surface-card {
@@ -138,21 +116,24 @@
         }
 
         .rh-formation-item {
-            border: 2px solid rgba(30, 99, 204, 0.75);
-            border-radius: 14px;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            border-radius: 10px;
             background: #fff;
             padding: .9rem;
-            box-shadow: 0 10px 22px rgba(30, 64, 175, 0.08);
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
             transition: transform .15s ease, box-shadow .15s ease;
+            cursor: pointer;
         }
 
         .rh-formation-item:hover {
             transform: translateY(-1px);
-            box-shadow: 0 14px 26px rgba(30, 64, 175, 0.12);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+            border-color: rgba(31, 111, 235, 0.32);
         }
 
         .rh-formation-item.is-selected {
-            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2), 0 16px 30px rgba(30, 64, 175, 0.12);
+            border-color: rgba(31, 111, 235, 0.65);
+            box-shadow: 0 0 0 1px rgba(31, 111, 235, 0.25);
         }
 
         .rh-card-meta {
@@ -181,8 +162,8 @@
         }
 
         .rh-sidepanel {
-            border: 2px solid rgba(30, 99, 204, 0.75);
-            border-radius: 14px;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            border-radius: 10px;
             background: #fff;
             overflow: hidden;
             height: fit-content;
@@ -192,8 +173,8 @@
 
         .rh-sidepanel-header {
             padding: .9rem 1rem;
-            border-bottom: 1px solid #dbe5f3;
-            background: #eef5ff;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+            background: rgba(31, 111, 235, 0.07);
         }
 
         .rh-sidepanel-body {
@@ -222,18 +203,19 @@
 {% endblock %}
 
 {% block body %}
-
-    <div class="app-hero rh-hero position-relative p-4 p-md-5 mb-4">
+    <div class="dashboard-formation">
+    <div class="rh-shell">
+    <div class="rh-hero">
         <div class="row align-items-center g-4 position-relative">
             <div class="col-lg-7">
-                <div class="soft-pill mb-3"><i class="ti ti-layout-dashboard"></i> Espace RH</div>
-                <h2 class="display-6 mb-2">Gestion des Formations RH</h2>
-                <p class="mini-muted mb-0">Creation, modification, suppression et suivi des demandes en attente dans une interface plus lisible.</p>
+                <div class="text-secondary text-uppercase small fw-bold mb-2">Tableau RH</div>
+                <h2 class="h2 mb-2">Gestion des formations</h2>
+                <p class="text-secondary mb-0">Consultez, filtrez et pilotez les formations dans une interface Tabler simple et coherente.</p>
             </div>
             
             <div class="col-lg-5 text-lg-end">
                 {% if rh_logged %}
-                    <a class="btn btn-primary btn-lg shadow-sm" href="{{ path('app_formation_new') }}">
+                    <a class="btn btn-primary" href="{{ path('app_formation_new') }}">
                         <i class="ti ti-plus me-1"></i>
                         Nouvelle formation
                     </a>
@@ -279,7 +261,7 @@
         <div class="alert alert-danger" role="alert">{{ message }}</div>
     {% endfor %}
 
-    <div class="surface-card mb-3">
+    <div class="card mb-3">
         <div class="card-header">
             <h3 class="card-title">Identification RH</h3>
         </div>
@@ -322,7 +304,7 @@
     {% endif %}
 
     {% if rh_logged %}
-    <div class="surface-card">
+    <div class="card">
         <div class="rh-toolbar border-bottom">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
@@ -378,6 +360,8 @@
                         {% set formationQuery = app.request.query.all|merge({'formation': formation.id}) %}
                         <article
                             class="rh-formation-item {{ selected_formation and selected_formation.id == formation.id ? 'is-selected' : '' }}"
+                            tabindex="0"
+                            role="button"
                             data-formation-id="{{ formation.id }}"
                             data-title="{{ formation.titre }}"
                             data-organisme="{{ formation.organisme }}"
@@ -408,7 +392,6 @@
                             </div>
 
                             <div class="rh-card-divider d-flex flex-wrap gap-2 align-items-center">
-                                <a class="btn btn-sm btn-outline-secondary js-rh-details" href="{{ path('app_formation_rh', formationQuery) }}">Details</a>
                                 {% if rowPending > 0 %}
                                     <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="offcanvas" data-bs-target="#pendingInscriptionsPanel{{ formation.id }}" aria-controls="pendingInscriptionsPanel{{ formation.id }}">
                                         <i class="ti ti-bell me-1"></i>Demandes
@@ -445,7 +428,7 @@
                                 <a class="btn btn-sm btn-primary" id="rh-panel-edit" href="{{ path('app_formation_edit', {'id': selected_formation.id}) }}">Modifier</a>
                             </div>
                         {% else %}
-                            <div id="rh-panel-empty">Choisissez une formation via le bouton Details pour voir son resume ici.</div>
+                            <div id="rh-panel-empty">Choisissez une formation pour afficher son resume ici.</div>
                         {% endif %}
                     </div>
                 </div>
@@ -634,7 +617,6 @@
                 applyClientFilters();
             }
 
-            const detailLinks = document.querySelectorAll('.js-rh-details');
             const panelTitle = document.getElementById('rh-panel-title');
             const panelContent = document.getElementById('rh-panel-content');
             const panelOrganisme = document.getElementById('rh-panel-organisme');
@@ -645,47 +627,82 @@
             const panelShow = document.getElementById('rh-panel-show');
             const panelEdit = document.getElementById('rh-panel-edit');
 
-            detailLinks.forEach((link) => {
-                link.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    const card = link.closest('.rh-formation-item');
-                    if (!card || !panelTitle || !panelContent || !panelOrganisme || !panelDates || !panelLieu || !panelCapacite || !panelPending || !panelShow || !panelEdit) {
-                        window.location.href = link.href;
+            const selectCard = (card) => {
+                if (!card || !panelTitle || !panelContent || !panelOrganisme || !panelDates || !panelLieu || !panelCapacite || !panelPending || !panelShow || !panelEdit) {
+                    return;
+                }
+
+                document.querySelectorAll('.rh-formation-item').forEach((item) => item.classList.remove('is-selected'));
+                card.classList.add('is-selected');
+
+                panelContent.classList.remove('text-secondary');
+                const panelEmpty = document.getElementById('rh-panel-empty');
+                if (panelEmpty) {
+                    panelEmpty.remove();
+                }
+
+                const pending = parseInt(card.dataset.pending || '0', 10);
+                panelTitle.textContent = card.dataset.title || 'Aucune selection';
+                panelOrganisme.textContent = card.dataset.organisme || '';
+                panelDates.textContent = (card.dataset.dateDebut || '') + ' - ' + (card.dataset.dateFin || '');
+                panelLieu.textContent = card.dataset.lieu || '';
+                panelCapacite.textContent = 'Capacite ' + (card.dataset.capacite || '0');
+                if (pending > 0) {
+                    panelPending.className = 'badge rh-status-pending';
+                    panelPending.textContent = pending + ' demande(s)';
+                } else {
+                    panelPending.className = 'badge bg-green-lt text-green';
+                    panelPending.textContent = 'Aucune demande en attente';
+                }
+                panelShow.href = card.dataset.showUrl || '#';
+                panelEdit.href = card.dataset.editUrl || '#';
+
+                if (window.history && window.history.replaceState) {
+                    const next = new URL(window.location.href);
+                    next.searchParams.set('formation', card.dataset.formationId || '');
+                    window.history.replaceState({}, '', next.toString());
+                }
+            };
+
+            if (grid) {
+                grid.addEventListener('click', (event) => {
+                    const clickInsideButton = event.target.closest('a, button, form, input, select, textarea');
+                    if (clickInsideButton) {
                         return;
                     }
 
-                    document.querySelectorAll('.rh-formation-item').forEach((item) => item.classList.remove('is-selected'));
-                    card.classList.add('is-selected');
-
-                    panelContent.classList.remove('text-secondary');
-                    const panelEmpty = document.getElementById('rh-panel-empty');
-                    if (panelEmpty) {
-                        panelEmpty.remove();
+                    const card = event.target.closest('.rh-formation-item');
+                    if (!card) {
+                        return;
                     }
 
-                    const pending = parseInt(card.dataset.pending || '0', 10);
-                    panelTitle.textContent = card.dataset.title || 'Aucune selection';
-                    panelOrganisme.textContent = card.dataset.organisme || '';
-                    panelDates.textContent = (card.dataset.dateDebut || '') + ' - ' + (card.dataset.dateFin || '');
-                    panelLieu.textContent = card.dataset.lieu || '';
-                    panelCapacite.textContent = 'Capacite ' + (card.dataset.capacite || '0');
-                    if (pending > 0) {
-                        panelPending.className = 'badge rh-status-pending';
-                        panelPending.textContent = pending + ' demande(s)';
-                    } else {
-                        panelPending.className = 'badge bg-green-lt text-green';
-                        panelPending.textContent = 'Aucune demande en attente';
-                    }
-                    panelShow.href = card.dataset.showUrl || '#';
-                    panelEdit.href = card.dataset.editUrl || '#';
-
-                    if (window.history && window.history.replaceState) {
-                        const next = new URL(window.location.href);
-                        next.searchParams.set('formation', card.dataset.formationId || '');
-                        window.history.replaceState({}, '', next.toString());
-                    }
+                    selectCard(card);
                 });
-            });
+
+                grid.addEventListener('keydown', (event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') {
+                        return;
+                    }
+
+                    const card = event.target.closest('.rh-formation-item');
+                    if (!card) {
+                        return;
+                    }
+
+                    if (event.target.closest('a, button, form, input, select, textarea')) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    selectCard(card);
+                });
+            }
+
+            if (cards.length > 0 && !document.querySelector('.rh-formation-item.is-selected')) {
+                selectCard(cards[0]);
+            }
         })();
     </script>
+    </div>
+    </div>
 {% endblock %}

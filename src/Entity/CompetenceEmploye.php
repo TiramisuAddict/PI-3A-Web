@@ -6,7 +6,7 @@ use App\Repository\CompetenceEmployeRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: CompetenceEmployeRepository::class)]
-#[ORM\Table(name: 'compétence_employé')]
+#[ORM\Table(name: 'competence_employe')]
 class CompetenceEmploye
 {
     #[ORM\Id]

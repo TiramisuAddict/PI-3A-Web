@@ -9,6 +9,7 @@ use App\Repository\FormationRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -16,6 +17,33 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/formation')]
 final class FormationController extends AbstractController
 {
+    #[Route('/rh/{id}/details', name: 'app_formation_rh_details', methods: ['GET'])]
+    public function rhDetails(int $id, FormationRepository $formationRepository, Connection $connection): JsonResponse
+    {
+        $formation = $formationRepository->find($id);
+        if ($formation === null) {
+            return new JsonResponse(['error' => 'Formation not found'], 404);
+        }
+
+        $pending = $connection->fetchOne(
+            'SELECT COUNT(i.id_inscription) FROM inscription_formation i WHERE i.id_formation = ? AND i.statut = ?',
+            [$id, 'EN_ATTENTE']
+        ) ?: 0;
+
+        return new JsonResponse([
+            'id' => $formation->getId(),
+            'titre' => $formation->getTitre(),
+            'organisme' => $formation->getOrganisme(),
+            'dateDebut' => $formation->getDateDebut()?->format('Y-m-d'),
+            'dateFin' => $formation->getDateFin()?->format('Y-m-d'),
+            'lieu' => $formation->getLieu(),
+            'capacite' => $formation->getCapacite(),
+            'pending' => (int) $pending,
+            'showUrl' => $this->generateUrl('app_formation_show', ['id' => $formation->getId()]),
+            'editUrl' => $this->generateUrl('app_formation_edit', ['id' => $formation->getId()]),
+        ]);
+    }
+
     #[Route('/rh', name: 'app_formation_rh', methods: ['GET', 'POST'])]
     public function index(Request $request, FormationRepository $formationRepository, Connection $connection, EvaluationFormationRepository $evaluationFormationRepository): Response
     {
@@ -29,7 +57,7 @@ final class FormationController extends AbstractController
 
                 if ($rhId > 0) {
                     $rh = $connection->fetchAssociative(
-                        'SELECT id_employe, prenom, nom, role FROM `employé` WHERE id_employe = ? LIMIT 1',
+                        'SELECT id_employe, prenom, nom, role FROM employe WHERE id_employe = ? LIMIT 1',
                         [$rhId]
                     );
 
@@ -71,7 +99,7 @@ final class FormationController extends AbstractController
         $rhLogged = $rhId > 0 && str_contains($rhRole, 'rh');
 
         $rhUsers = $connection->fetchAllAssociative(
-            'SELECT id_employe, prenom, nom, role FROM `employé` WHERE LOWER(role) LIKE ? ORDER BY prenom, nom',
+            'SELECT id_employe, prenom, nom, role FROM employe WHERE LOWER(role) LIKE ? ORDER BY prenom, nom',
             ['%rh%']
         );
 
@@ -114,7 +142,7 @@ final class FormationController extends AbstractController
             'SELECT i.id_inscription, i.id_employe, i.raison, i.statut, f.id_formation AS formation_id, f.titre AS formation_titre, COALESCE(e.prenom, "") AS prenom, COALESCE(e.nom, "") AS nom
              FROM inscription_formation i
              INNER JOIN formation f ON f.id_formation = i.id_formation
-             LEFT JOIN `employé` e ON e.id_employe = i.id_employe
+               LEFT JOIN employe e ON e.id_employe = i.id_employe
              WHERE i.statut = "EN_ATTENTE"
              ORDER BY i.id_inscription DESC'
         );
@@ -146,7 +174,7 @@ final class FormationController extends AbstractController
     }
 
     #[Route('/new', name: 'app_formation_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $entityManager): Response
+        public function new(Request $request, EntityManagerInterface $entityManager): Response
     {
         if (($response = $this->denyUnlessRhLogged($request)) !== null) {
             return $response;

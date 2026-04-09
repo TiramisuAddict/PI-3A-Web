@@ -5,9 +5,37 @@
 {% block stylesheets %}
     {{ parent() }}
     <style>
+        .dashboard-inscription {
+            background: #f5f7fb;
+            min-height: 100vh;
+            padding: 1.25rem 0 2rem;
+        }
+
+        .inscription-shell {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 0 .75rem;
+        }
+
+        .inscription-hero {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 10px;
+            background: #fff;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .surface-card {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 10px;
+            background: #fff;
+            overflow: hidden;
+        }
+
         .surface-card .card-header {
             padding: 1rem 1.25rem;
-            background: linear-gradient(180deg, rgba(248, 250, 255, 0.98), rgba(242, 246, 252, 0.96));
+            background: #fff;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
         }
 
         .surface-card .card-title {
@@ -19,7 +47,7 @@
         }
 
         .filter-toolbar {
-            background: rgba(248, 250, 255, 0.92);
+            background: #fff;
             padding: 1rem 1.25rem;
         }
 
@@ -110,21 +138,23 @@
         }
 
         .formation-item {
-            border: 2px solid rgba(30, 99, 204, 0.75);
-            border-radius: 14px;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            border-radius: 10px;
             background: #fff;
             padding: .9rem;
-            box-shadow: 0 10px 22px rgba(30, 64, 175, 0.08);
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
             transition: transform .15s ease, box-shadow .15s ease;
         }
 
         .formation-item:hover {
             transform: translateY(-1px);
-            box-shadow: 0 14px 26px rgba(30, 64, 175, 0.12);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+            border-color: rgba(31, 111, 235, 0.32);
         }
 
         .formation-item.is-selected {
-            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2), 0 16px 30px rgba(30, 64, 175, 0.12);
+            border-color: rgba(31, 111, 235, 0.65);
+            box-shadow: 0 0 0 1px rgba(31, 111, 235, 0.25);
         }
 
         .formation-meta {
@@ -199,8 +229,8 @@
         }
 
         .formation-sidepanel {
-            border: 2px solid rgba(30, 99, 204, 0.75);
-            border-radius: 14px;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            border-radius: 10px;
             background: #fff;
             overflow: hidden;
             height: fit-content;
@@ -210,8 +240,8 @@
 
         .formation-sidepanel-header {
             padding: .9rem 1rem;
-            border-bottom: 1px solid #dbe5f3;
-            background: #eef5ff;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+            background: rgba(31, 111, 235, 0.07);
         }
 
         .formation-sidepanel-body {
@@ -240,12 +270,14 @@
 {% endblock %}
 
 {% block body %}
-    <div class="app-hero position-relative p-4 p-md-5 mb-4">
+    <div class="dashboard-inscription">
+    <div class="inscription-shell">
+    <div class="inscription-hero">
         <div class="row align-items-center g-4 position-relative">
             <div class="col-lg-8">
-                <div class="soft-pill mb-3"><i class="ti ti-user-share"></i> Espace Employe</div>
-                <h2 class="display-6 mb-2">Inscription Formation</h2>
-                <p class="mini-muted mb-0">Consultez les formations et envoyez votre raison d'inscription depuis une interface plus fluide.</p>
+                <div class="text-secondary text-uppercase small fw-bold mb-2">Espace Employe</div>
+                <h2 class="h2 mb-2">Inscription formation</h2>
+                <p class="text-secondary mb-0">Consultez les formations, lisez les avis et envoyez vos demandes dans une interface claire et uniforme.</p>
             </div>
             <div class="col-lg-4 text-lg-end">
                 {% if employee_logged %}
@@ -357,6 +389,7 @@
                         {% set formationQuery = app.request.query.all|merge({'formation': formation.id}) %}
                         <article
                             class="formation-item {{ selected_formation and selected_formation.id == formation.id ? 'is-selected' : '' }}"
+                            data-formation-id="{{ formation.id }}"
                             data-title="{{ formation.titre }}"
                             data-organisme="{{ formation.organisme }}"
                             data-lieu="{{ formation.lieu }}"
@@ -441,14 +474,34 @@
                         <div class="mb-3">{{ selected_formation.dateDebut ? selected_formation.dateDebut|date('Y-m-d') : '' }} - {{ selected_formation.dateFin ? selected_formation.dateFin|date('Y-m-d') : '' }}</div>
 
                         {% if formation_reviews is not empty %}
+                            <div class="stat-card p-3 mb-3">
+                                <div class="mini-muted mb-2">Analyse des avis</div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <span class="badge bg-green-lt text-green">Positifs: {{ formation_review_summary.positive|default(0) }}</span>
+                                    <span class="badge bg-yellow-lt text-yellow">Mitigés: {{ formation_review_summary.neutral|default(0) }}</span>
+                                    <span class="badge bg-red-lt text-red">Negatifs: {{ formation_review_summary.negative|default(0) }}</span>
+                                    {% if formation_review_summary.problem|default(0) > 0 %}
+                                        <span class="badge bg-orange-lt text-orange">Problemes: {{ formation_review_summary.problem }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
                             <div class="d-flex flex-column gap-2">
                                 {% for review in formation_reviews|slice(0, 4) %}
                                     <div class="stat-card p-2">
                                         <div class="d-flex justify-content-between align-items-start mb-1">
                                             <div class="fw-bold small">{{ review.prenom }} {{ review.nom }}</div>
-                                            <span class="badge bg-blue-lt text-blue">{{ review.note }}/5</span>
+                                            <span class="badge {{ review.analysis.label == 'positive' ? 'bg-green-lt text-green' : (review.analysis.label == 'negative' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow') }}">{{ review.note }}/5</span>
                                         </div>
                                         <div class="small text-secondary">{{ review.commentaire ?: 'Aucun commentaire.' }}</div>
+                                        <div class="mt-1">
+                                            <span class="badge {{ review.analysis.label == 'positive' ? 'bg-green-lt text-green' : (review.analysis.label == 'negative' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow') }}">
+                                                {{ review.analysis.label == 'positive' ? 'Positif' : (review.analysis.label == 'negative' ? 'Negatif' : 'Mitige') }}
+                                            </span>
+                                            {% if review.analysis.problems is not empty %}
+                                                <span class="badge bg-red-lt text-red ms-1">Probleme detecte</span>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 {% endfor %}
                             </div>
@@ -592,6 +645,100 @@
             }
 
             applyClientFilters();
+
+            // Card selection handler - load reviews via AJAX without page refresh
+            if (grid) {
+                grid.addEventListener('click', (event) => {
+                    const clickInsideButton = event.target.closest('a, button, form, input, select, textarea');
+                    if (clickInsideButton) {
+                        return;
+                    }
+
+                    const card = event.target.closest('.formation-item');
+                    if (!card) {
+                        return;
+                    }
+
+                    const formationId = card.dataset.formationId;
+                    if (!formationId) {
+                        return;
+                    }
+
+                    console.log('Formation card clicked:', card.dataset.title);
+                    
+                    // Remove selection from all cards
+                    document.querySelectorAll('.formation-item').forEach((item) => item.classList.remove('is-selected'));
+                    card.classList.add('is-selected');
+
+                    // Update URL without reload
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('formation', formationId);
+                    window.history.replaceState({}, '', url.toString());
+
+                    // Fetch reviews data via AJAX
+                    const reviewsUrl = '{{ path("app_inscription_employe_reviews", {id: 0}) }}'.replace('/0', '/' + formationId);
+                    
+                    fetch(reviewsUrl)
+                        .then(response => response.json())
+                        .then(data => {
+                            const panelHeader = document.querySelector('.formation-sidepanel-header');
+                            const panelBody = document.querySelector('.formation-sidepanel-body');
+
+                            if (!panelHeader || !panelBody) return;
+
+                            // Update header
+                            panelHeader.innerHTML = '<div class="mini-muted">Formation selectionnee</div><div class="fw-bold">' + (data.formation.titre || 'Aucune selection') + '</div>';
+
+                            // Build reviews HTML
+                            let reviewsHTML = '<div class="mini-muted mb-2">' + (data.formation.organisme || '') + '</div>';
+                            reviewsHTML += '<div class="mb-3">' + (data.formation.dateDebut || '') + ' - ' + (data.formation.dateFin || '') + '</div>';
+
+                            if (data.reviews && data.reviews.length > 0) {
+                                reviewsHTML += '<div class="stat-card p-3 mb-3">';
+                                reviewsHTML += '<div class="mini-muted mb-2">Analyse des avis</div>';
+                                reviewsHTML += '<div class="d-flex flex-wrap gap-2">';
+                                reviewsHTML += '<span class="badge bg-green-lt text-green">Positifs: ' + (data.summary.positive || 0) + '</span>';
+                                reviewsHTML += '<span class="badge bg-yellow-lt text-yellow">Mitigés: ' + (data.summary.neutral || 0) + '</span>';
+                                reviewsHTML += '<span class="badge bg-red-lt text-red">Negatifs: ' + (data.summary.negative || 0) + '</span>';
+                                if ((data.summary.problem || 0) > 0) {
+                                    reviewsHTML += '<span class="badge bg-orange-lt text-orange">Problemes: ' + data.summary.problem + '</span>';
+                                }
+                                reviewsHTML += '</div></div>';
+
+                                reviewsHTML += '<div class="d-flex flex-column gap-2">';
+                                data.reviews.slice(0, 4).forEach((review) => {
+                                    const labelClass = review.label === 'positive' ? 'bg-green-lt text-green' : (review.label === 'negative' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow');
+                                    const labelText = review.label === 'positive' ? 'Positif' : (review.label === 'negative' ? 'Negatif' : 'Mitige');
+                                    
+                                    reviewsHTML += '<div class="stat-card p-2">';
+                                    reviewsHTML += '<div class="d-flex justify-content-between align-items-start mb-1">';
+                                    reviewsHTML += '<div class="fw-bold small">' + review.prenom + ' ' + review.nom + '</div>';
+                                    reviewsHTML += '<span class="badge ' + labelClass + '">' + review.note + '/5</span>';
+                                    reviewsHTML += '</div>';
+                                    reviewsHTML += '<div class="small text-secondary">' + (review.commentaire || 'Aucun commentaire.') + '</div>';
+                                    reviewsHTML += '<div class="mt-1">';
+                                    reviewsHTML += '<span class="badge ' + labelClass + '">' + labelText + '</span>';
+                                    if (review.problems && review.problems.length > 0) {
+                                        reviewsHTML += '<span class="badge bg-red-lt text-red ms-1">Probleme detecte</span>';
+                                    }
+                                    reviewsHTML += '</div></div>';
+                                });
+                                reviewsHTML += '</div>';
+                            } else {
+                                reviewsHTML += '<div class="text-secondary">Aucun avis pour cette formation.</div>';
+                            }
+
+                            panelBody.innerHTML = reviewsHTML;
+                        })
+                        .catch(error => {
+                            console.error('Error loading reviews:', error);
+                            const panelBody = document.querySelector('.formation-sidepanel-body');
+                            if (panelBody) {
+                                panelBody.innerHTML = '<div class="alert alert-danger">Erreur lors du chargement des avis.</div>';
+                            }
+                        });
+                });
+            }
         })();
     </script>
 
@@ -1030,4 +1177,6 @@
             </div>
         </div>
     {% endif %}
+    </div>
+    </div>
 {% endblock %}

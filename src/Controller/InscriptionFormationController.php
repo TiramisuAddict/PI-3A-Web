@@ -10,6 +10,7 @@ use App\Enum\StatutInscription;
 use App\Repository\EvaluationFormationRepository;
 use App\Repository\FormationRepository;
 use App\Repository\InscriptionFormationRepository;
+use App\Service\FeedbackAnalysisService;
 use App\Service\ReasonAssistantService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -22,6 +23,52 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/inscription')]
 final class InscriptionFormationController extends AbstractController
 {
+    #[Route('/employe/reviews/{id}', name: 'app_inscription_employe_reviews', methods: ['GET'])]
+    public function getFormationReviews(int $id, FormationRepository $formationRepository, Connection $connection, FeedbackAnalysisService $feedbackAnalysisService): JsonResponse
+    {
+        $formation = $formationRepository->find($id);
+        if ($formation === null) {
+            return new JsonResponse(['error' => 'Formation not found'], 404);
+        }
+
+        $formationReviews = $connection->fetchAllAssociative(
+            'SELECT ev.note, ev.commentaire, ev.date_evaluation, COALESCE(e.prenom, "") AS prenom, COALESCE(e.nom, "") AS nom
+             FROM evaluation_formation ev
+             LEFT JOIN employe e ON e.id_employe = ev.id_employe
+             WHERE ev.id_formation = ?
+             ORDER BY ev.date_evaluation DESC
+             LIMIT 10',
+            [$id]
+        );
+
+        $reviews = [];
+        foreach ($formationReviews as $review) {
+            $analysis = $feedbackAnalysisService->analyzeReview((string) ($review['commentaire'] ?? ''), (int) ($review['note'] ?? 0));
+            $reviews[] = [
+                'note' => (int) ($review['note'] ?? 0),
+                'commentaire' => (string) ($review['commentaire'] ?? ''),
+                'prenom' => (string) ($review['prenom'] ?? ''),
+                'nom' => (string) ($review['nom'] ?? ''),
+                'label' => $analysis['label'],
+                'problems' => $analysis['problems'] ?? [],
+            ];
+        }
+
+        $summary = $feedbackAnalysisService->summarizeReviews($formationReviews);
+
+        return new JsonResponse([
+            'formation' => [
+                'id' => $formation->getId(),
+                'titre' => $formation->getTitre(),
+                'organisme' => $formation->getOrganisme(),
+                'dateDebut' => $formation->getDateDebut()?->format('Y-m-d'),
+                'dateFin' => $formation->getDateFin()?->format('Y-m-d'),
+            ],
+            'reviews' => $reviews,
+            'summary' => $summary,
+        ]);
+    }
+
     #[Route('/employe/analyze', name: 'app_inscription_employe_analyze', methods: ['POST'])]
     public function analyzeReason(Request $request, FormationRepository $formationRepository, ReasonAssistantService $reasonAssistantService): JsonResponse
     {
@@ -77,7 +124,7 @@ final class InscriptionFormationController extends AbstractController
     }
 
     #[Route('/employe', name: 'app_inscription_employe', methods: ['GET', 'POST'])]
-    public function employe(Request $request, Connection $connection, FormationRepository $formationRepository, EntityManagerInterface $entityManager, InscriptionFormationRepository $inscriptionRepository, EvaluationFormationRepository $evaluationFormationRepository, ReasonAssistantService $reasonAssistantService): Response
+    public function employe(Request $request, Connection $connection, FormationRepository $formationRepository, EntityManagerInterface $entityManager, InscriptionFormationRepository $inscriptionRepository, EvaluationFormationRepository $evaluationFormationRepository, ReasonAssistantService $reasonAssistantService, FeedbackAnalysisService $feedbackAnalysisService): Response
     {
         $session = $request->getSession();
         $analysisResult = null;
@@ -112,7 +159,7 @@ final class InscriptionFormationController extends AbstractController
 
                 if ($employeeId > 0) {
                     $employee = $connection->fetchAssociative(
-                        'SELECT id_employe, prenom, nom, role FROM `employé` WHERE id_employe = ? LIMIT 1',
+                        'SELECT id_employe, prenom, nom, role FROM employe WHERE id_employe = ? LIMIT 1',
                         [$employeeId]
                     );
 
@@ -147,7 +194,7 @@ final class InscriptionFormationController extends AbstractController
 
                 return $this->redirectToRoute('app_inscription_employe');
             }
-
+//ajout, annulation, modification raison, evaluation
             if ($action === 'inscrire') {
                 $employeeId = (int) $session->get('employee_id', 0);
                 $employeeRole = strtolower(trim((string) $session->get('employee_role', '')));
@@ -327,7 +374,7 @@ final class InscriptionFormationController extends AbstractController
         $selectedFormation = $selectedFormationId > 0 ? $formationRepository->find($selectedFormationId) : null;
 
         $employees = $connection->fetchAllAssociative(
-            'SELECT id_employe, prenom, nom, role FROM `employé` WHERE LOWER(role) IN (\'employé\', \'employe\') ORDER BY prenom, nom'
+            'SELECT id_employe, prenom, nom, role FROM employe WHERE LOWER(role) IN (\'employé\', \'employe\') ORDER BY prenom, nom'
         );
 
         $formations = $formationRepository->findBy([], ['dateDebut' => 'DESC']);
@@ -397,16 +444,30 @@ final class InscriptionFormationController extends AbstractController
         });
 
         $formationReviews = [];
+        $formationReviewSummary = [
+            'positive' => 0,
+            'neutral' => 0,
+            'negative' => 0,
+            'problem' => 0,
+            'total' => 0,
+        ];
         if ($selectedFormation instanceof Formation && $selectedFormation->getId() !== null) {
             $formationReviews = $connection->fetchAllAssociative(
                 'SELECT ev.note, ev.commentaire, ev.date_evaluation, COALESCE(e.prenom, "") AS prenom, COALESCE(e.nom, "") AS nom
                  FROM evaluation_formation ev
-                 LEFT JOIN `employé` e ON e.id_employe = ev.id_employe
+                 LEFT JOIN employe e ON e.id_employe = ev.id_employe
                  WHERE ev.id_formation = ?
                  ORDER BY ev.date_evaluation DESC
                  LIMIT 10',
                 [(int) $selectedFormation->getId()]
             );
+
+            foreach ($formationReviews as $index => $review) {
+                $analysis = $feedbackAnalysisService->analyzeReview((string) ($review['commentaire'] ?? ''), (int) ($review['note'] ?? 0));
+                $formationReviews[$index]['analysis'] = $analysis;
+            }
+
+            $formationReviewSummary = $feedbackAnalysisService->summarizeReviews($formationReviews);
         }
 
         $inscriptionByFormation = [];
@@ -447,6 +508,7 @@ final class InscriptionFormationController extends AbstractController
             'formations' => $formations,
             'employee_logged' => $employeeLogged,
             'employee_id' => $employeeId,
+            'formation_review_summary' => $formationReviewSummary,
             'selected_formation' => $selectedFormation,
             'already_inscrit' => $alreadyInscrit,
             'inscription_by_formation' => $inscriptionByFormation,

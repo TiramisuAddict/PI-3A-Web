@@ -3,50 +3,55 @@
 {% block title %}Formation {{ formation.id }}{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none mt-4">
-        <div class="row g-2 align-items-center">
-            <div class="col">
-                <h2 class="page-title">Details formation #{{ formation.id }}</h2>
-            </div>
-            <div class="col-auto ms-auto d-print-none">
-                <div class="btn-list">
-                    <a class="btn btn-outline-secondary" href="{{ path('app_formation_rh') }}">Retour liste</a>
-                    <a class="btn btn-primary" href="{{ path('app_formation_edit', {'id': formation.id}) }}">Modifier</a>
+    <div class="page-wrapper">
+        <div class="container-xl py-4">
+            <div class="page-header d-print-none mb-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">Details formation #{{ formation.id }}</h2>
+                        <div class="text-secondary">Consultez les informations completes de la formation.</div>
+                    </div>
+                    <div class="col-auto ms-auto d-print-none">
+                        <div class="btn-list">
+                            <a class="btn btn-outline-secondary" href="{{ path('app_formation_rh') }}">Retour liste</a>
+                            <a class="btn btn-primary" href="{{ path('app_formation_edit', {'id': formation.id}) }}">Modifier</a>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <div class="card mb-3">
-        <div class="card-body">
-            <dl class="row mb-0">
-                <dt class="col-sm-3">Titre</dt>
-                <dd class="col-sm-9">{{ formation.titre }}</dd>
+            <div class="card mb-3">
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Titre</dt>
+                        <dd class="col-sm-9">{{ formation.titre }}</dd>
 
-                <dt class="col-sm-3">Organisme</dt>
-                <dd class="col-sm-9">{{ formation.organisme }}</dd>
+                        <dt class="col-sm-3">Organisme</dt>
+                        <dd class="col-sm-9">{{ formation.organisme }}</dd>
 
-                <dt class="col-sm-3">Date debut</dt>
-                <dd class="col-sm-9">{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}</dd>
+                        <dt class="col-sm-3">Date debut</dt>
+                        <dd class="col-sm-9">{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}</dd>
 
-                <dt class="col-sm-3">Date fin</dt>
-                <dd class="col-sm-9">{{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}</dd>
+                        <dt class="col-sm-3">Date fin</dt>
+                        <dd class="col-sm-9">{{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}</dd>
 
-                <dt class="col-sm-3">Lieu</dt>
-                <dd class="col-sm-9">{{ formation.lieu }}</dd>
+                        <dt class="col-sm-3">Lieu</dt>
+                        <dd class="col-sm-9">{{ formation.lieu }}</dd>
 
-                <dt class="col-sm-3">Capacite</dt>
-                <dd class="col-sm-9">{{ formation.capacite }}</dd>
-            </dl>
-        </div>
-    </div>
+                        <dt class="col-sm-3">Capacite</dt>
+                        <dd class="col-sm-9">{{ formation.capacite }}</dd>
+                    </dl>
+                </div>
+            </div>
 
-    <div class="card border-danger">
-        <div class="card-header">
-            <h3 class="card-title text-danger">Suppression</h3>
-        </div>
-        <div class="card-body">
-            {{ include('formation/_delete_form.html.twig') }}
+            <div class="card border-danger-subtle">
+                <div class="card-header">
+                    <h3 class="card-title text-danger">Suppression</h3>
+                </div>
+                <div class="card-body">
+                    {{ include('formation/_delete_form.html.twig') }}
+                </div>
+            </div>
         </div>
     </div>
 {% endblock %}
