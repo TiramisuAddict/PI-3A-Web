@@ -8,13 +8,14 @@ use App\Entity\HistoriqueDemande;
 use App\Entity\Employe;
 use App\Form\DemandeType;
 use App\Repository\DemandeRepository;
-use App\Service\DemandeFormHelper;
+use App\Services\DemandeFormHelper;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
 
 class DemandeController extends AbstractController
 {
@@ -33,7 +34,7 @@ class DemandeController extends AbstractController
     }
 
     #[Route('/demande', name: 'demande_index', methods: ['GET'])]
-    public function index(Request $request): Response
+    public function index(Request $request,SessionInterface $session): Response
     {
         $filters = [
             'categorie' => $request->query->get('categorie'),
@@ -59,11 +60,13 @@ class DemandeController extends AbstractController
             'priorites' => $this->formHelper->getPriorites(),
             'filters' => $filters,
             'stats' => $stats,
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
         ]);
     }
 
     #[Route('/demande/nouvelle', name: 'demande_new', methods: ['GET', 'POST'])]
-    public function new(Request $request): Response
+    public function new(Request $request,SessionInterface $session): Response
     {
         $demande = new Demande();
         $demande->setDateCreation(new \DateTime());
@@ -116,11 +119,13 @@ class DemandeController extends AbstractController
             'detailErrors' => $detailErrors,
             'submittedDetails' => $submittedDetails,
             'submittedType' => $submittedType,
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
         ]);
     }
 
     #[Route('/demande/statistics', name: 'demande_statistics', methods: ['GET'])]
-    public function statistics(): Response
+    public function statistics(SessionInterface $session): Response
     {
         $stats = [
             'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll() : 0,
@@ -132,6 +137,8 @@ class DemandeController extends AbstractController
 
         return $this->render('demande/statistics.html.twig', [
             'stats' => $stats,
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
         ]);
     }
 
@@ -216,7 +223,7 @@ class DemandeController extends AbstractController
     }
 
     #[Route('/demande/{id}', name: 'demande_show', requirements: ['id' => '\d+'], methods: ['GET'])]
-    public function show(int $id): Response
+    public function show(int $id,SessionInterface $session): Response
     {
         $demande = $this->demandeRepository->find($id);
 
@@ -242,11 +249,13 @@ class DemandeController extends AbstractController
             'detailsData' => $detailsData,
             'fieldLabels' => $fieldLabels,
             'statuses' => $this->formHelper->getStatuses(),
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
         ]);
     }
 
     #[Route('/demande/{id}/edit', name: 'demande_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
-    public function edit(int $id, Request $request): Response
+    public function edit(int $id, Request $request,SessionInterface $session): Response
     {
         $demande = $this->demandeRepository->find($id);
 
@@ -320,6 +329,8 @@ class DemandeController extends AbstractController
             'existingDetails' => $submittedDetails,
             'detailErrors' => $detailErrors,
             'submittedType' => $submittedType,
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
         ]);
     }
 
