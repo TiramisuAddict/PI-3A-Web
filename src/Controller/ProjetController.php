@@ -14,12 +14,14 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
+
 
 #[Route('/projet')]
 final class ProjetController extends AbstractController
 {
     #[Route(name: 'app_projet_index', methods: ['GET'])]
-    public function index(Request $request, ProjetRepository $projetRepository, EmployeRepository $employeRepository): Response
+    public function index(Request $request, ProjetRepository $projetRepository, EmployeRepository $employeRepository,SessionInterface $session): Response
     {
         $filters = [
             'search' => trim((string) $request->query->get('search', '')),
@@ -67,6 +69,8 @@ final class ProjetController extends AbstractController
             'currentEmployeId' => null,
             'canManageProjects' => true,
             'canManageTasks' => true,
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
         ]);
     }
 

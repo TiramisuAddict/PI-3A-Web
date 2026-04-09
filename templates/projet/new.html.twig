@@ -3,6 +3,9 @@
 {% block title %}Nouveau projet{% endblock %}
 
 {% block body %}
+{{ include('components/navbar.html.twig') }}
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+    {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': 'RH'}) }}
     <div class="workspace-card p-3 mb-3">
         <div class="row g-2 align-items-center">
             <div class="col-auto">
@@ -17,6 +20,7 @@
                 <a href="{{ path('app_projet_index') }}" class="btn btn-outline-secondary">Retour a la liste</a>
             </div>
         </div>
+    </div>
     </div>
 
     {{ include('projet/_form.html.twig', {'button_label': 'Creer le projet'}) }}
