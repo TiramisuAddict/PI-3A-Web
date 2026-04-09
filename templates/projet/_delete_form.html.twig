@@ -1,7 +1,7 @@
-<form method="post" action="{{ path('app_projet_delete', {'id_projet': projet.idProjet}) }}" class="d-inline m-0" onsubmit="return confirm('Voulez-vous vraiment supprimer ce projet ?');">
-    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ projet.idProjet) }}">
-    <button class="btn btn-outline-danger">
-        <i class="ti ti-trash me-1"></i>
-        Supprimer
-    </button>
-</form>
+<button type="button" class="btn btn-outline-danger js-delete-trigger"
+        data-delete-url="{{ path('app_projet_delete', {'id_projet': projet.idProjet}) }}"
+        data-delete-token="{{ csrf_token('delete' ~ projet.idProjet) }}"
+        data-delete-message="Voulez-vous vraiment supprimer le projet « {{ projet.nom }} » ? Cette action est irreversible.">
+    <i class="ti ti-trash me-1"></i>
+    Supprimer
+</button>

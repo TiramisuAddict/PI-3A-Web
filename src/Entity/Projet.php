@@ -18,7 +18,6 @@ class Projet
     public const STATUT_EN_COURS = 'EN_COURS';
     public const STATUT_EN_ATTENTE = 'EN_ATTENTE';
     public const STATUT_TERMINE = 'TERMINE';
-    public const STATUT_ANNULE = 'ANNULE';
 
     public const PRIORITE_BASSE = 'BASSE';
     public const PRIORITE_MOYENNE = 'MOYENNE';
@@ -29,7 +28,6 @@ class Projet
         self::STATUT_EN_COURS,
         self::STATUT_EN_ATTENTE,
         self::STATUT_TERMINE,
-        self::STATUT_ANNULE,
     ];
 
     public const PRIORITE_VALUES = [
@@ -97,9 +95,9 @@ class Projet
         return $this->nom;
     }
 
-    public function setNom(string $nom): self
+    public function setNom(?string $nom): self
     {
-        $this->nom = trim(preg_replace('/\s+/', ' ', $nom) ?? '');
+        $this->nom = $nom !== null ? trim(preg_replace('/\s+/', ' ', $nom) ?? '') : null;
         return $this;
     }
 
@@ -119,9 +117,9 @@ class Projet
         return $this->description;
     }
 
-    public function setDescription(string $description): self
+    public function setDescription(?string $description): self
     {
-        $this->description = trim($description);
+        $this->description = $description !== null ? trim($description) : null;
         return $this;
     }
 
@@ -196,6 +194,16 @@ class Projet
     #[Assert\Callback]
     public function validateBusinessRules(ExecutionContextInterface $context): void
     {
+        if ($this->id_projet === null && $this->date_debut instanceof \DateTimeInterface) {
+            $today = new \DateTime('today');
+            if ($this->date_debut < $today) {
+                $context
+                    ->buildViolation('La date de debut ne peut pas etre dans le passe.')
+                    ->atPath('date_debut')
+                    ->addViolation();
+            }
+        }
+
         if ($this->date_debut instanceof \DateTimeInterface && $this->date_fin_prevue instanceof \DateTimeInterface && $this->date_fin_prevue < $this->date_debut) {
             $context
                 ->buildViolation('La date de fin prevue doit etre superieure ou egale a la date de debut.')
@@ -217,9 +225,9 @@ class Projet
                 ->addViolation();
         }
 
-        if ($this->date_fin_reelle instanceof \DateTimeInterface && !in_array($this->statut, [self::STATUT_TERMINE, self::STATUT_ANNULE], true)) {
+        if ($this->date_fin_reelle instanceof \DateTimeInterface && $this->statut !== self::STATUT_TERMINE) {
             $context
-                ->buildViolation('La date de fin reelle ne peut etre renseignee que pour un projet TERMINE ou ANNULE.')
+                ->buildViolation('La date de fin reelle ne peut etre renseignee que pour un projet TERMINE.')
                 ->atPath('date_fin_reelle')
                 ->addViolation();
         }

@@ -95,9 +95,9 @@ class Tache
         return $this->titre;
     }
 
-    public function setTitre(string $titre): self
+    public function setTitre(?string $titre): self
     {
-        $this->titre = $titre;
+        $this->titre = $titre !== null ? trim($titre) : null;
         return $this;
     }
 
@@ -111,9 +111,9 @@ class Tache
         return $this->description;
     }
 
-    public function setDescription(string $description): self
+    public function setDescription(?string $description): self
     {
-        $this->description = $description;
+        $this->description = $description !== null ? trim($description) : null;
         return $this;
     }
 

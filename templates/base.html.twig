@@ -13,19 +13,25 @@
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.35.0/dist/tabler-icons.min.css">
             <style>
                 :root {
-                    --workspace-bg: #eff2f8;
-                    --workspace-card: #ffffff;
-                    --workspace-border: #e7ebf2;
-                    --workspace-text: #20293a;
-                    --workspace-muted: #64748b;
-                    --workspace-topbar: linear-gradient(90deg, #0f3a8a 0%, #1d4fa8 55%, #2258b8 100%);
+                    --m-primary: #2563eb;
+                    --m-primary-hover: #1d4ed8;
+                    --m-primary-light: #eff6ff;
+                    --m-bg: #f1f5f9;
+                    --m-card: #ffffff;
+                    --m-border: #e2e8f0;
+                    --m-text: #1e293b;
+                    --m-muted: #64748b;
+                    --m-radius: 12px;
+                    --m-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+                    --m-shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
                 }
 
                 body {
-                    font-family: 'Manrope', 'Segoe UI', sans-serif;
-                    background: var(--workspace-bg);
-                    color: var(--workspace-text);
+                    font-family: 'Manrope', 'Inter', sans-serif;
+                    background: var(--m-bg);
+                    color: var(--m-text);
                     margin: 0;
+                    -webkit-font-smoothing: antialiased;
                 }
 
                 .workspace-shell {
@@ -33,70 +39,101 @@
                 }
 
                 .workspace-topbar {
-                    height: 72px;
-                    background: var(--workspace-topbar);
-                    color: #fff;
+                    height: 64px;
+                    background: #ffffff;
+                    border-bottom: 1px solid var(--m-border);
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    padding: 0 20px;
-                    box-shadow: 0 10px 24px rgba(18, 49, 106, 0.28);
+                    padding: 0 28px;
                     position: sticky;
                     top: 0;
                     z-index: 30;
                 }
 
+                .workspace-topbar-brand {
+                    font-size: 22px;
+                    font-weight: 800;
+                    color: var(--m-text);
+                    text-decoration: none;
+                    letter-spacing: -0.5px;
+                }
+
+                .workspace-topbar-brand .brand-accent {
+                    color: var(--m-primary);
+                }
+
                 .workspace-topbar-menu {
                     display: flex;
-                    gap: 12px;
+                    gap: 4px;
                     align-items: center;
-                    flex-wrap: wrap;
                 }
 
                 .workspace-topbar-link {
-                    color: rgba(255, 255, 255, 0.86);
+                    color: var(--m-muted);
                     text-decoration: none;
-                    font-weight: 700;
+                    font-weight: 600;
                     font-size: 14px;
-                    padding: 9px 14px;
-                    border-radius: 999px;
+                    padding: 8px 16px;
+                    border-radius: 8px;
                     transition: all .2s ease;
+                    position: relative;
                 }
 
                 .workspace-topbar-link:hover {
-                    color: #fff;
-                    background: rgba(255, 255, 255, 0.12);
+                    color: var(--m-text);
+                    background: var(--m-primary-light);
                 }
 
                 .workspace-topbar-link.is-active {
-                    background: #fff;
-                    color: #16448f;
-                    box-shadow: 0 8px 16px rgba(15, 40, 88, 0.24);
+                    color: var(--m-primary);
+                    background: transparent;
+                    font-weight: 700;
+                }
+
+                .workspace-topbar-link.is-active::after {
+                    content: '';
+                    position: absolute;
+                    bottom: -20px;
+                    left: 16px;
+                    right: 16px;
+                    height: 2.5px;
+                    background: var(--m-primary);
+                    border-radius: 2px;
                 }
 
                 .workspace-layout {
                     display: grid;
                     grid-template-columns: 280px 1fr;
-                    gap: 20px;
-                    padding: 20px;
+                    gap: 24px;
+                    padding: 24px;
+                    max-width: 1600px;
+                    margin: 0 auto;
                 }
 
                 .workspace-sidebar {
-                    background: var(--workspace-card);
-                    border: 1px solid var(--workspace-border);
-                    border-radius: 18px;
-                    box-shadow: 0 4px 20px rgba(12, 20, 37, .05);
-                    padding: 18px 14px;
+                    background: var(--m-card);
+                    border: 1px solid var(--m-border);
+                    border-radius: var(--m-radius);
+                    box-shadow: var(--m-shadow);
+                    padding: 20px 14px;
                     height: calc(100vh - 112px);
                     position: sticky;
-                    top: 92px;
+                    top: 88px;
                     overflow: auto;
+                    scrollbar-width: thin;
+                    scrollbar-color: #cbd5e1 transparent;
                 }
 
+                .workspace-sidebar::-webkit-scrollbar { width: 4px; }
+                .workspace-sidebar::-webkit-scrollbar-track { background: transparent; }
+                .workspace-sidebar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
                 .workspace-sidebar-title {
-                    font-size: 28px;
+                    font-size: 18px;
                     font-weight: 800;
                     margin: 0;
+                    color: var(--m-text);
                 }
 
                 .workspace-side-link {
@@ -104,22 +141,26 @@
                     align-items: center;
                     justify-content: space-between;
                     text-decoration: none;
-                    color: #2f3a4d;
-                    padding: 10px 10px;
-                    border-radius: 10px;
+                    color: var(--m-muted);
+                    padding: 10px 12px;
+                    border-radius: 8px;
                     font-weight: 700;
-                    margin-top: 4px;
+                    font-size: 12px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    margin-top: 8px;
+                    transition: all .15s ease;
                 }
 
                 .workspace-side-link:hover,
                 .workspace-side-link.is-active {
-                    background: #f2f4fb;
-                    color: #40209e;
+                    background: var(--m-primary-light);
+                    color: var(--m-primary);
                 }
 
                 .workspace-sublist {
-                    margin-top: 6px;
-                    padding-left: 8px;
+                    margin-top: 4px;
+                    padding-left: 0;
                 }
 
                 .workspace-sublist-link {
@@ -127,31 +168,45 @@
                     align-items: center;
                     justify-content: space-between;
                     text-decoration: none;
-                    color: #334155;
-                    padding: 8px 10px;
+                    color: var(--m-text);
+                    padding: 9px 12px;
                     border-radius: 8px;
                     font-size: 14px;
-                    font-weight: 600;
+                    font-weight: 500;
                     margin-top: 2px;
+                    transition: all .15s ease;
                 }
 
-                .workspace-sublist-link:hover,
-                .workspace-sublist-link.is-active {
-                    background: #e9f0ff;
-                    color: #1947b8;
+                .workspace-sublist-link:hover {
+                    background: var(--m-primary-light);
                 }
+
+                .workspace-sublist-link.is-active {
+                    background: var(--m-primary-light);
+                    color: var(--m-primary);
+                    font-weight: 600;
+                }
+
+                .workspace-sublist-link[data-statut="EN_COURS"] .workspace-initials { background: #ecfdf5; color: #059669; }
+                .workspace-sublist-link[data-statut="EN_COURS"]:hover { background: #ecfdf5; }
+                .workspace-sublist-link[data-statut="TERMINE"] .workspace-initials { background: #f0fdf4; color: #16a34a; }
+                .workspace-sublist-link[data-statut="TERMINE"]:hover { background: #f0fdf4; }
+                .workspace-sublist-link[data-statut="EN_ATTENTE"] .workspace-initials { background: #fffbeb; color: #d97706; }
+                .workspace-sublist-link[data-statut="EN_ATTENTE"]:hover { background: #fffbeb; }
+                .workspace-sublist-link[data-statut="PLANIFIE"] .workspace-initials { background: #eff6ff; color: #2563eb; }
+                .workspace-sublist-link[data-statut="PLANIFIE"]:hover { background: #eff6ff; }
 
                 .workspace-initials {
-                    width: 22px;
-                    height: 22px;
-                    border-radius: 999px;
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 8px;
                     display: inline-flex;
                     align-items: center;
                     justify-content: center;
                     font-size: 11px;
-                    font-weight: 800;
-                    background: #e8eefc;
-                    color: #2b4ea2;
+                    font-weight: 700;
+                    background: var(--m-primary-light);
+                    color: var(--m-primary);
                     flex-shrink: 0;
                 }
 
@@ -160,68 +215,96 @@
                 }
 
                 .workspace-card {
-                    background: var(--workspace-card);
-                    border: 1px solid var(--workspace-border);
-                    border-radius: 14px;
-                    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
-                    transition: transform .16s ease, box-shadow .16s ease;
+                    background: var(--m-card);
+                    border: 1px solid var(--m-border);
+                    border-radius: var(--m-radius);
+                    box-shadow: var(--m-shadow);
+                    transition: box-shadow .2s ease;
                 }
 
                 .workspace-card:hover {
-                    transform: translateY(-1px);
-                    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+                    box-shadow: var(--m-shadow-md);
                 }
 
                 .workspace-subtle {
-                    color: var(--workspace-muted);
-                }
-
-                .filter-panel {
-                    background: linear-gradient(180deg, #f8fbff 0%, #f2f6fd 100%);
-                    border: 1px solid #e0e8f6;
-                    border-radius: 12px;
-                    padding: 10px;
-                    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-                }
-
-                .filter-panel-title {
-                    font-size: 11px;
-                    letter-spacing: .08em;
-                    text-transform: uppercase;
-                    font-weight: 800;
-                    color: #466190;
-                    margin-bottom: 8px;
-                }
-
-                .filter-field-label {
-                    font-size: 12px;
-                    font-weight: 700;
-                    color: #4a5f86;
-                    margin-bottom: 4px;
+                    color: var(--m-muted);
                 }
 
                 .filter-control {
-                    border-color: #d3deef;
-                    border-radius: 10px;
-                    background: #fff;
-                    box-shadow: none;
+                    border: 1px solid var(--m-border);
+                    border-radius: 8px;
+                    background: var(--m-bg);
+                    font-size: 13px;
                     transition: border-color .15s ease, box-shadow .15s ease;
                 }
 
                 .filter-control:focus {
-                    border-color: #5e83c5;
-                    box-shadow: 0 0 0 3px rgba(64, 122, 216, 0.16);
+                    border-color: var(--m-primary);
+                    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+                    background: #fff;
                 }
 
                 .filter-reset {
-                    border-radius: 10px;
-                    font-weight: 700;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 13px;
+                }
+
+                .topbar-user {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+
+                .topbar-user-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 6px 14px;
+                    background: var(--m-primary-light);
+                    border-radius: 8px;
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--m-primary);
+                }
+
+                .topbar-user-info i { font-size: 16px; }
+
+                .topbar-btn {
+                    padding: 6px 14px;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    font-weight: 600;
+                    text-decoration: none;
+                    border: 1px solid var(--m-border);
+                    background: #fff;
+                    color: var(--m-text);
+                    transition: all .15s ease;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    line-height: 1.5;
+                }
+
+                .topbar-btn:hover {
+                    background: var(--m-bg);
+                    border-color: #cbd5e1;
+                }
+
+                .topbar-btn-danger {
+                    color: #dc2626;
+                    border-color: #fecaca;
+                }
+
+                .topbar-btn-danger:hover {
+                    background: #fef2f2;
+                    border-color: #fca5a5;
                 }
 
                 @media (max-width: 991px) {
                     .workspace-layout {
                         grid-template-columns: 1fr;
-                        padding: 14px;
+                        padding: 16px;
                     }
 
                     .workspace-sidebar {
@@ -231,10 +314,9 @@
 
                     .workspace-topbar {
                         height: auto;
-                        align-items: flex-start;
-                        flex-direction: column;
-                        gap: 10px;
-                        padding: 12px 14px;
+                        padding: 12px 16px;
+                        flex-wrap: wrap;
+                        gap: 8px;
                     }
                 }
             </style>
@@ -246,43 +328,56 @@
             <script>
                 window.addEventListener('DOMContentLoaded', function () {
                     const form = document.getElementById('project-filter-form');
-                    if (!form) {
-                        return;
+                    if (form) {
+                        const controls = form.querySelectorAll('input[type="text"], select');
+                        const searchInput = form.querySelector('input[name="search"]');
+                        let timeoutId = null;
+
+                        const submitWithDebounce = function () {
+                            if (timeoutId !== null) {
+                                clearTimeout(timeoutId);
+                            }
+
+                            timeoutId = setTimeout(function () {
+                                form.submit();
+                            }, 300);
+                        };
+
+                        controls.forEach(function (control) {
+                            if (control.tagName === 'SELECT') {
+                                control.addEventListener('change', function () {
+                                    form.submit();
+                                });
+                            } else {
+                                control.addEventListener('input', submitWithDebounce);
+                            }
+                        });
+
+                        window.addEventListener('keydown', function (event) {
+                            const target = event.target;
+                            const isTyping = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+                            if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !isTyping && searchInput) {
+                                event.preventDefault();
+                                searchInput.focus();
+                                searchInput.select();
+                            }
+                        });
                     }
 
-                    const controls = form.querySelectorAll('input[type="text"], select');
-                    const searchInput = form.querySelector('input[name="search"]');
-                    let timeoutId = null;
-
-                    const submitWithDebounce = function () {
-                        if (timeoutId !== null) {
-                            clearTimeout(timeoutId);
-                        }
-
-                        timeoutId = setTimeout(function () {
-                            form.submit();
-                        }, 300);
-                    };
-
-                    controls.forEach(function (control) {
-                        if (control.tagName === 'SELECT') {
-                            control.addEventListener('change', function () {
-                                form.submit();
-                            });
-                        } else {
-                            control.addEventListener('input', submitWithDebounce);
-                        }
-                    });
-
-                    window.addEventListener('keydown', function (event) {
-                        const target = event.target;
-                        const isTyping = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
-
-                        if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !isTyping && searchInput) {
-                            event.preventDefault();
-                            searchInput.focus();
-                            searchInput.select();
-                        }
+                    document.querySelectorAll('.js-delete-trigger').forEach(function (btn) {
+                        btn.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            var modalForm = document.getElementById('modal-delete-form');
+                            var modalToken = document.getElementById('modal-delete-token');
+                            var modalMsg = document.getElementById('modal-delete-message');
+                            if (modalForm) modalForm.action = btn.getAttribute('data-delete-url') || '';
+                            if (modalToken) modalToken.value = btn.getAttribute('data-delete-token') || '';
+                            if (modalMsg) modalMsg.textContent = btn.getAttribute('data-delete-message') || 'Voulez-vous vraiment supprimer cet element ?';
+                            var modal = new bootstrap.Modal(document.getElementById('modal-delete'));
+                            modal.show();
+                        });
                     });
                 });
             </script>
@@ -299,16 +394,22 @@
         {% set route = app.request.attributes.get('_route')|default('') %}
         <div class="workspace-shell">
             <header class="workspace-topbar">
-                <nav class="workspace-topbar-menu">
-                    <a href="{{ path('app_projet_index') }}" class="workspace-topbar-link {{ route starts with 'app_projet_' ? 'is-active' : '' }}"><i class="ti ti-layout-kanban me-1"></i>Projets</a>
-                </nav>
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-4">
+                    <a href="{{ path('app_projet_index') }}" class="workspace-topbar-brand"><span class="brand-accent">M</span>omentum</a>
+                    <nav class="workspace-topbar-menu">
+                        <a href="{{ path('app_projet_index') }}" class="workspace-topbar-link {{ route starts with 'app_projet_' ? 'is-active' : '' }}"><i class="ti ti-layout-kanban me-1"></i>Projets</a>
+                    </nav>
+                </div>
+                <div class="topbar-user">
                     {% if currentEmploye is defined and currentEmploye %}
-                        <span class="badge bg-blue-lt">{{ currentEmploye.nom }} {{ currentEmploye.prenom }} | {{ currentEmploye.role|default('-') }}</span>
+                        <div class="topbar-user-info">
+                            <i class="ti ti-user-circle"></i>
+                            {{ currentEmploye.nom }} {{ currentEmploye.prenom }} <span style="opacity:0.5">|</span> {{ currentEmploye.role|default('-') }}
+                        </div>
                     {% endif %}
-                    <a href="{{ path('app_auth_login_id') }}" class="btn btn-sm btn-light">Changer utilisateur</a>
+                    <a href="{{ path('app_auth_login_id') }}" class="topbar-btn">Changer utilisateur</a>
                     <form method="post" action="{{ path('app_auth_logout') }}" class="m-0">
-                        <button type="submit" class="btn btn-sm btn-light text-danger">Se deconnecter</button>
+                        <button type="submit" class="topbar-btn topbar-btn-danger">Se deconnecter</button>
                     </form>
                 </div>
             </header>
@@ -324,6 +425,52 @@
                         {% endif %}
                     </div>
 
+                    {% if route == 'app_projet_index' %}
+                        <form id="project-filter-form" method="get" action="{{ path('app_projet_index') }}" class="px-1 mb-2">
+                            {% if sidebarSelectedProjetId is defined and sidebarSelectedProjetId %}
+                                <input type="hidden" name="projet" value="{{ sidebarSelectedProjetId }}">
+                            {% endif %}
+                            <div class="d-flex gap-2 mb-2">
+                                <div class="input-icon flex-grow-1">
+                                    <span class="input-icon-addon"><i class="ti ti-search" style="font-size:14px;color:var(--m-muted);"></i></span>
+                                    <input type="text" name="search" value="{{ filters.search|default('') }}" class="form-control form-control-sm filter-control" placeholder="Rechercher...">
+                                </div>
+                                {% set hasAdvancedFilters = filters.statut|default('') != '' or filters.priorite|default('') != '' or filters.chef_projet|default(filters.responsable|default('')) != '' %}
+                                <button type="button" class="btn btn-sm btn-icon {{ hasAdvancedFilters ? 'btn-primary' : 'btn-ghost-secondary' }}" data-bs-toggle="collapse" data-bs-target="#sidebar-filters-panel" aria-expanded="{{ hasAdvancedFilters ? 'true' : 'false' }}" title="Filtres avances">
+                                    <i class="ti ti-adjustments-horizontal"></i>
+                                </button>
+                            </div>
+                            <div id="sidebar-filters-panel" class="collapse {{ hasAdvancedFilters ? 'show' : '' }}">
+                                <div class="d-flex flex-column gap-2 mb-2">
+                                    <select name="statut" class="form-select form-select-sm filter-control">
+                                        <option value="">Tous les statuts</option>
+                                        <option value="PLANIFIE" {{ filters.statut|default('') == 'PLANIFIE' ? 'selected' : '' }}>Planifie</option>
+                                        <option value="EN_COURS" {{ filters.statut|default('') == 'EN_COURS' ? 'selected' : '' }}>En cours</option>
+                                        <option value="EN_ATTENTE" {{ filters.statut|default('') == 'EN_ATTENTE' ? 'selected' : '' }}>En attente</option>
+                                        <option value="TERMINE" {{ filters.statut|default('') == 'TERMINE' ? 'selected' : '' }}>Termine</option>
+                                    </select>
+                                    <select name="priorite" class="form-select form-select-sm filter-control">
+                                        <option value="">Toutes priorites</option>
+                                        <option value="BASSE" {{ filters.priorite|default('') == 'BASSE' ? 'selected' : '' }}>Basse</option>
+                                        <option value="MOYENNE" {{ filters.priorite|default('') == 'MOYENNE' ? 'selected' : '' }}>Moyenne</option>
+                                        <option value="HAUTE" {{ filters.priorite|default('') == 'HAUTE' ? 'selected' : '' }}>Haute</option>
+                                    </select>
+                                    <select name="chef_projet" class="form-select form-select-sm filter-control">
+                                        <option value="">Tous les chefs</option>
+                                        {% for chefProjet in chefProjets|default([]) %}
+                                            <option value="{{ chefProjet.idEmploye|default('') }}" {{ filters.chef_projet|default(filters.responsable|default('')) == chefProjet.idEmploye|default('') ? 'selected' : '' }}>
+                                                {{ chefProjet.nom }} {{ chefProjet.prenom }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <a href="{{ path('app_projet_index') }}" class="btn btn-sm w-100" style="color:var(--m-muted);font-size:12px;font-weight:600;">
+                                        <i class="ti ti-rotate me-1"></i>Reinitialiser
+                                    </a>
+                                </div>
+                            </div>
+                        </form>
+                    {% endif %}
+
                     <a href="#sidebar-projets" class="workspace-side-link" data-bs-toggle="collapse" aria-expanded="true" aria-controls="sidebar-projets">
                         <span><i class="ti ti-list-details me-2"></i>Tous les projets</span>
                         <i class="ti ti-chevron-down"></i>
@@ -332,10 +479,10 @@
                     <div id="sidebar-projets" class="collapse show workspace-sublist">
                         {% for p in sidebarProjets|default([]) %}
                             {% set isSelected = sidebarSelectedProjetId|default(0) == p.idProjet %}
-                            {% set delayed = p.statut != 'TERMINE' and p.statut != 'ANNULE' and p.dateFinPrevue and p.dateFinPrevue|date('Y-m-d') < 'now'|date('Y-m-d') %}
+                            {% set delayed = p.statut != 'TERMINE' and p.dateFinPrevue and p.dateFinPrevue|date('Y-m-d') < 'now'|date('Y-m-d') %}
                             {% set initialNom = p.responsable and p.responsable.nom ? p.responsable.nom|slice(0,1) : '?' %}
                             {% set initialPrenom = p.responsable and p.responsable.prenom ? p.responsable.prenom|slice(0,1) : '' %}
-                            <div class="workspace-sublist-link {{ isSelected ? 'is-active' : '' }}">
+                            <div class="workspace-sublist-link {{ isSelected ? 'is-active' : '' }}" data-statut="{{ p.statut|default('') }}">
                                 <a
                                     href="{{ path('app_projet_index', {
                                         projet: p.idProjet,
@@ -366,12 +513,12 @@
                                                 <i class="ti ti-pencil me-2"></i>Modifier
                                             </a>
                                             <div class="dropdown-divider"></div>
-                                            <form method="post" action="{{ path('app_projet_delete', {'id_projet': p.idProjet}) }}" onsubmit="return confirm('Voulez-vous vraiment supprimer ce projet ?');">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ p.idProjet) }}">
-                                                <button class="dropdown-item text-danger" type="submit">
-                                                    <i class="ti ti-trash me-2"></i>Supprimer
-                                                </button>
-                                            </form>
+                                            <button type="button" class="dropdown-item text-danger js-delete-trigger"
+                                                    data-delete-url="{{ path('app_projet_delete', {'id_projet': p.idProjet}) }}"
+                                                    data-delete-token="{{ csrf_token('delete' ~ p.idProjet) }}"
+                                                    data-delete-message="Voulez-vous vraiment supprimer le projet « {{ p.nom }} » ? Cette action est irreversible.">
+                                                <i class="ti ti-trash me-2"></i>Supprimer
+                                            </button>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -380,68 +527,40 @@
                             <div class="px-2 py-2 small workspace-subtle">Aucun projet.</div>
                         {% endfor %}
                     </div>
-
-                    <a href="#sidebar-filtres" class="workspace-side-link" data-bs-toggle="collapse" aria-expanded="true" aria-controls="sidebar-filtres">
-                        <span><i class="ti ti-filter me-2"></i>Filtres</span>
-                        <i class="ti ti-chevron-down"></i>
-                    </a>
-
-                    <div id="sidebar-filtres" class="collapse show workspace-sublist">
-                        {% if route == 'app_projet_index' %}
-                            <form id="project-filter-form" method="get" action="{{ path('app_projet_index') }}" class="px-2 pb-1 filter-panel">
-                                {% if sidebarSelectedProjetId is defined and sidebarSelectedProjetId %}
-                                    <input type="hidden" name="projet" value="{{ sidebarSelectedProjetId }}">
-                                {% endif %}
-                                <div class="filter-panel-title">Affiner la liste</div>
-                                <div class="mb-2">
-                                    <div class="filter-field-label">Recherche</div>
-                                    <div class="input-icon">
-                                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                                        <input type="text" name="search" value="{{ filters.search|default('') }}" class="form-control form-control-sm filter-control" placeholder="Nom, description...">
-                                    </div>
-                                </div>
-                                <div class="mb-2">
-                                    <div class="filter-field-label">Statut</div>
-                                    <select name="statut" class="form-select form-select-sm filter-control">
-                                        <option value="">Statut: tous</option>
-                                        <option value="PLANIFIE" {{ filters.statut|default('') == 'PLANIFIE' ? 'selected' : '' }}>Planifie</option>
-                                        <option value="EN_COURS" {{ filters.statut|default('') == 'EN_COURS' ? 'selected' : '' }}>En cours</option>
-                                        <option value="EN_ATTENTE" {{ filters.statut|default('') == 'EN_ATTENTE' ? 'selected' : '' }}>En attente</option>
-                                        <option value="TERMINE" {{ filters.statut|default('') == 'TERMINE' ? 'selected' : '' }}>Termine</option>
-                                        <option value="ANNULE" {{ filters.statut|default('') == 'ANNULE' ? 'selected' : '' }}>Annule</option>
-                                    </select>
-                                </div>
-                                <div class="mb-2">
-                                    <div class="filter-field-label">Priorite</div>
-                                    <select name="priorite" class="form-select form-select-sm filter-control">
-                                        <option value="">Priorite: toutes</option>
-                                        <option value="BASSE" {{ filters.priorite|default('') == 'BASSE' ? 'selected' : '' }}>Basse</option>
-                                        <option value="MOYENNE" {{ filters.priorite|default('') == 'MOYENNE' ? 'selected' : '' }}>Moyenne</option>
-                                        <option value="HAUTE" {{ filters.priorite|default('') == 'HAUTE' ? 'selected' : '' }}>Haute</option>
-                                    </select>
-                                </div>
-                                <div class="mb-2">
-                                    <div class="filter-field-label">Chef projet</div>
-                                    <select name="chef_projet" class="form-select form-select-sm filter-control">
-                                        <option value="">Chef projet: tous</option>
-                                        {% for chefProjet in chefProjets|default([]) %}
-                                            <option value="{{ chefProjet.idEmploye|default('') }}" {{ filters.chef_projet|default(filters.responsable|default('')) == chefProjet.idEmploye|default('') ? 'selected' : '' }}>
-                                                {{ chefProjet.nom }} {{ chefProjet.prenom }}
-                                            </option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <a href="{{ path('app_projet_index') }}" class="btn btn-outline-primary btn-sm w-100 filter-reset">Reinitialiser</a>
-                            </form>
-                        {% else %}
-                            <div class="px-2 py-2 small workspace-subtle">Les filtres sont disponibles sur la liste des projets.</div>
-                        {% endif %}
-                    </div>
                 </aside>
 
                 <main class="workspace-content">
                     {% block body %}{% endblock %}
                 </main>
+            </div>
+        </div>
+
+        <div class="modal modal-blur fade" id="modal-delete" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <div class="modal-status bg-danger"></div>
+                    <div class="modal-body text-center py-4">
+                        <i class="ti ti-alert-triangle icon mb-2 text-danger icon-lg" style="font-size:40px;"></i>
+                        <h3>Confirmer la suppression</h3>
+                        <div class="text-muted" id="modal-delete-message">Voulez-vous vraiment supprimer cet element ?</div>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="w-100">
+                            <div class="row">
+                                <div class="col">
+                                    <button type="button" class="btn w-100" data-bs-dismiss="modal">Annuler</button>
+                                </div>
+                                <div class="col">
+                                    <form id="modal-delete-form" method="post" action="">
+                                        <input type="hidden" name="_token" id="modal-delete-token" value="">
+                                        <button type="submit" class="btn btn-danger w-100">Supprimer</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </body>
