@@ -556,7 +556,10 @@
 {% endblock %}
 
 {% block body %}
-    <div class="row g-3">
+ {{ include('components/navbar.html.twig') }}
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+    {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': 'RH'}) }} 
+    <div class="flex-fill">
         <div class="col-12">
             {% if selectedProjet %}
                 {% set totalTasks = selectedProjet.taches|length %}
@@ -808,6 +811,7 @@
                 {% endif %}
             {% endif %}
         </div>
+    </div>
     </div>
 {% endblock %}
 

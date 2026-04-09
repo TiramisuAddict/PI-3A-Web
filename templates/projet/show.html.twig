@@ -3,6 +3,9 @@
 {% block title %}Details projet{% endblock %}
 
 {% block body %}
+{{ include('components/navbar.html.twig') }}
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+    {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': 'RH'}) }}
     {% set statutColor = 'secondary' %}
     {% if projet.statut == 'EN_COURS' %}{% set statutColor = 'azure' %}{% endif %}
     {% if projet.statut == 'TERMINE' %}{% set statutColor = 'green' %}{% endif %}
@@ -146,5 +149,6 @@
                 </div>
             {% endif %}
         </div>
+    </div>
     </div>
 {% endblock %}
