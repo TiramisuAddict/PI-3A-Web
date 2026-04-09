@@ -33,6 +33,9 @@
 {% endblock %}
 
 {% block body %}
+{{ include('components/navbar.html.twig') }}
+<div class="d-flex" style="min-height:calc(100vh - 56px);">
+{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': 'RH'}) }}
 <div class="page-wrapper">
     <div class="page-header d-print-none mb-3">
         <div class="container-xl">
@@ -156,6 +159,7 @@
             {{ form_end(form) }}
         </div>
     </div>
+</div>
 </div>
 {% endblock %}
 
