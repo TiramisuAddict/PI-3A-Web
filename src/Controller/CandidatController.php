@@ -11,6 +11,7 @@ use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 use App\Form\CandidatType;
@@ -24,7 +25,6 @@ final class CandidatController extends AbstractController
             'controller_name' => 'CandidatController',
         ]);
     }
-
     #[Route('/candidature/suivre', name: 'app_suivre_candidature')]
     public function suivre_candidature(CandidatRepository $candidat_repository): Response
     {
@@ -36,7 +36,7 @@ final class CandidatController extends AbstractController
     }
 
     #[Route('/candidats/dashboard', name: 'app_candidat_dashboard', methods: ['GET'])]
-    public function dashboard(Request $request, OffreRepository $offreRepository, CandidatRepository $candidatRepository): Response
+    public function dashboard(Request $request, OffreRepository $offreRepository, CandidatRepository $candidatRepository, SessionInterface $session): Response
     {
         $offres = $offreRepository->findAll();
 
@@ -79,6 +79,8 @@ final class CandidatController extends AbstractController
             'candidats' => $candidats,
             'selectedCandidat' => $selectedCandidat,
             'selectedCandidatId' => $selectedCandidatId,
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
         ]);
     }
 

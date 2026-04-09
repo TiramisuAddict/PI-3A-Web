@@ -26,7 +26,7 @@ final class RHController extends AbstractController
         return $session->get('employe_logged_in') === true;
     }
 
-    #[Route('/RH/Home', name: 'RH_Home', methods: ['GET'])]
+#[Route('/RH/Home', name: 'RH_Home', methods: ['GET'])]
 public function dashboard(Request $request, SessionInterface $session, EmployeRepository $employeRepo, EntrepriseRepository $entrepriseRepo): Response
 {
     if (!$this->isEmployeLoggedIn($session)) {
