@@ -225,6 +225,333 @@
             color: var(--m-muted);
             font-size: 13px;
         }
+
+        /* ── View toggle ── */
+        .view-toggle {
+            display: inline-flex;
+            border: 1px solid var(--m-border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .view-toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--m-muted);
+            background: #fff;
+            border: none;
+            cursor: pointer;
+            transition: all .15s ease;
+        }
+
+        .view-toggle-btn:not(:last-child) {
+            border-right: 1px solid var(--m-border);
+        }
+
+        .view-toggle-btn.is-active {
+            background: var(--m-primary);
+            color: #fff;
+        }
+
+        .view-toggle-btn:not(.is-active):hover {
+            background: var(--m-primary-light);
+            color: var(--m-primary);
+        }
+
+        /* ── Calendar ── */
+        .cal-container {
+            background: #fff;
+            border: 1px solid var(--m-border);
+            border-radius: var(--m-radius);
+            overflow: hidden;
+        }
+
+        .cal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--m-border);
+        }
+
+        .cal-header-title {
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: capitalize;
+        }
+
+        .cal-nav {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .cal-nav-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px solid var(--m-border);
+            background: #fff;
+            cursor: pointer;
+            color: var(--m-text);
+            transition: all .15s ease;
+        }
+
+        .cal-nav-btn:hover {
+            background: var(--m-primary-light);
+            color: var(--m-primary);
+            border-color: var(--m-primary);
+        }
+
+        .cal-today-btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--m-border);
+            background: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--m-text);
+            transition: all .15s ease;
+        }
+
+        .cal-today-btn:hover {
+            background: var(--m-primary-light);
+            color: var(--m-primary);
+        }
+
+        .cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+        }
+
+        .cal-dow {
+            padding: 10px 8px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: var(--m-muted);
+            background: var(--m-bg);
+            border-bottom: 1px solid var(--m-border);
+        }
+
+        .cal-cell {
+            min-height: 110px;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--m-border);
+            border-right: 1px solid var(--m-border);
+            vertical-align: top;
+            position: relative;
+        }
+
+        .cal-cell:nth-child(7n) {
+            border-right: none;
+        }
+
+        .cal-cell.is-other-month,
+        .cal-cell.is-outside {
+            background: var(--m-bg);
+        }
+
+        .cal-cell.is-other-month .cal-day-num,
+        .cal-cell.is-outside .cal-day-num {
+            color: #cbd5e1;
+        }
+
+        .cal-day-num {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--m-muted);
+            margin-bottom: 4px;
+        }
+
+        .cal-day-num.is-today {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            background: var(--m-primary);
+            color: #fff;
+        }
+
+        .cal-task {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 8px;
+            margin-bottom: 2px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            color: var(--m-text);
+            transition: all .15s ease;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .cal-task:hover {
+            filter: brightness(0.95);
+            transform: translateX(1px);
+        }
+
+        .cal-task.prio-haute { background: #fef2f2; border-left: 3px solid #ef4444; }
+        .cal-task.prio-moyenne { background: #fffbeb; border-left: 3px solid #f59e0b; }
+        .cal-task.prio-basse { background: #f0fdf4; border-left: 3px solid #22c55e; }
+
+        .cal-task .cal-task-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .cal-task .cal-task-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .cal-task-avatar {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            font-size: 9px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--m-primary-light);
+            color: var(--m-primary);
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+
+        .cal-more {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--m-primary);
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .cal-more:hover {
+            background: var(--m-primary-light);
+        }
+
+        /* Calendar cell hover + add button */
+        .cal-cell:not(.is-outside) {
+            cursor: pointer;
+            transition: background .15s ease;
+        }
+
+        .cal-cell:not(.is-outside):hover {
+            background: #f8fafc;
+        }
+
+        .cal-cell-add {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--m-muted);
+            cursor: pointer;
+            text-decoration: none;
+            transition: all .15s ease;
+            margin-top: 2px;
+        }
+
+        .cal-cell:not(.is-outside):hover .cal-cell-add {
+            display: inline-flex;
+        }
+
+        .cal-cell-add:hover {
+            color: var(--m-primary);
+            background: var(--m-primary-light);
+        }
+
+        /* Task popover */
+        .cal-popover {
+            position: absolute;
+            z-index: 1050;
+            width: 280px;
+            background: #fff;
+            border: 1px solid var(--m-border);
+            border-radius: var(--m-radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,.12);
+            padding: 0;
+            pointer-events: auto;
+        }
+
+        .cal-popover-header {
+            padding: 12px 14px 8px;
+            border-bottom: 1px solid var(--m-border);
+        }
+
+        .cal-popover-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--m-text);
+            margin: 0;
+            word-break: break-word;
+        }
+
+        .cal-popover-badges {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+
+        .cal-popover-body {
+            padding: 10px 14px;
+            font-size: 13px;
+            color: var(--m-muted);
+        }
+
+        .cal-popover-body .cal-pop-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+        }
+
+        .cal-popover-body .cal-pop-row i {
+            font-size: 15px;
+            width: 18px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .cal-popover-footer {
+            padding: 8px 14px 12px;
+            border-top: 1px solid var(--m-border);
+            display: flex;
+            gap: 8px;
+        }
+
+        .cal-popover-footer .btn {
+            font-size: 12px;
+            padding: 4px 12px;
+        }
     </style>
 {% endblock %}
 
@@ -303,32 +630,35 @@
                     {'key':'TERMINEE', 'label':'Terminee', 'header':'status-done'}
                 ] %}
 
-                <div class="row g-3 kanban-board">
-                    <div class="col-12">
-                            <div class="kanban-toolbar">
-                                <div class="kanban-search">
-                                    <div class="input-icon">
-                                        <span class="input-icon-addon"><i class="ti ti-search" style="font-size:15px;color:var(--m-muted);"></i></span>
-                                        <input type="text" class="form-control" placeholder="Rechercher une tache..." data-task-search style="border-radius:8px;">
-                                    </div>
-                                </div>
-                                <div class="kanban-filter">
-                                    <select class="form-select" data-task-filter style="border-radius:8px;">
-                                        <option value="ALL">Toutes les taches</option>
-                                        <option value="A_FAIRE">A faire</option>
-                                        <option value="EN_COURS">En cours</option>
-                                        <option value="BLOCQUEE">Bloquees</option>
-                                        <option value="TERMINEE">Terminees</option>
-                                    </select>
-                                </div>
-                                <button type="button" class="topbar-btn" data-task-filter-reset style="font-size:13px;">
-                                    <i class="ti ti-rotate me-1"></i>Reset
-                                </button>
-                                {% if canManageTasks|default(false) %}
-                                    <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary ms-auto" style="border-radius:8px;font-weight:600;white-space:nowrap;"><i class="ti ti-plus me-1"></i>Nouvelle tache</a>
-                                {% endif %}
-                            </div>
+                <div class="kanban-toolbar">
+                    <div class="kanban-search">
+                        <div class="input-icon">
+                            <span class="input-icon-addon"><i class="ti ti-search" style="font-size:15px;color:var(--m-muted);"></i></span>
+                            <input type="text" class="form-control" placeholder="Rechercher une tache..." data-task-search style="border-radius:8px;">
+                        </div>
                     </div>
+                    <div class="kanban-filter">
+                        <select class="form-select" data-task-filter style="border-radius:8px;">
+                            <option value="ALL">Toutes les taches</option>
+                            <option value="A_FAIRE">A faire</option>
+                            <option value="EN_COURS">En cours</option>
+                            <option value="BLOCQUEE">Bloquees</option>
+                            <option value="TERMINEE">Terminees</option>
+                        </select>
+                    </div>
+                    <button type="button" class="topbar-btn" data-task-filter-reset style="font-size:13px;">
+                        <i class="ti ti-rotate me-1"></i>Reset
+                    </button>
+                    <div class="view-toggle ms-auto">
+                        <button type="button" class="view-toggle-btn is-active" data-view="kanban"><i class="ti ti-layout-kanban"></i> Kanban</button>
+                        <button type="button" class="view-toggle-btn" data-view="calendar"><i class="ti ti-calendar-month"></i> Calendrier</button>
+                    </div>
+                    {% if canManageTasks|default(false) %}
+                        <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary" style="border-radius:8px;font-weight:600;white-space:nowrap;"><i class="ti ti-plus me-1"></i>Nouvelle tache</a>
+                    {% endif %}
+                </div>
+
+                <div class="row g-3 kanban-board" id="kanban-view">
 
                     {% for column in taskColumns %}
                         <div class="col-12 col-lg-3 col-md-6">
@@ -443,6 +773,20 @@
                         </div>
                     {% endfor %}
                 </div>
+
+                {# ── Calendar View ── #}
+                <div id="calendar-view" class="cal-container" style="display:none;">
+                    <div class="cal-header">
+                        <div class="cal-nav">
+                            <button type="button" class="cal-nav-btn" id="cal-prev"><i class="ti ti-chevron-left"></i></button>
+                            <button type="button" class="cal-nav-btn" id="cal-next"><i class="ti ti-chevron-right"></i></button>
+                            <button type="button" class="cal-today-btn" id="cal-today">Aujourd'hui</button>
+                        </div>
+                        <h3 class="cal-header-title" id="cal-month-title"></h3>
+                    </div>
+                    <div class="cal-grid" id="cal-grid"></div>
+                </div>
+
             {% else %}
                 {% if hasActiveFilters|default(false) %}
                     <div class="workspace-card p-4 text-center">
@@ -481,6 +825,277 @@
             const resetFilterButton = document.querySelector('[data-task-filter-reset]');
             let draggedTask = null;
 
+            /* ── Calendar View ────────────────────────────────── */
+            const calGrid = document.getElementById('cal-grid');
+            const calTitle = document.getElementById('cal-month-title');
+            const calView = document.getElementById('calendar-view');
+            const kanbanView = document.getElementById('kanban-view');
+            const viewBtns = document.querySelectorAll('.view-toggle-btn');
+
+            const MONTH_NAMES = ['Janvier','Fevrier','Mars','Avril','Mai','Juin','Juillet','Aout','Septembre','Octobre','Novembre','Decembre'];
+            const DOW_LABELS = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+            const STATUS_COLORS = {
+                'A_FAIRE': '#64748b',
+                'EN_COURS': '#2563eb',
+                'BLOCQUEE': '#ef4444',
+                'TERMINEE': '#16a34a'
+            };
+            const PRIO_CLASS = { 'HAUTE': 'haute', 'MOYENNE': 'moyenne', 'BASSE': 'basse' };
+
+            /* Build task data array from Twig */
+            const calTasks = [];
+            const canManageTasksCal = {{ canManageTasks|default(false) ? 'true' : 'false' }};
+            const newTaskBaseUrl = {{ selectedProjet is defined and selectedProjet ? ("'" ~ path('app_tache_new', {'id_projet': selectedProjet.idProjet}) ~ "'")|raw : "''" }};
+            {% if selectedProjet is defined and selectedProjet %}
+                {% for tache in selectedProjet.taches %}
+                    calTasks.push({
+                        id: {{ tache.idTache }},
+                        titre: {{ tache.titre|json_encode()|raw }},
+                        dateLimite: {{ tache.date_limite ? ("'" ~ tache.date_limite|date('Y-m-d') ~ "'")|raw : 'null' }},
+                        dateDeb: {{ tache.date_deb ? ("'" ~ tache.date_deb|date('Y-m-d') ~ "'")|raw : 'null' }},
+                        statut: {{ tache.statut_tache|json_encode()|raw }},
+                        priorite: {{ tache.priorite|json_encode()|raw }},
+                        employe: {{ tache.employe ? ("'" ~ tache.employe.nom ~ " " ~ tache.employe.prenom ~ "'")|json_encode()|raw : 'null' }},
+                        editUrl: {{ path('app_tache_edit', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache})|json_encode()|raw }},
+                        showUrl: {{ path('app_tache_show', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache})|json_encode()|raw }},
+                        progression: {{ tache.progression ?? 0 }}
+                    });
+                {% endfor %}
+            {% endif %}
+
+            const STATUS_LABELS = {'A_FAIRE':'A faire','EN_COURS':'En cours','BLOCQUEE':'Bloquee','TERMINEE':'Terminee'};
+            const PRIO_LABELS = {'HAUTE':'Haute','MOYENNE':'Moyenne','BASSE':'Basse'};
+            const PRIO_BADGE = {'HAUTE':'bg-red-lt','MOYENNE':'bg-orange-lt','BASSE':'bg-green-lt'};
+            let calDate = new Date();
+            let activePopover = null;
+
+            function closePopover() {
+                if (activePopover) { activePopover.remove(); activePopover = null; }
+            }
+
+            function showTaskPopover(taskData, anchor) {
+                closePopover();
+                const pop = document.createElement('div');
+                pop.className = 'cal-popover';
+
+                const prioClass = PRIO_BADGE[taskData.priorite] || 'bg-secondary-lt';
+                const statusLabel = STATUS_LABELS[taskData.statut] || taskData.statut;
+                const prioLabel = PRIO_LABELS[taskData.priorite] || taskData.priorite || '-';
+                const statusDot = STATUS_COLORS[taskData.statut] || '#94a3b8';
+
+                pop.innerHTML = '<div class="cal-popover-header">'
+                    + '<div class="cal-popover-title">' + taskData.titre.replace(/</g,'&lt;') + '</div>'
+                    + '<div class="cal-popover-badges">'
+                    + '<span class="badge ' + prioClass + '">' + prioLabel + '</span>'
+                    + '<span class="badge" style="background:' + statusDot + '22;color:' + statusDot + ';">' + statusLabel + '</span>'
+                    + '</div></div>'
+                    + '<div class="cal-popover-body">'
+                    + '<div class="cal-pop-row"><i class="ti ti-user"></i><span>' + (taskData.employe || 'Non assigne') + '</span></div>'
+                    + '<div class="cal-pop-row"><i class="ti ti-calendar"></i><span>Echeance: ' + (taskData.dateLimite || '-') + '</span></div>'
+                    + '<div class="cal-pop-row"><i class="ti ti-chart-bar"></i><span>Progression: ' + taskData.progression + '%</span></div>'
+                    + '</div>'
+                    + '<div class="cal-popover-footer">'
+                    + '<a href="' + taskData.showUrl + '" class="btn btn-outline-secondary btn-sm"><i class="ti ti-eye me-1"></i>Voir</a>'
+                    + (canManageTasksCal ? '<a href="' + taskData.editUrl + '" class="btn btn-primary btn-sm"><i class="ti ti-edit me-1"></i>Modifier</a>' : '')
+                    + '</div>';
+
+                document.body.appendChild(pop);
+                activePopover = pop;
+
+                const rect = anchor.getBoundingClientRect();
+                let top = rect.bottom + window.scrollY + 4;
+                let left = rect.left + window.scrollX;
+                if (left + 280 > window.innerWidth) left = window.innerWidth - 290;
+                if (left < 10) left = 10;
+                if (top + 220 > window.innerHeight + window.scrollY) top = rect.top + window.scrollY - 220;
+                pop.style.top = top + 'px';
+                pop.style.left = left + 'px';
+            }
+
+            document.addEventListener('click', function (e) {
+                if (activePopover && !activePopover.contains(e.target) && !e.target.closest('.cal-task')) {
+                    closePopover();
+                }
+            });
+
+            function renderCalendar(year, month) {
+                if (!calGrid) return;
+                calGrid.innerHTML = '';
+                closePopover();
+
+                DOW_LABELS.forEach(function (d) {
+                    var dow = document.createElement('div');
+                    dow.className = 'cal-dow';
+                    dow.textContent = d;
+                    calGrid.appendChild(dow);
+                });
+
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                const daysInMonth = lastDay.getDate();
+
+                let startDow = firstDay.getDay() - 1;
+                if (startDow < 0) startDow = 6;
+
+                const today = new Date();
+                const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+                const prevLastDay = new Date(year, month, 0).getDate();
+                for (let i = startDow - 1; i >= 0; i--) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cal-cell is-outside';
+                    const num = document.createElement('div');
+                    num.className = 'cal-day-num';
+                    num.textContent = String(prevLastDay - i);
+                    cell.appendChild(num);
+                    calGrid.appendChild(cell);
+                }
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+                    const cell = document.createElement('div');
+                    cell.className = 'cal-cell';
+
+                    const num = document.createElement('div');
+                    num.className = 'cal-day-num';
+                    if (dateStr === todayStr) num.classList.add('is-today');
+                    num.textContent = String(d);
+                    cell.appendChild(num);
+
+                    const dayTasks = calTasks.filter(function (t) {
+                        return t.dateLimite === dateStr;
+                    });
+                    const maxVisible = 3;
+                    dayTasks.slice(0, maxVisible).forEach(function (t) {
+                        const pill = document.createElement('a');
+                        pill.href = 'javascript:void(0)';
+                        pill.className = 'cal-task' + (PRIO_CLASS[t.priorite] ? ' prio-' + PRIO_CLASS[t.priorite] : '');
+                        pill.title = t.titre + (t.employe ? ' \u2014 ' + t.employe : '');
+                        pill.setAttribute('data-task-cal-id', t.id);
+
+                        pill.addEventListener('click', function (ev) {
+                            ev.stopPropagation();
+                            ev.preventDefault();
+                            showTaskPopover(t, pill);
+                        });
+
+                        const dot = document.createElement('span');
+                        dot.className = 'cal-task-status';
+                        dot.style.background = STATUS_COLORS[t.statut] || '#94a3b8';
+                        pill.appendChild(dot);
+
+                        const label = document.createElement('span');
+                        label.className = 'cal-task-label';
+                        label.textContent = t.titre;
+                        pill.appendChild(label);
+
+                        if (t.employe) {
+                            const avatar = document.createElement('span');
+                            avatar.className = 'cal-task-avatar';
+                            avatar.textContent = t.employe.split(' ').map(function (w) { return w.charAt(0).toUpperCase(); }).join('');
+                            pill.appendChild(avatar);
+                        }
+
+                        cell.appendChild(pill);
+                    });
+
+                    if (dayTasks.length > maxVisible) {
+                        const more = document.createElement('div');
+                        more.className = 'cal-more';
+                        more.textContent = '+' + (dayTasks.length - maxVisible) + ' de plus';
+                        more.addEventListener('click', function (ev) {
+                            ev.stopPropagation();
+                            dayTasks.slice(maxVisible).forEach(function (t) {
+                                const pill = document.createElement('a');
+                                pill.href = 'javascript:void(0)';
+                                pill.className = 'cal-task' + (PRIO_CLASS[t.priorite] ? ' prio-' + PRIO_CLASS[t.priorite] : '');
+                                pill.setAttribute('data-task-cal-id', t.id);
+                                pill.addEventListener('click', function (ev2) { ev2.stopPropagation(); ev2.preventDefault(); showTaskPopover(t, pill); });
+                                var dot2 = document.createElement('span'); dot2.className = 'cal-task-status'; dot2.style.background = STATUS_COLORS[t.statut] || '#94a3b8'; pill.appendChild(dot2);
+                                var lbl2 = document.createElement('span'); lbl2.className = 'cal-task-label'; lbl2.textContent = t.titre; pill.appendChild(lbl2);
+                                cell.insertBefore(pill, more);
+                            });
+                            more.remove();
+                        });
+                        cell.appendChild(more);
+                    }
+
+                    if (canManageTasksCal && newTaskBaseUrl) {
+                        const addLink = document.createElement('a');
+                        addLink.className = 'cal-cell-add';
+                        addLink.href = newTaskBaseUrl + '?date=' + dateStr;
+                        addLink.innerHTML = '<i class="ti ti-plus" style="font-size:13px;"></i> Ajouter';
+                        addLink.addEventListener('click', function (ev) { ev.stopPropagation(); });
+                        cell.appendChild(addLink);
+                    }
+
+                    calGrid.appendChild(cell);
+                }
+
+                const totalCells = startDow + daysInMonth;
+                const remainder = totalCells % 7;
+                if (remainder > 0) {
+                    for (let i = 1; i <= (7 - remainder); i++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cal-cell is-outside';
+                        const num = document.createElement('div');
+                        num.className = 'cal-day-num';
+                        num.textContent = String(i);
+                        cell.appendChild(num);
+                        calGrid.appendChild(cell);
+                    }
+                }
+
+                if (calTitle) {
+                    calTitle.textContent = MONTH_NAMES[month] + ' ' + year;
+                }
+            }
+
+            var calPrev = document.getElementById('cal-prev');
+            var calNext = document.getElementById('cal-next');
+            var calTodayBtn = document.getElementById('cal-today');
+
+            if (calPrev) {
+                calPrev.addEventListener('click', function () {
+                    calDate.setMonth(calDate.getMonth() - 1);
+                    renderCalendar(calDate.getFullYear(), calDate.getMonth());
+                });
+            }
+            if (calNext) {
+                calNext.addEventListener('click', function () {
+                    calDate.setMonth(calDate.getMonth() + 1);
+                    renderCalendar(calDate.getFullYear(), calDate.getMonth());
+                });
+            }
+            if (calTodayBtn) {
+                calTodayBtn.addEventListener('click', function () {
+                    calDate = new Date();
+                    renderCalendar(calDate.getFullYear(), calDate.getMonth());
+                });
+            }
+
+            /* View toggle */
+            viewBtns.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var view = btn.getAttribute('data-view');
+                    viewBtns.forEach(function (b) { b.classList.remove('is-active'); });
+                    btn.classList.add('is-active');
+
+                    if (view === 'calendar') {
+                        if (kanbanView) kanbanView.style.display = 'none';
+                        if (calView) calView.style.display = '';
+                        renderCalendar(calDate.getFullYear(), calDate.getMonth());
+                    } else {
+                        if (calView) calView.style.display = 'none';
+                        if (kanbanView) kanbanView.style.display = '';
+                        closePopover();
+                    }
+                });
+            });
+
+            renderCalendar(calDate.getFullYear(), calDate.getMonth());
+
+            /* ── Kanban board logic ─────────────────────────────── */
             if (tasks.length === 0 || columns.length === 0) {
                 return;
             }
