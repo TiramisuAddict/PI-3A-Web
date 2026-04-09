@@ -1,0 +1,21 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Modifier tache{% endblock %}
+
+{% block body %}
+    <div class="workspace-card p-3 mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+            <div>
+                <div class="workspace-subtle text-uppercase fw-semibold" style="letter-spacing:.08em; font-size:11px;">Kanban</div>
+                <h2 class="mb-1">Modifier tache</h2>
+                {% if canManageTasks|default(false) %}
+                    <div class="workspace-subtle">Projet: {{ projet.nom }}</div>
+                {% else %}
+                    <div class="workspace-subtle">Mise a jour autorisee: statut et progression uniquement.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {{ include('tache/_form.html.twig', {'button_label': 'Mettre a jour'}) }}
+{% endblock %}

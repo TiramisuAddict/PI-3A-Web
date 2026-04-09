@@ -239,135 +239,124 @@ class Employe
         return $this;
     }
 
-
-    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employé')]
-    private Collection $demandes;
-
-    /**
-     * @return Collection<int, Demande>
-     */
-    public function getDemandes(): Collection
-    {
-        if (!$this->demandes instanceof Collection) {
-            $this->demandes = new ArrayCollection();
-        }
-        return $this->demandes;
-    }
-
-    public function addDemande(Demande $demande): self
-    {
-        if (!$this->getDemandes()->contains($demande)) {
-            $this->getDemandes()->add($demande);
-        }
-        return $this;
-    }
-
-    public function removeDemande(Demande $demande): self
-    {
-        $this->getDemandes()->removeElement($demande);
-        return $this;
-    }
-
-    #[ORM\OneToMany(targetEntity: Notification::class, mappedBy: 'employé')]
-    private Collection $notifications;
-
-    /**
-     * @return Collection<int, Notification>
-     */
-    public function getNotifications(): Collection
-    {
-        if (!$this->notifications instanceof Collection) {
-            $this->notifications = new ArrayCollection();
-        }
-        return $this->notifications;
-    }
-
-    public function addNotification(Notification $notification): self
-    {
-        if (!$this->getNotifications()->contains($notification)) {
-            $this->getNotifications()->add($notification);
-        }
-        return $this;
-    }
-
-    public function removeNotification(Notification $notification): self
-    {
-        $this->getNotifications()->removeElement($notification);
-        return $this;
-    }
-
-    #[ORM\OneToOne(targetEntity: Participation::class, mappedBy: 'employé')]
-    private ?Participation $participation = null;
-
-    public function getParticipation(): ?Participation
-    {
-        return $this->participation;
-    }
-
-    public function setParticipation(?Participation $participation): self
-    {
-        $this->participation = $participation;
-        return $this;
-    }
-
-    #[ORM\OneToMany(targetEntity: Post::class, mappedBy: 'employé')]
-    private Collection $posts;
-
-    /**
-     * @return Collection<int, Post>
-     */
-    public function getPosts(): Collection
-    {
-        if (!$this->posts instanceof Collection) {
-            $this->posts = new ArrayCollection();
-        }
-        return $this->posts;
-    }
-
-    public function addPost(Post $post): self
-    {
-        if (!$this->getPosts()->contains($post)) {
-            $this->getPosts()->add($post);
-        }
-        return $this;
-    }
-
-    public function removePost(Post $post): self
-    {
-        $this->getPosts()->removeElement($post);
-        return $this;
-    }
-
-    #[ORM\OneToMany(targetEntity: Projet::class, mappedBy: 'employé')]
-    private Collection $projets;
+    #[ORM\OneToMany(targetEntity: Projet::class, mappedBy: 'responsable')]
+    private Collection $projetsResponsables;
 
     /**
      * @return Collection<int, Projet>
      */
+    public function getProjetsResponsables(): Collection
+    {
+        if (!$this->projetsResponsables instanceof Collection) {
+            $this->projetsResponsables = new ArrayCollection();
+        }
+
+        return $this->projetsResponsables;
+    }
+
+    public function addProjetResponsable(Projet $projet): self
+    {
+        if (!$this->getProjetsResponsables()->contains($projet)) {
+            $this->getProjetsResponsables()->add($projet);
+            $projet->setResponsable($this);
+        }
+
+        return $this;
+    }
+
+    public function removeProjetResponsable(Projet $projet): self
+    {
+        if ($this->getProjetsResponsables()->removeElement($projet) && $projet->getResponsable() === $this) {
+            $projet->setResponsable(null);
+        }
+
+        return $this;
+    }
+
+    #[ORM\ManyToMany(targetEntity: Projet::class, mappedBy: 'membresEquipe')]
+    private Collection $projetsEquipe;
+
+    /**
+     * @return Collection<int, Projet>
+     */
+    public function getProjetsEquipe(): Collection
+    {
+        if (!$this->projetsEquipe instanceof Collection) {
+            $this->projetsEquipe = new ArrayCollection();
+        }
+
+        return $this->projetsEquipe;
+    }
+
+    public function addProjetEquipe(Projet $projet): self
+    {
+        if (!$this->getProjetsEquipe()->contains($projet)) {
+            $this->getProjetsEquipe()->add($projet);
+            $projet->addMembreEquipe($this);
+        }
+
+        return $this;
+    }
+
+    public function removeProjetEquipe(Projet $projet): self
+    {
+        if ($this->getProjetsEquipe()->removeElement($projet)) {
+            $projet->removeMembreEquipe($this);
+        }
+
+        return $this;
+    }
+
     public function getProjets(): Collection
     {
-        if (!$this->projets instanceof Collection) {
-            $this->projets = new ArrayCollection();
-        }
-        return $this->projets;
+        return $this->getProjetsResponsables();
     }
 
     public function addProjet(Projet $projet): self
     {
-        if (!$this->getProjets()->contains($projet)) {
-            $this->getProjets()->add($projet);
-        }
-        return $this;
+        return $this->addProjetResponsable($projet);
     }
 
     public function removeProjet(Projet $projet): self
     {
-        $this->getProjets()->removeElement($projet);
-        return $this;
+        return $this->removeProjetResponsable($projet);
     }
 
-    #[ORM\OneToMany(targetEntity: Tache::class, mappedBy: 'employé')]
+    public function addProjetMembre(Projet $projet): self
+    {
+        return $this->addProjetEquipe($projet);
+    }
+
+    public function removeProjetMembre(Projet $projet): self
+    {
+        return $this->removeProjetEquipe($projet);
+    }
+
+    public function getProjetsMembre(): Collection
+    {
+        return $this->getProjetsEquipe();
+    }
+
+    public function getProjetsMembres(): Collection
+    {
+        return $this->getProjetsEquipe();
+    }
+
+    public function getProjetsEnEquipe(): Collection
+    {
+        return $this->getProjetsEquipe();
+    }
+
+    #[ORM\OneToMany(targetEntity: Tache::class, mappedBy: 'employe')]
     private Collection $taches;
+
+    public function __construct()
+    {
+        $this->comptes = new ArrayCollection();
+        $this->projetsResponsables = new ArrayCollection();
+        $this->projetsEquipe = new ArrayCollection();
+        $this->taches = new ArrayCollection();
+    }
 
     /**
      * @return Collection<int, Tache>
