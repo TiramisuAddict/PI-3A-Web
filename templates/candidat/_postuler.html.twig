@@ -1,0 +1,118 @@
+{{ form_start(form, { attr: { novalidate: 'novalidate', 'data-postuler-validation': '1' } }) }}
+
+{{ form_errors(form) }}
+
+<div class="row g-3">
+	<div class="col-12 col-md-6">
+		<label class="form-label" for="{{ form.cv_data.vars.id }}">{{ form.cv_data.vars.label }}</label>
+		<div class="dropzone dz-clickable">
+			<div class="dz-message">
+				<h3 class="dropzone-msg-title mb-1">Déposez votre CV ici</h3>
+				<span class="dropzone-msg-desc text-secondary">PDF uniquement, taille max 8 MB</span>
+			</div>
+			<div class="fallback mt-2">
+				{{ form_widget(form.cv_data, { attr: { class: 'form-control', accept: 'application/pdf,.pdf' } }) }}
+			</div>
+		</div>
+		{{ form_errors(form.cv_data) }}
+	</div>
+
+	<div class="col-12 col-md-6">
+		<label class="form-label" for="{{ form.lettre_motivation_data.vars.id }}">{{ form.lettre_motivation_data.vars.label }}</label>
+		<div class="dropzone dz-clickable">
+			<div class="dz-message">
+				<h3 class="dropzone-msg-title mb-1">Déposez votre lettre ici</h3>
+				<span class="dropzone-msg-desc text-secondary">PDF uniquement, taille max 8 MB</span>
+			</div>
+			<div class="fallback mt-2">
+				{{ form_widget(form.lettre_motivation_data, { attr: { class: 'form-control', accept: 'application/pdf,.pdf' } }) }}
+			</div>
+		</div>
+		{{ form_errors(form.lettre_motivation_data) }}
+	</div>
+</div>
+
+<div class="mt-3 d-grid">
+	{{ form_widget(form.Submit, { attr: { class: 'btn btn-primary' } }) }}
+</div>
+
+{{ form_rest(form) }}
+{{ form_end(form, { render_rest: false }) }}
+
+<style>
+	form[data-postuler-validation="1"] .form-control.is-invalid,
+	form[data-postuler-validation="1"] .form-select.is-invalid {
+		background-image: none !important;
+		padding-right: 0.75rem;
+	}
+</style>
+
+<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		document.querySelectorAll('form[data-postuler-validation="1"]').forEach(function (postulerForm) {
+			if (postulerForm.dataset.validationBound === '1') {
+				return;
+			}
+
+			postulerForm.dataset.validationBound = '1';
+
+			const cvInput = postulerForm.querySelector('input[type="file"][name$="[cv_data]"]');
+			const lettreInput = postulerForm.querySelector('input[type="file"][name$="[lettre_motivation_data]"]');
+			const maxSize = 8 * 1024 * 1024;
+
+			function validatePdf(file) {
+				if (!file) return null;
+				const isPdfType = file.type === 'application/pdf' || file.type === 'application/x-pdf';
+				const isPdfName = /\.pdf$/i.test(file.name || '');
+
+				if (!isPdfType && !isPdfName) {
+					return 'Seuls les fichiers PDF sont autorises.';
+				}
+
+				if (file.size > maxSize) {
+					return 'Chaque fichier doit etre inferieur ou egal a 8 MB.';
+				}
+
+				return null;
+			}
+
+			postulerForm.addEventListener('submit', function (event) {
+				let errors = [];
+
+				if (cvInput) {
+					cvInput.classList.remove('is-invalid');
+					const cvFile = cvInput.files && cvInput.files[0] ? cvInput.files[0] : null;
+
+					if (!cvFile) {
+						errors.push('Le CV est requis.');
+						cvInput.classList.add('is-invalid');
+					} else {
+						const cvError = validatePdf(cvFile);
+						if (cvError) {
+							errors.push('CV: ' + cvError);
+							cvInput.classList.add('is-invalid');
+						}
+					}
+				}
+
+				if (lettreInput) {
+					lettreInput.classList.remove('is-invalid');
+					const lettreFile = lettreInput.files && lettreInput.files[0] ? lettreInput.files[0] : null;
+
+					if (lettreFile) {
+						const lettreError = validatePdf(lettreFile);
+						if (lettreError) {
+							errors.push('Lettre de motivation: ' + lettreError);
+							lettreInput.classList.add('is-invalid');
+						}
+					}
+				}
+
+				if (errors.length > 0) {
+					event.preventDefault();
+					alert(errors.join('\n'));
+				}
+			});
+		});
+	});
+</script>
