@@ -135,7 +135,7 @@ class DemandeController extends AbstractController
         ]);
     }
 
-    #[Route('/demande/api/fields/{type}', name: 'demande_api_fields', methods: ['GET'])]
+    #[Route('/demande/api/fields/{type}', name: 'demande_controller_api_fields', methods: ['GET'])]
     public function getFields(string $type): JsonResponse
     {
         return new JsonResponse($this->formHelper->getFieldsForType($type));

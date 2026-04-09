@@ -6,134 +6,157 @@
 {{ parent() }}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-.badge { color: #ffffff !important; background: #206bc4 !important; }
-.badge.bg-blue { color: #ffffff !important; background: #206bc4 !important; }
-.badge.bg-green { color: #ffffff !important; background: #2fb344 !important; }
-.badge.bg-red { color: #ffffff !important; background: #d63939 !important; }
-.badge.bg-yellow { color: #1e293b !important; background: #f59f00 !important; }
-.badge.bg-orange { color: #ffffff !important; background: #f76707 !important; }
-.badge.bg-secondary { color: #ffffff !important; background: #6c757d !important; }
-.badge.bg-primary { color: #ffffff !important; background: #206bc4 !important; }
-.badge.bg-success { color: #ffffff !important; background: #2fb344 !important; }
-.badge.bg-danger { color: #ffffff !important; background: #d63939 !important; }
-.badge.bg-warning { color: #1e293b !important; background: #f59f00 !important; }
-.badge.bg-info { color: #ffffff !important; background: #4299e1 !important; }
-.field-error { color: #dc2626; font-size: .85rem; margin-top: .4rem; font-weight: 600; }
-.is-invalid-custom { border-color: #dc2626 !important; box-shadow: 0 0 0 .2rem rgba(220,38,38,0.12) !important; }
-.section-note { font-size: .88rem; color: #64748b; }
-.form-label.required::after { content: " *"; color: #dc2626; }
-.map-wrapper { position: relative; }
-.map-zoom-controls { position: absolute; top: 10px; left: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 4px; }
-.map-zoom-controls button { width: 32px; height: 32px; background: white; border: 1px solid #ddd; border-radius: 4px; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-.map-zoom-controls button:hover { background: #f0f0f0; }
-.map-info-bar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; background: white; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; color: #444; box-shadow: 0 2px 8px rgba(0,0,0,0.2); white-space: nowrap; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
-.map-search-bar { display: flex; gap: 8px; margin-bottom: 10px; }
-.map-search-bar input { flex: 1; padding: 8px 15px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; }
-.map-search-bar button { padding: 8px 20px; background: #4A5DEF; color: white; border: none; border-radius: 20px; cursor: pointer; font-size: 14px; }
-.map-search-bar button:hover { background: #3a4ddf; }
-.map-selected-info { font-size: .9rem; color: #475569; background: #f0f5ff; border: 1px solid #c0d0ff; padding: .65rem .85rem; border-radius: .5rem; margin-top: 8px; display: none; }
-.map-selected-info.visible { display: block; }
-.map-card-header { background: #f0f5ff; padding: 12px 16px; border-bottom: 1px solid #c0d0ff; display: flex; align-items: center; gap: 8px; font-weight: 600; color: #4A5DEF; }
-.map-card-body { padding: 16px; }
-.map-confirm-bar { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
-.btn-confirm-location { background: #4A5DEF; color: white; border: none; padding: 10px 24px; border-radius: 25px; font-weight: 600; font-size: 14px; cursor: pointer; }
-.btn-confirm-location:disabled { background: #aaa; cursor: not-allowed; }
-.btn-confirm-location:not(:disabled):hover { background: #3a4ddf; }
-.btn-clear-location { background: #888; color: white; border: none; padding: 10px 20px; border-radius: 25px; font-size: 14px; cursor: pointer; }
-.btn-clear-location:hover { background: #666; }
-.inline-map-section { margin-top: 8px; border: 2px solid #4A5DEF; border-radius: 12px; overflow: hidden; }
+    .form-label.required::after { content: " *"; color: #dc2626; }
+    .map-wrapper { position: relative; }
+    .map-zoom-controls { position: absolute; top: 10px; left: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 4px; }
+    .map-zoom-controls button { width: 32px; height: 32px; background: white; border: 1px solid #ddd; border-radius: 4px; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+    .map-zoom-controls button:hover { background: #f0f0f0; }
+    .map-info-bar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; background: white; padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: bold; color: #444; box-shadow: 0 2px 8px rgba(0,0,0,0.15); white-space: nowrap; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+    .map-search-bar { display: flex; gap: 8px; margin-bottom: 10px; }
+    .map-search-bar input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+    .map-search-bar button { padding: 8px 16px; background: #4a5def; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s ease; }
+    .map-search-bar button:hover { background: #3a4ddf; }
+    .map-selected-info { font-size: .9rem; color: #475569; background: #f0f5ff; border: 1px solid #c0d0ff; padding: .65rem .85rem; border-radius: 6px; margin-top: 8px; display: none; }
+    .map-selected-info.visible { display: block; }
+    .map-card-header { background: #f0f5ff; padding: 12px 16px; border-bottom: 1px solid #c0d0ff; display: flex; align-items: center; gap: 8px; font-weight: 600; color: #4a5def; border-radius: 6px 6px 0 0; }
+    .map-card-body { padding: 16px; border: 1px solid #c0d0ff; border-top: none; border-radius: 0 0 6px 6px; }
+    .map-confirm-bar { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+    .btn-confirm-location { background: #4a5def; color: white; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s ease; }
+    .btn-confirm-location:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-confirm-location:not(:disabled):hover { background: #3a4ddf; }
+    .btn-clear-location { background: #6b7280; color: white; border: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s ease; }
+    .btn-clear-location:hover { background: #4b5563; }
+    .inline-map-section { margin-top: 8px; border: 1px solid #c0d0ff; border-radius: 6px; overflow: hidden; background: white; }
+    #map { height: 400px; width: 100%; background: #aad3df; border-radius: 4px; }
+    .location-input-group input { background: #f8fafc !important; }
 </style>
 {% endblock %}
 
 {% block body %}
-<div class="row mb-4 align-items-center">
-    <div class="col-auto">
-        <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="btn btn-outline-secondary">
-            <i class="ti ti-arrow-left me-1"></i>Retour
-        </a>
+<div class="page-wrapper">
+    <div class="page-header d-print-none mb-3">
+        <div class="container-xl">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">
+                        <i class="ti ti-edit me-2"></i>Modifier la Demande
+                    </h2>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="col">
-        <div class="page-pretitle">Demandes</div>
-        <h2 class="page-title"><i class="ti ti-edit me-2"></i>Modifier la demande</h2>
+
+    <div class="page-body">
+        <div class="container-xl">
+            {% if form.vars.submitted %}
+                {% include 'demande/_form_errors.html.twig' with {'form': form, 'detailErrors': detailErrors} %}
+            {% endif %}
+
+            {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'id': 'demandeForm'}}) }}
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-info-circle me-2"></i>Informations générales</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        {{ form_label(form.categorie, null, {'label_attr': {'class': 'form-label required'}}) }}
+                                        {{ form_widget(form.categorie, {'attr': {'class': 'form-select' ~ (form.categorie.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                        {% if form.categorie.vars.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.categorie.vars.errors %}{{ error.message }}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form_label(form.typeDemande, null, {'label_attr': {'class': 'form-label required'}}) }}
+                                        {{ form_widget(form.typeDemande, {'attr': {'class': 'form-select' ~ (form.typeDemande.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                        {% if form.typeDemande.vars.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.typeDemande.vars.errors %}{{ error.message }}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        {{ form_label(form.priorite, null, {'label_attr': {'class': 'form-label required'}}) }}
+                                        {{ form_widget(form.priorite, {'attr': {'class': 'form-select' ~ (form.priorite.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                        {% if form.priorite.vars.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.priorite.vars.errors %}{{ error.message }}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form_label(form.status, null, {'label_attr': {'class': 'form-label required'}}) }}
+                                        {{ form_widget(form.status, {'attr': {'class': 'form-select' ~ (form.status.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                        {% if form.status.vars.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.status.vars.errors %}{{ error.message }}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                {{ form_label(form.titre, null, {'label_attr': {'class': 'form-label required'}}) }}
+                                {{ form_widget(form.titre, {'attr': {'class': 'form-control' ~ (form.titre.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                {% if form.titre.vars.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.titre.vars.errors %}{{ error.message }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="mb-0">
+                                {{ form_label(form.description, null, {'label_attr': {'class': 'form-label'}}) }}
+                                {{ form_widget(form.description, {'attr': {'class': 'form-control', 'rows': 4}}) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3" id="dynamicFieldsCard" style="display:block;">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-forms me-2"></i>Informations spécifiques</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3" id="dynamicFields"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-send me-2"></i>Actions</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                {{ form_label(form.commentaire, null, {'label_attr': {'class': 'form-label'}}) }}
+                                {{ form_widget(form.commentaire, {'attr': {'class': 'form-control', 'rows': 3, 'placeholder': 'Ajoutez un commentaire (optionnel)'}}) }}
+                            </div>
+                            <hr>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="ti ti-check me-1"></i>Enregistrer
+                                </button>
+                                <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="btn btn-outline-secondary">Annuler</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{ form_end(form) }}
+        </div>
     </div>
 </div>
-
-{% if form.vars.submitted %}
-    {% include 'demande/_form_errors.html.twig' with {'form': form, 'detailErrors': detailErrors} %}
-{% endif %}
-
-{{ form_start(form, {'attr': {'novalidate': 'novalidate', 'id': 'demandeForm'}}) }}
-
-<div class="row">
-    <div class="col-lg-8">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h3 class="card-title"><i class="ti ti-info-circle me-2"></i>Informations generales</h3>
-            </div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        {{ form_label(form.categorie, null, {'label_attr': {'class': 'form-label required'}}) }}
-                        {{ form_widget(form.categorie, {'attr': {'class': 'form-select' ~ (form.categorie.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
-                    </div>
-                    <div class="col-md-6">
-                        {{ form_label(form.typeDemande, null, {'label_attr': {'class': 'form-label required'}}) }}
-                        {{ form_widget(form.typeDemande, {'attr': {'class': 'form-select' ~ (form.typeDemande.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
-                        <small class="section-note" id="typeInfo"></small>
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        {{ form_label(form.priorite, null, {'label_attr': {'class': 'form-label required'}}) }}
-                        {{ form_widget(form.priorite, {'attr': {'class': 'form-select' ~ (form.priorite.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
-                    </div>
-                    <div class="col-md-6">
-                        {{ form_label(form.status, null, {'label_attr': {'class': 'form-label required'}}) }}
-                        {{ form_widget(form.status, {'attr': {'class': 'form-select' ~ (form.status.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
-                    </div>
-                </div>
-                <div class="mb-3">
-                    {{ form_label(form.titre, null, {'label_attr': {'class': 'form-label required'}}) }}
-                    {{ form_widget(form.titre, {'attr': {'class': 'form-control' ~ (form.titre.vars.errors|length > 0 ? ' is-invalid-custom' : '')}}) }}
-                </div>
-                <div class="mb-3">
-                    {{ form_label(form.description, null, {'label_attr': {'class': 'form-label'}}) }}
-                    {{ form_widget(form.description, {'attr': {'class': 'form-control', 'rows': 4}}) }}
-                </div>
-            </div>
-        </div>
-
-        <div class="card mb-4" id="dynamicFieldsCard" style="display:block;">
-            <div class="card-header">
-                <h3 class="card-title"><i class="ti ti-forms me-2"></i>Informations specifiques</h3>
-            </div>
-            <div class="card-body">
-                <div class="row g-3" id="dynamicFields"></div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title"><i class="ti ti-send me-2"></i>Actions</h3>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    {{ form_label(form.commentaire, null, {'label_attr': {'class': 'form-label'}}) }}
-                    {{ form_widget(form.commentaire, {'attr': {'class': 'form-control', 'rows': 4, 'placeholder': 'Ajoutez un commentaire (optionnel)'}}) }}
-                </div>
-                <hr>
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary"><i class="ti ti-check me-1"></i>Enregistrer</button>
-                    <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="btn btn-outline-secondary">Annuler</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-{{ form_end(form) }}
 {% endblock %}
 
 {% block javascripts %}

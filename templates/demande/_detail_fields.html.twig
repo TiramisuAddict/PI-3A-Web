@@ -16,7 +16,7 @@
                 {% if isLocation %}
                     <div class="input-group">
                         {{ form_widget(field, {'attr': {'class': 'form-control' ~ (field.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
-                        <button type="button" class="btn btn-primary btn-map-picker" data-field-id="{{ field.vars.id }}">
+                        <button type="button" class="btn btn-primary btn-map-picker" data-field-id="{{ field.vars.id }}" title="Choisir sur la carte">
                             <i class="ti ti-map-pin"></i>
                         </button>
                     </div>
@@ -29,9 +29,9 @@
                 {% endif %}
                 
                 {% if field.vars.errors|length > 0 %}
-                    <div class="invalid-feedback d-block">
+                    <div class="invalid-feedback d-block" style="font-size: 0.8rem;">
                         {% for error in field.vars.errors %}
-                            {{ error.message }}
+                            <div>{{ error.message }}</div>
                         {% endfor %}
                     </div>
                 {% endif %}

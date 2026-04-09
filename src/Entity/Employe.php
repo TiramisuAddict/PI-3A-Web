@@ -8,7 +8,7 @@ use Doctrine\Common\Collections\Collection;
 use App\Repository\EmployeRepository;
 
 #[ORM\Entity(repositoryClass: EmployeRepository::class)]
-#[ORM\Table(name: 'employé')]
+#[ORM\Table(name: 'employe')]
 class Employe
 {
     #[ORM\Id]
@@ -58,12 +58,12 @@ class Employe
     #[ORM\Column(type: 'string', nullable: false)]
     private ?string $e_mail = null;
 
-    public function getE_mail(): ?string
+    public function getEmail(): ?string
     {
         return $this->e_mail;
     }
 
-    public function setE_mail(string $e_mail): self
+    public function setEmail(string $e_mail): self
     {
         $this->e_mail = $e_mail;
         return $this;
@@ -114,12 +114,12 @@ class Employe
     #[ORM\Column(type: 'date', nullable: true)]
     private ?\DateTimeInterface $date_embauche = null;
 
-    public function getDate_embauche(): ?\DateTimeInterface
+    public function getDateEmbauche(): ?\DateTimeInterface
     {
         return $this->date_embauche;
     }
 
-    public function setDate_embauche(?\DateTimeInterface $date_embauche): self
+    public function setDateEmbauche(?\DateTimeInterface $date_embauche): self
     {
         $this->date_embauche = $date_embauche;
         return $this;
@@ -139,7 +139,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Entreprise::class, inversedBy: 'employés')]
+    #[ORM\ManyToOne(targetEntity: Entreprise::class, inversedBy: 'employes')]
     #[ORM\JoinColumn(name: 'id_entreprise', referencedColumnName: 'id_entreprise')]
     private ?Entreprise $entreprise = null;
 
@@ -182,35 +182,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Commentaire::class, mappedBy: 'employé')]
-    private Collection $commentaires;
-
-    /**
-     * @return Collection<int, Commentaire>
-     */
-    public function getCommentaires(): Collection
-    {
-        if (!$this->commentaires instanceof Collection) {
-            $this->commentaires = new ArrayCollection();
-        }
-        return $this->commentaires;
-    }
-
-    public function addCommentaire(Commentaire $commentaire): self
-    {
-        if (!$this->getCommentaires()->contains($commentaire)) {
-            $this->getCommentaires()->add($commentaire);
-        }
-        return $this;
-    }
-
-    public function removeCommentaire(Commentaire $commentaire): self
-    {
-        $this->getCommentaires()->removeElement($commentaire);
-        return $this;
-    }
-
-    #[ORM\OneToMany(targetEntity: Compte::class, mappedBy: 'employé')]
+    #[ORM\OneToMany(targetEntity: Compte::class, mappedBy: 'employe')]
     private Collection $comptes;
 
     /**
@@ -239,7 +211,7 @@ class Employe
     }
 
 
-    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employé')]
+    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employe')]
     private Collection $demandes;
 
     /**
@@ -264,206 +236,6 @@ class Employe
     public function removeDemande(Demande $demande): self
     {
         $this->getDemandes()->removeElement($demande);
-        return $this;
-    }
-
-    #[ORM\OneToMany(targetEntity: Notification::class, mappedBy: 'employé')]
-    private Collection $notifications;
-
-    /**
-     * @return Collection<int, Notification>
-     */
-    public function getNotifications(): Collection
-    {
-        if (!$this->notifications instanceof Collection) {
-            $this->notifications = new ArrayCollection();
-        }
-        return $this->notifications;
-    }
-
-    public function addNotification(Notification $notification): self
-    {
-        if (!$this->getNotifications()->contains($notification)) {
-            $this->getNotifications()->add($notification);
-        }
-        return $this;
-    }
-
-    public function removeNotification(Notification $notification): self
-    {
-        $this->getNotifications()->removeElement($notification);
-        return $this;
-    }
-
-    #[ORM\OneToOne(targetEntity: Participation::class, mappedBy: 'employé')]
-    private ?Participation $participation = null;
-
-    public function getParticipation(): ?Participation
-    {
-        return $this->participation;
-    }
-
-    public function setParticipation(?Participation $participation): self
-    {
-        $this->participation = $participation;
-        return $this;
-    }
-
-    #[ORM\OneToMany(targetEntity: Post::class, mappedBy: 'employé')]
-    private Collection $posts;
-
-    /**
-     * @return Collection<int, Post>
-     */
-    public function getPosts(): Collection
-    {
-        if (!$this->posts instanceof Collection) {
-            $this->posts = new ArrayCollection();
-        }
-        return $this->posts;
-    }
-
-    public function addPost(Post $post): self
-    {
-        if (!$this->getPosts()->contains($post)) {
-            $this->getPosts()->add($post);
-        }
-        return $this;
-    }
-
-    public function removePost(Post $post): self
-    {
-        $this->getPosts()->removeElement($post);
-        return $this;
-    }
-
-    #[ORM\OneToMany(targetEntity: Projet::class, mappedBy: 'employé')]
-    private Collection $projets;
-
-    /**
-     * @return Collection<int, Projet>
-     */
-    public function getProjets(): Collection
-    {
-        if (!$this->projets instanceof Collection) {
-            $this->projets = new ArrayCollection();
-        }
-        return $this->projets;
-    }
-
-    public function addProjet(Projet $projet): self
-    {
-        if (!$this->getProjets()->contains($projet)) {
-            $this->getProjets()->add($projet);
-        }
-        return $this;
-    }
-
-    public function removeProjet(Projet $projet): self
-    {
-        $this->getProjets()->removeElement($projet);
-        return $this;
-    }
-
-    #[ORM\OneToMany(targetEntity: Tache::class, mappedBy: 'employé')]
-    private Collection $taches;
-
-    /**
-     * @return Collection<int, Tache>
-     */
-    public function getTaches(): Collection
-    {
-        if (!$this->taches instanceof Collection) {
-            $this->taches = new ArrayCollection();
-        }
-        return $this->taches;
-    }
-
-    public function addTache(Tache $tache): self
-    {
-        if (!$this->getTaches()->contains($tache)) {
-            $this->getTaches()->add($tache);
-        }
-        return $this;
-    }
-
-    public function removeTache(Tache $tache): self
-    {
-        $this->getTaches()->removeElement($tache);
-        return $this;
-    }
-
-    #[ORM\ManyToMany(targetEntity: Projet::class, inversedBy: 'employés')]
-    #[ORM\JoinTable(
-        name: 'equipe_projet',
-        joinColumns: [
-            new ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')
-        ],
-        inverseJoinColumns: [
-            new ORM\JoinColumn(name: 'id_projet', referencedColumnName: 'id_projet')
-        ]
-    )]
-    private Collection $projets1;
-
-    /**
-     * @return Collection<int, Projet>
-     */
-    public function getProjets1(): Collection
-    {
-        if (!$this->projets instanceof Collection) {
-            $this->projets = new ArrayCollection();
-        }
-        return $this->projets;
-    }
-
-    public function addProjet1(Projet $projet): self
-    {
-        if (!$this->getProjets1()->contains($projet)) {
-            $this->getProjets1()->add($projet);
-        }
-        return $this;
-    }
-
-    public function removeProjet1(Projet $projet): self
-    {
-        $this->getProjets1()->removeElement($projet);
-        return $this;
-    }
-
-    #[ORM\ManyToMany(targetEntity: Post::class, inversedBy: 'employés')]
-    #[ORM\JoinTable(
-        name: 'like_post',
-        joinColumns: [
-            new ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe')
-        ],
-        inverseJoinColumns: [
-            new ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post')
-        ]
-    )]
-    private Collection $posts1;
-
-    /**
-     * @return Collection<int, Post>
-     */
-    public function getPosts1(): Collection
-    {
-        if (!$this->posts instanceof Collection) {
-            $this->posts = new ArrayCollection();
-        }
-        return $this->posts;
-    }
-
-    public function addPost1(Post $post): self
-    {
-        if (!$this->getPosts1()->contains($post)) {
-            $this->getPosts1()->add($post);
-        }
-        return $this;
-    }
-
-    public function removePost1(Post $post): self
-    {
-        $this->getPosts1()->removeElement($post);
         return $this;
     }
 }

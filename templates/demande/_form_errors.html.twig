@@ -1,17 +1,15 @@
 {% set hasError = false %}
 {% set hasBlank = false %}
-{% set hasFormat = false %}
 {% set formatErrors = [] %}
 
 {% for field in form %}
     {% if field.vars.errors is defined and field.vars.errors|length > 0 %}
         {% set hasError = true %}
         {% for error in field.vars.errors %}
-            {% if 'obligatoire' in error.message %}
-                {% set hasBlank = true %}
-            {% else %}
-                {% set hasFormat = true %}
+            {% if 'obligatoire' not in error.message and 'required' not in error.message %}
                 {% set formatErrors = formatErrors|merge([error.message]) %}
+            {% else %}
+                {% set hasBlank = true %}
             {% endif %}
         {% endfor %}
     {% endif %}
@@ -23,15 +21,14 @@
         {% if error.type == 'blank' %}
             {% set hasBlank = true %}
         {% else %}
-            {% set hasFormat = true %}
             {% set formatErrors = formatErrors|merge([error.message]) %}
         {% endif %}
     {% endfor %}
 {% endif %}
 
 {% if hasError %}
-    <div class="alert alert-danger py-2 mb-4" role="alert">
-        <div class="d-flex gap-2 align-items-start">
+    <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+        <div class="d-flex gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
                 viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -40,16 +37,19 @@
                 <path d="M12 8v4"/>
                 <path d="M12 16h.01"/>
             </svg>
-            <div style="font-size:0.85rem;">
+            <div style="font-size: 0.9rem;">
                 {% if hasBlank %}
-                    <div>Veuillez remplir tous les champs obligatoires.</div>
+                    <div class="mb-2"><strong>Veuillez remplir tous les champs obligatoires.</strong></div>
                 {% endif %}
-                {% if hasFormat %}
-                    {% for errorMsg in formatErrors %}
-                        <div>{{ errorMsg }}</div>
-                    {% endfor %}
+                {% if formatErrors|length > 0 %}
+                    <div>
+                        {% for errorMsg in formatErrors %}
+                            <div class="mb-1">{{ errorMsg }}</div>
+                        {% endfor %}
+                    </div>
                 {% endif %}
             </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     </div>
 {% endif %}
