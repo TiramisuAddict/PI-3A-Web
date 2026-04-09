@@ -2,7 +2,7 @@
 {% set descriptionClass = 'form-control' ~ (form.description.vars.errors|length ? ' is-invalid' : '') %}
 {% set dateDebutClass = 'form-control' ~ (form.date_debut.vars.errors|length ? ' is-invalid' : '') %}
 {% set dateFinPrevueClass = 'form-control' ~ (form.date_fin_prevue.vars.errors|length ? ' is-invalid' : '') %}
-{% set dateFinReelleClass = 'form-control' ~ (form.date_fin_reelle.vars.errors|length ? ' is-invalid' : '') %}
+{% set dateFinReelleClass = form.date_fin_reelle is defined ? ('form-control' ~ (form.date_fin_reelle.vars.errors|length ? ' is-invalid' : '')) : 'form-control' %}
 {% set statutClass = 'form-select' ~ (form.statut.vars.errors|length ? ' is-invalid' : '') %}
 {% set prioriteClass = 'form-select' ~ (form.priorite.vars.errors|length ? ' is-invalid' : '') %}
 {% set responsableClass = 'form-select' ~ (form.responsable.vars.errors|length ? ' is-invalid' : '') %}
@@ -62,6 +62,7 @@
                                 <div class="invalid-feedback d-block">{{ error.message }}</div>
                             {% endfor %}
                         </div>
+                        {% if form.date_fin_reelle is defined %}
                         <div class="col-md-6">
                             {{ form_label(form.date_fin_reelle, null, {'label_attr': {'class': 'form-label'}}) }}
                             {{ form_widget(form.date_fin_reelle, {'attr': {'class': dateFinReelleClass, 'data-field-id': 'date_fin_reelle'}}) }}
@@ -71,6 +72,7 @@
                                 <div class="invalid-feedback d-block">{{ error.message }}</div>
                             {% endfor %}
                         </div>
+                        {% endif %}
                         <div class="col-md-3">
                             {{ form_label(form.statut, null, {'label_attr': {'class': 'form-label'}}) }}
                             {{ form_widget(form.statut, {'attr': {'class': statutClass, 'data-field-id': 'statut'}}) }}
@@ -110,21 +112,25 @@
                         {{ form_label(form.membresEquipe, null, {'label_attr': {'class': 'form-label'}}) }}
                         <div class="input-icon mb-2">
                             <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                            <input type="text" id="member-search" class="form-control" placeholder="Rechercher un employe...">
+                            <input type="text" id="member-search" class="form-control form-control-sm" placeholder="Rechercher un employe..." style="border-radius:8px;background:var(--m-bg,#f1f5f9);">
                         </div>
-                        <div id="member-checkbox-list" class="border rounded p-2 bg-body-secondary" style="max-height: 280px; overflow:auto; border-color:#e3e8f3 !important;">
+                        <div id="member-checkbox-list" style="max-height: 320px; overflow:auto; scrollbar-width:thin; scrollbar-color:#cbd5e1 transparent;">
                             {% for choice in form.membresEquipe %}
                                 {% set label = choice.vars.label|default('') %}
-                                <label class="member-option d-flex align-items-center gap-2 px-2 py-2 rounded mb-2 bg-white border" data-member-label="{{ label|lower }}" style="border-color:#e8edf7 !important; cursor:pointer;">
-                                    {{ form_widget(choice, {'attr': {'class': 'form-check-input mt-0 member-checkbox'}}) }}
-                                    <span class="form-check-label fw-medium text-truncate">{{ label }}</span>
+                                {% set labelParts = label|split(' ') %}
+                                {% set initials = (labelParts[0]|default('?'))|slice(0,1) ~ (labelParts[1] is defined ? labelParts[1]|slice(0,1) : '') %}
+                                <label class="member-option" data-member-label="{{ label|lower }}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;margin-bottom:4px;cursor:pointer;border:1px solid transparent;transition:all .15s ease;background:#fff;">
+                                    {{ form_widget(choice, {'attr': {'class': 'form-check-input mt-0 member-checkbox', 'style': 'display:none;'}}) }}
+                                    <span class="member-avatar" style="width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:#eff6ff;color:#2563eb;flex-shrink:0;transition:all .15s ease;">{{ initials|upper }}</span>
+                                    <span style="font-weight:500;font-size:14px;flex:1;">{{ label }}</span>
+                                    <span class="member-check-icon" style="display:none;color:#2563eb;"><i class="ti ti-circle-check-filled" style="font-size:18px;"></i></span>
                                 </label>
                             {% else %}
                                 <div class="workspace-subtle small">Aucun employe disponible.</div>
                             {% endfor %}
                         </div>
                         <div id="member-search-empty" class="workspace-subtle small mt-2" style="display:none;">Aucun employe ne correspond a la recherche.</div>
-                        <div class="form-hint">Selectionnez les membres de l'equipe via les cases a cocher.</div>
+                        <div class="form-hint mt-2" style="font-size:12px;color:var(--m-muted,#64748b);">Cliquez pour selectionner les membres de l'equipe.</div>
                         {% for error in form.membresEquipe.vars.errors %}
                             <div class="invalid-feedback d-block">{{ error.message }}</div>
                         {% endfor %}
@@ -144,4 +150,73 @@
     </div>
 {{ form_end(form) }}
 
-<script src="{{ asset('js/projet-form-validation.js') }}"></script>
+<script>
+(function() {
+    function syncMemberUI() {
+        document.querySelectorAll('.member-option').forEach(function(label) {
+            var cb = label.querySelector('.member-checkbox');
+            var avatar = label.querySelector('.member-avatar');
+            var icon = label.querySelector('.member-check-icon');
+            if (!cb) return;
+            if (cb.checked) {
+                label.style.background = '#eff6ff';
+                label.style.borderColor = '#2563eb';
+                if (avatar) { avatar.style.background = '#2563eb'; avatar.style.color = '#fff'; }
+                if (icon) icon.style.display = 'inline';
+            } else {
+                label.style.background = '#fff';
+                label.style.borderColor = 'transparent';
+                if (avatar) { avatar.style.background = '#eff6ff'; avatar.style.color = '#2563eb'; }
+                if (icon) icon.style.display = 'none';
+            }
+        });
+    }
+    document.querySelectorAll('.member-option').forEach(function(label) {
+        label.addEventListener('mouseenter', function() {
+            if (!label.querySelector('.member-checkbox').checked) {
+                label.style.background = '#f8fafc';
+            }
+        });
+        label.addEventListener('mouseleave', function() {
+            syncMemberUI();
+        });
+    });
+    document.querySelectorAll('.member-checkbox').forEach(function(cb) {
+        cb.addEventListener('change', syncMemberUI);
+    });
+    syncMemberUI();
+
+    var searchInput = document.getElementById('member-search');
+    var list = document.getElementById('member-checkbox-list');
+    var emptyState = document.getElementById('member-search-empty');
+    if (searchInput && list) {
+        var options = Array.from(list.querySelectorAll('.member-option'));
+        searchInput.addEventListener('input', function () {
+            var term = searchInput.value.trim().toLowerCase();
+            var visibleCount = 0;
+            options.forEach(function (option) {
+                var label = option.getAttribute('data-member-label') || '';
+                var visible = label.includes(term);
+                option.style.display = visible ? '' : 'none';
+                if (visible) visibleCount += 1;
+            });
+            if (emptyState) emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+        });
+    }
+
+    var responsableSelect = document.querySelector('[data-field-id="responsable"]');
+    var memberCheckboxes = Array.from(document.querySelectorAll('.member-checkbox'));
+    function syncResponsableWithEquipe() {
+        var val = responsableSelect ? responsableSelect.value : '';
+        if (!val) return;
+        memberCheckboxes.forEach(function (cb) {
+            if (cb.value === val) { cb.checked = true; }
+        });
+        syncMemberUI();
+    }
+    if (responsableSelect) {
+        responsableSelect.addEventListener('change', syncResponsableWithEquipe);
+    }
+    syncResponsableWithEquipe();
+})();
+</script>

@@ -6,7 +6,7 @@
     {% set statutColor = 'secondary' %}
     {% if projet.statut == 'EN_COURS' %}{% set statutColor = 'azure' %}{% endif %}
     {% if projet.statut == 'TERMINE' %}{% set statutColor = 'green' %}{% endif %}
-    {% if projet.statut == 'ANNULE' %}{% set statutColor = 'red' %}{% endif %}
+    {% if projet.statut == 'EN_ATTENTE' %}{% set statutColor = 'orange' %}{% endif %}
 
     {% set prioriteColor = 'secondary' %}
     {% if projet.priorite == 'HAUTE' %}{% set prioriteColor = 'red' %}{% endif %}
@@ -19,7 +19,7 @@
     {% if projet.statut == 'TERMINE' %}
         {% set healthLabel = 'Termine' %}
         {% set healthColor = 'green' %}
-    {% elseif projet.statut != 'ANNULE' and projet.dateFinPrevue and projet.dateFinPrevue|date('Y-m-d') < today %}
+    {% elseif projet.dateFinPrevue and projet.dateFinPrevue|date('Y-m-d') < today %}
         {% set healthLabel = 'En retard' %}
         {% set healthColor = 'red' %}
     {% elseif projet.statut == 'EN_ATTENTE' %}

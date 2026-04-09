@@ -8,30 +8,42 @@
         .kanban-shell {
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 20px;
         }
 
         .kanban-summary {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
             gap: 12px;
-            flex-wrap: wrap;
-            align-items: center;
         }
 
         .kanban-stat {
-            min-width: 96px;
-            padding: 10px 14px;
-            border-radius: 12px;
-            background: #f4f7fc;
-            border: 1px solid #e7edf7;
+            padding: 18px 16px;
+            border-radius: var(--m-radius);
+            background: #fff;
+            border: 1px solid var(--m-border);
             text-align: center;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .kanban-stat:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--m-shadow-md);
         }
 
         .kanban-stat strong {
             display: block;
-            font-size: 24px;
+            font-size: 28px;
+            font-weight: 800;
             line-height: 1;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
+        }
+
+        .kanban-stat .stat-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }
 
         .kanban-board {
@@ -39,48 +51,84 @@
         }
 
         .kanban-lane {
-            border-radius: 14px;
-            border: 1px solid #e8edf7;
-            background: #f8fbff;
-            padding: 10px;
+            border-radius: var(--m-radius);
+            background: var(--m-bg);
+            border: 1px solid var(--m-border);
+            padding: 0;
             min-height: 68vh;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         .kanban-lane-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-radius: 10px;
-            padding: 10px 12px;
+            padding: 14px 16px;
             font-weight: 700;
+            font-size: 13px;
+            background: #fff;
+            border-bottom: 1px solid var(--m-border);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
         }
 
+        .kanban-lane-header.status-todo { border-top: 3px solid #2563eb; }
+        .kanban-lane-header.status-doing { border-top: 3px solid #0ea5e9; }
+        .kanban-lane-header.status-blocked { border-top: 3px solid #ef4444; }
+        .kanban-lane-header.status-done { border-top: 3px solid #16a34a; }
+
         .kanban-count {
-            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 24px;
+            border-radius: 6px;
             font-size: 12px;
-            padding: 2px 8px;
-            background: rgba(255, 255, 255, 0.65);
+            font-weight: 700;
+            padding: 0 6px;
+            background: var(--m-bg);
+            color: var(--m-muted);
         }
 
         .kanban-column {
-            margin-top: 10px;
+            padding: 8px;
             flex: 1;
             min-height: 140px;
             max-height: 60vh;
             overflow: auto;
-            border-radius: 10px;
-            transition: background-color .18s ease;
-            padding: 2px;
+            transition: background-color .2s ease;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
         }
 
+        .kanban-column::-webkit-scrollbar { width: 4px; }
+        .kanban-column::-webkit-scrollbar-track { background: transparent; }
+        .kanban-column::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
         .kanban-task {
-            border-radius: 12px;
-            border: 1px solid #e9eef8;
+            border-radius: 10px;
+            border: 1px solid var(--m-border);
             background: #fff;
             cursor: grab;
-            transition: box-shadow .2s ease, transform .2s ease;
+            transition: all .2s cubic-bezier(.4,0,.2,1);
+        }
+
+        .kanban-task:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .kanban-task[data-priority="HAUTE"] { border-left: 3px solid #ef4444; }
+        .kanban-task[data-priority="MOYENNE"] { border-left: 3px solid #f59e0b; }
+        .kanban-task[data-priority="BASSE"] { border-left: 3px solid #22c55e; }
+
+        .kanban-task.is-dragging {
+            opacity: 0.5;
+            transform: rotate(2deg) scale(0.97);
+            box-shadow: 0 12px 28px rgba(0,0,0,0.18);
         }
 
         .is-filter-hidden {
@@ -89,9 +137,13 @@
 
         .kanban-toolbar {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             align-items: center;
             flex-wrap: wrap;
+            padding: 14px 16px;
+            background: #fff;
+            border-radius: var(--m-radius);
+            border: 1px solid var(--m-border);
         }
 
         .kanban-search {
@@ -101,6 +153,77 @@
 
         .kanban-filter {
             min-width: 190px;
+        }
+
+        /* Custom range slider */
+        .js-progress-input {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: #e2e8f0;
+            outline: none;
+            transition: background .15s;
+        }
+
+        .js-progress-input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--m-primary);
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            transition: transform .15s ease;
+        }
+
+        .js-progress-input::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .js-progress-input::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--m-primary);
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .kanban-column.drag-over {
+            background: rgba(37, 99, 235, 0.05);
+            outline: 2px dashed rgba(37, 99, 235, 0.25);
+            outline-offset: -2px;
+            border-radius: 8px;
+        }
+
+        .kanban-add-task {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--m-muted);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all .15s ease;
+            margin: 4px 8px 8px;
+            border: 1px dashed var(--m-border);
+        }
+
+        .kanban-add-task:hover {
+            background: var(--m-primary-light);
+            color: var(--m-primary);
+            border-color: var(--m-primary);
+        }
+
+        .kanban-empty {
+            color: var(--m-muted);
+            font-size: 13px;
         }
     </style>
 {% endblock %}
@@ -122,52 +245,50 @@
                     {% if normalizedStatus == 'TERMINEE' %}{% set doneCount = doneCount + 1 %}{% endif %}
                 {% endfor %}
 
-                <div class="workspace-card p-3 mb-3 kanban-shell">
+                <div class="workspace-card p-4 mb-3 kanban-shell">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
                         <div>
-                            <h2 class="mb-1">{{ selectedProjet.nom }}</h2>
-                            <div class="workspace-subtle">
+                            <div class="workspace-subtle text-uppercase fw-semibold" style="letter-spacing:.06em; font-size:11px;">Tableau de bord</div>
+                            <h2 class="mb-1" style="font-size:22px;">{{ selectedProjet.nom }}</h2>
+                            <div class="workspace-subtle" style="font-size:13px;">
                                 {% if selectedProjet.responsable %}
-                                    Chef projet: {{ selectedProjet.responsable.nom }} {{ selectedProjet.responsable.prenom }}
+                                    <i class="ti ti-user-star me-1"></i>{{ selectedProjet.responsable.nom }} {{ selectedProjet.responsable.prenom }}
                                 {% else %}
                                     Chef projet non defini
                                 {% endif %}
                             </div>
                         </div>
-                        <div class="d-flex flex-wrap gap-2">
-                            {% if canManageTasks|default(false) %}
-                                <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Nouvelle tache</a>
-                            {% endif %}
-                            {% if canManageProjects|default(false) %}
-                                <a href="{{ path('app_projet_edit', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary-lt">Modifier le projet</a>
-                            {% endif %}
-                        </div>
+                        {% if canManageProjects|default(false) %}
+                            <a href="{{ path('app_projet_edit', {'id_projet': selectedProjet.idProjet}) }}" class="topbar-btn" style="font-size:13px;">
+                                <i class="ti ti-settings me-1"></i>Parametres
+                            </a>
+                        {% endif %}
                     </div>
 
                     <div class="kanban-summary">
-                        <div class="kanban-stat">
+                        <div class="kanban-stat" data-stat="total">
                             <strong>{{ totalTasks }}</strong>
-                            <span class="workspace-subtle small">Total</span>
+                            <span class="stat-label workspace-subtle">Total</span>
                         </div>
-                        <div class="kanban-stat" style="background:#ecfbf4;border-color:#ccf0df;color:#0b8f58;">
-                            <strong>{{ doneCount }}</strong>
-                            <span class="small">Terminees</span>
+                        <div class="kanban-stat" style="border-top:3px solid #16a34a;" data-stat="TERMINEE">
+                            <strong style="color:#16a34a;">{{ doneCount }}</strong>
+                            <span class="stat-label" style="color:#16a34a;">Terminees</span>
                         </div>
-                        <div class="kanban-stat" style="background:#ecf3ff;border-color:#d2e3ff;color:#2f6dde;">
-                            <strong>{{ doingCount }}</strong>
-                            <span class="small">En cours</span>
+                        <div class="kanban-stat" style="border-top:3px solid #0ea5e9;" data-stat="EN_COURS">
+                            <strong style="color:#0ea5e9;">{{ doingCount }}</strong>
+                            <span class="stat-label" style="color:#0ea5e9;">En cours</span>
                         </div>
-                        <div class="kanban-stat" style="background:#fff0f0;border-color:#ffd9d9;color:#d14343;">
-                            <strong>{{ blockedCount }}</strong>
-                            <span class="small">Bloquees</span>
+                        <div class="kanban-stat" style="border-top:3px solid #ef4444;" data-stat="BLOCQUEE">
+                            <strong style="color:#ef4444;">{{ blockedCount }}</strong>
+                            <span class="stat-label" style="color:#ef4444;">Bloquees</span>
                         </div>
                     </div>
 
                     <div class="mt-3">
-                        <div class="small fw-semibold mb-2">Equipe</div>
+                        <div class="small fw-semibold mb-2" style="font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--m-muted);">Equipe</div>
                         <div class="d-flex flex-wrap gap-2">
                             {% for membre in selectedProjet.membresEquipe %}
-                                <span class="badge bg-blue-lt">{{ membre.nom }} {{ membre.prenom }}</span>
+                                <span class="badge" style="background:var(--m-primary-light);color:var(--m-primary);font-weight:600;padding:6px 12px;border-radius:6px;">{{ membre.nom }} {{ membre.prenom }}</span>
                             {% else %}
                                 <span class="workspace-subtle">Aucun membre.</span>
                             {% endfor %}
@@ -176,21 +297,23 @@
                 </div>
 
                 {% set taskColumns = [
-                    {'key':'A_FAIRE', 'label':'A faire', 'header':'bg-blue-lt text-blue'},
-                    {'key':'EN_COURS', 'label':'En cours', 'header':'bg-azure-lt text-azure'},
-                    {'key':'BLOCQUEE', 'label':'Bloquee', 'header':'bg-red-lt text-red'},
-                    {'key':'TERMINEE', 'label':'Terminee', 'header':'bg-green-lt text-green'}
+                    {'key':'A_FAIRE', 'label':'A faire', 'header':'status-todo'},
+                    {'key':'EN_COURS', 'label':'En cours', 'header':'status-doing'},
+                    {'key':'BLOCQUEE', 'label':'Bloquee', 'header':'status-blocked'},
+                    {'key':'TERMINEE', 'label':'Terminee', 'header':'status-done'}
                 ] %}
 
                 <div class="row g-3 kanban-board">
                     <div class="col-12">
-                        <div class="workspace-card p-2">
                             <div class="kanban-toolbar">
                                 <div class="kanban-search">
-                                    <input type="text" class="form-control" placeholder="Rechercher..." data-task-search>
+                                    <div class="input-icon">
+                                        <span class="input-icon-addon"><i class="ti ti-search" style="font-size:15px;color:var(--m-muted);"></i></span>
+                                        <input type="text" class="form-control" placeholder="Rechercher une tache..." data-task-search style="border-radius:8px;">
+                                    </div>
                                 </div>
                                 <div class="kanban-filter">
-                                    <select class="form-select" data-task-filter>
+                                    <select class="form-select" data-task-filter style="border-radius:8px;">
                                         <option value="ALL">Toutes les taches</option>
                                         <option value="A_FAIRE">A faire</option>
                                         <option value="EN_COURS">En cours</option>
@@ -198,11 +321,13 @@
                                         <option value="TERMINEE">Terminees</option>
                                     </select>
                                 </div>
-                                <button type="button" class="btn btn-primary-lt" data-task-filter-reset>
+                                <button type="button" class="topbar-btn" data-task-filter-reset style="font-size:13px;">
                                     <i class="ti ti-rotate me-1"></i>Reset
                                 </button>
+                                {% if canManageTasks|default(false) %}
+                                    <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary ms-auto" style="border-radius:8px;font-weight:600;white-space:nowrap;"><i class="ti ti-plus me-1"></i>Nouvelle tache</a>
+                                {% endif %}
                             </div>
-                        </div>
                     </div>
 
                     {% for column in taskColumns %}
@@ -229,12 +354,13 @@
                                                      draggable="{{ canUpdateTask ? 'true' : 'false' }}"
                                                      data-can-move="{{ canUpdateTask ? '1' : '0' }}"
                                                      data-task-id="{{ tache.idTache }}"
+                                                     data-priority="{{ tache.priorite|default('') }}"
                                                      data-edit-url="{{ path('app_tache_edit', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}"
                                                      data-move-url="{{ path('app_tache_move', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}"
                                                      data-csrf-token="{{ csrf_token('move_tache_' ~ tache.idTache) }}"
                                                      data-progress-url="{{ path('app_tache_progress', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}"
                                                      data-progress-csrf-token="{{ csrf_token('progress_tache_' ~ tache.idTache) }}"
-                                                     style="cursor: {{ canUpdateTask ? 'grab' : 'default' }}; transition: box-shadow .2s ease, transform .2s ease;">
+                                                     style="cursor: {{ canUpdateTask ? 'grab' : 'default' }}">
                                                 <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
                                                     <div class="d-flex align-items-center gap-2 min-w-0">
                                                         <a href="{{ path('app_tache_edit', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}" class="fw-semibold text-truncate text-decoration-none text-reset">{{ tache.titre }}</a>
@@ -261,12 +387,12 @@
                                                             {% endif %}
                                                             {% if canManageTasks|default(false) %}
                                                                 <div class="dropdown-divider"></div>
-                                                                <form method="post" action="{{ path('app_tache_delete', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}" onsubmit="return confirm('Supprimer cette tache ?');">
-                                                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_tache_' ~ tache.idTache) }}">
-                                                                    <button type="submit" class="dropdown-item text-danger">
-                                                                        <i class="ti ti-trash me-2"></i>Supprimer
-                                                                    </button>
-                                                                </form>
+                                                                <button type="button" class="dropdown-item text-danger js-delete-trigger"
+                                                                        data-delete-url="{{ path('app_tache_delete', {'id_projet': selectedProjet.idProjet, 'id_tache': tache.idTache}) }}"
+                                                                        data-delete-token="{{ csrf_token('delete_tache_' ~ tache.idTache) }}"
+                                                                        data-delete-message="Voulez-vous vraiment supprimer la tache « {{ tache.titre }} » ?">
+                                                                    <i class="ti ti-trash me-2"></i>Supprimer
+                                                                </button>
                                                             {% endif %}
                                                         </div>
                                                     </div>
@@ -309,9 +435,9 @@
                                 </div>
 
                                 {% if column.key != 'TERMINEE' and canManageTasks|default(false) %}
-                                    <div class="text-center pt-2">
-                                        <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet, 'status': column.key}) }}" class="btn btn-link text-decoration-none">+ Ajouter une tache</a>
-                                    </div>
+                                    <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet, 'status': column.key}) }}" class="kanban-add-task">
+                                        <i class="ti ti-plus me-1"></i>Ajouter une tache
+                                    </a>
                                 {% endif %}
                             </div>
                         </div>
@@ -372,6 +498,24 @@
                     });
 
                     counter.textContent = String(visibleTasks.length);
+                });
+            };
+
+            const refreshStats = function () {
+                var statusMap = {'A_FAIRE': 0, 'EN_COURS': 0, 'BLOCQUEE': 0, 'TERMINEE': 0};
+                var total = 0;
+                columns.forEach(function (col) {
+                    var key = (col.getAttribute('data-status') || '').toUpperCase();
+                    var count = col.querySelectorAll('.kanban-task').length;
+                    if (statusMap.hasOwnProperty(key)) { statusMap[key] = count; }
+                    total += count;
+                });
+                document.querySelectorAll('[data-stat]').forEach(function (el) {
+                    var stat = el.getAttribute('data-stat');
+                    var strong = el.querySelector('strong');
+                    if (!strong) return;
+                    if (stat === 'total') { strong.textContent = String(total); }
+                    else if (statusMap.hasOwnProperty(stat)) { strong.textContent = String(statusMap[stat]); }
                 });
             };
 
@@ -448,6 +592,7 @@
                 ensureEmptyPlaceholder(sourceColumn);
                 ensureEmptyPlaceholder(targetColumn);
                 refreshCounters();
+                refreshStats();
 
                 try {
                     const response = await fetch(moveUrl, {
@@ -473,6 +618,7 @@
                     ensureEmptyPlaceholder(sourceColumn);
                     ensureEmptyPlaceholder(targetColumn);
                     refreshCounters();
+                    refreshStats();
                     window.alert(error.message || 'Erreur lors du deplacement de la tache.');
                 }
             };
@@ -515,7 +661,7 @@
                 }
 
                 applyTaskFilters();
-            };
+                refreshStats();            };
 
             tasks.forEach(function (task) {
                 let dragStarted = false;
@@ -528,13 +674,11 @@
                 task.addEventListener('dragstart', function () {
                     dragStarted = true;
                     draggedTask = task;
-                    task.style.opacity = '0.65';
-                    task.style.transform = 'scale(0.98)';
+                    task.classList.add('is-dragging');
                 });
 
                 task.addEventListener('dragend', function () {
-                    task.style.opacity = '1';
-                    task.style.transform = 'none';
+                    task.classList.remove('is-dragging');
                     task.style.cursor = 'grab';
                     draggedTask = null;
 
@@ -545,7 +689,7 @@
 
                 task.addEventListener('mouseenter', function () {
                     if (task !== draggedTask) {
-                        task.style.boxShadow = '0 10px 22px rgba(31, 41, 55, 0.08)';
+                        task.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
                     }
                 });
 
@@ -559,16 +703,16 @@
             columns.forEach(function (column) {
                 column.addEventListener('dragover', function (event) {
                     event.preventDefault();
-                    column.style.background = 'rgba(13, 110, 253, 0.06)';
+                    column.classList.add('drag-over');
                 });
 
                 column.addEventListener('dragleave', function () {
-                    column.style.background = 'transparent';
+                    column.classList.remove('drag-over');
                 });
 
                 column.addEventListener('drop', async function (event) {
                     event.preventDefault();
-                    column.style.background = 'transparent';
+                    column.classList.remove('drag-over');
 
                     if (!draggedTask) {
                         return;
@@ -607,6 +751,28 @@
                 const task = input.closest('.kanban-task');
                 const valueLabel = task ? task.querySelector('.js-progress-value') : null;
                 let lastSavedValue = input.value;
+
+                input.addEventListener('mousedown', function (e) {
+                    e.stopPropagation();
+                    if (task) { task.setAttribute('draggable', 'false'); }
+                });
+
+                input.addEventListener('mouseup', function () {
+                    if (task && (task.getAttribute('data-can-move') || '0') === '1') {
+                        task.setAttribute('draggable', 'true');
+                    }
+                });
+
+                input.addEventListener('touchstart', function (e) {
+                    e.stopPropagation();
+                    if (task) { task.setAttribute('draggable', 'false'); }
+                }, { passive: true });
+
+                input.addEventListener('touchend', function () {
+                    if (task && (task.getAttribute('data-can-move') || '0') === '1') {
+                        task.setAttribute('draggable', 'true');
+                    }
+                });
 
                 input.addEventListener('input', function () {
                     if (valueLabel) {
@@ -651,6 +817,7 @@
             }
 
             refreshCounters();
+            refreshStats();
             applyTaskFilters();
         });
     </script>

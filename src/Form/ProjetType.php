@@ -40,24 +40,27 @@ class ProjetType extends AbstractType
                 'required' => true,
                 'attr' => $isEdit ? [] : [
                     'min' => $today,
-                    'max' => $today,
                 ],
             ])
             ->add('date_fin_prevue', DateType::class, [
                 'widget' => 'single_text',
                 'required' => true,
-            ])
-            ->add('date_fin_reelle', DateType::class, [
+            ]);
+
+        if ($isEdit) {
+            $builder->add('date_fin_reelle', DateType::class, [
                 'required' => false,
                 'widget' => 'single_text',
-            ])
+            ]);
+        }
+
+        $builder
             ->add('statut', ChoiceType::class, [
                 'choices' => [
                     Projet::STATUT_PLANIFIE => Projet::STATUT_PLANIFIE,
                     Projet::STATUT_EN_COURS => Projet::STATUT_EN_COURS,
                     Projet::STATUT_EN_ATTENTE => Projet::STATUT_EN_ATTENTE,
                     Projet::STATUT_TERMINE => Projet::STATUT_TERMINE,
-                    Projet::STATUT_ANNULE => Projet::STATUT_ANNULE,
                 ],
                 'required' => true,
                 'placeholder' => 'Choisir un statut',
