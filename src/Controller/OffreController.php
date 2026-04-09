@@ -14,6 +14,8 @@ use App\Repository\OffreRepository;
 
 use Doctrine\Persistence\ManagerRegistry;
 
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
+
 final class OffreController extends AbstractController
 {
     #[Route('/offre', name: 'app_offre')]
@@ -49,7 +51,7 @@ final class OffreController extends AbstractController
 
     // dashboard_offre_hr
     #[Route('/offre/dashboard', name: 'app_offre_dashboard')]
-    public function dashboard(Request $request, OffreRepository $offre_repository): Response
+    public function dashboard(Request $request, OffreRepository $offre_repository, SessionInterface $session): Response
     {
         $q = $request->query->get('q');
         $contract = $request->query->get('contract');
@@ -68,11 +70,13 @@ final class OffreController extends AbstractController
                 'etat' => $etat,
                 'category' => $category,
             ],
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
         ]);
     }
 
     #[Route('/offre/createOffre', name: 'app_offre_create', methods: ['GET', 'POST'])]
-    public function createOffreForm(Request $request, ManagerRegistry $doctrine) : Response {
+    public function createOffreForm(Request $request, ManagerRegistry $doctrine, SessionInterface $session) : Response {
         $offre = new Offre();
 
         $form = $this->createForm(OffreType::class, $offre);
@@ -94,11 +98,13 @@ final class OffreController extends AbstractController
         return $this->render('offre/dashboard_offre_hr.html.twig', [
             'form' => $form->createView(),
             'offres' => $offres,
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
         ]);
     }
 
     #[Route('/offre/updateOffre/{id}', name: 'app_offre_update', methods: ['GET', 'POST'])]
-    public function updateOffreForm(Request $request, ManagerRegistry $doctrine, int $id) : Response {
+    public function updateOffreForm(Request $request, ManagerRegistry $doctrine, SessionInterface $session, int $id) : Response {
         $offre = $doctrine->getRepository(Offre::class)->find($id);
 
         if (!$offre) {
@@ -125,6 +131,8 @@ final class OffreController extends AbstractController
         return $this->render('offre/dashboard_offre_hr.html.twig', [
             'form' => $form->createView(),
             'offres' => $offres,
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
         ]);
     }
 
