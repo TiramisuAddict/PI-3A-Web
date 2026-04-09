@@ -32,7 +32,7 @@ class EmployeRepository extends ServiceEntityRepository
     //        ;
     //    }
 
-    //    public function findOneBySomeField($value): ?Employe
+    //    public function findOneBySomeField($value): ?Employé
     //    {
     //        return $this->createQueryBuilder('e')
     //            ->andWhere('e.exampleField = :val')
@@ -41,4 +41,24 @@ class EmployeRepository extends ServiceEntityRepository
     //            ->getOneOrNullResult()
     //        ;
     //    }
+    public function findByEntrepriseAndFilters($entreprise, ?string $search, ?string $role): array
+{
+    $qb = $this->createQueryBuilder('e')
+               ->andWhere('e.entreprise = :entreprise')
+               ->setParameter('entreprise', $entreprise);
+
+    if ($search) {
+        $qb->andWhere('LOWER(e.nom) LIKE :search OR LOWER(e.prenom) LIKE :search')
+           ->setParameter('search', '%'.strtolower($search).'%');
+    }
+
+    if ($role) {
+        $qb->andWhere('LOWER(e.role) = :role')
+           ->setParameter('role', strtolower($role));
+    }
+
+    return $qb->orderBy('e.nom', 'ASC')
+              ->getQuery()
+              ->getResult();
+}
 }
