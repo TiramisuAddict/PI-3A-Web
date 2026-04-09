@@ -1,4 +1,4 @@
-{% extends 'base.html.twig' %}
+﻿{% extends 'base.html.twig' %}
 
 {% block title %}Momentum | Dashboard RH{% endblock %}
 
@@ -195,14 +195,14 @@
 
             function normalizeEtat(value) {
                 if (value === 'OUVERT') return 'Ouvert';
-                if (value === 'FERMÉ' || value === 'FERME') return 'Fermé';
+                if (value === 'FERMÃ‰' || value === 'FERME') return 'FermÃ©';
                 return value || '';
             }
 
             document.querySelectorAll('[data-offer-create]').forEach(function (btn) {
                 btn.addEventListener('click', function () {
-                    modalTitle.textContent = 'Créer une Offre';
-                    modalSubtitle.textContent = 'Complétez les informations de la nouvelle offre.';
+                    modalTitle.textContent = 'CrÃ©er une Offre';
+                    modalSubtitle.textContent = 'ComplÃ©tez les informations de la nouvelle offre.';
                     resetForm();
                 });
             });
@@ -212,7 +212,7 @@
                     const card = btn.closest('[data-offer-card]');
                     
                     modalTitle.textContent = 'Modifier l\'Offre';
-                    modalSubtitle.textContent = 'Mettez à jour les informations de cette offre.';
+                    modalSubtitle.textContent = 'Mettez Ã  jour les informations de cette offre.';
 
                     if (modalForm) {
                         modalForm.action = updateActionTemplate.replace('__ID__', card.dataset.offerId || '0');
@@ -230,7 +230,7 @@
                 btn.addEventListener('click', function (event) {
                     const offerId = btn.dataset.offerId;
                     
-                    if (confirm('Êtes-vous sûr de vouloir supprimer cette offre ?')) {
+                    if (confirm('ÃŠtes-vous sÃ»r de vouloir supprimer cette offre ?')) {
                         const form = document.createElement('form');
                         form.method = 'POST';
                         form.action = deleteActionTemplate.replace('__ID__', offerId || '0');
@@ -244,8 +244,14 @@
 {% endblock %}
 
 {% block body %}
-    <div class="dashboard-hr">
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+        {{ include('components/sidebar.html.twig', {'active_page': 'offres','sidebar_role': 'RH'}) }}
+    
+    <div class="dashboard-hr flex-grow-1">
         <div class="container-xl">
+
+            {{ include('offre/_dashboard_recruitement_hr.html.twig') }}
+
             {% for message in app.flashes('success') %}
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     {{ message }}
@@ -263,10 +269,10 @@
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                 <div>
                     <h1 class="h2 mb-1">Dashboard des Offres</h1>
-                    <p class="text-secondary mb-0">Visualisez et gérez vos opportunités de recrutement.</p>
+                    <p class="text-secondary mb-0">Visualisez et gÃ©rez vos opportunitÃ©s de recrutement.</p>
                 </div>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#offreModal" data-offer-create>
-                    + Créer une Offre
+                    + CrÃ©er une Offre
                 </button>
             </div>
 
@@ -287,20 +293,20 @@
                         </div>
                         <div class="col-12 col-md-4 col-lg-2">
                             <select class="form-select" name="etat">
-                                <option value="">Tous les états</option>
+                                <option value="">Tous les Ã©tats</option>
                                 <option value="Ouvert" {{ filters.etat|default('') == 'Ouvert' ? 'selected' : '' }}>Ouvert</option>
-                                <option value="Fermé" {{ filters.etat|default('') == 'Fermé' ? 'selected' : '' }}>Fermé</option>
+                                <option value="FermÃ©" {{ filters.etat|default('') == 'FermÃ©' ? 'selected' : '' }}>FermÃ©</option>
                             </select>
                         </div>
                         <div class="col-12 col-md-4 col-lg-3">
                             <select class="form-select" name="category">
-                                <option value="">Toutes les catégories</option>
+                                <option value="">Toutes les catÃ©gories</option>
                                 <option value="Informatique" {{ filters.category|default('') == 'Informatique' ? 'selected' : '' }}>Informatique</option>
                                 <option value="Marketing" {{ filters.category|default('') == 'Marketing' ? 'selected' : '' }}>Marketing</option>
                                 <option value="Vente" {{ filters.category|default('') == 'Vente' ? 'selected' : '' }}>Vente</option>
                                 <option value="Finance" {{ filters.category|default('') == 'Finance' ? 'selected' : '' }}>Finance</option>
                                 <option value="Ressources Humaines" {{ filters.category|default('') == 'Ressources Humaines' ? 'selected' : '' }}>Ressources Humaines</option>
-                                <option value="Santé" {{ filters.category|default('') == 'Santé' ? 'selected' : '' }}>Santé</option>
+                                <option value="SantÃ©" {{ filters.category|default('') == 'SantÃ©' ? 'selected' : '' }}>SantÃ©</option>
                                 <option value="Education" {{ filters.category|default('') == 'Education' ? 'selected' : '' }}>Education</option>
                                 <option value="Art et Design" {{ filters.category|default('') == 'Art et Design' ? 'selected' : '' }}>Art et Design</option>
                                 <option value="Autre" {{ filters.category|default('') == 'Autre' ? 'selected' : '' }}>Autre</option>
@@ -334,12 +340,12 @@
                                 <div class="offer-meta">
                                     {% if offre.typeContrat %}{{ offre.typeContrat }} - {% endif %}
                                     {% if offre.dateLimite %}Expire le {{ offre.dateLimite|date('d/m/Y') }}{% else %}Pas de date limite{% endif %}
-                                    {% if offre.idEmployer %} - Créé par: #{{ offre.idEmployer }}{% endif %}
+                                    {% if offre.idEmployer %} - CrÃ©Ã© par: #{{ offre.idEmployer }}{% endif %}
                                 </div>
                             </div>
 
                             <div class="d-flex align-items-center gap-2">
-                                <span class="badge {{ offre.etat == 'FERMÉ' ? 'bg-red-lt text-red' : 'bg-blue-lt text-blue' }}">{{ offre.etat|default('OUVERT') }}</span>
+                                <span class="badge {{ offre.etat == 'FERMÃ‰' ? 'bg-red-lt text-red' : 'bg-blue-lt text-blue' }}">{{ offre.etat|default('OUVERT') }}</span>
                                 <button type="button" class="btn btn-outline-primary edit-mini-btn" data-offer-edit data-offer-id="{{ offre.id }}" title="Modifier" data-bs-toggle="modal" data-bs-target="#offreModal">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"/></svg>
                                 </button>
@@ -354,7 +360,7 @@
                         <div class="card-body">
                             <div class="empty">
                                 <div class="empty-title">Aucune offre disponible</div>
-                                <div class="empty-subtitle text-secondary">Créez une offre pour la voir apparaître ici.</div>
+                                <div class="empty-subtitle text-secondary">CrÃ©ez une offre pour la voir apparaÃ®tre ici.</div>
                             </div>
                         </div>
                     </div>
@@ -367,8 +373,8 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <div>
-                            <h5 class="modal-title" id="offreModalTitle">Créer une Offre</h5>
-                            <div class="modal-title-sub" id="offreModalSubtitle">Complétez les informations de la nouvelle offre.</div>
+                            <h5 class="modal-title" id="offreModalTitle">CrÃ©er une Offre</h5>
+                            <div class="modal-title-sub" id="offreModalSubtitle">ComplÃ©tez les informations de la nouvelle offre.</div>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
@@ -400,7 +406,9 @@
                     </div>
                 </div>
             </div>
+            </div>
         </div>
         {# Modal ============================================================== #}
     </div>
 {% endblock %}
+
