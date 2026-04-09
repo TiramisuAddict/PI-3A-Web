@@ -1,0 +1,230 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Momentum | Plateforme RH et Carriere{% endblock %}
+
+{% block stylesheets %}
+	{{ parent() }}
+	
+    <style>
+
+		.momentum-home {
+			background: #f5f7fb;
+			min-height: 100vh;
+			padding-bottom: 2.5rem;
+		}
+
+		.momentum-hero {
+			padding-top: 1rem;
+		}
+
+		.momentum-hero-content {
+			max-width: 680px;
+		}
+
+		.momentum-hero-visual {
+			border: 1px solid rgba(15, 23, 42, 0.08);
+			border-radius: 10px;
+			background: #fff;
+			overflow: hidden;
+		}
+
+		.momentum-hero-visual-top {
+			padding: .75rem 1rem;
+			border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+			background: linear-gradient(90deg, rgba(31, 111, 235, 0.08), rgba(14, 116, 144, 0.08));
+		}
+
+		.momentum-hero-visual-body {
+			padding: 1rem;
+		}
+
+		.momentum-preview-card {
+			border: 1px solid rgba(15, 23, 42, 0.08);
+			border-radius: 8px;
+			padding: .75rem;
+			background: #ffffff;
+		}
+
+		.momentum-preview-card + .momentum-preview-card {
+			margin-top: .75rem;
+		}
+
+		.momentum-logo-hero {
+			height: 34px;
+			width: auto;
+		}
+
+		.momentum-dual-card {
+			border: 1px solid rgba(15, 23, 42, 0.08);
+			border-radius: 10px;
+			background: #fff;
+			height: 100%;
+		}
+
+		.momentum-home .card {
+			border-radius: 10px;
+			border: 1px solid rgba(15, 23, 42, 0.08);
+		}
+
+		.momentum-audience-label {
+			font-size: .75rem;
+			letter-spacing: .05em;
+			text-transform: uppercase;
+			font-weight: 700;
+			color: #64748b;
+		}
+
+		.momentum-list {
+			margin: 0;
+			padding-left: 1rem;
+			color: #334155;
+		}
+
+		.momentum-list li + li {
+			margin-top: .5rem;
+		}
+
+		@media (max-width: 991.98px) {
+			.momentum-hero-content {
+				max-width: 100%;
+			}
+		}
+	</style>
+{% endblock %}
+
+{% block body %}
+	<div class="momentum-home">
+		{# include navbar #}
+		{% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'home', logged_user: false } %}
+
+		<section class="container-xl momentum-hero">
+			<div class="row align-items-center g-4 g-xl-5">
+				<div class="col-12 col-lg-7">
+					<div class="momentum-hero-content">
+						<h1 class="display-5 fw-bold mb-3">Une seule plateforme pour recruter, collaborer et evoluer</h1>
+						<p class="text-secondary fs-4 mb-4">
+							Momentum connecte entreprises et candidats avec l'IA, la gestion RH moderne,
+							le suivi des projets en Kanban et un espace social professionnel.
+                            Recrutez plus intelligemment, travaillez plus efficacement et avancez dans votre carriere.
+						</p>
+					</div>
+				</div>
+
+				<div class="col-12 col-lg-5">
+					<div class="momentum-hero-visual">
+						
+						<div class="momentum-hero-visual-body">
+							<div class="momentum-preview-card">
+								<div class="d-flex justify-content-between align-items-center mb-1">
+									<strong class="text-dark">Pipeline recrutement</strong>
+									<span class="badge bg-azure-lt text-azure">18 candidats</span>
+								</div>
+								<p class="text-secondary mb-0 small">Tri IA des profils et suivi des candidatures en temps reel.</p>
+							</div>
+							<div class="momentum-preview-card">
+								<div class="d-flex justify-content-between align-items-center mb-1">
+									<strong class="text-dark">Projet Kanban</strong>
+									<span class="badge bg-teal-lt text-teal">8 taches</span>
+								</div>
+								<p class="text-secondary mb-0 small">Organisation equipe, priorites visibles et collaboration fluide.</p>
+							</div>
+							<div class="momentum-preview-card">
+								<div class="d-flex justify-content-between align-items-center mb-1">
+									<strong class="text-dark">Espace communaute</strong>
+									<span class="badge bg-indigo-lt text-indigo">Nouveau post</span>
+								</div>
+								<p class="text-secondary mb-0 small">Actualites, evenements et interactions professionnelles.</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="row g-3 mt-1">
+				<div class="col-12 col-lg-6" id="hr-zone">
+					<div class="card momentum-dual-card">
+						<div class="card-body p-4 p-xl-5">
+							<span class="momentum-audience-label">Pour les RH et entreprises</span>
+							<h2 class="h2 mt-2">Pilotez le recrutement et vos equipes avec clarte</h2>
+							<p class="text-secondary mb-4">
+								Centralisez offres d'emploi, suivi des candidats, aide a la decision par IA
+								et organisation des equipes dans un espace de travail unique.
+							</p>
+
+							<ul class="momentum-list mb-4">
+								<li>Gestion des offres et pipeline de candidatures</li>
+								<li>Recommandations IA pour accelerer le tri des profils</li>
+								<li>Espace collaboratif pour les equipes</li>
+							</ul>
+
+							<div class="d-flex flex-wrap gap-2">
+								<a href="{{ path('app_offre_list') }}" class="btn btn-primary">Voir les offres publiees</a>
+								<a href="#" class="btn btn-outline-primary">Demander une demo</a>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="col-12 col-lg-6" id="candidate-zone">
+					<div class="card momentum-dual-card">
+						<div class="card-body p-4 p-xl-5">
+							<span class="momentum-audience-label">Pour les candidats</span>
+							<h2 class="h2 mt-2">Trouvez des opportunites et avancez dans votre carriere</h2>
+							<p class="text-secondary mb-4">
+								Explorez les offres, postulez facilement, suivez vos candidatures
+								et restez connecte aux entreprises et a la communaute Momentum.
+							</p>
+
+							<ul class="momentum-list mb-4">
+								<li>Recherche d'opportunites en quelques clics</li>
+								<li>Suivi transparent de vos candidatures</li>
+								<li>Acces web et desktop pour une continuite totale</li>
+							</ul>
+
+							<div class="d-flex flex-wrap gap-2">
+								<a href="{{ path('app_offre_list') }}" class="btn btn-primary">Explorer les offres</a>
+								<a href="#" class="btn btn-outline-primary">Creer mon compte</a>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="container-xl mt-5">
+			<div class="row g-3 g-md-4">
+				<div class="col-12 col-md-4">
+					<div class="card h-100">
+						<div class="card-body">
+							<h3 class="h3 mb-2">Recrutement intelligent</h3>
+							<p class="text-secondary mb-0">
+								Des outils IA utiles pour mieux prioriser les candidatures et gagner du temps,
+								sans complexite.
+							</p>
+						</div>
+					</div>
+				</div>
+				<div class="col-12 col-md-4">
+					<div class="card h-100">
+						<div class="card-body">
+							<h3 class="h3 mb-2">Collaboration operationnelle</h3>
+							<p class="text-secondary mb-0">
+								Une organisation projet claire avec des workflows Kanban pour garder les equipes alignees.
+							</p>
+						</div>
+					</div>
+				</div>
+				<div class="col-12 col-md-4">
+					<div class="card h-100">
+						<div class="card-body">
+							<h3 class="h3 mb-2">Communaute professionnelle</h3>
+							<p class="text-secondary mb-0">
+								Un espace social integre pour publier, suivre des evenements et renforcer la marque employeur.
+							</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+	</div>
+{% endblock %}

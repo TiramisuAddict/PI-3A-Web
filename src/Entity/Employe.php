@@ -2,7 +2,6 @@
 
 namespace App\Entity;
 
-use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -29,7 +28,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\Column(type: 'string', length: 30, nullable: false)]
+    #[ORM\Column(type: 'string', nullable: false)]
     private ?string $nom = null;
 
     public function getNom(): ?string
@@ -43,7 +42,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\Column(type: 'string', length: 30, nullable: false)]
+    #[ORM\Column(type: 'string', nullable: false)]
     private ?string $prenom = null;
 
     public function getPrenom(): ?string
@@ -57,15 +56,15 @@ class Employe
         return $this;
     }
 
-    #[ORM\Column(type: 'string', length: 30, nullable: false)]
+    #[ORM\Column(type: 'string', nullable: false)]
     private ?string $e_mail = null;
 
-    public function getE_mail(): ?string
+    public function getEmail(): ?string
     {
         return $this->e_mail;
     }
 
-    public function setE_mail(string $e_mail): self
+    public function setEmail(string $e_mail): self
     {
         $this->e_mail = $e_mail;
         return $this;
@@ -85,7 +84,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\Column(type: 'string', length: 30, nullable: false)]
+    #[ORM\Column(type: 'string', nullable: false)]
     private ?string $poste = null;
 
     public function getPoste(): ?string
@@ -99,7 +98,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\Column(type: 'string', length: 30, nullable: false)]
+    #[ORM\Column(type: 'string', nullable: false)]
     private ?string $role = null;
 
     public function getRole(): ?string
@@ -116,18 +115,18 @@ class Employe
     #[ORM\Column(type: 'date', nullable: true)]
     private ?\DateTimeInterface $date_embauche = null;
 
-    public function getDate_embauche(): ?\DateTimeInterface
+    public function getDateEmbauche(): ?\DateTimeInterface
     {
         return $this->date_embauche;
     }
 
-    public function setDate_embauche(?\DateTimeInterface $date_embauche): self
+    public function setDateEmbauche(?\DateTimeInterface $date_embauche): self
     {
         $this->date_embauche = $date_embauche;
         return $this;
     }
 
-    #[ORM\Column(type: 'string', length: 200, nullable: true)]
+    #[ORM\Column(type: 'string', nullable: true)]
     private ?string $image_profil = null;
 
     public function getImage_profil(): ?string
@@ -141,7 +140,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Entreprise::class, inversedBy: 'employes')]
+    #[ORM\ManyToOne(targetEntity: Entreprise::class, inversedBy: 'employés')]
     #[ORM\JoinColumn(name: 'id_entreprise', referencedColumnName: 'id_entreprise')]
     private ?Entreprise $entreprise = null;
 
@@ -170,7 +169,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    #[ORM\Column(type: 'string', nullable: true)]
     private ?string $cv_nom = null;
 
     public function getCv_nom(): ?string
@@ -184,7 +183,35 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Compte::class, mappedBy: 'employe')]
+    #[ORM\OneToMany(targetEntity: Commentaire::class, mappedBy: 'employé')]
+    private Collection $commentaires;
+
+    /**
+     * @return Collection<int, Commentaire>
+     */
+    public function getCommentaires(): Collection
+    {
+        if (!$this->commentaires instanceof Collection) {
+            $this->commentaires = new ArrayCollection();
+        }
+        return $this->commentaires;
+    }
+
+    public function addCommentaire(Commentaire $commentaire): self
+    {
+        if (!$this->getCommentaires()->contains($commentaire)) {
+            $this->getCommentaires()->add($commentaire);
+        }
+        return $this;
+    }
+
+    public function removeCommentaire(Commentaire $commentaire): self
+    {
+        $this->getCommentaires()->removeElement($commentaire);
+        return $this;
+    }
+
+    #[ORM\OneToMany(targetEntity: Compte::class, mappedBy: 'employé')]
     private Collection $comptes;
 
     /**
@@ -356,129 +383,77 @@ class Employe
         return $this;
     }
 
-    public function getIdEmploye(): ?int
+    #[ORM\ManyToMany(targetEntity: Projet::class, inversedBy: 'employés')]
+    #[ORM\JoinTable(
+        name: 'equipe_projet',
+        joinColumns: [
+            new ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')
+        ],
+        inverseJoinColumns: [
+            new ORM\JoinColumn(name: 'id_projet', referencedColumnName: 'id_projet')
+        ]
+    )]
+    private Collection $projets1;
+
+    /**
+     * @return Collection<int, Projet>
+     */
+    public function getProjets1(): Collection
     {
-        return $this->id_employe;
-    }
-
-    public function getEMail(): ?string
-    {
-        return $this->e_mail;
-    }
-
-    public function setEMail(string $e_mail): static
-    {
-        $this->e_mail = $e_mail;
-
-        return $this;
-    }
-
-    public function getDateEmbauche(): ?\DateTime
-    {
-        return $this->date_embauche;
-    }
-
-    public function setDateEmbauche(?\DateTime $date_embauche): static
-    {
-        $this->date_embauche = $date_embauche;
-
-        return $this;
-    }
-
-    public function getImageProfil(): ?string
-    {
-        return $this->image_profil;
-    }
-
-    public function setImageProfil(?string $image_profil): static
-    {
-        $this->image_profil = $image_profil;
-
-        return $this;
-    }
-
-    public function getCvData(): ?string
-    {
-        return $this->cv_data;
-    }
-
-    public function setCvData(?string $cv_data): static
-    {
-        $this->cv_data = $cv_data;
-
-        return $this;
-    }
-
-    public function getCvNom(): ?string
-    {
-        return $this->cv_nom;
-    }
-
-    public function setCvNom(?string $cv_nom): static
-    {
-        $this->cv_nom = $cv_nom;
-
-        return $this;
-    }
-
-    public function addProjetsResponsable(Projet $projetsResponsable): static
-    {
-        if (!$this->projetsResponsables->contains($projetsResponsable)) {
-            $this->projetsResponsables->add($projetsResponsable);
-            $projetsResponsable->setResponsable($this);
+        if (!$this->projets instanceof Collection) {
+            $this->projets = new ArrayCollection();
         }
+        return $this->projets;
+    }
 
+    public function addProjet1(Projet $projet): self
+    {
+        if (!$this->getProjets1()->contains($projet)) {
+            $this->getProjets1()->add($projet);
+        }
         return $this;
     }
 
-    public function removeProjetsResponsable(Projet $projetsResponsable): static
+    public function removeProjet1(Projet $projet): self
     {
-        if ($this->projetsResponsables->removeElement($projetsResponsable)) {
-            if ($projetsResponsable->getResponsable() === $this) {
-                $projetsResponsable->setResponsable(null);
-            }
-        }
-
+        $this->getProjets1()->removeElement($projet);
         return $this;
     }
 
-    public function addProjetsEquipe(Projet $projetsEquipe): static
-    {
-        if (!$this->projetsEquipe->contains($projetsEquipe)) {
-            $this->projetsEquipe->add($projetsEquipe);
-            $projetsEquipe->addMembresEquipe($this);
-        }
+    #[ORM\ManyToMany(targetEntity: Post::class, inversedBy: 'employés')]
+    #[ORM\JoinTable(
+        name: 'like_post',
+        joinColumns: [
+            new ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe')
+        ],
+        inverseJoinColumns: [
+            new ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post')
+        ]
+    )]
+    private Collection $posts1;
 
+    /**
+     * @return Collection<int, Post>
+     */
+    public function getPosts1(): Collection
+    {
+        if (!$this->posts instanceof Collection) {
+            $this->posts = new ArrayCollection();
+        }
+        return $this->posts;
+    }
+
+    public function addPost1(Post $post): self
+    {
+        if (!$this->getPosts1()->contains($post)) {
+            $this->getPosts1()->add($post);
+        }
         return $this;
     }
 
-    public function removeProjetsEquipe(Projet $projetsEquipe): static
+    public function removePost1(Post $post): self
     {
-        if ($this->projetsEquipe->removeElement($projetsEquipe)) {
-            $projetsEquipe->removeMembresEquipe($this);
-        }
-
-        return $this;
-    }
-
-    public function addTach(Tache $tach): static
-    {
-        if (!$this->taches->contains($tach)) {
-            $this->taches->add($tach);
-            $tach->setEmploye($this);
-        }
-
-        return $this;
-    }
-
-    public function removeTach(Tache $tach): static
-    {
-        if ($this->taches->removeElement($tach)) {
-            if ($tach->getEmploye() === $this) {
-                $tach->setEmploye(null);
-            }
-        }
-
+        $this->getPosts1()->removeElement($post);
         return $this;
     }
 }
