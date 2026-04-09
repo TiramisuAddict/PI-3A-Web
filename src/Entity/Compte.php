@@ -56,18 +56,18 @@ class Compte
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Employé::class, inversedBy: 'comptes')]
+    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'comptes')]
     #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
-    private ?Employé $employé = null;
+    private ?Employe $employe = null;
 
-    public function getEmployé(): ?Employé
+    public function getEmploye(): ?Employe
     {
-        return $this->employé;
+        return $this->employe;
     }
 
-    public function setEmployé(?Employé $employé): self
+    public function setEmploye(?Employe $employe): self
     {
-        $this->employé = $employé;
+        $this->employe = $employe;
         return $this;
     }
 

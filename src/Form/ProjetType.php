@@ -2,7 +2,7 @@
 
 namespace App\Form;
 
-use App\Entity\Employé;
+use App\Entity\Employe;
 use App\Entity\Projet;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
@@ -78,17 +78,17 @@ class ProjetType extends AbstractType
                 'placeholder' => 'Choisir une priorite',
             ])
             ->add('responsable', EntityType::class, [
-                'class' => Employé::class,
+                'class' => Employe::class,
                 'choices' => $chefProjetChoices,
-                'choice_label' => static fn (Employé $employe): string => trim(sprintf('%s %s', $employe->getNom() ?? '', $employe->getPrenom() ?? '')),
+                'choice_label' => static fn (Employe $employe): string => trim(sprintf('%s %s', $employe->getNom() ?? '', $employe->getPrenom() ?? '')),
                 'required' => true,
                 'label' => 'Chef projet',
                 'placeholder' => 'Choisir un chef projet',
             ])
             ->add('membresEquipe', EntityType::class, [
-                'class' => Employé::class,
+                'class' => Employe::class,
                 'choices' => $options['membres_choices'],
-                'choice_label' => static fn (Employé $employe): string => trim(sprintf('%s %s', $employe->getNom() ?? '', $employe->getPrenom() ?? '')),
+                'choice_label' => static fn (Employe $employe): string => trim(sprintf('%s %s', $employe->getNom() ?? '', $employe->getPrenom() ?? '')),
                 'multiple' => true,
                 'expanded' => true,
                 'required' => false,

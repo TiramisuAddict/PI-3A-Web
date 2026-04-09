@@ -69,19 +69,19 @@ class Tache
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Employé::class, inversedBy: 'taches')]
+    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'taches')]
     #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
     #[Assert\NotNull(message: 'Veuillez choisir un employe.')] 
-    private ?Employé $employé = null;
+    private ?Employe $employe = null;
 
-    public function getEmploye(): ?Employé
+    public function getEmploye(): ?Employe
     {
-        return $this->employé;
+        return $this->employe;
     }
 
-    public function setEmploye(?Employé $employe): self
+    public function setEmploye(?Employe $employe): self
     {
-        $this->employé = $employe;
+        $this->employe = $employe;
         return $this;
     }
 
@@ -193,11 +193,11 @@ class Tache
     #[Assert\Callback]
     public function validateAssignment(ExecutionContextInterface $context): void
     {
-        if (!$this->projet instanceof Projet || !$this->employé instanceof Employé) {
+        if (!$this->projet instanceof Projet || !$this->employe instanceof Employe) {
             return;
         }
 
-        if (!$this->projet->getMembresEquipe()->contains($this->employé)) {
+        if (!$this->projet->getMembresEquipe()->contains($this->employe)) {
             $context
                 ->buildViolation('L\'employe assigne doit appartenir a l\'equipe du projet.')
                 ->atPath('employe')
@@ -260,14 +260,14 @@ class Tache
         return $this->setDate_limite($date_limite);
     }
 
-    public function getEmployé(): ?Employé
+    public function getEmployé(): ?Employe
     {
-        return $this->employé;
+        return $this->employe;
     }
 
-    public function setEmployé(?Employé $employé): static
+    public function setEmployé(?Employe $employe): static
     {
-        $this->employé = $employé;
+        $this->employe = $employe;
 
         return $this;
     }

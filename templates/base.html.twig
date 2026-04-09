@@ -401,16 +401,6 @@
                     </nav>
                 </div>
                 <div class="topbar-user">
-                    {% if currentEmploye is defined and currentEmploye %}
-                        <div class="topbar-user-info">
-                            <i class="ti ti-user-circle"></i>
-                            {{ currentEmploye.nom }} {{ currentEmploye.prenom }} <span style="opacity:0.5">|</span> {{ currentEmploye.role|default('-') }}
-                        </div>
-                    {% endif %}
-                    <a href="{{ path('app_auth_login_id') }}" class="topbar-btn">Changer utilisateur</a>
-                    <form method="post" action="{{ path('app_auth_logout') }}" class="m-0">
-                        <button type="submit" class="topbar-btn topbar-btn-danger">Se deconnecter</button>
-                    </form>
                 </div>
             </header>
 

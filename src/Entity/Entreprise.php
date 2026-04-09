@@ -196,31 +196,31 @@ class Entreprise
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Employé::class, mappedBy: 'entreprise')]
-    private Collection $employés;
+    #[ORM\OneToMany(targetEntity: Employe::class, mappedBy: 'entreprise')]
+    private Collection $employes;
 
     /**
-     * @return Collection<int, Employé>
+     * @return Collection<int, Employe>
      */
-    public function getEmployés(): Collection
+    public function getEmployes(): Collection
     {
-        if (!$this->employés instanceof Collection) {
-            $this->employés = new ArrayCollection();
+        if (!$this->employes instanceof Collection) {
+            $this->employes = new ArrayCollection();
         }
-        return $this->employés;
+        return $this->employes;
     }
 
-    public function addEmployé(Employé $employé): self
+    public function addEmploye(Employe $employe): self
     {
-        if (!$this->getEmployés()->contains($employé)) {
-            $this->getEmployés()->add($employé);
+        if (!$this->getEmployes()->contains($employe)) {
+            $this->getEmployes()->add($employe);
         }
         return $this;
     }
 
-    public function removeEmployé(Employé $employé): self
+    public function removeEmploye(Employe $employe): self
     {
-        $this->getEmployés()->removeElement($employé);
+        $this->getEmployes()->removeElement($employe);
         return $this;
     }
 

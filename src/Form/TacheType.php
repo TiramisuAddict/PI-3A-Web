@@ -2,7 +2,7 @@
 
 namespace App\Form;
 
-use App\Entity\Employé;
+use App\Entity\Employe;
 use App\Entity\Tache;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
@@ -89,13 +89,13 @@ class TacheType extends AbstractType
                 ],
             ])
             ->add('employe', EntityType::class, [
-                'class' => Employé::class,
+                'class' => Employe::class,
                 'required' => true,
                 'disabled' => $employeeSelfUpdate,
                 'placeholder' => 'Choisir un employe',
                 'choices' => $options['project_team_choices'],
-                'choice_label' => static fn (Employé $employe): string => trim(sprintf('%s %s', $employe->getNom() ?? '', $employe->getPrenom() ?? '')),
-                'property_path' => 'employé',
+                'choice_label' => static fn (Employe $employe): string => trim(sprintf('%s %s', $employe->getNom() ?? '', $employe->getPrenom() ?? '')),
+                'property_path' => 'employe',
             ]);
     }
 

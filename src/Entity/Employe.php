@@ -7,11 +7,11 @@ use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
-use App\Repository\EmployéRepository;
+use App\Repository\EmployeRepository;
 
-#[ORM\Entity(repositoryClass: EmployéRepository::class)]
-#[ORM\Table(name: 'employé')]
-class Employé
+#[ORM\Entity(repositoryClass: EmployeRepository::class)]
+#[ORM\Table(name: 'employe')]
+class Employe
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -29,7 +29,7 @@ class Employé
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: false)]
+    #[ORM\Column(type: 'string', length: 30, nullable: false)]
     private ?string $nom = null;
 
     public function getNom(): ?string
@@ -43,7 +43,7 @@ class Employé
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: false)]
+    #[ORM\Column(type: 'string', length: 30, nullable: false)]
     private ?string $prenom = null;
 
     public function getPrenom(): ?string
@@ -57,7 +57,7 @@ class Employé
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: false)]
+    #[ORM\Column(type: 'string', length: 30, nullable: false)]
     private ?string $e_mail = null;
 
     public function getE_mail(): ?string
@@ -85,7 +85,7 @@ class Employé
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: false)]
+    #[ORM\Column(type: 'string', length: 30, nullable: false)]
     private ?string $poste = null;
 
     public function getPoste(): ?string
@@ -99,7 +99,7 @@ class Employé
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: false)]
+    #[ORM\Column(type: 'string', length: 30, nullable: false)]
     private ?string $role = null;
 
     public function getRole(): ?string
@@ -127,7 +127,7 @@ class Employé
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'string', length: 200, nullable: true)]
     private ?string $image_profil = null;
 
     public function getImage_profil(): ?string
@@ -141,7 +141,7 @@ class Employé
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Entreprise::class, inversedBy: 'employés')]
+    #[ORM\ManyToOne(targetEntity: Entreprise::class, inversedBy: 'employes')]
     #[ORM\JoinColumn(name: 'id_entreprise', referencedColumnName: 'id_entreprise')]
     private ?Entreprise $entreprise = null;
 
@@ -156,32 +156,21 @@ class Employé
         return $this;
     }
 
-    #[ORM\Column(type: 'blob', nullable: true)]
-    private $cv_data = null;
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $cv_data = null;
 
     public function getCv_data(): ?string
     {
-        if (is_resource($this->cv_data)) {
-            $metadata = stream_get_meta_data($this->cv_data);
-            if (($metadata['seekable'] ?? false) === true) {
-                rewind($this->cv_data);
-            }
-
-            $content = stream_get_contents($this->cv_data);
-
-            return $content === false ? null : $content;
-        }
-
         return $this->cv_data;
     }
 
-    public function setCv_data(mixed $cv_data): self
+    public function setCv_data(?string $cv_data): self
     {
         $this->cv_data = $cv_data;
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $cv_nom = null;
 
     public function getCv_nom(): ?string
@@ -195,7 +184,7 @@ class Employé
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Compte::class, mappedBy: 'employé')]
+    #[ORM\OneToMany(targetEntity: Compte::class, mappedBy: 'employe')]
     private Collection $comptes;
 
     /**
@@ -331,7 +320,7 @@ class Employé
         return $this->getProjetsEquipe();
     }
 
-    #[ORM\OneToMany(targetEntity: Tache::class, mappedBy: 'employé')]
+    #[ORM\OneToMany(targetEntity: Tache::class, mappedBy: 'employe')]
     private Collection $taches;
 
     public function __construct()
@@ -408,12 +397,12 @@ class Employé
         return $this;
     }
 
-    public function getCvData(): mixed
+    public function getCvData(): ?string
     {
         return $this->cv_data;
     }
 
-    public function setCvData(mixed $cv_data): static
+    public function setCvData(?string $cv_data): static
     {
         $this->cv_data = $cv_data;
 
@@ -476,7 +465,7 @@ class Employé
     {
         if (!$this->taches->contains($tach)) {
             $this->taches->add($tach);
-            $tach->setEmployé($this);
+            $tach->setEmploye($this);
         }
 
         return $this;
@@ -485,8 +474,8 @@ class Employé
     public function removeTach(Tache $tach): static
     {
         if ($this->taches->removeElement($tach)) {
-            if ($tach->getEmployé() === $this) {
-                $tach->setEmployé(null);
+            if ($tach->getEmploye() === $this) {
+                $tach->setEmploye(null);
             }
         }
 
