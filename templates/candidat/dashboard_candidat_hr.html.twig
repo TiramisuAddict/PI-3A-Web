@@ -1,4 +1,4 @@
-{% extends 'base.html.twig' %}
+﻿{% extends 'base.html.twig' %}
 
 {% block title %}Candidatures | Dashboard RH{% endblock %}
 
@@ -90,6 +90,7 @@
 
 	<div class="candidat-dashboard flex-grow-1">
 		<div class="container-xl">
+		{{ include('offre/_dashboard_recruitement_hr.html.twig') }}
 		{% for message in app.flashes('success') %}
 			<div class="alert alert-success alert-dismissible fade show" role="alert">
 				{{ message }}
@@ -163,9 +164,9 @@
 											<td>{{ candidat.visiteur.eMail }}</td>
 											<td>{{ candidat.score is not null ? candidat.score|number_format(2, '.', '') : '-' }}</td>
 											<td>
-												{% if candidat.etat == 'Refusée' or candidat.etat == 'Refusé' %}
+												{% if candidat.etat == 'RefusÃ©e' or candidat.etat == 'RefusÃ©' %}
 													<span class="badge bg-red-lt text-red">{{ candidat.etat }}</span>
-												{% elseif candidat.etat == 'Acceptée' or candidat.etat == 'Accepté' %}
+												{% elseif candidat.etat == 'AcceptÃ©e' or candidat.etat == 'AcceptÃ©' %}
 													<span class="badge bg-green-lt text-green">{{ candidat.etat }}</span>
 												{% else %}
 													<span class="badge bg-blue-lt text-blue">{{ candidat.etat }}</span>
@@ -255,3 +256,5 @@
 		});
 	</script>
 {% endblock %}
+
+
