@@ -45,6 +45,9 @@ class ProjetType extends AbstractType
             ->add('date_fin_prevue', DateType::class, [
                 'widget' => 'single_text',
                 'required' => true,
+                'attr' => $isEdit ? [] : [
+                    'min' => $today,
+                ],
             ]);
 
         if ($isEdit) {

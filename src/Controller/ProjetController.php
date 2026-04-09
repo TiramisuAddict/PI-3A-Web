@@ -227,7 +227,19 @@ final class ProjetController extends AbstractController
 
         $tache->setStatutTache($requestedStatus);
         $tache->setProgression(0);
-        $tache->setDateDeb(new \DateTime('today'));
+
+        $requestedDate = trim((string) $request->query->get('date', ''));
+        if ($requestedDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)) {
+            try {
+                $dateObj = new \DateTime($requestedDate);
+                $tache->setDateDeb($dateObj);
+                $tache->setDateLimite($dateObj);
+            } catch (\Exception) {
+                $tache->setDateDeb(new \DateTime('today'));
+            }
+        } else {
+            $tache->setDateDeb(new \DateTime('today'));
+        }
 
         $teamChoices = $projet->getMembresEquipe()->toArray();
 
