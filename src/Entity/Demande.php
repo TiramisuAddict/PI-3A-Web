@@ -5,7 +5,6 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-
 use App\Repository\DemandeRepository;
 
 #[ORM\Entity(repositoryClass: DemandeRepository::class)]
@@ -17,76 +16,91 @@ class Demande
     #[ORM\Column(type: 'integer')]
     private ?int $id_demande = null;
 
-    public function getId_demande(): ?int
+    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'demandes')]
+    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
+    private ?Employe $employe = null;
+
+    #[ORM\Column(type: 'string', nullable: false)]
+    private ?string $categorie = null;
+
+    #[ORM\Column(type: 'string', nullable: false)]
+    private ?string $titre = null;
+
+    #[ORM\Column(type: 'string', nullable: true)]
+    private ?string $description = null;
+
+    #[ORM\Column(type: 'string', nullable: true)]
+    private ?string $priorite = null;
+
+    #[ORM\Column(type: 'string', nullable: false)]
+    private ?string $status = null;
+
+    #[ORM\Column(type: 'date', nullable: false)]
+    private ?\DateTimeInterface $date_creation = null;
+
+    #[ORM\Column(type: 'string', nullable: true)]
+    private ?string $type_demande = null;
+
+    #[ORM\OneToMany(targetEntity: DemandeDetail::class, mappedBy: 'demande', cascade: ['remove'])]
+    private Collection $demandeDetails;
+
+    #[ORM\OneToMany(targetEntity: HistoriqueDemande::class, mappedBy: 'demande', cascade: ['remove'])]
+    private Collection $historiqueDemandes;
+
+    public function __construct()
+    {
+        $this->demandeDetails = new ArrayCollection();
+        $this->historiqueDemandes = new ArrayCollection();
+    }
+
+    public function getIdDemande(): ?int
     {
         return $this->id_demande;
     }
 
-    public function setId_demande(int $id_demande): self
+    public function getEmploye(): ?Employe
     {
-        $this->id_demande = $id_demande;
+        return $this->employe;
+    }
+
+    public function setEmploye(?Employe $employe): self
+    {
+        $this->employe = $employe;
         return $this;
     }
-
-    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'demandes')]
-    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
-    private ?Employe $employé = null;
-
-    public function getEmployé(): ?Employe
-    {
-        return $this->employé;
-    }
-
-    public function setEmployé(?Employe $employé): self
-    {
-        $this->employé = $employé;
-        return $this;
-    }
-
-    #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $categorie = null;
 
     public function getCategorie(): ?string
     {
         return $this->categorie;
     }
 
-    public function setCategorie(string $categorie): self
+    public function setCategorie(?string $categorie): self
     {
         $this->categorie = $categorie;
         return $this;
     }
-
-    #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $titre = null;
 
     public function getTitre(): ?string
     {
         return $this->titre;
     }
 
-    public function setTitre(string $titre): self
+    public function setTitre(?string $titre): self
     {
         $this->titre = $titre;
         return $this;
     }
-
-    #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $description = null;
 
     public function getDescription(): ?string
     {
         return $this->description;
     }
 
-    public function setDescription(string $description): self
+    public function setDescription(?string $description): self
     {
         $this->description = $description;
         return $this;
     }
-
-    #[ORM\Column(type: 'string', nullable: true)]
-    private ?string $priorite = null;
 
     public function getPriorite(): ?string
     {
@@ -99,102 +113,84 @@ class Demande
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $status = null;
-
     public function getStatus(): ?string
     {
         return $this->status;
     }
 
-    public function setStatus(string $status): self
+    public function setStatus(?string $status): self
     {
         $this->status = $status;
         return $this;
     }
 
-    #[ORM\Column(type: 'date', nullable: false)]
-    private ?\DateTimeInterface $date_creation = null;
-
-    public function getDate_creation(): ?\DateTimeInterface
+    public function getDateCreation(): ?\DateTimeInterface
     {
         return $this->date_creation;
     }
 
-    public function setDate_creation(\DateTimeInterface $date_creation): self
+    public function setDateCreation(\DateTimeInterface $date_creation): self
     {
         $this->date_creation = $date_creation;
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $type_demande = null;
-
-    public function getType_demande(): ?string
+    public function getTypeDemande(): ?string
     {
         return $this->type_demande;
     }
 
-    public function setType_demande(string $type_demande): self
+    public function setTypeDemande(?string $type_demande): self
     {
         $this->type_demande = $type_demande;
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: DemandeDetail::class, mappedBy: 'demande')]
-    private Collection $demandeDetails;
-
-    /**
-     * @return Collection<int, DemandeDetail>
-     */
     public function getDemandeDetails(): Collection
     {
-        if (!$this->demandeDetails instanceof Collection) {
-            $this->demandeDetails = new ArrayCollection();
-        }
         return $this->demandeDetails;
     }
 
     public function addDemandeDetail(DemandeDetail $demandeDetail): self
     {
-        if (!$this->getDemandeDetails()->contains($demandeDetail)) {
-            $this->getDemandeDetails()->add($demandeDetail);
+        if (!$this->demandeDetails->contains($demandeDetail)) {
+            $this->demandeDetails->add($demandeDetail);
+            $demandeDetail->setDemande($this);
         }
         return $this;
     }
 
     public function removeDemandeDetail(DemandeDetail $demandeDetail): self
     {
-        $this->getDemandeDetails()->removeElement($demandeDetail);
+        if ($this->demandeDetails->removeElement($demandeDetail)) {
+            if ($demandeDetail->getDemande() === $this) {
+                $demandeDetail->setDemande(null);
+            }
+        }
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: HistoriqueDemande::class, mappedBy: 'demande')]
-    private Collection $historiqueDemandes;
-
-    /**
-     * @return Collection<int, HistoriqueDemande>
-     */
     public function getHistoriqueDemandes(): Collection
     {
-        if (!$this->historiqueDemandes instanceof Collection) {
-            $this->historiqueDemandes = new ArrayCollection();
-        }
         return $this->historiqueDemandes;
     }
 
     public function addHistoriqueDemande(HistoriqueDemande $historiqueDemande): self
     {
-        if (!$this->getHistoriqueDemandes()->contains($historiqueDemande)) {
-            $this->getHistoriqueDemandes()->add($historiqueDemande);
+        if (!$this->historiqueDemandes->contains($historiqueDemande)) {
+            $this->historiqueDemandes->add($historiqueDemande);
+            $historiqueDemande->setDemande($this);
         }
         return $this;
     }
 
     public function removeHistoriqueDemande(HistoriqueDemande $historiqueDemande): self
     {
-        $this->getHistoriqueDemandes()->removeElement($historiqueDemande);
+        if ($this->historiqueDemandes->removeElement($historiqueDemande)) {
+            if ($historiqueDemande->getDemande() === $this) {
+                $historiqueDemande->setDemande(null);
+            }
+        }
         return $this;
     }
-
 }
