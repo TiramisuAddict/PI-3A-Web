@@ -206,35 +206,35 @@ class Entreprise
     }
 
     #[ORM\OneToMany(targetEntity: Employe::class, mappedBy: 'entreprise')]
-    private Collection $employés;
+    private Collection $employes;
 
     public function __construct()
     {
-        $this->employés = new ArrayCollection();
+        $this->employes = new ArrayCollection();
     }
 
     /**
-     * @return Collection<int, Employé>
+     * @return Collection<int, Employe>
      */
-    public function getEmployés(): Collection
+    public function getEmployes(): Collection
     {
-        if (!$this->employés instanceof Collection) {
-            $this->employés = new ArrayCollection();
+        if (!$this->employes instanceof Collection) {
+            $this->employes = new ArrayCollection();
         }
-        return $this->employés;
+        return $this->employes;
     }
 
-    public function addEmployé(Employe $employé): self
+    public function addEmploye(Employe $employe): self
     {
-        if (!$this->getEmployés()->contains($employé)) {
-            $this->getEmployés()->add($employé);
+        if (!$this->getEmployes()->contains($employe)) {
+            $this->getEmployes()->add($employe);
         }
         return $this;
     }
 
-    public function removeEmployé(Employe $employé): self
+    public function removeEmploye(Employe $employe): self
     {
-        $this->getEmployés()->removeElement($employé);
+        $this->getEmployes()->removeElement($employe);
         return $this;
     }
 
@@ -305,8 +305,8 @@ class Entreprise
 
     public function addEmploy(Employe $employ): static
     {
-        if (!$this->employés->contains($employ)) {
-            $this->employés->add($employ);
+        if (!$this->employes->contains($employ)) {
+            $this->employes->add($employ);
             $employ->setEntreprise($this);
         }
 
@@ -315,7 +315,7 @@ class Entreprise
 
     public function removeEmploy(Employe $employ): static
     {
-        if ($this->employés->removeElement($employ)) {
+        if ($this->employes->removeElement($employ)) {
             // set the owning side to null (unless already changed)
             if ($employ->getEntreprise() === $this) {
                 $employ->setEntreprise(null);

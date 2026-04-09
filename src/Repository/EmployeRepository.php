@@ -32,7 +32,7 @@ class EmployeRepository extends ServiceEntityRepository
     //        ;
     //    }
 
-    //    public function findOneBySomeField($value): ?Employé
+    //    public function findOneBySomeField($value): ?Employe
     //    {
     //        return $this->createQueryBuilder('e')
     //            ->andWhere('e.exampleField = :val')
