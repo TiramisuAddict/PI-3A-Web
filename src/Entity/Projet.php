@@ -52,29 +52,29 @@ class Projet
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Employé::class, inversedBy: 'projetsResponsables')]
+    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'projetsResponsables')]
     #[ORM\JoinColumn(name: 'responsable_id', referencedColumnName: 'id_employe', nullable: false)]
     #[Assert\NotNull(message: 'Veuillez choisir un chef projet.')]
-    private ?Employé $responsable = null;
+    private ?Employe $responsable = null;
 
-    public function getResponsable(): ?Employé
+    public function getResponsable(): ?Employe
     {
         return $this->responsable;
     }
 
-    public function setResponsable(?Employé $responsable): self
+    public function setResponsable(?Employe $responsable): self
     {
         $this->responsable = $responsable;
 
         return $this;
     }
 
-    public function getEmploye(): ?Employé
+    public function getEmploye(): ?Employe
     {
         return $this->responsable;
     }
 
-    public function setEmploye(?Employé $employe): self
+    public function setEmploye(?Employe $employe): self
     {
         return $this->setResponsable($employe);
     }
@@ -277,7 +277,7 @@ class Projet
         return $this;
     }
 
-    #[ORM\ManyToMany(targetEntity: Employé::class, inversedBy: 'projetsEquipe')]
+    #[ORM\ManyToMany(targetEntity: Employe::class, inversedBy: 'projetsEquipe')]
     #[ORM\JoinTable(
         name: 'equipe_projet',
         joinColumns: [
@@ -296,7 +296,7 @@ class Projet
     }
 
     /**
-     * @return Collection<int, Employé>
+     * @return Collection<int, Employe>
      */
     public function getMembresEquipe(): Collection
     {
@@ -307,7 +307,7 @@ class Projet
         return $this->membresEquipe;
     }
 
-    public function addMembreEquipe(Employé $employe): self
+    public function addMembreEquipe(Employe $employe): self
     {
         if (!$this->getMembresEquipe()->contains($employe)) {
             $this->getMembresEquipe()->add($employe);
@@ -317,7 +317,7 @@ class Projet
         return $this;
     }
 
-    public function removeMembreEquipe(Employé $employe): self
+    public function removeMembreEquipe(Employe $employe): self
     {
         if ($this->getMembresEquipe()->removeElement($employe)) {
             $employe->removeProjetEquipe($this);
@@ -327,7 +327,7 @@ class Projet
     }
 
     /**
-     * @param iterable<Employé> $membresEquipe
+     * @param iterable<Employe> $membresEquipe
      */
     public function setMembresEquipe(iterable $membresEquipe): self
     {
@@ -342,30 +342,30 @@ class Projet
         return $this;
     }
 
-    public function addMembresEquipe(Employé $employe): self
+    public function addMembresEquipe(Employe $employe): self
     {
         return $this->addMembreEquipe($employe);
     }
 
-    public function removeMembresEquipe(Employé $employe): self
+    public function removeMembresEquipe(Employe $employe): self
     {
         return $this->removeMembreEquipe($employe);
     }
 
     /**
-     * @return Collection<int, Employé>
+     * @return Collection<int, Employe>
      */
     public function getEmployes(): Collection
     {
         return $this->getMembresEquipe();
     }
 
-    public function addEmploye(Employé $employe): self
+    public function addEmploye(Employe $employe): self
     {
         return $this->addMembreEquipe($employe);
     }
 
-    public function removeEmploye(Employé $employe): self
+    public function removeEmploye(Employe $employe): self
     {
         return $this->removeMembreEquipe($employe);
     }
@@ -421,12 +421,12 @@ class Projet
         return $this->removeTache($tach);
     }
 
-    public function addEmploy(Employé $employ): static
+    public function addEmploy(Employe $employ): static
     {
         return $this->addEmploye($employ);
     }
 
-    public function removeEmploy(Employé $employ): static
+    public function removeEmploy(Employe $employ): static
     {
         return $this->removeEmploye($employ);
     }
