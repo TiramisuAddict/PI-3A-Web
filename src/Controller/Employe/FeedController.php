@@ -7,6 +7,9 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use App\Entity\Commentaire;
+use App\Entity\Participation;
+use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Contrôleur Front Office — Fil d'actualité.
@@ -18,6 +21,7 @@ class FeedController extends AbstractController
 {
     public function __construct(
         private readonly PostRepository $postRepository,
+        private readonly EntityManagerInterface $em,
     ) {
     }
 
@@ -50,10 +54,40 @@ class FeedController extends AbstractController
             'current_user_id' => null,
             'google_maps_api_key' => getenv('GOOGLE_MAPS_API_KEY') ?: null,
             // Définir ces routes quand les actions POST existent :
-            'feed_route_comment' => null,
-            'feed_route_like' => null,
-            'feed_route_participate' => null,
+            'feed_route_comment'    => 'app_employe_feed_comment',
+            'feed_route_participate' => 'app_employe_feed_participate',
+            'current_user_id'       => 132,
             'author_labels' => null,
         ]);
+    }
+
+    #[Route('/comment/{id_post}', name: 'app_employe_feed_comment', methods: ['POST'])]
+    public function comment(int $id_post, Request $request): Response
+    {
+        $post = $this->postRepository->find($id_post);
+        if ($post) {
+            $c = new Commentaire();
+            $c->setContenu($request->request->get('contenu', ''));
+            $c->setUtilisateurId(132);
+            $c->setDateCommentaire(new \DateTime());
+            $c->setPost($post);
+            $this->em->persist($c);
+            $this->em->flush();
+        }
+        return $this->redirectToRoute('app_employe_feed');
+    }
+
+    #[Route('/participate/{id_post}', name: 'app_employe_feed_participate', methods: ['POST'])]
+    public function participate(int $id_post): Response
+    {
+        $post = $this->postRepository->find($id_post);
+        if ($post) {
+            $p = new Participation();
+            $p->setUtilisateurId(132);
+            $p->setPost($post);
+            $this->em->persist($p);
+            $this->em->flush();
+        }
+        return $this->redirectToRoute('app_employe_feed');
     }
 }

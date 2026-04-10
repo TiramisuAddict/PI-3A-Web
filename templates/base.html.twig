@@ -2,202 +2,22 @@
 <html>
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{% block title %}Welcome!{% endblock %}</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>⚫️</text><text y=%221.3em%22 x=%220.2em%22 font-size=%2276%22 fill=%22%23fff%22>sf</text></svg>">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+
+        {# Tabler Theme & change primary color to 4A5DEF #}
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css">
+        <style>
+            :root {
+                --tblr-primary: #4A5DEF;
+            }
+        </style>
+
         {% block stylesheets %}
-            <style>
-                :root {
-                    --app-bg: #f4f7fb;
-                    --app-bg-2: #eef4ff;
-                    --app-border: #e4e9f2;
-                    --app-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
-                    --app-shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.05);
-                    --app-accent: #0d6efd;
-                    --app-accent-soft: rgba(13, 110, 253, 0.10);
-                }
+        {% endblock %}
 
-                body {
-                    min-height: 100vh;
-                    background:
-                        radial-gradient(circle at top left, rgba(13, 110, 253, 0.10), transparent 28%),
-                        radial-gradient(circle at top right, rgba(255, 193, 7, 0.10), transparent 22%),
-                        linear-gradient(180deg, var(--app-bg-2) 0%, var(--app-bg) 26%, #ffffff 100%);
-                    color: #1f2a37;
-                }
-
-                .navbar-brand-title {
-                    letter-spacing: 0.2px;
-                }
-
-                .page {
-                    position: relative;
-                    min-height: 100vh;
-                }
-
-                .navbar {
-                    position: sticky;
-                    top: 0;
-                    z-index: 1030;
-                    backdrop-filter: blur(14px);
-                    background: rgba(255, 255, 255, 0.84);
-                    border-bottom: 1px solid rgba(228, 233, 242, 0.9);
-                    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
-                }
-
-                .navbar-brand-title {
-                    font-weight: 800;
-                    color: #12263f;
-                }
-
-                .app-topbar-chip {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: .4rem;
-                    padding: .4rem .7rem;
-                    border-radius: 999px;
-                    background: var(--app-accent-soft);
-                    color: var(--app-accent);
-                    font-weight: 700;
-                    font-size: .88rem;
-                }
-
-                .app-shell {
-                    padding-top: 1.25rem;
-                    padding-bottom: 2.5rem;
-                }
-
-                .app-hero {
-                    border: 1px solid var(--app-border);
-                    border-radius: 22px;
-                    background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(248,250,255,.92));
-                    box-shadow: var(--app-shadow);
-                    overflow: hidden;
-                }
-
-                .app-hero::before {
-                    content: '';
-                    position: absolute;
-                    inset: 0;
-                    background: linear-gradient(135deg, rgba(13,110,253,.06), transparent 42%);
-                    pointer-events: none;
-                }
-
-                .surface-card {
-                    border: 1px solid var(--app-border);
-                    border-radius: 18px;
-                    box-shadow: var(--app-shadow-soft);
-                    overflow: hidden;
-                    background: rgba(255,255,255,.95);
-                }
-
-                .surface-card .card-header {
-                    background: rgba(248, 250, 255, 0.92);
-                    border-bottom: 1px solid var(--app-border);
-                }
-
-                .stat-card {
-                    border: 1px solid var(--app-border);
-                    border-radius: 18px;
-                    background: rgba(255,255,255,.95);
-                    box-shadow: var(--app-shadow-soft);
-                }
-
-                .soft-pill {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: .35rem;
-                    border-radius: 999px;
-                    padding: .4rem .75rem;
-                    background: rgba(15, 23, 42, 0.05);
-                    color: #334155;
-                    font-size: .85rem;
-                }
-
-                .btn-icon-only {
-                    width: 2.25rem;
-                    height: 2.25rem;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 0;
-                    border-radius: 999px;
-                }
-
-                .btn-icon-only .badge {
-                    font-size: .7rem;
-                    line-height: 1;
-                }
-
-                .btn.btn-icon {
-                    width: 2.35rem;
-                    height: 2.35rem;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 0;
-                    border-radius: 0.5rem;
-                }
-
-                .table > :not(caption) > * > * {
-                    padding-top: .95rem;
-                    padding-bottom: .95rem;
-                }
-
-                .table tbody tr:hover {
-                    background: rgba(13, 110, 253, 0.035);
-                }
-
-                .mini-muted {
-                    color: #6b7280;
-                    font-size: .92rem;
-                }
-
-                .app-nav-section {
-                    border-radius: 12px;
-                    padding: 0.35rem 0.5rem;
-                }
-
-                .app-nav-link {
-                    border-radius: 10px;
-                    padding: 0.45rem 0.75rem !important;
-                    margin: 0.1rem 0;
-                    transition: background-color 0.15s ease, color 0.15s ease;
-                }
-
-                .app-nav-link:hover {
-                    background: rgba(13, 110, 253, 0.09);
-                    color: #0d6efd !important;
-                }
-
-                .app-nav-link.active {
-                    background: rgba(13, 110, 253, 0.14);
-                    color: #0d6efd !important;
-                    font-weight: 700;
-                }
-
-                .app-nav-label {
-                    font-size: 0.65rem;
-                    letter-spacing: 0.08em;
-                    font-weight: 800;
-                    color: #94a3b8;
-                    text-transform: uppercase;
-                    margin-bottom: 0.15rem;
-                    padding-left: 0.35rem;
-                }
-
-                .admin-dash-card {
-                    transition: transform 0.15s ease, box-shadow 0.15s ease;
-                    border-color: var(--app-border) !important;
-                }
-
-                a:hover .admin-dash-card {
-                    transform: translateY(-3px);
-                    box-shadow: var(--app-shadow) !important;
-                }
-            </style>
+        {% block javascripts %}
+            {% block importmap %}{{ importmap('app') }}{% endblock %}
         {% endblock %}
 
         {% set frankenphpHotReload = app.request.server.get('FRANKENPHP_HOT_RELOAD') %}
@@ -207,89 +27,9 @@
         <script src="https://cdn.jsdelivr.net/npm/frankenphp-hot-reload/+esm" type="module"></script>
         {% endif %}
     </head>
-    <body class="layout-fluid">
-        <div class="page">
-            <header class="navbar navbar-expand-md d-print-none">
-                <div class="container-xl">
-                    <h1 class="navbar-brand navbar-brand-autodark pe-0 pe-md-3 m-0">
-                        <a href="{{ path('app_employe_feed') }}" class="text-decoration-none">
-                            <span class="navbar-brand-title">PI-3A</span>
-                        </a>
-                    </h1>
-                    {% set currentEmployeeName = app.session is defined and app.session.get('employee_name') ? app.session.get('employee_name') : '' %}
-                    {% set currentEmployeeRole = app.session is defined and app.session.get('employee_role') ? app.session.get('employee_role')|lower : '' %}
-                    <div class="navbar-text d-none d-md-block ms-3">
-                        {% if currentEmployeeName %}
-                            <span class="app-topbar-chip me-2"><i class="ti ti-user-circle"></i>{{ currentEmployeeName }}</span>
-                            <span class="soft-pill">{{ currentEmployeeRole|upper }}</span>
-                        {% endif %}
-                    </div>
-                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#app-main-nav" aria-controls="app-main-nav" aria-expanded="false" aria-label="Menu">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
-                    {% set _route = app.request.attributes.get('_route') %}
-                    <div class="collapse navbar-collapse order-md-last" id="app-main-nav">
-                        <div class="navbar-nav ms-md-auto flex-wrap align-items-stretch align-items-md-center gap-2 gap-md-3 py-2 py-md-0">
-                            <div class="app-nav-section d-flex flex-column">
-                                <span class="app-nav-label d-none d-md-block">FRONT OFFICE</span>
-                                <a class="nav-link fw-semibold app-nav-link {{ _route == 'app_employe_feed' ? 'active' : '' }}" href="{{ path('app_employe_feed') }}">
-                                    <i class="ti ti-news me-1"></i>
-                                    <span class="nav-link-title">Fil d'actualité</span>
-                                </a>
-                            </div>
-                            <div class="vr d-none d-md-block align-self-stretch my-2 opacity-25"></div>
-                            <div class="app-nav-section d-flex flex-column flex-grow-1">
-                                <span class="app-nav-label d-none d-md-block">BACK OFFICE (ADMIN)</span>
-                                <div class="d-flex flex-column flex-md-row flex-wrap gap-md-1">
-                                    <a class="nav-link fw-semibold app-nav-link {{ _route == 'app_admin_dashboard' ? 'active' : '' }}" href="{{ path('app_admin_dashboard') }}">
-                                        <i class="ti ti-layout-dashboard me-1"></i>
-                                        <span class="nav-link-title">Accueil Admin</span>
-                                    </a>
-                                    <a class="nav-link fw-semibold app-nav-link {{ _route starts with 'app_post_' ? 'active' : '' }}" href="{{ path('app_post_index') }}">
-                                        <i class="ti ti-file-text me-1"></i>
-                                        <span class="nav-link-title">Gestion des Posts</span>
-                                    </a>
-                                    <a class="nav-link fw-semibold app-nav-link {{ _route starts with 'app_commentaire_' ? 'active' : '' }}" href="{{ path('app_commentaire_index') }}">
-                                        <i class="ti ti-message me-1"></i>
-                                        <span class="nav-link-title">Commentaires</span>
-                                    </a>
-                                    <a class="nav-link fw-semibold app-nav-link {{ _route starts with 'app_participation_' ? 'active' : '' }}" href="{{ path('app_participation_index') }}">
-                                        <i class="ti ti-users me-1"></i>
-                                        <span class="nav-link-title">Participations</span>
-                                    </a>
-                                    <a class="nav-link fw-semibold app-nav-link {{ _route starts with 'app_notification_' ? 'active' : '' }}" href="{{ path('app_notification_index') }}">
-                                        <i class="ti ti-bell me-1"></i>
-                                        <span class="nav-link-title">Notifications</span>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            <div class="page-wrapper">
-                <div class="page-body">
-                    <div class="container-xl app-shell">
-                        {% for label, messages in app.flashes %}
-                            {% for message in messages %}
-                                {% set alert_class = label == 'error' ? 'danger' : label %}
-                                <div class="alert alert-{{ alert_class }} alert-dismissible mb-3" role="alert">
-                                    <div class="d-flex">
-                                        <div class="flex-grow-1">{{ message }}</div>
-                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        {% endfor %}
-                        {% block body %}{% endblock %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
-        {% block javascripts %}
-        {% endblock %}
+    <body>
+        {% block body %}{% endblock %}
+        {# Tabler Theme #}
+        <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
     </body>
 </html>

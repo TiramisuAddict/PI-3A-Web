@@ -463,8 +463,6 @@
                         <input type="text" name="contenu" class="form-control border-start-0" placeholder="Ajouter un commentaire..." required maxlength="2000" autocomplete="off">
                         <button type="submit" class="btn btn-primary">Publier</button>
                     </form>
-                {% else %}
-                    <p class="text-muted small mb-0">Connexion requise pour commenter (configurez <code>feed_route_comment</code> et <code>current_user_id</code>).</p>
                 {% endif %}
             </div>
         </article>

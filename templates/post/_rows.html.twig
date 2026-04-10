@@ -15,6 +15,10 @@
         <td>{{ post.longitude }}</td>
         <td class="text-end text-nowrap">
             <div class="d-inline-flex align-items-center justify-content-end gap-1">
+                <a class="btn btn-sm btn-info" href="{{ path('app_commentaire_index', { id_post: post.idPost }) }}" title="Commentaires">Commentaires</a>
+                {% if post.typePost == 2 %}
+                <a class="btn btn-sm btn-secondary" href="{{ path('app_participation_index', { id_post: post.idPost }) }}" title="Participations">Participations</a>
+                {% endif %}
                 <a class="btn btn-sm btn-warning btn-icon" href="{{ path('app_post_edit', { id_post: post.idPost }) }}" title="Modifier"><i class="ti ti-edit"></i></a>
                 <form class="d-inline" method="post" action="{{ path('app_post_delete', { id_post: post.idPost }) }}" onsubmit="return confirm('Supprimer cette publication ?');">
                     <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ post.idPost) }}">
