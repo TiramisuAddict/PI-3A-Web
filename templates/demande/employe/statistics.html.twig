@@ -14,9 +14,7 @@
         box-shadow: 0 4px 16px rgba(74, 93, 239, 0.2);
         transition: transform 0.2s ease;
     }
-    .stat-card:hover {
-        transform: translateY(-4px);
-    }
+    .stat-card:hover { transform: translateY(-4px); }
     .stat-card.green {
         background: linear-gradient(135deg, #10b981, #059669);
         box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
@@ -24,10 +22,6 @@
     .stat-card.yellow {
         background: linear-gradient(135deg, #f59e0b, #d97706);
         box-shadow: 0 4px 16px rgba(245, 158, 11, 0.2);
-    }
-    .stat-card.red {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-        box-shadow: 0 4px 16px rgba(239, 68, 68, 0.2);
     }
     .stat-value {
         font-size: 2.5rem;
@@ -70,29 +64,18 @@
         display: inline-block;
         color: white !important;
     }
-    .badge.bg-danger {
-        background-color: #dc3545 !important;
-    }
-    .badge.bg-warning {
-        background-color: #ffc107 !important;
-        color: #333 !important;
-    }
-    .badge.bg-success {
-        background-color: #28a745 !important;
-    }
-    .badge.bg-info {
-        background-color: #17a2b8 !important;
-    }
-    .badge.bg-secondary {
-        background-color: #6c757d !important;
-    }
+    .badge.bg-danger { background-color: #dc3545 !important; }
+    .badge.bg-warning { background-color: #ffc107 !important; color: #333 !important; }
+    .badge.bg-success { background-color: #28a745 !important; }
+    .badge.bg-info { background-color: #17a2b8 !important; }
+    .badge.bg-secondary { background-color: #6c757d !important; }
 </style>
 {% endblock %}
 
 {% block body %}
 {{ include('components/navbar.html.twig') }}
 <div class="d-flex" style="min-height:calc(100vh - 56px);">
-{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': 'RH'}) }}
+{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': role}) }}
 <div class="page-wrapper">
     <div class="page-header d-print-none mb-3">
         <div class="container-xl">
@@ -102,6 +85,16 @@
                         <i class="ti ti-chart-bar me-2"></i>Statistiques
                     </h2>
                     <div class="text-secondary">Vue d'ensemble de vos demandes</div>
+                </div>
+                <div class="col-auto">
+                    <div class="btn-list">
+                        <a href="{{ path('demande_new') }}" class="btn btn-primary">
+                            <i class="ti ti-plus me-2"></i>Nouvelle Demande
+                        </a>
+                        <a href="{{ path('demande_index') }}" class="btn btn-outline-secondary">
+                            <i class="ti ti-arrow-left me-2"></i>Retour
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -122,7 +115,7 @@
                     <div class="stat-card green">
                         <div class="stat-value">{{ stats.byStatus['Resolue'] | default(0) }}</div>
                         <div class="stat-label">
-                            <i class="ti ti-check me-2"></i>Demandes résolues
+                            <i class="ti ti-check me-2"></i>Demandes resolues
                         </div>
                     </div>
                 </div>
@@ -141,7 +134,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">
-                                <i class="ti ti-flag me-2"></i>Répartition par Statut
+                                <i class="ti ti-flag me-2"></i>Repartition par Statut
                             </h3>
                         </div>
                         <div class="card-body p-0">
@@ -150,7 +143,7 @@
                                     <tbody>
                                         {% set statusColors = {
                                             'Nouvelle': '#3b82f6',
-                                            'En cours': '#f59e0b', 
+                                            'En cours': '#f59e0b',
                                             'En attente': '#f97316',
                                             'Resolue': '#10b981',
                                             'Fermee': '#6b7280',
@@ -186,7 +179,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">
-                                <i class="ti ti-alert-triangle me-2"></i>Répartition par Priorité
+                                <i class="ti ti-alert-triangle me-2"></i>Repartition par Priorite
                             </h3>
                         </div>
                         <div class="card-body p-0">
@@ -231,7 +224,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">
-                                <i class="ti ti-folder me-2"></i>Répartition par Catégorie
+                                <i class="ti ti-folder me-2"></i>Repartition par Categorie
                             </h3>
                         </div>
                         <div class="card-body p-0">
@@ -268,7 +261,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">
-                                <i class="ti ti-tag me-2"></i>Répartition par Type
+                                <i class="ti ti-tag me-2"></i>Repartition par Type
                             </h3>
                         </div>
                         <div class="card-body p-0">
@@ -303,4 +296,5 @@
     </div>
 </div>
 </div>
+{{ include('demande/_logout_modal.html.twig') }}
 {% endblock %}

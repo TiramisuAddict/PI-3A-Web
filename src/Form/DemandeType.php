@@ -29,6 +29,8 @@ class DemandeType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $isEdit = $options['is_edit'];
+        $includeEmploye = $options['include_employe'];
+        $employeChoices = $options['employe_choices'];
         $categories = $this->formHelper->getCategoryTypes();
         $priorites = $this->formHelper->getPriorites();
         $statuses = $this->formHelper->getStatuses();
@@ -48,9 +50,10 @@ class DemandeType extends AbstractType
             $statusChoices[$s] = $s;
         }
 
-        if (!$isEdit) {
+        if (!$isEdit && $includeEmploye) {
             $builder->add('employe', EntityType::class, [
                 'class' => Employe::class,
+                'choices' => $employeChoices,
                 'choice_label' => function (Employe $employe) {
                     return $employe->getNom() . ' ' . $employe->getPrenom();
                 },
@@ -157,6 +160,8 @@ class DemandeType extends AbstractType
         $resolver->setDefaults([
             'data_class' => Demande::class,
             'is_edit' => false,
+            'include_employe' => true,
+            'employe_choices' => [],
         ]);
     }
 }

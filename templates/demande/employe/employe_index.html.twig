@@ -1,0 +1,527 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Mes Demandes{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+    .stats-row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+    .stat-card {
+        flex: 1;
+        min-width: 140px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        background: #fff;
+        transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+        cursor: pointer;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .stat-card:hover {
+        border-color: rgba(74, 93, 239, 0.35);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+        transform: translateY(-2px);
+    }
+    .stat-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+    .stat-content {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-top: 4px;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+    .demande-row.hidden {
+        display: none;
+    }
+    .badge {
+        padding: 4px 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    .badge.bg-danger {
+        background-color: #dc3545 !important;
+        color: white;
+    }
+    .badge.bg-warning {
+        background-color: #ffc107 !important;
+        color: #333;
+    }
+    .badge.bg-success {
+        background-color: #28a745 !important;
+        color: white;
+    }
+    .badge.bg-info {
+        background-color: #17a2b8 !important;
+        color: white;
+    }
+    .badge.bg-orange {
+        background-color: #fd7e14 !important;
+        color: white;
+    }
+    .badge.bg-secondary {
+        background-color: #6c757d !important;
+        color: white;
+    }
+    .titre-link {
+        color: #1f2937;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .titre-link:hover {
+        color: #4a5def;
+    }
+    .category-tag {
+        background: rgba(74, 93, 239, 0.1);
+        color: #4a5def;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .date-text {
+        color: #64748b;
+        font-size: 0.85rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .quick-filter-btn {
+        padding: 6px 14px;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        background: white;
+        color: #64748b;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .quick-filter-btn:hover {
+        border-color: #4a5def;
+        color: #4a5def;
+        background: rgba(74, 93, 239, 0.05);
+    }
+    .quick-filter-btn.active {
+        background: #4a5def;
+        color: white;
+        border-color: #4a5def;
+    }
+    .btn-list {
+        display: flex !important;
+        gap: 4px;
+        align-items: center;
+    }
+    .action-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border-radius: 6px;
+        border: 1px solid #4a5def;
+        background: rgba(74, 93, 239, 0.1);
+        color: #4a5def;
+        text-decoration: none;
+    }
+    .action-btn:hover {
+        background: #4a5def;
+        color: white;
+    }
+    .empty-state {
+        padding: 60px 20px;
+        text-align: center;
+    }
+    .empty-state i {
+        font-size: 3rem;
+        color: #cbd5e1;
+        margin-bottom: 16px;
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+{{ include('components/navbar.html.twig') }}
+<div class="d-flex" style="min-height:calc(100vh - 56px);">
+{{ include('components/sidebar.html.twig', {'active_page': 'demandes', 'sidebar_role': role}) }}
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none mb-3">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">
+                        <i class="ti ti-file-text me-2"></i>Mes demandes
+                    </h2>
+                    <div class="text-secondary">Visualisez et suivez vos demandes.</div>
+                </div>
+                <div class="col-auto">
+                    <div class="btn-list">
+                        <a href="{{ path('demande_new') }}" class="btn btn-primary">
+                            <i class="ti ti-plus me-2"></i>Nouvelle Demande
+                        </a>
+                        <a href="{{ path('demande_statistics') }}" class="btn btn-outline-primary">
+                            <i class="ti ti-chart-bar me-2"></i>Statistiques
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            {% for message in app.flashes('warning') %}
+                <div class="alert alert-warning alert-dismissible mb-3" role="alert">
+                    <div class="d-flex">
+                        <div class="alert-icon me-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon icon-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M12 9v4"/>
+                                <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636-2.87l-8.106-13.536a1.914 1.914 0 0 0-3.274 0z"/>
+                                <path d="M12 16h.01"/>
+                            </svg>
+                        </div>
+                        <div>{{ message }}</div>
+                    </div>
+                    <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
+                </div>
+            {% endfor %}
+
+            {% for message in app.flashes('success') %}
+                <div class="alert alert-success alert-dismissible mb-3" role="alert">
+                    <div class="d-flex">
+                        <div class="alert-icon me-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon icon-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M5 12l5 5l10 -10"/>
+                            </svg>
+                        </div>
+                        <div>{{ message }}</div>
+                    </div>
+                    <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
+                </div>
+            {% endfor %}
+
+            <div class="stats-row">
+                <div class="stat-card" onclick="filterByStatus('')">
+                    <div class="stat-icon bg-primary-lt text-primary">
+                        <i class="ti ti-files"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value text-primary">{{ stats.total }}</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                </div>
+                <div class="stat-card" onclick="filterByStatus('Nouvelle')">
+                    <div class="stat-icon bg-blue-lt text-blue">
+                        <i class="ti ti-clock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value text-blue">{{ stats.byStatus['Nouvelle'] | default(0) }}</div>
+                        <div class="stat-label">Nouvelles</div>
+                    </div>
+                </div>
+                <div class="stat-card" onclick="filterByStatus('En cours')">
+                    <div class="stat-icon bg-yellow-lt text-yellow">
+                        <i class="ti ti-loader"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value text-yellow">{{ stats.byStatus['En cours'] | default(0) }}</div>
+                        <div class="stat-label">En cours</div>
+                    </div>
+                </div>
+                <div class="stat-card" onclick="filterByStatus('Resolue')">
+                    <div class="stat-icon bg-green-lt text-green">
+                        <i class="ti ti-check"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value text-green">{{ stats.byStatus['Resolue'] | default(0) }}</div>
+                        <div class="stat-label">Resolues</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row align-items-center g-2">
+                        <div class="col-12 col-md-6">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Rechercher par titre, categorie, type ou statut" autocomplete="off">
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                                <button type="button" class="quick-filter-btn active" data-filter="all">
+                                    <i class="ti ti-list"></i>Tous
+                                </button>
+                                <button type="button" class="quick-filter-btn" data-filter="HAUTE">
+                                    <i class="ti ti-alert-circle"></i>Haute
+                                </button>
+                                <button type="button" class="quick-filter-btn" data-filter="Nouvelle">
+                                    <i class="ti ti-sparkles"></i>Nouvelles
+                                </button>
+                                <button type="button" class="quick-filter-btn" data-filter="En cours">
+                                    <i class="ti ti-progress"></i>En cours
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter table-hover card-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 30%">Titre</th>
+                                <th>Categorie</th>
+                                <th>Type</th>
+                                <th>Priorite</th>
+                                <th>Statut</th>
+                                <th>Date creation</th>
+                                <th class="text-end" style="width: 70px;">Voir</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for demande in demandes %}
+                                <tr class="demande-row"
+                                    data-titre="{{ demande.titre|lower }}"
+                                    data-categorie="{{ demande.categorie|lower }}"
+                                    data-type="{{ demande.typeDemande|lower }}"
+                                    data-priorite="{{ demande.priorite }}"
+                                    data-status="{{ demande.status }}">
+                                    <td>
+                                        <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="titre-link">
+                                            {{ demande.titre }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <span class="category-tag">
+                                            <i class="ti ti-folder"></i>{{ demande.categorie }}
+                                        </span>
+                                    </td>
+                                    <td>{{ demande.typeDemande }}</td>
+                                    <td>
+                                        {% if demande.priorite == 'HAUTE' %}
+                                            <span class="badge bg-danger"><i class="ti ti-alert-triangle me-1"></i>{{ demande.priorite }}</span>
+                                        {% elseif demande.priorite == 'NORMALE' %}
+                                            <span class="badge bg-info"><i class="ti ti-minus me-1"></i>{{ demande.priorite }}</span>
+                                        {% else %}
+                                            <span class="badge bg-success"><i class="ti ti-arrow-down me-1"></i>{{ demande.priorite }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if demande.status == 'Nouvelle' %}
+                                            <span class="badge bg-info"><i class="ti ti-sparkles me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'En cours' %}
+                                            <span class="badge bg-warning"><i class="ti ti-loader me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'En attente' %}
+                                            <span class="badge bg-orange"><i class="ti ti-clock me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Resolue' %}
+                                            <span class="badge bg-success"><i class="ti ti-check me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Annulee' %}
+                                            <span class="badge bg-danger"><i class="ti ti-x me-1"></i>{{ demande.status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary"><i class="ti ti-lock me-1"></i>{{ demande.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="date-text">
+                                            <i class="ti ti-calendar"></i>{{ demande.dateCreation|date('d/m/Y') }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="action-btn" title="Afficher">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="7">
+                                        <div class="empty-state">
+                                            <i class="ti ti-file-off"></i>
+                                            <h3>Aucune demande trouvee</h3>
+                                            <p class="text-muted">Vous n'avez aucune demande pour le moment.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="empty-state" id="noResults" style="display: none;">
+                <i class="ti ti-search-off"></i>
+                <h3>Aucun resultat</h3>
+                <p class="text-muted">Aucune demande ne correspond a votre recherche.</p>
+                <button type="button" class="btn btn-outline-primary btn-sm mt-3" onclick="clearSearch()">
+                    <i class="ti ti-refresh me-1"></i>Reinitialiser
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+{{ include('demande/_logout_modal.html.twig') }}
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+(function() {
+    "use strict";
+
+    var searchInput;
+    var noResults;
+    var currentFilter = "all";
+
+    document.addEventListener("DOMContentLoaded", init);
+
+    function init() {
+        searchInput = document.getElementById("searchInput");
+        noResults = document.getElementById("noResults");
+
+        if (searchInput) {
+            searchInput.addEventListener("input", debounce(performSearch, 300));
+            searchInput.addEventListener("keyup", function(e) {
+                if (e.key === "Escape") {
+                    clearSearch();
+                }
+            });
+        }
+
+        document.querySelectorAll(".quick-filter-btn").forEach(function(btn) {
+            btn.addEventListener("click", function() {
+                document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+                    b.classList.remove("active");
+                });
+                this.classList.add("active");
+                currentFilter = this.getAttribute("data-filter");
+                performSearch();
+            });
+        });
+    }
+
+    function performSearch() {
+        var searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        var rows = document.querySelectorAll(".demande-row");
+        var visibleCount = 0;
+
+        rows.forEach(function(row) {
+            var titre = row.getAttribute("data-titre") || "";
+            var categorie = row.getAttribute("data-categorie") || "";
+            var type = row.getAttribute("data-type") || "";
+            var priorite = row.getAttribute("data-priorite") || "";
+            var status = row.getAttribute("data-status") || "";
+
+            var matchesSearch = searchTerm === "" ||
+                titre.indexOf(searchTerm) !== -1 ||
+                categorie.indexOf(searchTerm) !== -1 ||
+                type.indexOf(searchTerm) !== -1 ||
+                priorite.toLowerCase().indexOf(searchTerm) !== -1 ||
+                status.toLowerCase().indexOf(searchTerm) !== -1;
+
+            var matchesFilter = currentFilter === "all" ||
+                priorite === currentFilter ||
+                status === currentFilter;
+
+            if (matchesSearch && matchesFilter) {
+                row.classList.remove("hidden");
+                visibleCount++;
+            } else {
+                row.classList.add("hidden");
+            }
+        });
+
+        var tableResponsive = document.querySelector(".table-responsive");
+        if (visibleCount === 0 && rows.length > 0) {
+            if (noResults) noResults.style.display = "block";
+            if (tableResponsive) tableResponsive.style.display = "none";
+        } else {
+            if (noResults) noResults.style.display = "none";
+            if (tableResponsive) tableResponsive.style.display = "block";
+        }
+    }
+
+    function clearSearch() {
+        if (searchInput) {
+            searchInput.value = "";
+        }
+        currentFilter = "all";
+        document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+            b.classList.remove("active");
+        });
+        var allBtn = document.querySelector('.quick-filter-btn[data-filter="all"]');
+        if (allBtn) {
+            allBtn.classList.add("active");
+        }
+        performSearch();
+    }
+
+    function filterByStatus(status) {
+        if (searchInput) {
+            searchInput.value = "";
+        }
+        currentFilter = status || "all";
+        document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+            b.classList.remove("active");
+            if (b.getAttribute("data-filter") === currentFilter) {
+                b.classList.add("active");
+            }
+        });
+        performSearch();
+    }
+
+    function debounce(func, wait) {
+        var timeout;
+        return function() {
+            var context = this;
+            var args = arguments;
+            clearTimeout(timeout);
+            timeout = setTimeout(function() {
+                func.apply(context, args);
+            }, wait);
+        };
+    }
+
+    window.filterByStatus = filterByStatus;
+    window.clearSearch = clearSearch;
+})();
+</script>
+{% endblock %}

@@ -4,8 +4,8 @@ namespace App\Controller;
 
 use App\Entity\Demande;
 use App\Entity\DemandeDetail;
-use App\Entity\HistoriqueDemande;
 use App\Entity\Employe;
+use App\Entity\HistoriqueDemande;
 use App\Form\DemandeType;
 use App\Repository\DemandeRepository;
 use App\Services\DemandeFormHelper;
@@ -34,26 +34,34 @@ class DemandeController extends AbstractController
     }
 
     #[Route('/demande', name: 'demande_index', methods: ['GET'])]
-    public function index(Request $request,SessionInterface $session): Response
+    public function index(Request $request, SessionInterface $session): Response
     {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return $this->redirectToRoute('login');
+        }
+
         $filters = [
             'categorie' => $request->query->get('categorie'),
             'status' => $request->query->get('status'),
             'priorite' => $request->query->get('priorite'),
             'search' => $request->query->get('search'),
         ];
+        $isManager = $this->canManageDemandes($session);
+        $scopedEmployeId = $isManager ? null : $this->getLoggedInEmployeId($session);
+
+        $activeFilters = array_filter($filters, static fn ($value) => null !== $value && '' !== $value);
 
         $demandes = method_exists($this->demandeRepository, 'findWithFilters')
-            ? $this->demandeRepository->findWithFilters(array_filter($filters))
+            ? $this->demandeRepository->findWithFilters($activeFilters, $scopedEmployeId)
             : $this->demandeRepository->findAll();
 
         $stats = [
-            'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll() : count($demandes),
-            'byStatus' => method_exists($this->demandeRepository, 'countGroupByStatus') ? $this->demandeRepository->countGroupByStatus() : [],
-            'byPriorite' => method_exists($this->demandeRepository, 'countGroupByPriorite') ? $this->demandeRepository->countGroupByPriorite() : [],
+            'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll($scopedEmployeId, $activeFilters) : count($demandes),
+            'byStatus' => method_exists($this->demandeRepository, 'countGroupByStatus') ? $this->demandeRepository->countGroupByStatus($scopedEmployeId, $activeFilters) : [],
+            'byPriorite' => method_exists($this->demandeRepository, 'countGroupByPriorite') ? $this->demandeRepository->countGroupByPriorite($scopedEmployeId, $activeFilters) : [],
         ];
 
-        return $this->render('demande/index.html.twig', [
+        return $this->render($isManager ? 'demande/adminetrh/index.html.twig' : 'demande/employe/employe_index.html.twig', [
             'demandes' => $demandes,
             'categories' => $this->formHelper->getCategories(),
             'statuses' => $this->formHelper->getStatuses(),
@@ -66,13 +74,33 @@ class DemandeController extends AbstractController
     }
 
     #[Route('/demande/nouvelle', name: 'demande_new', methods: ['GET', 'POST'])]
-    public function new(Request $request,SessionInterface $session): Response
+    public function new(Request $request, SessionInterface $session): Response
     {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return $this->redirectToRoute('login');
+        }
+
+        if ($this->canManageDemandes($session)) {
+            $this->addFlash('warning', 'Les comptes RH et administrateur entreprise ne peuvent pas creer de demande.');
+
+            return $this->redirectToRoute('demande_index');
+        }
+
+        $employe = $this->em->getRepository(Employe::class)->find($this->getLoggedInEmployeId($session));
+        if (!$employe) {
+            throw $this->createAccessDeniedException('Employe connecte introuvable.');
+        }
+
         $demande = new Demande();
         $demande->setDateCreation(new \DateTime());
         $demande->setStatus('Nouvelle');
+        $demande->setEmploye($employe);
 
-        $form = $this->createForm(DemandeType::class, $demande, ['is_edit' => false]);
+        $form = $this->createForm(DemandeType::class, $demande, [
+            'is_edit' => false,
+            'include_employe' => true,
+            'employe_choices' => [$employe],
+        ]);
         $form->handleRequest($request);
 
         $detailErrors = [];
@@ -88,6 +116,8 @@ class DemandeController extends AbstractController
                 $detailErrors = $this->validateDetails($submittedType, $submittedDetails);
             }
 
+            $demande->setEmploye($employe);
+
             if ($form->isValid() && empty($detailErrors)) {
                 $this->em->persist($demande);
                 $this->em->flush();
@@ -102,7 +132,7 @@ class DemandeController extends AbstractController
                 $historique = new HistoriqueDemande();
                 $historique->setDemande($demande);
                 $historique->setNouveauStatut('Nouvelle');
-                $historique->setActeur($this->getEmployeeName($demande->getEmploye()));
+                $historique->setActeur($this->getActorLabel($session));
                 $historique->setCommentaire('Demande creee');
                 $historique->setDateAction(new \DateTime());
                 $this->em->persist($historique);
@@ -113,7 +143,7 @@ class DemandeController extends AbstractController
             }
         }
 
-        return $this->render('demande/new.html.twig', [
+        return $this->render('demande/employe/new.html.twig', [
             'form' => $form->createView(),
             'categories' => $this->formHelper->getCategoryTypes(),
             'detailErrors' => $detailErrors,
@@ -127,15 +157,21 @@ class DemandeController extends AbstractController
     #[Route('/demande/statistics', name: 'demande_statistics', methods: ['GET'])]
     public function statistics(SessionInterface $session): Response
     {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return $this->redirectToRoute('login');
+        }
+
+        $scopedEmployeId = $this->canManageDemandes($session) ? null : $this->getLoggedInEmployeId($session);
+
         $stats = [
-            'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll() : 0,
-            'byStatus' => method_exists($this->demandeRepository, 'countGroupByStatus') ? $this->demandeRepository->countGroupByStatus() : [],
-            'byPriorite' => method_exists($this->demandeRepository, 'countGroupByPriorite') ? $this->demandeRepository->countGroupByPriorite() : [],
-            'byType' => method_exists($this->demandeRepository, 'countGroupByType') ? $this->demandeRepository->countGroupByType() : [],
-            'byCategorie' => method_exists($this->demandeRepository, 'countGroupByCategorie') ? $this->demandeRepository->countGroupByCategorie() : [],
+            'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll($scopedEmployeId) : 0,
+            'byStatus' => method_exists($this->demandeRepository, 'countGroupByStatus') ? $this->demandeRepository->countGroupByStatus($scopedEmployeId) : [],
+            'byPriorite' => method_exists($this->demandeRepository, 'countGroupByPriorite') ? $this->demandeRepository->countGroupByPriorite($scopedEmployeId) : [],
+            'byType' => method_exists($this->demandeRepository, 'countGroupByType') ? $this->demandeRepository->countGroupByType($scopedEmployeId) : [],
+            'byCategorie' => method_exists($this->demandeRepository, 'countGroupByCategorie') ? $this->demandeRepository->countGroupByCategorie($scopedEmployeId) : [],
         ];
 
-        return $this->render('demande/statistics.html.twig', [
+        return $this->render($this->canManageDemandes($session) ? 'demande/adminetrh/statistics.html.twig' : 'demande/employe/statistics.html.twig', [
             'stats' => $stats,
             'email' => $session->get('employe_email') ?? '',
             'role' => $session->get('employe_role') ?? '',
@@ -149,8 +185,16 @@ class DemandeController extends AbstractController
     }
 
     #[Route('/demande/action/status/{id}', name: 'demande_update_status', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function updateStatus(int $id, Request $request): JsonResponse
+    public function updateStatus(int $id, Request $request, SessionInterface $session): JsonResponse
     {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return $this->jsonAccessDenied('Vous devez etre connecte pour modifier le statut.', 401);
+        }
+
+        if (!$this->canManageDemandes($session)) {
+            return $this->jsonAccessDenied('Seuls les comptes RH et administrateur entreprise peuvent modifier le statut.');
+        }
+
         try {
             $demande = $this->demandeRepository->find($id);
 
@@ -173,7 +217,7 @@ class DemandeController extends AbstractController
             $historique->setDemande($demande);
             $historique->setAncienStatut($oldStatus);
             $historique->setNouveauStatut($newStatus);
-            $historique->setActeur($this->getEmployeeName($demande->getEmploye()));
+            $historique->setActeur($this->getActorLabel($session));
             $historique->setCommentaire($commentaire);
             $historique->setDateAction(new \DateTime());
 
@@ -187,48 +231,30 @@ class DemandeController extends AbstractController
     }
 
     #[Route('/demande/action/delete/{id}', name: 'demande_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function delete(int $id): JsonResponse
+    public function delete(int $id, SessionInterface $session): JsonResponse
     {
-        try {
-            $demande = $this->demandeRepository->find($id);
-
-            if (!$demande) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Demande non trouvee'
-                ], 404);
-            }
-
-            foreach ($demande->getHistoriqueDemandes() as $historique) {
-                $this->em->remove($historique);
-            }
-
-            foreach ($demande->getDemandeDetails() as $detail) {
-                $this->em->remove($detail);
-            }
-
-            $this->em->remove($demande);
-            $this->em->flush();
-
-            return new JsonResponse([
-                'success' => true,
-                'message' => 'Demande supprimee'
-            ]);
-        } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Erreur: ' . $e->getMessage()
-            ], 500);
+        if (!$this->isEmployeLoggedIn($session)) {
+            return $this->jsonAccessDenied('Vous devez etre connecte pour supprimer une demande.', 401);
         }
+
+        return $this->jsonAccessDenied('La suppression des demandes est desactivee pour le moment.');
     }
 
     #[Route('/demande/{id}', name: 'demande_show', requirements: ['id' => '\d+'], methods: ['GET'])]
-    public function show(int $id,SessionInterface $session): Response
+    public function show(int $id, SessionInterface $session): Response
     {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return $this->redirectToRoute('login');
+        }
+
         $demande = $this->demandeRepository->find($id);
 
         if (!$demande) {
             throw $this->createNotFoundException('Demande non trouvee');
+        }
+
+        if (!$this->canAccessDemande($demande, $session)) {
+            throw $this->createAccessDeniedException('Vous ne pouvez pas consulter cette demande.');
         }
 
         $detailsData = [];
@@ -244,7 +270,7 @@ class DemandeController extends AbstractController
             }
         }
 
-        return $this->render('demande/show.html.twig', [
+        return $this->render($this->canManageDemandes($session) ? 'demande/adminetrh/show.html.twig' : 'demande/employe/employe_show.html.twig', [
             'demande' => $demande,
             'detailsData' => $detailsData,
             'fieldLabels' => $fieldLabels,
@@ -255,8 +281,16 @@ class DemandeController extends AbstractController
     }
 
     #[Route('/demande/{id}/edit', name: 'demande_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
-    public function edit(int $id, Request $request,SessionInterface $session): Response
+    public function edit(int $id, Request $request, SessionInterface $session): Response
     {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return $this->redirectToRoute('login');
+        }
+
+        if (!$this->canManageDemandes($session)) {
+            throw $this->createAccessDeniedException('Seuls les comptes RH et administrateur entreprise peuvent modifier une demande.');
+        }
+
         $demande = $this->demandeRepository->find($id);
 
         if (!$demande) {
@@ -296,7 +330,7 @@ class DemandeController extends AbstractController
                     $historique->setDemande($demande);
                     $historique->setAncienStatut($oldStatus);
                     $historique->setNouveauStatut($newStatus);
-                    $historique->setActeur($this->getEmployeeName($demande->getEmploye()));
+                    $historique->setActeur($this->getActorLabel($session));
                     $historique->setCommentaire($commentaire ?? 'Statut modifie');
                     $historique->setDateAction(new \DateTime());
                     $this->em->persist($historique);
@@ -321,7 +355,7 @@ class DemandeController extends AbstractController
             }
         }
 
-        return $this->render('demande/edit.html.twig', [
+        return $this->render('demande/adminetrh/edit.html.twig', [
             'demande' => $demande,
             'form' => $form->createView(),
             'categories' => $this->formHelper->getCategoryTypes(),
@@ -332,6 +366,66 @@ class DemandeController extends AbstractController
             'email' => $session->get('employe_email') ?? '',
             'role' => $session->get('employe_role') ?? '',
         ]);
+    }
+
+    private function isEmployeLoggedIn(SessionInterface $session): bool
+    {
+        return true === $session->get('employe_logged_in');
+    }
+
+    private function canManageDemandes(SessionInterface $session): bool
+    {
+        return $this->isEmployeLoggedIn($session)
+            && in_array((string) $session->get('employe_role'), ['RH', 'administrateur entreprise'], true);
+    }
+
+    private function getLoggedInEmployeId(SessionInterface $session): ?int
+    {
+        $employeId = $session->get('employe_id');
+
+        return is_numeric($employeId) ? (int) $employeId : null;
+    }
+
+    private function canAccessDemande(Demande $demande, SessionInterface $session): bool
+    {
+        if ($this->canManageDemandes($session)) {
+            return true;
+        }
+
+        $demandeEmployeId = $demande->getEmploye()?->getId_employe();
+        $loggedInEmployeId = $this->getLoggedInEmployeId($session);
+
+        return null !== $demandeEmployeId
+            && null !== $loggedInEmployeId
+            && $demandeEmployeId === $loggedInEmployeId;
+    }
+
+    private function jsonAccessDenied(string $message, int $status = 403): JsonResponse
+    {
+        return new JsonResponse([
+            'success' => false,
+            'message' => $message,
+        ], $status);
+    }
+
+    private function getActorLabel(SessionInterface $session): string
+    {
+        if (true === $session->get('admin_logged_in')) {
+            return 'Administrateur systeme';
+        }
+
+        $role = trim((string) $session->get('employe_role'));
+        $email = trim((string) $session->get('employe_email'));
+
+        if ('' !== $role && '' !== $email) {
+            return $role . ' - ' . $email;
+        }
+
+        if ('' !== $email) {
+            return $email;
+        }
+
+        return '' !== $role ? $role : 'Systeme';
     }
 
     private function validateDetails(string $typeDemande, array $details): array
@@ -415,14 +509,5 @@ class DemandeController extends AbstractController
         }
 
         return $errors;
-    }
-
-    private function getEmployeeName(?Employe $employe = null): string
-    {
-        if ($employe) {
-            return trim(($employe->getNom() ?? '') . ' ' . ($employe->getPrenom() ?? ''));
-        }
-
-        return 'Systeme';
     }
 }

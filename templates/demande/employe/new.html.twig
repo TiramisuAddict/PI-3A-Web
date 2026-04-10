@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
     .form-label.required::after { content: " *"; color: #dc2626; }
+    .field-error { color: #dc2626; font-size: 0.875rem; margin-top: 6px; display: block; }
     .map-wrapper { position: relative; }
     .map-zoom-controls { position: absolute; top: 10px; left: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 4px; }
     .map-zoom-controls button { width: 32px; height: 32px; background: white; border: 1px solid #ddd; border-radius: 4px; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
@@ -26,35 +27,23 @@
     .btn-confirm-location:not(:disabled):hover { background: #3a4ddf; }
     .btn-clear-location { background: #6b7280; color: white; border: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s ease; }
     .btn-clear-location:hover { background: #4b5563; }
-    .inline-map-section { margin-top: 8px; border: 1px solid #c0d0ff; border-radius: 6px; overflow: hidden; display: none; background: white; }
-    .inline-map-section.active { display: block; }
+    .inline-map-section { margin-top: 8px; border: 1px solid #c0d0ff; border-radius: 6px; overflow: hidden; background: white; }
     #map { height: 400px; width: 100%; background: #aad3df; border-radius: 4px; }
     .location-input-group input { background: #f8fafc !important; }
-    .badge {
-        padding: 4px 8px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        border-radius: 4px;
-        display: inline-block;
-    }
-    .badge.bg-info {
-        background-color: #17a2b8 !important;
-        color: white;
-    }
 </style>
 {% endblock %}
 
 {% block body %}
 {{ include('components/navbar.html.twig') }}
 <div class="d-flex" style="min-height:calc(100vh - 56px);">
-{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': 'RH'}) }}
+{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': role}) }}
 <div class="page-wrapper">
     <div class="page-header d-print-none mb-3">
         <div class="container-xl">
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <i class="ti ti-file-plus me-2"></i>Nouvelle Demande
+                        <i class="ti ti-file-plus me-2"></i>Nouvelle demande
                     </h2>
                 </div>
             </div>
@@ -63,10 +52,6 @@
 
     <div class="page-body">
         <div class="container-xl">
-            {% if form.vars.submitted %}
-                {% include 'demande/_form_errors.html.twig' with {'form': form, 'detailErrors': detailErrors} %}
-            {% endif %}
-
             {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'id': 'demandeForm'}}) }}
 
             <div class="row">
@@ -80,9 +65,9 @@
                                 <div class="row">
                                     <div class="col-md-6">
                                         {{ form_label(form.employe, null, {'label_attr': {'class': 'form-label required'}}) }}
-                                        {{ form_widget(form.employe, {'attr': {'class': 'form-select' ~ (form.employe.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                        {{ form_widget(form.employe, {'attr': {'class': 'form-select' ~ (form.employe.vars.errors|length > 0 ? ' is-invalid' : ''), 'onmousedown': 'return false;', 'onkeydown': 'return false;'}}) }}
                                         {% if form.employe.vars.errors %}
-                                            <div class="invalid-feedback d-block">
+                                            <div class="field-error">
                                                 {% for error in form.employe.vars.errors %}{{ error.message }}{% endfor %}
                                             </div>
                                         {% endif %}
@@ -91,7 +76,7 @@
                                         {{ form_label(form.categorie, null, {'label_attr': {'class': 'form-label required'}}) }}
                                         {{ form_widget(form.categorie, {'attr': {'class': 'form-select' ~ (form.categorie.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
                                         {% if form.categorie.vars.errors %}
-                                            <div class="invalid-feedback d-block">
+                                            <div class="field-error">
                                                 {% for error in form.categorie.vars.errors %}{{ error.message }}{% endfor %}
                                             </div>
                                         {% endif %}
@@ -104,7 +89,7 @@
                                         {{ form_label(form.typeDemande, null, {'label_attr': {'class': 'form-label required'}}) }}
                                         {{ form_widget(form.typeDemande, {'attr': {'class': 'form-select' ~ (form.typeDemande.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
                                         {% if form.typeDemande.vars.errors %}
-                                            <div class="invalid-feedback d-block">
+                                            <div class="field-error">
                                                 {% for error in form.typeDemande.vars.errors %}{{ error.message }}{% endfor %}
                                             </div>
                                         {% endif %}
@@ -113,7 +98,7 @@
                                         {{ form_label(form.priorite, null, {'label_attr': {'class': 'form-label required'}}) }}
                                         {{ form_widget(form.priorite, {'attr': {'class': 'form-select' ~ (form.priorite.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
                                         {% if form.priorite.vars.errors %}
-                                            <div class="invalid-feedback d-block">
+                                            <div class="field-error">
                                                 {% for error in form.priorite.vars.errors %}{{ error.message }}{% endfor %}
                                             </div>
                                         {% endif %}
@@ -124,14 +109,14 @@
                                 {{ form_label(form.titre, null, {'label_attr': {'class': 'form-label required'}}) }}
                                 {{ form_widget(form.titre, {'attr': {'class': 'form-control' ~ (form.titre.vars.errors|length > 0 ? ' is-invalid' : ''), 'placeholder': 'Titre de votre demande'}}) }}
                                 {% if form.titre.vars.errors %}
-                                    <div class="invalid-feedback d-block">
+                                    <div class="field-error">
                                         {% for error in form.titre.vars.errors %}{{ error.message }}{% endfor %}
                                     </div>
                                 {% endif %}
                             </div>
                             <div class="mb-0">
                                 {{ form_label(form.description, null, {'label_attr': {'class': 'form-label'}}) }}
-                                {{ form_widget(form.description, {'attr': {'class': 'form-control', 'rows': 4, 'placeholder': 'Description détaillée (optionnel)'}}) }}
+                                {{ form_widget(form.description, {'attr': {'class': 'form-control', 'rows': 4}}) }}
                             </div>
                         </div>
                     </div>
@@ -152,11 +137,6 @@
                             <h3 class="card-title"><i class="ti ti-send me-2"></i>Actions</h3>
                         </div>
                         <div class="card-body">
-                            <div class="mb-3">
-                                <div class="form-label">Statut</div>
-                                <span class="badge bg-info">Nouvelle</span>
-                            </div>
-                            <hr>
                             <div class="d-grid gap-2">
                                 <button type="submit" class="btn btn-primary" id="submitBtn">
                                     <i class="ti ti-check me-1"></i>Créer la demande
@@ -173,6 +153,7 @@
     </div>
 </div>
 </div>
+{{ include('demande/_logout_modal.html.twig') }}
 {% endblock %}
 
 {% block javascripts %}
@@ -191,75 +172,19 @@
     var markers = {};
     var selectedLocations = {};
 
-    var categorieSelect, typeSelect, typeInfo, dynamicFieldsCard, dynamicFieldsContainer;
-
-    document.addEventListener("DOMContentLoaded", function () {
-        categorieSelect = document.getElementById("demande_categorie");
-        typeSelect = document.getElementById("demande_typeDemande");
-        typeInfo = document.getElementById("typeInfo");
-        dynamicFieldsCard = document.getElementById("dynamicFieldsCard");
-        dynamicFieldsContainer = document.getElementById("dynamicFields");
-
-        if (!categorieSelect || !typeSelect) return;
-
-        categorieSelect.addEventListener("change", onCategoryChange);
-        typeSelect.addEventListener("change", onTypeChange);
-
-        if (SUBMITTED_TYPE) {
-            loadDynamicFields(SUBMITTED_TYPE, SUBMITTED_DETAILS);
-        }
-    });
-
-    function onCategoryChange() {
-        var category = categorieSelect.value;
-        typeSelect.innerHTML = '<option value="">-- Choisir un type --</option>';
-        dynamicFieldsCard.style.display = "none";
-        dynamicFieldsContainer.innerHTML = "";
-        maps = {};
-        markers = {};
-        selectedLocations = {};
-
-        if (category && CATEGORIES[category]) {
-            var types = CATEGORIES[category];
-            for (var i = 0; i < types.length; i++) {
-                var opt = document.createElement("option");
-                opt.value = types[i];
-                opt.textContent = types[i];
-                typeSelect.appendChild(opt);
-            }
-            typeInfo.textContent = types.length + " types disponibles";
-            typeInfo.style.color = "green";
-        } else {
-            typeInfo.textContent = "";
-        }
-    }
-
-    function onTypeChange() {
-        var type = typeSelect.value;
-        maps = {};
-        markers = {};
-        selectedLocations = {};
-        if (!type) {
-            dynamicFieldsCard.style.display = "none";
-            dynamicFieldsContainer.innerHTML = "";
-            return;
-        }
-        loadDynamicFields(type, {});
-    }
-
-    function loadDynamicFields(type, existingValues) {
-        fetch("/demande/api/fields/" + encodeURIComponent(type))
+    function loadDynamicFields(type, existingValues, container, card) {
+        fetch("{{ path('demande_api_fields', {type: '__TYPE__'}) }}".replace("__TYPE__", encodeURIComponent(type)))
             .then(function (r) {
                 if (!r.ok) throw new Error("HTTP " + r.status);
                 return r.json();
             })
             .then(function (fields) {
                 if (fields && fields.length > 0) {
-                    renderDynamicFields(fields, existingValues);
-                    dynamicFieldsCard.style.display = "block";
+                    renderDynamicFields(fields, existingValues, container);
+                    card.style.display = "block";
                 } else {
-                    dynamicFieldsCard.style.display = "none";
-                    dynamicFieldsContainer.innerHTML = "";
+                    card.style.display = "none";
+                    container.innerHTML = "";
                 }
             })
             .catch(function (e) { console.error(e); });
@@ -272,8 +197,15 @@
         return false;
     }
 
-    function renderDynamicFields(fields, existingValues) {
-        dynamicFieldsContainer.innerHTML = "";
+    function getFieldErrorMessage(key) {
+        for (var i = 0; i < DETAIL_ERRORS.length; i++) {
+            if (DETAIL_ERRORS[i].field === key) return DETAIL_ERRORS[i].message;
+        }
+        return "";
+    }
+
+    function renderDynamicFields(fields, existingValues, container) {
+        container.innerHTML = "";
         maps = {};
         markers = {};
         selectedLocations = {};
@@ -287,15 +219,26 @@
                 var fullCol = document.createElement("div");
                 fullCol.className = "col-12";
                 fullCol.appendChild(buildLocationField(field, existingValue, existingValues));
-                dynamicFieldsContainer.appendChild(fullCol);
+                container.appendChild(fullCol);
             } else {
                 var col = document.createElement("div");
                 col.className = field.type === "textarea" ? "col-12" : "col-md-6";
                 col.appendChild(buildLabel(field));
                 col.appendChild(buildInput(field, existingValue, errClass));
-                dynamicFieldsContainer.appendChild(col);
+                appendFieldError(col, field.key);
+                container.appendChild(col);
             }
         }
+    }
+
+    function appendFieldError(container, key) {
+        var message = getFieldErrorMessage(key);
+        if (!message) return;
+
+        var error = document.createElement("div");
+        error.className = "field-error";
+        error.textContent = message;
+        container.appendChild(error);
     }
 
     function buildLabel(field) {
@@ -504,6 +447,7 @@
 
         mapSection.appendChild(mapCardBody);
         wrapper.appendChild(mapSection);
+        appendFieldError(wrapper, field.key);
 
         setTimeout(function () {
             initInlineMap(field.key, existingLat, existingLon, existingValue);
@@ -666,6 +610,55 @@
             confirmBtn.style.background = "";
         }
     }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        var categorieSelect = document.getElementById("demande_categorie");
+        var typeSelect = document.getElementById("demande_typeDemande");
+        var typeInfo = document.getElementById("typeInfo");
+        var dynamicFieldsCard = document.getElementById("dynamicFieldsCard");
+        var dynamicFieldsContainer = document.getElementById("dynamicFields");
+
+        if (SUBMITTED_TYPE) {
+            loadDynamicFields(SUBMITTED_TYPE, SUBMITTED_DETAILS, dynamicFieldsContainer, dynamicFieldsCard);
+        }
+
+        categorieSelect.addEventListener("change", function () {
+            var category = this.value;
+            typeSelect.innerHTML = '<option value="">-- Choisir un type --</option>';
+            dynamicFieldsCard.style.display = "none";
+            dynamicFieldsContainer.innerHTML = "";
+            maps = {};
+            markers = {};
+            selectedLocations = {};
+
+            if (category && CATEGORIES[category]) {
+                var types = CATEGORIES[category];
+                for (var i = 0; i < types.length; i++) {
+                    var opt = document.createElement("option");
+                    opt.value = types[i];
+                    opt.textContent = types[i];
+                    typeSelect.appendChild(opt);
+                }
+                typeInfo.textContent = types.length + " types disponibles";
+                typeInfo.style.color = "green";
+            } else {
+                typeInfo.textContent = "";
+            }
+        });
+
+        typeSelect.addEventListener("change", function () {
+            var type = this.value;
+            maps = {};
+            markers = {};
+            selectedLocations = {};
+            if (!type) {
+                dynamicFieldsCard.style.display = "none";
+                dynamicFieldsContainer.innerHTML = "";
+                return;
+            }
+            loadDynamicFields(type, {}, dynamicFieldsContainer, dynamicFieldsCard);
+        });
+    });
 
 })();
 </script>

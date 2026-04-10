@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
     .form-label.required::after { content: " *"; color: #dc2626; }
+    .field-error { color: #dc2626; font-size: 0.875rem; margin-top: 6px; display: block; }
     .map-wrapper { position: relative; }
     .map-zoom-controls { position: absolute; top: 10px; left: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 4px; }
     .map-zoom-controls button { width: 32px; height: 32px; background: white; border: 1px solid #ddd; border-radius: 4px; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
@@ -35,7 +36,7 @@
 {% block body %}
 {{ include('components/navbar.html.twig') }}
 <div class="d-flex" style="min-height:calc(100vh - 56px);">
-{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': 'RH'}) }}
+{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': role}) }}
 <div class="page-wrapper">
     <div class="page-header d-print-none mb-3">
         <div class="container-xl">
@@ -51,10 +52,6 @@
 
     <div class="page-body">
         <div class="container-xl">
-            {% if form.vars.submitted %}
-                {% include 'demande/_form_errors.html.twig' with {'form': form, 'detailErrors': detailErrors} %}
-            {% endif %}
-
             {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'id': 'demandeForm'}}) }}
 
             <div class="row">
@@ -70,7 +67,7 @@
                                         {{ form_label(form.categorie, null, {'label_attr': {'class': 'form-label required'}}) }}
                                         {{ form_widget(form.categorie, {'attr': {'class': 'form-select' ~ (form.categorie.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
                                         {% if form.categorie.vars.errors %}
-                                            <div class="invalid-feedback d-block">
+                                            <div class="field-error">
                                                 {% for error in form.categorie.vars.errors %}{{ error.message }}{% endfor %}
                                             </div>
                                         {% endif %}
@@ -79,7 +76,7 @@
                                         {{ form_label(form.typeDemande, null, {'label_attr': {'class': 'form-label required'}}) }}
                                         {{ form_widget(form.typeDemande, {'attr': {'class': 'form-select' ~ (form.typeDemande.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
                                         {% if form.typeDemande.vars.errors %}
-                                            <div class="invalid-feedback d-block">
+                                            <div class="field-error">
                                                 {% for error in form.typeDemande.vars.errors %}{{ error.message }}{% endfor %}
                                             </div>
                                         {% endif %}
@@ -92,7 +89,7 @@
                                         {{ form_label(form.priorite, null, {'label_attr': {'class': 'form-label required'}}) }}
                                         {{ form_widget(form.priorite, {'attr': {'class': 'form-select' ~ (form.priorite.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
                                         {% if form.priorite.vars.errors %}
-                                            <div class="invalid-feedback d-block">
+                                            <div class="field-error">
                                                 {% for error in form.priorite.vars.errors %}{{ error.message }}{% endfor %}
                                             </div>
                                         {% endif %}
@@ -101,7 +98,7 @@
                                         {{ form_label(form.status, null, {'label_attr': {'class': 'form-label required'}}) }}
                                         {{ form_widget(form.status, {'attr': {'class': 'form-select' ~ (form.status.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
                                         {% if form.status.vars.errors %}
-                                            <div class="invalid-feedback d-block">
+                                            <div class="field-error">
                                                 {% for error in form.status.vars.errors %}{{ error.message }}{% endfor %}
                                             </div>
                                         {% endif %}
@@ -112,7 +109,7 @@
                                 {{ form_label(form.titre, null, {'label_attr': {'class': 'form-label required'}}) }}
                                 {{ form_widget(form.titre, {'attr': {'class': 'form-control' ~ (form.titre.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
                                 {% if form.titre.vars.errors %}
-                                    <div class="invalid-feedback d-block">
+                                    <div class="field-error">
                                         {% for error in form.titre.vars.errors %}{{ error.message }}{% endfor %}
                                     </div>
                                 {% endif %}
@@ -161,6 +158,7 @@
     </div>
 </div>
 </div>
+{{ include('demande/_logout_modal.html.twig') }}
 {% endblock %}
 
 {% block javascripts %}
@@ -245,6 +243,13 @@
         return false;
     }
 
+    function getFieldErrorMessage(key) {
+        for (var i = 0; i < DETAIL_ERRORS.length; i++) {
+            if (DETAIL_ERRORS[i].field === key) return DETAIL_ERRORS[i].message;
+        }
+        return "";
+    }
+
     function renderFields(fields, values, container) {
         container.innerHTML = "";
         maps = {}; markers = {}; selectedLocations = {};
@@ -264,9 +269,20 @@
                 col.className = f.type === "textarea" ? "col-12" : "col-md-6";
                 col.appendChild(buildLabel(f));
                 col.appendChild(buildInput(f, val, err));
+                appendFieldError(col, f.key);
                 container.appendChild(col);
             }
         }
+    }
+
+    function appendFieldError(container, key) {
+        var message = getFieldErrorMessage(key);
+        if (!message) return;
+
+        var error = document.createElement("div");
+        error.className = "field-error";
+        error.textContent = message;
+        container.appendChild(error);
     }
 
     function buildLabel(f) {
@@ -430,6 +446,7 @@
         body.appendChild(confirmBar);
         mapSection.appendChild(body);
         wrapper.appendChild(mapSection);
+        appendFieldError(wrapper, f.key);
 
         setTimeout(function () { initInlineMap(f.key, existingLat, existingLon, val); }, 300);
 
