@@ -81,7 +81,10 @@
                         </div>
                         <div class="card-body pt-2">
                             <div style="position: relative; height: 200px;">
-                                <canvas id="chartPieTypes" aria-label="Répartition des types de posts"></canvas>
+                                <canvas id="chartPieTypes" 
+                                        data-pie-annonces="{{ pieAnnonces|default(0) }}"
+                                        data-pie-evenements="{{ pieEvenements|default(0) }}"
+                                        aria-label="Répartition des types de posts"></canvas>
                             </div>
                         </div>
                     </div>
@@ -93,7 +96,10 @@
                         </div>
                         <div class="card-body pt-2">
                             <div style="position: relative; height: 200px;">
-                                <canvas id="chartBarEngagement" aria-label="Engagement par publication"></canvas>
+                                <canvas id="chartBarEngagement" 
+                                        data-labels="{{ chartEngagementLabels|default([]) | json_encode }}"
+                                        data-values="{{ chartEngagementValues|default([]) | json_encode }}"
+                                        aria-label="Engagement par publication"></canvas>
                             </div>
                         </div>
                     </div>
@@ -105,7 +111,10 @@
                         </div>
                         <div class="card-body pt-2">
                             <div style="position: relative; height: 220px;">
-                                <canvas id="chartLineParticipation" aria-label="Participations par date"></canvas>
+                                <canvas id="chartLineParticipation"
+                                        data-labels="{{ chartParticipationLabels|default([]) | json_encode }}"
+                                        data-values="{{ chartParticipationValues|default([]) | json_encode }}"
+                                        aria-label="Participations par date"></canvas>
                             </div>
                         </div>
                     </div>
@@ -184,67 +193,5 @@
 {% block javascripts %}
     {{ parent() }}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-    <script>
-    (function () {
-        var pieAnnonces = {{ pieAnnonces|default(0) }};
-        var pieEvenements = {{ pieEvenements|default(0) }};
-        var pieEl = document.getElementById('chartPieTypes');
-        if (pieEl && typeof Chart !== 'undefined') {
-            new Chart(pieEl, {
-                type: 'pie',
-                data: {
-                    labels: ['Annonces (type 1)', 'Événements (type 2)'],
-                    datasets: [{ data: [pieAnnonces, pieEvenements], backgroundColor: ['#206bc4', '#f59f00'], borderWidth: 1 }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-            });
-        }
-
-        var barLabels = [{% for label in chartEngagementLabels|default([]) %}"{{ label|e('js') }}"{% if not loop.last %},{% endif %}{% endfor %}];
-        var barValues = [{% for value in chartEngagementValues|default([]) %}{{ value }}{% if not loop.last %},{% endif %}{% endfor %}];
-        var barEl = document.getElementById('chartBarEngagement');
-        if (barEl && typeof Chart !== 'undefined') {
-            new Chart(barEl, {
-                type: 'bar',
-                data: {
-                    labels: barLabels,
-                    datasets: [{ label: 'Likes + commentaires', data: barValues, backgroundColor: 'rgba(32, 107, 196, 0.65)', borderColor: '#206bc4', borderWidth: 1 }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { ticks: { maxRotation: 45, minRotation: 0 } } },
-                    plugins: { legend: { display: false } }
-                }
-            });
-        }
-
-        var lineLabels = [{% for label in chartParticipationLabels|default([]) %}"{{ label|e('js') }}"{% if not loop.last %},{% endif %}{% endfor %}];
-        var lineValues = [{% for value in chartParticipationValues|default([]) %}{{ value }}{% if not loop.last %},{% endif %}{% endfor %}  ];
-        var lineEl = document.getElementById('chartLineParticipation');
-        if (lineEl && typeof Chart !== 'undefined') {
-            new Chart(lineEl, {
-                type: 'line',
-                data: {
-                    labels: lineLabels,
-                    datasets: [{
-                        label: 'Participations (événements)',
-                        data: lineValues,
-                        fill: true,
-                        tension: 0.25,
-                        borderColor: '#2fb344',
-                        backgroundColor: 'rgba(47, 179, 68, 0.15)',
-                        pointRadius: 3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
-                    plugins: { legend: { display: true } }
-                }
-            });
-        }
-    })();
-    </script>
+    <script src="{{ asset('js/dashboard-charts.js') }}"></script>
 {% endblock %}
