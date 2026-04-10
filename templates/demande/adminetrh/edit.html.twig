@@ -129,9 +129,7 @@
                             <div class="row g-3" id="dynamicFields"></div>
                         </div>
                     </div>
-                </div>
 
-                <div class="col-lg-4">
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title"><i class="ti ti-send me-2"></i>Actions</h3>
@@ -147,6 +145,34 @@
                                     <i class="ti ti-check me-1"></i>Enregistrer
                                 </button>
                                 <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="btn btn-outline-secondary">Annuler</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-lightbulb me-2"></i>Conseils</h3>
+                        </div>
+                        <div class="card-body">
+                            <div style="font-size: 0.95rem; line-height: 1.6; color: #555;">
+                                <div style="display: flex; margin-bottom: 12px;">
+                                    <span style="color: #4a5def; font-weight: bold; margin-right: 8px;">•</span>
+                                    <span><strong>Mises à jour :</strong> Modifiez les champs selon les besoins actuels.</span>
+                                </div>
+                                <div style="display: flex; margin-bottom: 12px;">
+                                    <span style="color: #4a5def; font-weight: bold; margin-right: 8px;">•</span>
+                                    <span><strong>Statut :</strong> Changez le statut de la demande pour le mettre à jour.</span>
+                                </div>
+                                <div style="display: flex; margin-bottom: 12px;">
+                                    <span style="color: #4a5def; font-weight: bold; margin-right: 8px;">•</span>
+                                    <span><strong>Commentaires :</strong> Ajoutez des notes pour justifier vos modifications.</span>
+                                </div>
+                                <div style="display: flex;">
+                                    <span style="color: #4a5def; font-weight: bold; margin-right: 8px;">•</span>
+                                    <span><strong>Priorité :</strong> Ajustez la priorité si nécessaire.</span>
+                                </div>
                             </div>
                         </div>
                     </div>
