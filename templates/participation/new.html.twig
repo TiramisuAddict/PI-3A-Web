@@ -1,13 +1,28 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Nouvelle participation{% endblock %}
+{% block title %}Créer une participation — Momentum{% endblock %}
 
 {% block body %}
-<div class="surface-card p-4">
-    <h1 class="mb-4">Créer une participation</h1>
-    <div class="card shadow-sm">
-        <div class="card-body p-4">
-            {{ include('participation/_form.html.twig', { cancel_path: path('app_participation_index'), submit_label: 'Créer' }) }}
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Créer une participation</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="card-body">
+                    {{ include('participation/_form.html.twig', {
+                        cancel_path: path('app_participation_index'),
+                        submit_label: 'Créer'
+                    }) }}
+                </div>
+            </div>
         </div>
     </div>
 </div>

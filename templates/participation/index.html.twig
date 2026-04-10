@@ -1,44 +1,69 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Participations{% endblock %}
+{% block title %}Participations — Momentum{% endblock %}
 
 {% block body %}
-<div class="surface-card p-4">
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-        <h1 class="mb-0">Participations</h1>
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Participations</h2>
+                </div>
+                <div class="col-auto">
+                    <a class="btn btn-primary" href="{{ path('app_participation_new') }}"><i class="ti ti-plus me-1"></i>Ajouter une participation</a>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="table-responsive">
-        <table class="table table-striped table-bordered align-middle table-vcenter">
-            <thead class="table-light">
-                <tr>
-                    <th>ID</th>
-                    <th>Utilisateur</th>
-                    <th>Statut</th>
-                    <th>Date action</th>
-                    <th>Post</th>
-                    <th class="text-end text-nowrap" style="width: 1%;">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for participation in participations %}
-                <tr>
-                    <td>{{ participation.idParticipation }}</td>
-                    <td>{{ participation.utilisateurId }}</td>
-                    <td>{{ participation.statut }}</td>
-                    <td>{{ participation.dateAction ? participation.dateAction|date('Y-m-d H:i') : '' }}</td>
-                    <td>{% if participation.post %}#{{ participation.post.idPost }}{% endif %}</td>
-                    <td class="text-end text-nowrap">
-                        <form class="d-inline" method="post" action="{{ path('app_participation_delete', { id_participation: participation.idParticipation }) }}" onsubmit="return confirm('Supprimer cette participation ?');">
-                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ participation.idParticipation) }}">
-                            <button type="submit" class="btn btn-sm btn-outline-danger btn-icon" title="Supprimer"><i class="ti ti-trash"></i></button>
-                        </form>
-                    </td>
-                </tr>
-            {% else %}
-                <tr><td colspan="6" class="text-center text-secondary py-4">Aucun enregistrement</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                            <tr>
+                                <th>Statut</th>
+                                <th>Date d'action</th>
+                                <th>Post</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for participation in participations %}
+                            <tr>
+                                <td><span class="badge bg-blue-lt text-blue">{{ participation.statut }}</span></td>
+                                <td class="text-secondary small">{{ participation.dateAction ? participation.dateAction|date('d/m/Y H:i') : '—' }}</td>
+                                <td>{% if participation.post %}<a href="{{ path('app_post_show', {id_post: participation.post.idPost}) }}" class="btn btn-ghost-primary">{{ participation.post.titre|length > 25 ? participation.post.titre|slice(0, 25) ~ '…' : participation.post.titre }}</a>{% else %}—{% endif %}</td>
+                                <td class="text-end text-nowrap">
+                                    <div class="d-flex align-items-center justify-content-end gap-2">
+                                        <a href="{{ path('app_participation_show', { id_participation: participation.idParticipation }) }}" class="btn btn-icon btn-ghost-primary" title="Voir"><i class="ti ti-eye" style="font-size: 1.25rem;"></i></a>
+                                        <form class="d-inline" method="post" action="{{ path('app_participation_delete', { id_participation: participation.idParticipation }) }}" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette participation ?');">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ participation.idParticipation) }}">
+                                            <button type="submit" class="btn btn-icon btn-ghost-danger" title="Supprimer"><i class="ti ti-trash" style="font-size: 1.25rem;"></i></button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4">
+                                    <div class="empty">
+                                        <div class="empty-header">404</div>
+                                        <div class="empty-title">Aucune participation trouvée</div>
+                                        <div class="empty-subtitle text-secondary">Créez une nouvelle participation pour commencer.</div>
+                                        <div class="empty-action">
+                                            <a href="{{ path('app_participation_new') }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Ajouter une participation</a>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

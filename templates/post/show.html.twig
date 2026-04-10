@@ -1,62 +1,73 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}{{ post.titre }}{% endblock %}
+{% block title %}{{ post.titre|length > 50 ? post.titre|slice(0, 50) ~ '…' : post.titre }} — Momentum{% endblock %}
 
 {% block body %}
-<div class="surface-card p-4">
-    <h1 class="mb-4">{{ post.titre }}</h1>
-    <div class="card border shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-striped table-bordered mb-0">
-                    <tbody>
-                        <tr><th class="w-25">ID post</th><td>{{ post.idPost }}</td></tr>
-                        <tr><th>Titre</th><td>{{ post.titre }}</td></tr>
-                        <tr><th>Contenu</th><td class="text-break">{{ post.contenu }}</td></tr>
-                        <tr><th>Type publication</th><td>{{ post.typePost }}</td></tr>
-                        <tr><th>Date création</th><td>{{ post.dateCreation ? post.dateCreation|date('Y-m-d H:i:s') : '' }}</td></tr>
-                        <tr><th>Utilisateur</th><td>{{ post.utilisateurId }}</td></tr>
-                        <tr><th>Actif</th><td>{{ post.active ? 'Oui' : 'Non' }}</td></tr>
-                        <tr><th>Date événement</th><td>{{ post.dateEvenement ? post.dateEvenement|date('Y-m-d') : '' }}</td></tr>
-                        <tr><th>Date fin événement</th><td>{{ post.dateFinEvenement ? post.dateFinEvenement|date('Y-m-d') : '' }}</td></tr>
-                        <tr><th>Lieu</th><td>{{ post.lieu }}</td></tr>
-                        <tr><th>Capacité max</th><td>{{ post.capaciteMax }}</td></tr>
-                        <tr><th>Latitude</th><td>{{ post.latitude }}</td></tr>
-                        <tr><th>Longitude</th><td>{{ post.longitude }}</td></tr>
-                    </tbody>
-                </table>
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">{{ post.titre }}</h2>
+                </div>
             </div>
         </div>
     </div>
-    <div class="d-flex flex-wrap gap-2 mt-4">
-        <a class="btn btn-primary" href="{{ path('app_post_index') }}"><i class="ti ti-list me-1"></i>Retour à la liste</a>
-        <a class="btn btn-warning" href="{{ path('app_post_edit', { id_post: post.idPost }) }}"><i class="ti ti-edit me-1"></i>Modifier</a>
-        {{ include('post/_delete_form.html.twig') }}
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-4">
+                        {% if post.typePost == 2 %}
+                            <div class="col-12">
+                                <span class="badge bg-yellow-lt text-yellow">Événement</span>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="col-12">
+                            <div>
+                                <label class="form-label text-secondary small">Contenu</label>
+                                <p class="text-break">{{ post.contenu }}</p>
+                            </div>
+                        </div>
+
+                        {% if post.typePost == 2 %}
+                            <div class="col-md-6">
+                                <label class="form-label text-secondary small">Date de début</label>
+                                <p class="mb-0">{{ post.dateEvenement ? post.dateEvenement|date('d/m/Y') : '—' }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-secondary small">Date de fin</label>
+                                <p class="mb-0">{{ post.dateFinEvenement ? post.dateFinEvenement|date('d/m/Y') : '—' }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-secondary small">Lieu</label>
+                                <p class="mb-0">{{ post.lieu|default('—') }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-secondary small">Capacité</label>
+                                <p class="mb-0">{{ post.capaciteMax|default('—') }}</p>
+                            </div>
+                        {% endif %}
+
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small">Créé le</label>
+                            <p class="mb-0">{{ post.dateCreation ? post.dateCreation|date('d/m/Y H:i') : '—' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small">État</label>
+                            <p class="mb-0"><span class="badge {% if post.active %}bg-green-lt text-green{% else %}bg-secondary-lt text-secondary{% endif %}">{{ post.active ? 'Actif' : 'Inactif' }}</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <a class="btn btn-primary" href="{{ path('app_post_index') }}"><i class="ti ti-list me-1"></i>Retour à la liste</a>
+                <a class="btn btn-warning" href="{{ path('app_post_edit', { id_post: post.idPost }) }}"><i class="ti ti-edit me-1"></i>Modifier</a>
+                {{ include('post/_delete_form.html.twig') }}
+            </div>
+        </div>
     </div>
 </div>
-{% endblock %}
-
-{% block javascripts %}
-    {{ parent() }}
-
-    https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap&libraries=places
-
-    <script>
-        function initMap() {
-            const position = {
-                lat: {{ post.latitude }},
-                lng: {{ post.longitude }}
-            };
-
-            const map = new google.maps.Map(document.getElementById("map"), {
-                zoom: 14,
-                center: position,
-            });
-
-            new google.maps.Marker({
-                position: position,
-                map: map,
-            });
-        }
-    </script>
 {% endblock %}

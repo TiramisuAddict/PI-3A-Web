@@ -1,28 +1,51 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Image #{{ event_image.idImage }}{% endblock %}
+{% block title %}Image d'événement #{{ event_image.idImage }} — Momentum{% endblock %}
 
 {% block body %}
-<div class="surface-card p-4">
-    <h1 class="mb-4">Image événement #{{ event_image.idImage }}</h1>
-    <div class="card border shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-striped table-bordered mb-0">
-                    <tbody>
-                        <tr><th class="w-25">ID</th><td>{{ event_image.idImage }}</td></tr>
-                        <tr><th>Chemin image</th><td class="text-break"><code>{{ event_image.imagePath }}</code></td></tr>
-                        <tr><th>Ordre</th><td>{{ event_image.ordre }}</td></tr>
-                        <tr><th>Post</th><td>{% if event_image.post %}#{{ event_image.post.idPost }}{% else %}—{% endif %}</td></tr>
-                    </tbody>
-                </table>
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Image d'événement #{{ event_image.idImage }}</h2>
+                </div>
             </div>
         </div>
     </div>
-    <div class="d-flex flex-wrap gap-2 mt-4">
-        <a class="btn btn-primary" href="{{ path('app_event_image_index') }}"><i class="ti ti-list me-1"></i>Retour</a>
-        <a class="btn btn-warning" href="{{ path('app_event_image_edit', { id_image: event_image.idImage }) }}"><i class="ti ti-edit me-1"></i>Modifier</a>
-        {{ include('event_image/_delete_form.html.twig') }}
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-12">
+                            <label class="form-label text-secondary small">Chemin de l'image</label>
+                            <p class="mb-0"><code class="text-break">{{ event_image.imagePath }}</code></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small">Post associé</label>
+                            <p class="mb-0">
+                                {% if event_image.post %}
+                                    <a href="{{ path('app_post_show', {id_post: event_image.post.idPost}) }}" class="btn btn-sm btn-ghost-primary">#{{ event_image.post.idPost }} - {{ event_image.post.titre|truncate(40) }}</a>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small">Ordre d'affichage</label>
+                            <p class="mb-0">{{ event_image.ordre|default('Non défini', true) }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <a class="btn btn-primary" href="{{ path('app_event_image_index') }}"><i class="ti ti-list me-1"></i>Retour à la liste</a>
+                <a class="btn btn-warning" href="{{ path('app_event_image_edit', { id_image: event_image.idImage }) }}"><i class="ti ti-edit me-1"></i>Modifier</a>
+                {{ include('event_image/_delete_form.html.twig') }}
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

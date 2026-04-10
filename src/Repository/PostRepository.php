@@ -27,12 +27,8 @@ class PostRepository extends ServiceEntityRepository
             ->orderBy('p.date_creation', 'DESC');
 
         if (null !== $search && '' !== $search) {
-            $escaped = str_replace(['%', '_', '\\'], ['\\%', '\\_', '\\\\'], $search);
-            $qb->andWhere($qb->expr()->orX(
-                $qb->expr()->like('p.titre', ':q'),
-                $qb->expr()->like('p.contenu', ':q')
-            ));
-            $qb->setParameter('q', '%'.$escaped.'%');
+            $qb->andWhere('p.titre LIKE :search OR p.contenu LIKE :search')
+            ->setParameter('search', '%' . $search . '%');
         }
 
         return $qb->getQuery()->getResult();
@@ -40,7 +36,11 @@ class PostRepository extends ServiceEntityRepository
 
     public function countWithTypePost(int $typePost): int
     {
-        return (int) $this->count(['type_post' => $typePost]);
+        $conn = $this->getEntityManager()->getConnection();
+        $sql = 'SELECT COUNT(*) as cnt FROM post WHERE type_post = :type';
+        $result = $conn->executeQuery($sql, ['type' => $typePost]);
+        $row = $result->fetchAssociative();
+        return (int) ($row['cnt'] ?? 0);
     }
 
     /**
