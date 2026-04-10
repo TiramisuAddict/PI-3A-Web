@@ -1,11 +1,6 @@
-# Enable stateless CSRF protection for forms and logins/logouts
+# CSRF protection settings compatible with Symfony 6.4
 framework:
     form:
-        csrf_protection:
-            token_id: submit
+        csrf_protection: true
 
-    csrf_protection:
-        stateless_token_ids:
-            - submit
-            - authenticate
-            - logout
+    csrf_protection: true

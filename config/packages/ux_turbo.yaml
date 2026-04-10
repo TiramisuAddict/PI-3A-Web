@@ -1,4 +1,3 @@
-# Enable stateless CSRF protection for forms and logins/logouts
+# CSRF protection for Turbo requests (Symfony 6.4 compatible)
 framework:
-    csrf_protection:
-        check_header: true
+    csrf_protection: true
