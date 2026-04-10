@@ -3,25 +3,30 @@
 {% block title %}Nouveau projet{% endblock %}
 
 {% block body %}
-{{ include('components/navbar.html.twig') }}
+<div class="page">
+    {{ include('components/navbar.html.twig') }}
     <div class="d-flex" style="min-height:calc(100vh - 56px);">
-    {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': 'RH'}) }}
-    <div class="workspace-card p-3 mb-3">
-        <div class="row g-2 align-items-center">
-            <div class="col-auto">
-                <span class="avatar bg-primary-lt text-primary"><i class="ti ti-folders"></i></span>
-            </div>
-            <div class="col">
-                <div class="workspace-subtle text-uppercase fw-semibold" style="letter-spacing:.08em; font-size:11px;">Creation</div>
-                <h2 class="mb-1">Nouveau projet</h2>
-                <div class="workspace-subtle">Renseignez les informations essentielles puis affectez l'equipe.</div>
-            </div>
-            <div class="col-auto ms-auto">
-                <a href="{{ path('app_projet_index') }}" class="btn btn-outline-secondary">Retour a la liste</a>
-            </div>
+        {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': role}) }}
+        <div class="flex-fill overflow-auto p-3">
+                <div class="page-header d-print-none mb-3">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <span class="avatar bg-primary-lt text-primary"><i class="ti ti-folders"></i></span>
+                        </div>
+                        <div class="col">
+                            <div class="page-pretitle">Creation</div>
+                            <h2 class="page-title">Nouveau projet</h2>
+                            <div class="text-muted">Renseignez les informations essentielles puis affectez l'equipe.</div>
+                        </div>
+                        <div class="col-auto ms-auto">
+                            <a href="{{ path('app_projet_index') }}" class="btn btn-outline-secondary">
+                                <i class="ti ti-arrow-left me-1"></i>Retour a la liste
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {{ include('projet/_form.html.twig', {'button_label': 'Creer le projet'}) }}
         </div>
     </div>
-    </div>
-
-    {{ include('projet/_form.html.twig', {'button_label': 'Creer le projet'}) }}
+</div>
 {% endblock %}

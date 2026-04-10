@@ -3,23 +3,38 @@
 {% block title %}Detail tache{% endblock %}
 
 {% block body %}
-    <div class="workspace-card p-3 mb-3">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
-            <div>
-                <div class="workspace-subtle text-uppercase fw-semibold" style="letter-spacing:.08em; font-size:11px;">Tache</div>
-                <h2 class="mb-1">{{ tache.titre }}</h2>
-                <div class="workspace-subtle">Projet: {{ projet.nom }}</div>
-            </div>
-            <div class="d-flex gap-2">
-                {% if canEditTask|default(false) %}
-                    <a href="{{ path('app_tache_edit', {'id_projet': projet.idProjet, 'id_tache': tache.idTache}) }}" class="btn btn-primary-lt">Modifier</a>
-                {% endif %}
-                <a href="{{ path('app_projet_index', {'projet': projet.idProjet}) }}" class="btn btn-outline-secondary">Retour</a>
-            </div>
-        </div>
-    </div>
+<div class="page">
+    {{ include('components/navbar.html.twig') }}
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+        {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': role}) }}
+<div class="page">
+    <div class="page-wrapper">
+        <div class="page-body">
+            <div class="container-xl py-3">
+                <div class="page-header d-print-none mb-3">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="page-pretitle">Tache</div>
+                            <h2 class="page-title">{{ tache.titre }}</h2>
+                            <div class="text-muted">Projet: {{ projet.nom }}</div>
+                        </div>
+                        <div class="col-auto ms-auto">
+                            <div class="btn-list">
+                                {% if canEditTask|default(false) %}
+                                    <a href="{{ path('app_tache_edit', {'id_projet': projet.idProjet, 'id_tache': tache.idTache}) }}" class="btn btn-primary">
+                                        <i class="ti ti-edit me-1"></i>Modifier
+                                    </a>
+                                {% endif %}
+                                <a href="{{ path('app_projet_index', {'projet': projet.idProjet}) }}" class="btn btn-outline-secondary">
+                                    <i class="ti ti-arrow-left me-1"></i>Retour
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    <div class="workspace-card p-3">
+    <div class="card">
+        <div class="card-body">
         <div class="row g-3">
             <div class="col-12">
                 <div class="small text-secondary mb-1">Description</div>
@@ -56,4 +71,9 @@
             </div>
         </div>
     </div>
+
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

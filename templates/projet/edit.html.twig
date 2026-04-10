@@ -3,28 +3,33 @@
 {% block title %}Modifier projet{% endblock %}
 
 {% block body %}
-{{ include('components/navbar.html.twig') }}
+<div class="page">
+    {{ include('components/navbar.html.twig') }}
     <div class="d-flex" style="min-height:calc(100vh - 56px);">
-    {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': 'RH'}) }}
-    <div class="workspace-card p-3 mb-3">
-        <div class="row g-2 align-items-center">
-            <div class="col-auto">
-                <span class="avatar bg-azure-lt text-azure"><i class="ti ti-pencil"></i></span>
-            </div>
-            <div class="col">
-                <div class="workspace-subtle text-uppercase fw-semibold" style="letter-spacing:.08em; font-size:11px;">Edition</div>
-                <h2 class="mb-1">Modifier projet</h2>
-                <div class="workspace-subtle">Ajustez les dates, le statut, la priorite et la composition de l'equipe.</div>
-            </div>
-            <div class="col-auto ms-auto d-print-none">
-                <div class="d-flex align-items-center gap-2">
-                <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary">Retour</a>
-                {{ include('projet/_delete_form.html.twig') }}
+        {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': role}) }}
+        <div class="flex-fill overflow-auto p-3">
+                <div class="page-header d-print-none mb-3">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <span class="avatar bg-azure-lt text-azure"><i class="ti ti-pencil"></i></span>
+                        </div>
+                        <div class="col">
+                            <div class="page-pretitle">Edition</div>
+                            <h2 class="page-title">Modifier projet</h2>
+                            <div class="text-muted">Ajustez les dates, le statut, la priorite et la composition de l'equipe.</div>
+                        </div>
+                        <div class="col-auto ms-auto d-print-none">
+                            <div class="btn-list">
+                                <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary">
+                                    <i class="ti ti-arrow-left me-1"></i>Retour
+                                </a>
+                                {{ include('projet/_delete_form.html.twig') }}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+                {{ include('projet/_form.html.twig', {'button_label': 'Mettre a jour'}) }}
         </div>
     </div>
-    </div>
-
-    {{ include('projet/_form.html.twig', {'button_label': 'Mettre a jour'}) }}
+</div>
 {% endblock %}

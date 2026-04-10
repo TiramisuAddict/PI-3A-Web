@@ -86,7 +86,7 @@
 {% block body %}
 {{ include('components/navbar.html.twig') }}
 <div class="d-flex" style="min-height:calc(100vh - 56px);">
-	{{ include('components/sidebar.html.twig', {'active_page': 'offres','sidebar_role': 'RH'}) }}
+	{{ include('components/sidebar.html.twig', {'active_page': 'offres','sidebar_role': role}) }}
 
 	<div class="candidat-dashboard flex-grow-1">
 		<div class="container-xl">
