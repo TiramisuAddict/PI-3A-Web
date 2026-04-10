@@ -3,9 +3,12 @@
 {% block title %}Details projet{% endblock %}
 
 {% block body %}
-{{ include('components/navbar.html.twig') }}
+<div class="page">
+    {{ include('components/navbar.html.twig') }}
     <div class="d-flex" style="min-height:calc(100vh - 56px);">
-    {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': 'RH'}) }}
+        {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': role}) }}
+        <div class="flex-fill overflow-auto p-3">
+
     {% set statutColor = 'secondary' %}
     {% if projet.statut == 'EN_COURS' %}{% set statutColor = 'azure' %}{% endif %}
     {% if projet.statut == 'TERMINE' %}{% set statutColor = 'green' %}{% endif %}
@@ -30,20 +33,28 @@
         {% set healthColor = 'orange' %}
     {% endif %}
 
-    <div class="workspace-card p-3 mb-3">
-        <div class="row g-3 align-items-center">
+    <div class="page-header d-print-none mb-3">
+        <div class="row align-items-center">
             <div class="col">
-                <div class="workspace-subtle text-uppercase fw-semibold" style="letter-spacing:.08em; font-size:11px;">Fiche projet</div>
-                <h2 class="mb-1">{{ projet.nom }}</h2>
-                <div class="workspace-subtle">Reference #{{ projet.idProjet }}</div>
+                <div class="page-pretitle">Fiche projet</div>
+                <h2 class="page-title">{{ projet.nom }}</h2>
+                <div class="text-muted">Reference #{{ projet.idProjet }}</div>
             </div>
             <div class="col-auto ms-auto d-print-none">
                 <div class="btn-list">
-                    <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary">Retour</a>
-                    <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary">Voir les taches</a>
+                    <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary">
+                        <i class="ti ti-arrow-left me-1"></i>Retour
+                    </a>
+                    <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary">
+                        <i class="ti ti-layout-kanban me-1"></i>Voir les taches
+                    </a>
                     {% if canManageProjects|default(false) %}
-                        <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-primary">Modifier</a>
-                        <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-outline-secondary">Gerer l'equipe</a>
+                        <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-primary">
+                            <i class="ti ti-edit me-1"></i>Modifier
+                        </a>
+                        <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-outline-secondary">
+                            <i class="ti ti-users me-1"></i>Gerer l'equipe
+                        </a>
                     {% endif %}
                 </div>
             </div>
@@ -127,7 +138,7 @@
                         {% if projet.responsable %}
                             <div class="fw-semibold mt-1">{{ projet.responsable.nom }} {{ projet.responsable.prenom }}</div>
                         {% else %}
-                            <div class="workspace-subtle mt-1">Non defini</div>
+                            <div class="text-muted mt-1">Non defini</div>
                         {% endif %}
                     </div>
                     <div class="mt-3">
@@ -136,7 +147,7 @@
                             {% for employe in projet.membresEquipe %}
                                 <span class="badge bg-blue-lt">{{ employe.nom }} {{ employe.prenom }}</span>
                             {% else %}
-                                <span class="workspace-subtle">Aucun membre</span>
+                                <span class="text-muted">Aucun membre</span>
                             {% endfor %}
                         </div>
                     </div>
@@ -150,5 +161,8 @@
             {% endif %}
         </div>
     </div>
+
+        </div>
     </div>
+</div>
 {% endblock %}

@@ -1,4 +1,4 @@
-{% extends 'base.html.twig' %}
+﻿{% extends 'base.html.twig' %}
 
 {% block title %}Projets{% endblock %}
 
@@ -19,16 +19,16 @@
 
         .kanban-stat {
             padding: 18px 16px;
-            border-radius: var(--m-radius);
+            border-radius: var(--tblr-border-radius);
             background: #fff;
-            border: 1px solid var(--m-border);
+            border: 1px solid var(--tblr-border-color);
             text-align: center;
             transition: transform .2s ease, box-shadow .2s ease;
         }
 
         .kanban-stat:hover {
             transform: translateY(-2px);
-            box-shadow: var(--m-shadow-md);
+            box-shadow: 0 2px 16px rgba(0,0,0,.08);
         }
 
         .kanban-stat strong {
@@ -51,9 +51,9 @@
         }
 
         .kanban-lane {
-            border-radius: var(--m-radius);
-            background: var(--m-bg);
-            border: 1px solid var(--m-border);
+            border-radius: var(--tblr-border-radius);
+            background: var(--tblr-bg-surface-secondary, #f1f5f9);
+            border: 1px solid var(--tblr-border-color);
             padding: 0;
             min-height: 68vh;
             display: flex;
@@ -69,7 +69,7 @@
             font-weight: 700;
             font-size: 13px;
             background: #fff;
-            border-bottom: 1px solid var(--m-border);
+            border-bottom: 1px solid var(--tblr-border-color);
             text-transform: uppercase;
             letter-spacing: 0.03em;
         }
@@ -89,8 +89,8 @@
             font-size: 12px;
             font-weight: 700;
             padding: 0 6px;
-            background: var(--m-bg);
-            color: var(--m-muted);
+            background: var(--tblr-bg-surface-secondary, #f1f5f9);
+            color: var(--tblr-secondary-color, #667382);
         }
 
         .kanban-column {
@@ -110,7 +110,7 @@
 
         .kanban-task {
             border-radius: 10px;
-            border: 1px solid var(--m-border);
+            border: 1px solid var(--tblr-border-color);
             background: #fff;
             cursor: grab;
             transition: all .2s cubic-bezier(.4,0,.2,1);
@@ -142,8 +142,8 @@
             flex-wrap: wrap;
             padding: 14px 16px;
             background: #fff;
-            border-radius: var(--m-radius);
-            border: 1px solid var(--m-border);
+            border-radius: var(--tblr-border-radius);
+            border: 1px solid var(--tblr-border-color);
         }
 
         .kanban-search {
@@ -172,7 +172,7 @@
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            background: var(--m-primary);
+            background: var(--tblr-primary);
             cursor: pointer;
             border: 2px solid #fff;
             box-shadow: 0 1px 3px rgba(0,0,0,0.2);
@@ -187,7 +187,7 @@
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            background: var(--m-primary);
+            background: var(--tblr-primary);
             cursor: pointer;
             border: 2px solid #fff;
             box-shadow: 0 1px 3px rgba(0,0,0,0.2);
@@ -207,29 +207,29 @@
             padding: 10px;
             font-size: 13px;
             font-weight: 600;
-            color: var(--m-muted);
+            color: var(--tblr-secondary-color, #667382);
             text-decoration: none;
             border-radius: 8px;
             transition: all .15s ease;
             margin: 4px 8px 8px;
-            border: 1px dashed var(--m-border);
+            border: 1px dashed var(--tblr-border-color);
         }
 
         .kanban-add-task:hover {
-            background: var(--m-primary-light);
-            color: var(--m-primary);
-            border-color: var(--m-primary);
+            background: rgba(var(--tblr-primary-rgb), .08);
+            color: var(--tblr-primary);
+            border-color: var(--tblr-primary);
         }
 
         .kanban-empty {
-            color: var(--m-muted);
+            color: var(--tblr-secondary-color, #667382);
             font-size: 13px;
         }
 
         /* ── View toggle ── */
         .view-toggle {
             display: inline-flex;
-            border: 1px solid var(--m-border);
+            border: 1px solid var(--tblr-border-color);
             border-radius: 8px;
             overflow: hidden;
         }
@@ -241,7 +241,7 @@
             padding: 6px 14px;
             font-size: 13px;
             font-weight: 600;
-            color: var(--m-muted);
+            color: var(--tblr-secondary-color, #667382);
             background: #fff;
             border: none;
             cursor: pointer;
@@ -249,24 +249,24 @@
         }
 
         .view-toggle-btn:not(:last-child) {
-            border-right: 1px solid var(--m-border);
+            border-right: 1px solid var(--tblr-border-color);
         }
 
         .view-toggle-btn.is-active {
-            background: var(--m-primary);
+            background: var(--tblr-primary);
             color: #fff;
         }
 
         .view-toggle-btn:not(.is-active):hover {
-            background: var(--m-primary-light);
-            color: var(--m-primary);
+            background: rgba(var(--tblr-primary-rgb), .08);
+            color: var(--tblr-primary);
         }
 
         /* ── Calendar ── */
         .cal-container {
             background: #fff;
-            border: 1px solid var(--m-border);
-            border-radius: var(--m-radius);
+            border: 1px solid var(--tblr-border-color);
+            border-radius: var(--tblr-border-radius);
             overflow: hidden;
         }
 
@@ -275,7 +275,7 @@
             align-items: center;
             justify-content: space-between;
             padding: 16px 20px;
-            border-bottom: 1px solid var(--m-border);
+            border-bottom: 1px solid var(--tblr-border-color);
         }
 
         .cal-header-title {
@@ -297,34 +297,34 @@
             width: 32px;
             height: 32px;
             border-radius: 8px;
-            border: 1px solid var(--m-border);
+            border: 1px solid var(--tblr-border-color);
             background: #fff;
             cursor: pointer;
-            color: var(--m-text);
+            color: var(--tblr-body-color);
             transition: all .15s ease;
         }
 
         .cal-nav-btn:hover {
-            background: var(--m-primary-light);
-            color: var(--m-primary);
-            border-color: var(--m-primary);
+            background: rgba(var(--tblr-primary-rgb), .08);
+            color: var(--tblr-primary);
+            border-color: var(--tblr-primary);
         }
 
         .cal-today-btn {
             padding: 6px 14px;
             border-radius: 8px;
-            border: 1px solid var(--m-border);
+            border: 1px solid var(--tblr-border-color);
             background: #fff;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            color: var(--m-text);
+            color: var(--tblr-body-color);
             transition: all .15s ease;
         }
 
         .cal-today-btn:hover {
-            background: var(--m-primary-light);
-            color: var(--m-primary);
+            background: rgba(var(--tblr-primary-rgb), .08);
+            color: var(--tblr-primary);
         }
 
         .cal-grid {
@@ -339,16 +339,16 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: .04em;
-            color: var(--m-muted);
-            background: var(--m-bg);
-            border-bottom: 1px solid var(--m-border);
+            color: var(--tblr-secondary-color, #667382);
+            background: var(--tblr-bg-surface-secondary, #f1f5f9);
+            border-bottom: 1px solid var(--tblr-border-color);
         }
 
         .cal-cell {
             min-height: 110px;
             padding: 6px 8px;
-            border-bottom: 1px solid var(--m-border);
-            border-right: 1px solid var(--m-border);
+            border-bottom: 1px solid var(--tblr-border-color);
+            border-right: 1px solid var(--tblr-border-color);
             vertical-align: top;
             position: relative;
         }
@@ -359,7 +359,7 @@
 
         .cal-cell.is-other-month,
         .cal-cell.is-outside {
-            background: var(--m-bg);
+            background: var(--tblr-bg-surface-secondary, #f1f5f9);
         }
 
         .cal-cell.is-other-month .cal-day-num,
@@ -370,7 +370,7 @@
         .cal-day-num {
             font-size: 13px;
             font-weight: 600;
-            color: var(--m-muted);
+            color: var(--tblr-secondary-color, #667382);
             margin-bottom: 4px;
         }
 
@@ -381,7 +381,7 @@
             width: 26px;
             height: 26px;
             border-radius: 6px;
-            background: var(--m-primary);
+            background: var(--tblr-primary);
             color: #fff;
         }
 
@@ -396,7 +396,7 @@
             font-weight: 500;
             cursor: pointer;
             text-decoration: none;
-            color: var(--m-text);
+            color: var(--tblr-body-color);
             transition: all .15s ease;
             overflow: hidden;
             white-space: nowrap;
@@ -435,8 +435,8 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: var(--m-primary-light);
-            color: var(--m-primary);
+            background: rgba(var(--tblr-primary-rgb), .08);
+            color: var(--tblr-primary);
             flex-shrink: 0;
             margin-left: auto;
         }
@@ -444,14 +444,14 @@
         .cal-more {
             font-size: 11px;
             font-weight: 600;
-            color: var(--m-primary);
+            color: var(--tblr-primary);
             cursor: pointer;
             padding: 2px 6px;
             border-radius: 4px;
         }
 
         .cal-more:hover {
-            background: var(--m-primary-light);
+            background: rgba(var(--tblr-primary-rgb), .08);
         }
 
         /* Calendar cell hover + add button */
@@ -472,7 +472,7 @@
             border-radius: 4px;
             font-size: 11px;
             font-weight: 600;
-            color: var(--m-muted);
+            color: var(--tblr-secondary-color, #667382);
             cursor: pointer;
             text-decoration: none;
             transition: all .15s ease;
@@ -484,8 +484,8 @@
         }
 
         .cal-cell-add:hover {
-            color: var(--m-primary);
-            background: var(--m-primary-light);
+            color: var(--tblr-primary);
+            background: rgba(var(--tblr-primary-rgb), .08);
         }
 
         /* Task popover */
@@ -494,8 +494,8 @@
             z-index: 1050;
             width: 280px;
             background: #fff;
-            border: 1px solid var(--m-border);
-            border-radius: var(--m-radius);
+            border: 1px solid var(--tblr-border-color);
+            border-radius: var(--tblr-border-radius);
             box-shadow: 0 10px 30px rgba(0,0,0,.12);
             padding: 0;
             pointer-events: auto;
@@ -503,13 +503,13 @@
 
         .cal-popover-header {
             padding: 12px 14px 8px;
-            border-bottom: 1px solid var(--m-border);
+            border-bottom: 1px solid var(--tblr-border-color);
         }
 
         .cal-popover-title {
             font-size: 14px;
             font-weight: 700;
-            color: var(--m-text);
+            color: var(--tblr-body-color);
             margin: 0;
             word-break: break-word;
         }
@@ -524,7 +524,7 @@
         .cal-popover-body {
             padding: 10px 14px;
             font-size: 13px;
-            color: var(--m-muted);
+            color: var(--tblr-secondary-color, #667382);
         }
 
         .cal-popover-body .cal-pop-row {
@@ -543,7 +543,7 @@
 
         .cal-popover-footer {
             padding: 8px 14px 12px;
-            border-top: 1px solid var(--m-border);
+            border-top: 1px solid var(--tblr-border-color);
             display: flex;
             gap: 8px;
         }
@@ -556,11 +556,11 @@
 {% endblock %}
 
 {% block body %}
- {{ include('components/navbar.html.twig') }}
+<div class="page">
+    {{ include('components/navbar.html.twig') }}
     <div class="d-flex" style="min-height:calc(100vh - 56px);">
-    {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': 'RH'}) }} 
-    <div class="flex-fill">
-        <div class="col-12">
+        {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': role}) }}
+        <div class="flex-fill overflow-auto p-3">
             {% if selectedProjet %}
                 {% set totalTasks = selectedProjet.taches|length %}
                 {% set todoCount = 0 %}
@@ -575,12 +575,12 @@
                     {% if normalizedStatus == 'TERMINEE' %}{% set doneCount = doneCount + 1 %}{% endif %}
                 {% endfor %}
 
-                <div class="workspace-card p-4 mb-3 kanban-shell">
+                <div class="card p-4 mb-3 kanban-shell">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
                         <div>
-                            <div class="workspace-subtle text-uppercase fw-semibold" style="letter-spacing:.06em; font-size:11px;">Tableau de bord</div>
-                            <h2 class="mb-1" style="font-size:22px;">{{ selectedProjet.nom }}</h2>
-                            <div class="workspace-subtle" style="font-size:13px;">
+                            <div class="page-pretitle">Tableau de bord</div>
+                            <h2 class="page-title">{{ selectedProjet.nom }}</h2>
+                            <div class="text-muted" style="font-size:13px;">
                                 {% if selectedProjet.responsable %}
                                     <i class="ti ti-user-star me-1"></i>{{ selectedProjet.responsable.nom }} {{ selectedProjet.responsable.prenom }}
                                 {% else %}
@@ -589,7 +589,7 @@
                             </div>
                         </div>
                         {% if canManageProjects|default(false) %}
-                            <a href="{{ path('app_projet_edit', {'id_projet': selectedProjet.idProjet}) }}" class="topbar-btn" style="font-size:13px;">
+                            <a href="{{ path('app_projet_edit', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-ghost-primary btn-sm">
                                 <i class="ti ti-settings me-1"></i>Parametres
                             </a>
                         {% endif %}
@@ -598,7 +598,7 @@
                     <div class="kanban-summary">
                         <div class="kanban-stat" data-stat="total">
                             <strong>{{ totalTasks }}</strong>
-                            <span class="stat-label workspace-subtle">Total</span>
+                            <span class="stat-label text-muted">Total</span>
                         </div>
                         <div class="kanban-stat" style="border-top:3px solid #16a34a;" data-stat="TERMINEE">
                             <strong style="color:#16a34a;">{{ doneCount }}</strong>
@@ -615,12 +615,12 @@
                     </div>
 
                     <div class="mt-3">
-                        <div class="small fw-semibold mb-2" style="font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--m-muted);">Equipe</div>
+                        <div class="subheader mb-2">Equipe</div>
                         <div class="d-flex flex-wrap gap-2">
                             {% for membre in selectedProjet.membresEquipe %}
-                                <span class="badge" style="background:var(--m-primary-light);color:var(--m-primary);font-weight:600;padding:6px 12px;border-radius:6px;">{{ membre.nom }} {{ membre.prenom }}</span>
+                                <span class="badge bg-primary-lt">{{ membre.nom }} {{ membre.prenom }}</span>
                             {% else %}
-                                <span class="workspace-subtle">Aucun membre.</span>
+                                <span class="text-muted">Aucun membre.</span>
                             {% endfor %}
                         </div>
                     </div>
@@ -636,12 +636,12 @@
                 <div class="kanban-toolbar">
                     <div class="kanban-search">
                         <div class="input-icon">
-                            <span class="input-icon-addon"><i class="ti ti-search" style="font-size:15px;color:var(--m-muted);"></i></span>
-                            <input type="text" class="form-control" placeholder="Rechercher une tache..." data-task-search style="border-radius:8px;">
+                            <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                            <input type="text" class="form-control" placeholder="Rechercher une tache..." data-task-search>
                         </div>
                     </div>
                     <div class="kanban-filter">
-                        <select class="form-select" data-task-filter style="border-radius:8px;">
+                        <select class="form-select" data-task-filter>
                             <option value="ALL">Toutes les taches</option>
                             <option value="A_FAIRE">A faire</option>
                             <option value="EN_COURS">En cours</option>
@@ -649,7 +649,7 @@
                             <option value="TERMINEE">Terminees</option>
                         </select>
                     </div>
-                    <button type="button" class="topbar-btn" data-task-filter-reset style="font-size:13px;">
+                    <button type="button" class="btn btn-ghost-secondary btn-sm" data-task-filter-reset>
                         <i class="ti ti-rotate me-1"></i>Reset
                     </button>
                     <div class="view-toggle ms-auto">
@@ -657,7 +657,7 @@
                         <button type="button" class="view-toggle-btn" data-view="calendar"><i class="ti ti-calendar-month"></i> Calendrier</button>
                     </div>
                     {% if canManageTasks|default(false) %}
-                        <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary" style="border-radius:8px;font-weight:600;white-space:nowrap;"><i class="ti ti-plus me-1"></i>Nouvelle tache</a>
+                        <a href="{{ path('app_tache_new', {'id_projet': selectedProjet.idProjet}) }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Nouvelle tache</a>
                     {% endif %}
                 </div>
 
@@ -677,13 +677,13 @@
                                         {% set normalizedStatus = (tache.statut_tache ?? '')|upper|replace({' ': '_', '-': '_'}) %}
                                         {% if normalizedStatus == column.key %}
                                             {% set hasTasks = true %}
-                                            {% set canUpdateTask = (canManageTasks|default(false)) or (currentEmployeId|default(null) is not null and tache.employe and tache.employe.idEmploye == currentEmployeId|default(null)) %}
+                                            {% set canUpdateTask = (canManageTasks|default(false)) or (currentEmployeId|default(null) is not null and tache.employe and tache.employe.id_employe == currentEmployeId|default(null)) %}
                                             {% set taskPrioriteColor = 'secondary' %}
                                             {% if tache.priorite == 'HAUTE' %}{% set taskPrioriteColor = 'red' %}{% endif %}
                                             {% if tache.priorite == 'MOYENNE' %}{% set taskPrioriteColor = 'orange' %}{% endif %}
                                             {% if tache.priorite == 'BASSE' %}{% set taskPrioriteColor = 'green' %}{% endif %}
 
-                                            <article class="workspace-card p-3 mb-2 kanban-task"
+                                            <article class="card p-3 mb-2 kanban-task"
                                                      draggable="{{ canUpdateTask ? 'true' : 'false' }}"
                                                      data-can-move="{{ canUpdateTask ? '1' : '0' }}"
                                                      data-task-id="{{ tache.idTache }}"
@@ -730,15 +730,15 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div class="small workspace-subtle mb-2">
+                                                <div class="small text-muted mb-2">
                                                     {{ tache.description|length > 80 ? tache.description|slice(0, 80) ~ '...' : tache.description }}
                                                 </div>
-                                                <div class="small workspace-subtle d-flex justify-content-between align-items-center">
+                                                <div class="small text-muted d-flex justify-content-between align-items-center">
                                                     <span><i class="ti ti-calendar me-1"></i>{{ tache.date_limite ? tache.date_limite|date('d/m/Y') : '-' }}</span>
                                                     <span><i class="ti ti-user me-1"></i>{{ tache.employe ? (tache.employe.nom ~ ' ' ~ tache.employe.prenom) : '-' }}</span>
                                                 </div>
                                                 {% if canUpdateTask %}
-                                                    <div class="d-flex align-items-center gap-2 mt-2 small workspace-subtle">
+                                                    <div class="d-flex align-items-center gap-2 mt-2 small text-muted">
                                                         <input
                                                             type="range"
                                                             class="form-range flex-grow-1 js-progress-input"
@@ -751,7 +751,7 @@
                                                         <span class="js-progress-value">{{ tache.progression is not null ? tache.progression : 0 }}%</span>
                                                     </div>
                                                 {% else %}
-                                                    <div class="d-flex align-items-center gap-2 mt-2 small workspace-subtle">
+                                                    <div class="d-flex align-items-center gap-2 mt-2 small text-muted">
                                                         <div class="progress flex-grow-1" style="height: 8px;">
                                                             <div class="progress-bar bg-azure" role="progressbar" style="width: {{ tache.progression is not null ? tache.progression : 0 }}%;"></div>
                                                         </div>
@@ -763,7 +763,7 @@
                                     {% endfor %}
 
                                     {% if not hasTasks %}
-                                        <div class="p-3 text-center workspace-subtle small kanban-empty">Aucune tache</div>
+                                        <div class="p-3 text-center text-muted small kanban-empty">Aucune tache</div>
                                     {% endif %}
                                 </div>
 
@@ -792,27 +792,27 @@
 
             {% else %}
                 {% if hasActiveFilters|default(false) %}
-                    <div class="workspace-card p-4 text-center">
+                    <div class="card p-4 text-center">
                         <div class="h3 mb-2">Aucun resultat</div>
-                        <div class="workspace-subtle mb-3">Aucun projet ne correspond aux filtres appliques.</div>
+                        <div class="text-muted mb-3">Aucun projet ne correspond aux filtres appliques.</div>
                         <a href="{{ path('app_projet_index') }}" class="btn btn-outline-secondary">Reinitialiser les filtres</a>
                     </div>
                 {% else %}
-                    <div class="workspace-card p-4 text-center">
+                    <div class="card p-4 text-center">
                         {% if canManageProjects|default(false) %}
                             <div class="h3 mb-2">Aucun projet pour le moment</div>
-                            <div class="workspace-subtle mb-3">Commencez par creer votre premier projet.</div>
+                            <div class="text-muted mb-3">Commencez par creer votre premier projet.</div>
                             <a href="{{ path('app_projet_new') }}" class="btn btn-primary">Nouveau projet</a>
                         {% else %}
                             <div class="h3 mb-2">Aucun projet assigne</div>
-                            <div class="workspace-subtle mb-3">Vous ne faites partie d'aucun projet pour le moment.</div>
+                            <div class="text-muted mb-3">Vous ne faites partie d'aucun projet pour le moment.</div>
                         {% endif %}
                     </div>
                 {% endif %}
             {% endif %}
         </div>
     </div>
-    </div>
+</div>
 {% endblock %}
 
 {% block javascripts %}
@@ -1153,7 +1153,7 @@
                 }
 
                 if (!hasTasks && !empty) {
-                    column.insertAdjacentHTML('beforeend', '<div class="p-3 text-center workspace-subtle small kanban-empty">Aucune tache</div>');
+                    column.insertAdjacentHTML('beforeend', '<div class="p-3 text-center text-muted small kanban-empty">Aucune tache</div>');
                 }
             };
 
@@ -1438,7 +1438,53 @@
             refreshCounters();
             refreshStats();
             applyTaskFilters();
+
+            // ── Delete confirmation modal for tasks ──
+            document.querySelectorAll('.js-delete-trigger').forEach(function (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var form = document.getElementById('task-modal-delete-form');
+                    var token = document.getElementById('task-modal-delete-token');
+                    var msg = document.getElementById('task-modal-delete-message');
+                    if (form) form.action = btn.getAttribute('data-delete-url') || '';
+                    if (token) token.value = btn.getAttribute('data-delete-token') || '';
+                    if (msg) msg.textContent = btn.getAttribute('data-delete-message') || 'Voulez-vous vraiment supprimer cet élément ?';
+                    var modal = new bootstrap.Modal(document.getElementById('task-modal-delete'));
+                    modal.show();
+                });
+            });
         });
     </script>
+
+    {# ── Task delete confirmation modal ── #}
+    <div class="modal modal-blur fade" id="task-modal-delete" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="modal-status bg-danger"></div>
+                <div class="modal-body text-center py-4">
+                    <i class="ti ti-alert-triangle mb-2 text-danger" style="font-size:40px;"></i>
+                    <h3>Confirmer la suppression</h3>
+                    <div class="text-muted" id="task-modal-delete-message">Voulez-vous vraiment supprimer cet élément ?</div>
+                </div>
+                <div class="modal-footer">
+                    <div class="w-100">
+                        <div class="row">
+                            <div class="col">
+                                <button type="button" class="btn w-100" data-bs-dismiss="modal">Annuler</button>
+                            </div>
+                            <div class="col">
+                                <form id="task-modal-delete-form" method="post" action="">
+                                    <input type="hidden" name="_token" id="task-modal-delete-token" value="">
+                                    <button type="submit" class="btn btn-danger w-100">Supprimer</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 

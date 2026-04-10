@@ -287,7 +287,7 @@
 {% block body %}
 {{ include('components/navbar.html.twig') }}
 <div class="d-flex" style="min-height:calc(100vh - 56px);">
-{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': 'RH'}) }}
+{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': role}) }}
 <div class="page-wrapper">
     <div class="container-xl">
         <div class="page-header d-print-none mb-3">
