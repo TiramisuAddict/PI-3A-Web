@@ -7,7 +7,7 @@
 {% set prioriteClass = 'form-select' ~ (form.priorite.vars.errors|length ? ' is-invalid' : '') %}
 {% set responsableClass = 'form-select' ~ (form.responsable.vars.errors|length ? ' is-invalid' : '') %}
 
-{{ form_start(form, {'attr': {'id': 'projet-form', 'class': 'workspace-form', 'novalidate': 'novalidate'}}) }}
+{{ form_start(form, {'attr': {'id': 'projet-form', 'novalidate': 'novalidate'}}) }}
     {% if form.vars.errors|length > 0 %}
         <div class="alert alert-danger mb-3" role="alert">
             Merci de corriger les erreurs indiquees dans le formulaire.
@@ -112,7 +112,7 @@
                         {{ form_label(form.membresEquipe, null, {'label_attr': {'class': 'form-label'}}) }}
                         <div class="input-icon mb-2">
                             <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                            <input type="text" id="member-search" class="form-control form-control-sm" placeholder="Rechercher un employe..." style="border-radius:8px;background:var(--m-bg,#f1f5f9);">
+                            <input type="text" id="member-search" class="form-control form-control-sm" placeholder="Rechercher un employe...">
                         </div>
                         <div id="member-checkbox-list" style="max-height: 320px; overflow:auto; scrollbar-width:thin; scrollbar-color:#cbd5e1 transparent;">
                             {% for choice in form.membresEquipe %}
@@ -126,11 +126,11 @@
                                     <span class="member-check-icon" style="display:none;color:#2563eb;"><i class="ti ti-circle-check-filled" style="font-size:18px;"></i></span>
                                 </label>
                             {% else %}
-                                <div class="workspace-subtle small">Aucun employe disponible.</div>
+                                <div class="text-muted small">Aucun employe disponible.</div>
                             {% endfor %}
                         </div>
-                        <div id="member-search-empty" class="workspace-subtle small mt-2" style="display:none;">Aucun employe ne correspond a la recherche.</div>
-                        <div class="form-hint mt-2" style="font-size:12px;color:var(--m-muted,#64748b);">Cliquez pour selectionner les membres de l'equipe.</div>
+                        <div id="member-search-empty" class="text-muted small mt-2" style="display:none;">Aucun employe ne correspond a la recherche.</div>
+                        <div class="form-hint mt-2">Cliquez pour selectionner les membres de l'equipe.</div>
                         {% for error in form.membresEquipe.vars.errors %}
                             <div class="invalid-feedback d-block">{{ error.message }}</div>
                         {% endfor %}

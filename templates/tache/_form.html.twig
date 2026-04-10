@@ -7,12 +7,12 @@
 {% set progressionClass = 'form-control' ~ (form.progression.vars.errors|length ? ' is-invalid' : '') %}
 {% set employeClass = 'form-select' ~ (form.employe.vars.errors|length ? ' is-invalid' : '') %}
 
-{{ form_start(form, {'attr': {'class': 'workspace-form', 'novalidate': 'novalidate'}}) }}
+{{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
     {% if form.vars.errors|length > 0 %}
         <div class="alert alert-danger mb-3" role="alert">Merci de corriger les erreurs indiquees dans le formulaire.</div>
     {% endif %}
 
-    <div class="card workspace-card">
+    <div class="card">
         <div class="card-body p-4">
             <div class="row g-3">
                 <div class="col-12">
