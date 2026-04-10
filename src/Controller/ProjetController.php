@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Employe;
 use App\Entity\Projet;
 use App\Entity\Tache;
 use App\Form\ProjetType;
@@ -20,9 +21,94 @@ use Symfony\Component\HttpFoundation\Session\SessionInterface;
 #[Route('/projet')]
 final class ProjetController extends AbstractController
 {
-    #[Route(name: 'app_projet_index', methods: ['GET'])]
-    public function index(Request $request, ProjetRepository $projetRepository, EmployeRepository $employeRepository,SessionInterface $session): Response
+    private const MANAGER_ROLES = ['rh', 'chef projet', 'chef_projet', 'chefprojet', 'responsable', 'administrateur systeme', 'administrateur_systeme', 'administrateur système'];
+
+    private function resolveCurrentEmploye(SessionInterface $session, EmployeRepository $employeRepository): ?Employe
     {
+        $employeId = $session->get('employe_id');
+        if ($employeId === null) {
+            return null;
+        }
+
+        return $employeRepository->find($employeId);
+    }
+
+    private function isManagerRole(?string $role): bool
+    {
+        if ($role === null) {
+            return false;
+        }
+
+        return in_array(mb_strtolower(trim($role)), self::MANAGER_ROLES, true);
+    }
+
+    private function buildRbacContext(SessionInterface $session, EmployeRepository $employeRepository): array
+    {
+        $currentEmploye = $this->resolveCurrentEmploye($session, $employeRepository);
+        $role = $currentEmploye?->getRole();
+        $isManager = $this->isManagerRole($role);
+
+        return [
+            'currentEmploye' => $currentEmploye,
+            'currentEmployeId' => $currentEmploye?->getId_employe(),
+            'canManageProjects' => $isManager,
+            'canManageTasks' => $isManager,
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
+        ];
+    }
+
+    private function filterProjetsForEmploye(array $projets, ?Employe $employe, bool $isManager): array
+    {
+        if ($isManager || $employe === null) {
+            return $projets;
+        }
+
+        $employeId = $employe->getId_employe();
+
+        return array_values(array_filter($projets, static function (Projet $p) use ($employeId): bool {
+            // Responsable (chef projet) of the project
+            if ($p->getResponsable()?->getId_employe() === $employeId) {
+                return true;
+            }
+
+            // Member of the project team
+            foreach ($p->getMembresEquipe() as $membre) {
+                if ($membre->getId_employe() === $employeId) {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
+    }
+
+    private function employeCanAccessProjet(?Employe $employe, Projet $projet, bool $isManager): bool
+    {
+        if ($isManager || $employe === null) {
+            return true;
+        }
+
+        $employeId = $employe->getId_employe();
+
+        if ($projet->getResponsable()?->getId_employe() === $employeId) {
+            return true;
+        }
+
+        foreach ($projet->getMembresEquipe() as $membre) {
+            if ($membre->getId_employe() === $employeId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    #[Route(name: 'app_projet_index', methods: ['GET'])]
+    public function index(Request $request, ProjetRepository $projetRepository, EmployeRepository $employeRepository, SessionInterface $session): Response
+    {
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+
         $filters = [
             'search' => trim((string) $request->query->get('search', '')),
             'statut' => trim((string) $request->query->get('statut', '')),
@@ -41,6 +127,9 @@ final class ProjetController extends AbstractController
             null,
         );
 
+        // Filter projects for regular employees
+        $projets = $this->filterProjetsForEmploye($projets, $rbac['currentEmploye'], $rbac['canManageProjects']);
+
         $selectedProjetId = ctype_digit((string) $request->query->get('projet', '')) ? (int) $request->query->get('projet') : null;
         $selectedProjet = null;
 
@@ -57,7 +146,7 @@ final class ProjetController extends AbstractController
             $selectedProjet = $projets[0];
         }
 
-        return $this->render('projet/index.html.twig', [
+        return $this->render('projet/index.html.twig', array_merge($rbac, [
             'projets' => $projets,
             'selectedProjet' => $selectedProjet,
             'sidebarProjets' => $projets,
@@ -65,18 +154,18 @@ final class ProjetController extends AbstractController
             'filters' => $filters,
             'hasActiveFilters' => $filters['search'] !== '' || $filters['statut'] !== '' || $filters['priorite'] !== '' || $filters['chef_projet'] !== '',
             'chefProjets' => $this->buildChefProjetsForFilter($employeRepository),
-            'currentEmploye' => null,
-            'currentEmployeId' => null,
-            'canManageProjects' => true,
-            'canManageTasks' => true,
-            'email' => $session->get('employe_email') ?? '',
-            'role' => $session->get('employe_role') ?? '',
-        ]);
+        ]));
     }
 
     #[Route('/new', name: 'app_projet_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $entityManager, EmployeRepository $employeRepository, ProjetRepository $projetRepository): Response
+    public function new(Request $request, EntityManagerInterface $entityManager, EmployeRepository $employeRepository, ProjetRepository $projetRepository, SessionInterface $session): Response
     {
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+
+        if (!$rbac['canManageProjects']) {
+            throw $this->createAccessDeniedException('Acces refuse.');
+        }
+
         $projet = new Projet();
         $choices = $this->buildEmployeChoices($employeRepository);
         $form = $this->createForm(ProjetType::class, $projet, [
@@ -93,35 +182,43 @@ final class ProjetController extends AbstractController
             return $this->redirectToRoute('app_projet_index', [], Response::HTTP_SEE_OTHER);
         }
 
-        return $this->render('projet/new.html.twig', [
+        $sidebarProjets = $this->filterProjetsForEmploye($projetRepository->findAll(), $rbac['currentEmploye'], $rbac['canManageProjects']);
+
+        return $this->render('projet/new.html.twig', array_merge($rbac, [
             'projet' => $projet,
             'form' => $form,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $sidebarProjets,
             'sidebarSelectedProjetId' => null,
-            'currentEmploye' => null,
-            'currentEmployeId' => null,
-            'canManageProjects' => true,
-            'canManageTasks' => true,
-        ]);
+        ]));
     }
 
     #[Route('/{id_projet}', name: 'app_projet_show', methods: ['GET'])]
-    public function show(Projet $projet, ProjetRepository $projetRepository): Response
+    public function show(Projet $projet, ProjetRepository $projetRepository, SessionInterface $session, EmployeRepository $employeRepository): Response
     {
-        return $this->render('projet/show.html.twig', [
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+
+        if (!$this->employeCanAccessProjet($rbac['currentEmploye'], $projet, $rbac['canManageProjects'])) {
+            throw $this->createAccessDeniedException('Acces refuse.');
+        }
+
+        $sidebarProjets = $this->filterProjetsForEmploye($projetRepository->findAll(), $rbac['currentEmploye'], $rbac['canManageProjects']);
+
+        return $this->render('projet/show.html.twig', array_merge($rbac, [
             'projet' => $projet,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $sidebarProjets,
             'sidebarSelectedProjetId' => $projet->getIdProjet(),
-            'currentEmploye' => null,
-            'currentEmployeId' => null,
-            'canManageProjects' => true,
-            'canManageTasks' => true,
-        ]);
+        ]));
     }
 
     #[Route('/{id_projet}/edit', name: 'app_projet_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, Projet $projet, EntityManagerInterface $entityManager, EmployeRepository $employeRepository, ProjetRepository $projetRepository): Response
+    public function edit(Request $request, Projet $projet, EntityManagerInterface $entityManager, EmployeRepository $employeRepository, ProjetRepository $projetRepository, SessionInterface $session): Response
     {
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+
+        if (!$rbac['canManageProjects']) {
+            throw $this->createAccessDeniedException('Acces refuse.');
+        }
+
         $choices = $this->buildEmployeChoices($employeRepository);
         $form = $this->createForm(ProjetType::class, $projet, [
             'chef_projets_choices' => $choices['chefProjets'],
@@ -136,21 +233,25 @@ final class ProjetController extends AbstractController
             return $this->redirectToRoute('app_projet_index', [], Response::HTTP_SEE_OTHER);
         }
 
-        return $this->render('projet/edit.html.twig', [
+        $sidebarProjets = $this->filterProjetsForEmploye($projetRepository->findAll(), $rbac['currentEmploye'], $rbac['canManageProjects']);
+
+        return $this->render('projet/edit.html.twig', array_merge($rbac, [
             'projet' => $projet,
             'form' => $form,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $sidebarProjets,
             'sidebarSelectedProjetId' => $projet->getIdProjet(),
-            'currentEmploye' => null,
-            'currentEmployeId' => null,
-            'canManageProjects' => true,
-            'canManageTasks' => true,
-        ]);
+        ]));
     }
 
     #[Route('/{id_projet}', name: 'app_projet_delete', methods: ['POST'])]
-    public function delete(Request $request, Projet $projet, EntityManagerInterface $entityManager): Response
+    public function delete(Request $request, Projet $projet, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): Response
     {
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+
+        if (!$rbac['canManageProjects']) {
+            throw $this->createAccessDeniedException('Acces refuse.');
+        }
+
         if ($this->isCsrfTokenValid('delete'.$projet->getIdProjet(), (string) $request->request->get('_token'))) {
             $entityManager->remove($projet);
             $entityManager->flush();
@@ -160,8 +261,13 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/new', name: 'app_tache_new', methods: ['GET', 'POST'])]
-    public function newTask(Request $request, Projet $projet, ProjetRepository $projetRepository, EntityManagerInterface $entityManager): Response
+    public function newTask(Request $request, Projet $projet, ProjetRepository $projetRepository, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): Response
     {
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+
+        if (!$rbac['canManageTasks']) {
+            throw $this->createAccessDeniedException('Acces refuse.');
+        }
         $requestedStatus = mb_strtoupper(trim((string) $request->query->get('status', '')));
 
         $tache = new Tache();
@@ -204,24 +310,34 @@ final class ProjetController extends AbstractController
             return $this->redirectToRoute('app_projet_index', ['projet' => $projet->getIdProjet()], Response::HTTP_SEE_OTHER);
         }
 
-        return $this->render('tache/new.html.twig', [
+        $sidebarProjets = $this->filterProjetsForEmploye($projetRepository->findAll(), $rbac['currentEmploye'], $rbac['canManageProjects']);
+
+        return $this->render('tache/new.html.twig', array_merge($rbac, [
             'projet' => $projet,
             'tache' => $tache,
             'form' => $form,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $sidebarProjets,
             'sidebarSelectedProjetId' => $projet->getIdProjet(),
-            'currentEmploye' => null,
-            'currentEmployeId' => null,
-            'canManageProjects' => true,
-            'canManageTasks' => true,
-        ]);
+        ]));
     }
 
     #[Route('/{id_projet}/tache/{id_tache}/edit', name: 'app_tache_edit', methods: ['GET', 'POST'])]
-    public function editTask(Request $request, Projet $projet, Tache $tache, ProjetRepository $projetRepository, EntityManagerInterface $entityManager): Response
+    public function editTask(Request $request, Projet $projet, Tache $tache, ProjetRepository $projetRepository, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): Response
     {
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             throw $this->createNotFoundException('Tache introuvable pour ce projet.');
+        }
+
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+
+        // An employee can only edit their own task
+        $isOwnTask = $rbac['currentEmploye'] !== null
+            && $tache->getEmploye() !== null
+            && $tache->getEmploye()->getId_employe() === $rbac['currentEmployeId'];
+        $employeeSelfUpdate = !$rbac['canManageTasks'] && $isOwnTask;
+
+        if (!$rbac['canManageTasks'] && !$isOwnTask) {
+            throw $this->createAccessDeniedException('Acces refuse.');
         }
 
         $teamChoices = $projet->getMembresEquipe()->toArray();
@@ -229,7 +345,7 @@ final class ProjetController extends AbstractController
         $form = $this->createForm(TacheType::class, $tache, [
             'project_team_choices' => $teamChoices,
             'is_edit' => true,
-            'employee_self_update' => false,
+            'employee_self_update' => $employeeSelfUpdate,
         ]);
 
         $form->handleRequest($request);
@@ -241,44 +357,56 @@ final class ProjetController extends AbstractController
             return $this->redirectToRoute('app_projet_index', ['projet' => $projet->getIdProjet()], Response::HTTP_SEE_OTHER);
         }
 
-        return $this->render('tache/edit.html.twig', [
+        $sidebarProjets = $this->filterProjetsForEmploye($projetRepository->findAll(), $rbac['currentEmploye'], $rbac['canManageProjects']);
+
+        return $this->render('tache/edit.html.twig', array_merge($rbac, [
             'projet' => $projet,
             'tache' => $tache,
             'form' => $form,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $sidebarProjets,
             'sidebarSelectedProjetId' => $projet->getIdProjet(),
-            'currentEmploye' => null,
-            'currentEmployeId' => null,
-            'canManageProjects' => true,
-            'canManageTasks' => true,
-        ]);
+        ]));
     }
 
     #[Route('/{id_projet}/tache/{id_tache}', name: 'app_tache_show', methods: ['GET'])]
-    public function showTask(Projet $projet, Tache $tache, ProjetRepository $projetRepository): Response
+    public function showTask(Projet $projet, Tache $tache, ProjetRepository $projetRepository, SessionInterface $session, EmployeRepository $employeRepository): Response
     {
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             throw $this->createNotFoundException('Tache introuvable pour ce projet.');
         }
 
-        return $this->render('tache/show.html.twig', [
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+
+        if (!$this->employeCanAccessProjet($rbac['currentEmploye'], $projet, $rbac['canManageProjects'])) {
+            throw $this->createAccessDeniedException('Acces refuse.');
+        }
+
+        $isOwnTask = $rbac['currentEmploye'] !== null
+            && $tache->getEmploye() !== null
+            && $tache->getEmploye()->getId_employe() === $rbac['currentEmployeId'];
+
+        $sidebarProjets = $this->filterProjetsForEmploye($projetRepository->findAll(), $rbac['currentEmploye'], $rbac['canManageProjects']);
+
+        return $this->render('tache/show.html.twig', array_merge($rbac, [
             'projet' => $projet,
             'tache' => $tache,
-            'sidebarProjets' => $projetRepository->findAll(),
+            'sidebarProjets' => $sidebarProjets,
             'sidebarSelectedProjetId' => $projet->getIdProjet(),
-            'currentEmploye' => null,
-            'currentEmployeId' => null,
-            'canManageProjects' => true,
-            'canManageTasks' => true,
-            'canEditTask' => true,
-        ]);
+            'canEditTask' => $rbac['canManageTasks'] || $isOwnTask,
+        ]));
     }
 
     #[Route('/{id_projet}/tache/{id_tache}/delete', name: 'app_tache_delete', methods: ['POST'])]
-    public function deleteTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager): Response
+    public function deleteTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): Response
     {
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             throw $this->createNotFoundException('Tache introuvable pour ce projet.');
+        }
+
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+
+        if (!$rbac['canManageTasks']) {
+            throw $this->createAccessDeniedException('Acces refuse.');
         }
 
         if ($this->isCsrfTokenValid('delete_tache_'.$tache->getIdTache(), (string) $request->request->get('_token'))) {
@@ -290,10 +418,19 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/{id_tache}/move', name: 'app_tache_move', methods: ['POST'])]
-    public function moveTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager): JsonResponse
+    public function moveTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): JsonResponse
     {
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             return $this->json(['ok' => false, 'message' => 'Tache introuvable pour ce projet.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+        $isOwnTask = $rbac['currentEmploye'] !== null
+            && $tache->getEmploye() !== null
+            && $tache->getEmploye()->getId_employe() === $rbac['currentEmployeId'];
+
+        if (!$rbac['canManageTasks'] && !$isOwnTask) {
+            return $this->json(['ok' => false, 'message' => 'Acces refuse.'], Response::HTTP_FORBIDDEN);
         }
 
         $payload = json_decode($request->getContent(), true);
@@ -330,10 +467,19 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/{id_tache}/progress', name: 'app_tache_progress', methods: ['POST'])]
-    public function updateTaskProgress(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager): JsonResponse
+    public function updateTaskProgress(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): JsonResponse
     {
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             return $this->json(['ok' => false, 'message' => 'Tache introuvable pour ce projet.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+        $isOwnTask = $rbac['currentEmploye'] !== null
+            && $tache->getEmploye() !== null
+            && $tache->getEmploye()->getId_employe() === $rbac['currentEmployeId'];
+
+        if (!$rbac['canManageTasks'] && !$isOwnTask) {
+            return $this->json(['ok' => false, 'message' => 'Acces refuse.'], Response::HTTP_FORBIDDEN);
         }
 
         $payload = json_decode($request->getContent(), true);
