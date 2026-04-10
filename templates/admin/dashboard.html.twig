@@ -3,178 +3,180 @@
 {% block title %}Tableau de bord admin{% endblock %}
 
 {% block body %}
-<div class="surface-card p-4 mb-4">
-    <h1 class="mb-1">Tableau de bord</h1>
-    <p class="text-secondary mb-0">Statistiques et accès rapide au back-office. <a href="{{ path('app_employe_feed') }}">Front office — Fil d’actualité</a></p>
-</div>
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Tableau de bord</h2>
+                    <p class="text-secondary small mb-0">Statistiques et gestion du backend. <a href="{{ path('app_employe_feed') }}">Voir le fil d'actualité</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <!-- Stats Cards -->
+            <div class="row row-cards mb-4">
+                <div class="col-sm-6 col-lg-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-baseline">
+                                <div>
+                                    <div class="text-secondary small">Posts</div>
+                                    <div class="h2 mb-0">{{ stats.posts }}</div>
+                                </div>
+                                <div class="ms-auto lh-1"><i class="ti ti-file-text text-blue" style="font-size: 2.5rem; opacity: 0.15;"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-baseline">
+                                <div>
+                                    <div class="text-secondary small">Commentaires</div>
+                                    <div class="h2 mb-0">{{ stats.comments }}</div>
+                                </div>
+                                <div class="ms-auto lh-1"><i class="ti ti-message text-azure" style="font-size: 2.5rem; opacity: 0.15;"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-baseline">
+                                <div>
+                                    <div class="text-secondary small">Likes</div>
+                                    <div class="h2 mb-0">{{ stats.likes }}</div>
+                                </div>
+                                <div class="ms-auto lh-1"><i class="ti ti-thumb-up text-pink" style="font-size: 2.5rem; opacity: 0.15;"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-baseline">
+                                <div>
+                                    <div class="text-secondary small">Participations</div>
+                                    <div class="h2 mb-0">{{ stats.participations }}</div>
+                                </div>
+                                <div class="ms-auto lh-1"><i class="ti ti-users text-teal" style="font-size: 2.5rem; opacity: 0.15;"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-<div class="row row-cards mb-4">
-    <div class="col-sm-6 col-lg-4 col-xl-2">
-        <div class="card card-sm border shadow-sm">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto"><span class="bg-blue text-white avatar"><i class="ti ti-file-text"></i></span></div>
-                    <div class="col">
-                        <div class="font-weight-medium">Posts</div>
-                        <div class="h2 mb-0">{{ stats.posts }}</div>
+            <!-- Charts -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header pb-0">
+                            <h4 class="card-title">Annonces vs Événements</h4>
+                        </div>
+                        <div class="card-body pt-2">
+                            <div style="position: relative; height: 200px;">
+                                <canvas id="chartPieTypes" aria-label="Répartition des types de posts"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header pb-0">
+                            <h4 class="card-title">Engagement par publication</h4>
+                        </div>
+                        <div class="card-body pt-2">
+                            <div style="position: relative; height: 200px;">
+                                <canvas id="chartBarEngagement" aria-label="Engagement par publication"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header pb-0">
+                            <h4 class="card-title">Participations aux événements (par jour)</h4>
+                        </div>
+                        <div class="card-body pt-2">
+                            <div style="position: relative; height: 220px;">
+                                <canvas id="chartLineParticipation" aria-label="Participations par date"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-4 col-xl-2">
-        <div class="card card-sm border shadow-sm">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto"><span class="bg-azure text-white avatar"><i class="ti ti-message"></i></span></div>
-                    <div class="col">
-                        <div class="font-weight-medium">Commentaires</div>
-                        <div class="h2 mb-0">{{ stats.comments }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-4 col-xl-2">
-        <div class="card card-sm border shadow-sm">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto"><span class="bg-pink text-white avatar"><i class="ti ti-thumb-up"></i></span></div>
-                    <div class="col">
-                        <div class="font-weight-medium">Likes</div>
-                        <div class="h2 mb-0">{{ stats.likes }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-4 col-xl-2">
-        <div class="card card-sm border shadow-sm">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto"><span class="bg-teal text-white avatar"><i class="ti ti-users"></i></span></div>
-                    <div class="col">
-                        <div class="font-weight-medium">Participations</div>
-                        <div class="h2 mb-0">{{ stats.participations }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-4 col-xl-2">
-        <div class="card card-sm border shadow-sm">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto"><span class="bg-yellow text-white avatar"><i class="ti ti-bell"></i></span></div>
-                    <div class="col">
-                        <div class="font-weight-medium">Notifications</div>
-                        <div class="h2 mb-0">{{ stats.notifications }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="row g-4 mb-4">
-    <div class="col-lg-4">
-        <div class="card border shadow-sm h-100">
-            <div class="card-header"><h3 class="card-title mb-0">Annonces vs événements</h3></div>
-            <div class="card-body d-flex align-items-center justify-content-center" style="min-height: 260px;">
-                <canvas id="chartPieTypes" width="280" height="260" aria-label="Répartition des types de posts"></canvas>
+            <!-- Quick Access -->
+            <h3 class="my-4">Gestion</h3>
+            <div class="row g-3">
+                <div class="col-md-6 col-xl-3">
+                    <a href="{{ path('app_post_index') }}" class="card" style="text-decoration: none; color: inherit;">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="avatar avatar-lg" style="background-color: #4A5DEF; color: white; flex-shrink: 0;">
+                                    <i class="ti ti-file-text"></i>
+                                </div>
+                                <div>
+                                    <h3 class="card-title">Publications</h3>
+                                    <p class="text-secondary small mb-0">Gestion des posts</p>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <a href="{{ path('app_commentaire_index') }}" class="card" style="text-decoration: none; color: inherit;">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="avatar avatar-lg" style="background-color: #0e72ba; color: white; flex-shrink: 0;">
+                                    <i class="ti ti-message"></i>
+                                </div>
+                                <div>
+                                    <h3 class="card-title">Commentaires</h3>
+                                    <p class="text-secondary small mb-0">Modération</p>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <a href="{{ path('app_participation_index') }}" class="card" style="text-decoration: none; color: inherit;">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="avatar avatar-lg" style="background-color: #00a699; color: white; flex-shrink: 0;">
+                                    <i class="ti ti-users"></i>
+                                </div>
+                                <div>
+                                    <h3 class="card-title">Participations</h3>
+                                    <p class="text-secondary small mb-0">Événements</p>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <a href="{{ path('app_notification_index') }}" class="card" style="text-decoration: none; color: inherit;">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="avatar avatar-lg" style="background-color: #f59f00; color: white; flex-shrink: 0;">
+                                    <i class="ti ti-bell"></i>
+                                </div>
+                                <div>
+                                    <h3 class="card-title">Notifications</h3>
+                                    <p class="text-secondary small mb-0">Messages</p>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-lg-8">
-        <div class="card border shadow-sm h-100">
-            <div class="card-header"><h3 class="card-title mb-0">Engagement par post (likes + commentaires)</h3></div>
-            <div class="card-body" style="min-height: 280px;">
-                <canvas id="chartBarEngagement" height="240" aria-label="Engagement par publication"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-12">
-        <div class="card border shadow-sm">
-            <div class="card-header"><h3 class="card-title mb-0">Participations aux événements (par jour)</h3></div>
-            <div class="card-body" style="min-height: 280px;">
-                <canvas id="chartLineParticipation" height="260" aria-label="Participations par date"></canvas>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row g-4">
-    <div class="col-md-6 col-xl-4">
-        <a href="{{ path('app_post_index') }}" class="text-decoration-none text-reset d-block h-100">
-            <div class="card h-100 border shadow-sm admin-dash-card">
-                <div class="card-body">
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="avatar avatar-lg bg-blue-lt text-blue"><i class="ti ti-file-text fs-2"></i></span>
-                        <div><h2 class="h5 mb-0">Gestion des posts</h2><span class="text-secondary small">CRUD publications</span></div>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-6 col-xl-4">
-        <a href="{{ path('app_commentaire_index') }}" class="text-decoration-none text-reset d-block h-100">
-            <div class="card h-100 border shadow-sm admin-dash-card">
-                <div class="card-body">
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="avatar avatar-lg bg-azure-lt text-azure"><i class="ti ti-message fs-2"></i></span>
-                        <div><h2 class="h5 mb-0">Commentaires</h2><span class="text-secondary small">Modération</span></div>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-6 col-xl-4">
-        <a href="{{ path('app_participation_index') }}" class="text-decoration-none text-reset d-block h-100">
-            <div class="card h-100 border shadow-sm admin-dash-card">
-                <div class="card-body">
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="avatar avatar-lg bg-teal-lt text-teal"><i class="ti ti-users fs-2"></i></span>
-                        <div><h2 class="h5 mb-0">Participations</h2><span class="text-secondary small">Événements</span></div>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-6 col-xl-4">
-        <a href="{{ path('app_notification_index') }}" class="text-decoration-none text-reset d-block h-100">
-            <div class="card h-100 border shadow-sm admin-dash-card">
-                <div class="card-body">
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="avatar avatar-lg bg-yellow-lt text-yellow"><i class="ti ti-bell fs-2"></i></span>
-                        <div><h2 class="h5 mb-0">Notifications</h2><span class="text-secondary small">Messages</span></div>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-6 col-xl-4">
-        <a href="{{ path('app_event_image_index') }}" class="text-decoration-none text-reset d-block h-100">
-            <div class="card h-100 border shadow-sm admin-dash-card">
-                <div class="card-body">
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="avatar avatar-lg bg-purple-lt text-purple"><i class="ti ti-photo fs-2"></i></span>
-                        <div><h2 class="h5 mb-0">Images événement</h2><span class="text-secondary small">Galerie</span></div>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-6 col-xl-4">
-        <a href="{{ path('app_like_post_index') }}" class="text-decoration-none text-reset d-block h-100">
-            <div class="card h-100 border shadow-sm admin-dash-card">
-                <div class="card-body">
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="avatar avatar-lg bg-pink-lt text-pink"><i class="ti ti-thumb-up fs-2"></i></span>
-                        <div><h2 class="h5 mb-0">Likes</h2><span class="text-secondary small">Lecture seule</span></div>
-                    </div>
-                </div>
-            </div>
-        </a>
     </div>
 </div>
 {% endblock %}
@@ -198,8 +200,8 @@
             });
         }
 
-        var barLabels = {{ chartEngagementLabels|default([])|json_encode|raw }};
-        var barValues = {{ chartEngagementValues|default([])|json_encode|raw }};
+        var barLabels = [{% for label in chartEngagementLabels|default([]) %}"{{ label|e('js') }}"{% if not loop.last %},{% endif %}{% endfor %}];
+        var barValues = [{% for value in chartEngagementValues|default([]) %}{{ value }}{% if not loop.last %},{% endif %}{% endfor %}];
         var barEl = document.getElementById('chartBarEngagement');
         if (barEl && typeof Chart !== 'undefined') {
             new Chart(barEl, {
@@ -217,8 +219,8 @@
             });
         }
 
-        var lineLabels = {{ chartParticipationLabels|default([])|json_encode|raw }};
-        var lineValues = {{ chartParticipationValues|default([])|json_encode|raw }};
+        var lineLabels = [{% for label in chartParticipationLabels|default([]) %}"{{ label|e('js') }}"{% if not loop.last %},{% endif %}{% endfor %}];
+        var lineValues = [{% for value in chartParticipationValues|default([]) %}{{ value }}{% if not loop.last %},{% endif %}{% endfor %}  ];
         var lineEl = document.getElementById('chartLineParticipation');
         if (lineEl && typeof Chart !== 'undefined') {
             new Chart(lineEl, {

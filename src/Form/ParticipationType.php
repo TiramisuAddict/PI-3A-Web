@@ -17,10 +17,6 @@ class ParticipationType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
-            ->add('utilisateur_id', IntegerType::class, [
-                'label' => 'ID utilisateur',
-                'attr' => ['class' => 'form-control', 'min' => 0],
-            ])
             ->add('statut', TextType::class, [
                 'label' => 'Statut (ex. GOING, DECLINED)',
                 'attr' => ['class' => 'form-control'],

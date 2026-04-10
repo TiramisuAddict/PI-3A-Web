@@ -17,7 +17,7 @@ class ParticipationRepository extends ServiceEntityRepository
     }
 
     /**
-     * Participations sur des posts événement (type_post = 2), agrégées par jour (date d’action).
+     * Participations sur des posts événement (type_post = 2), agrégées par jour (date d'action).
      * Requête compatible MySQL / MariaDB (schéma projet « momentum »).
      *
      * @return list<array{day: string, count: int}>

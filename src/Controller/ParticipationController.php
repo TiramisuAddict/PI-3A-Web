@@ -23,6 +23,16 @@ final class ParticipationController extends AbstractController
         ]);
     }
 
+    #[Route('/by-post/{id_post}', name: 'app_participation_by_post', methods: ['GET'])]
+    public function byPost(int $id_post, ParticipationRepository $participationRepository): Response
+    {
+        $participations = $participationRepository->findBy(['post' => $id_post]);
+
+        return $this->render('participation/index.html.twig', [
+            'participations' => $participations,
+        ]);
+    }
+
     #[Route('/new', name: 'app_participation_new', methods: ['GET', 'POST'])]
     public function new(Request $request, EntityManagerInterface $entityManager): Response
     {
