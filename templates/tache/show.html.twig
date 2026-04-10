@@ -1,0 +1,79 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Detail tache{% endblock %}
+
+{% block body %}
+<div class="page">
+    {{ include('components/navbar.html.twig') }}
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+        {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': role}) }}
+<div class="page">
+    <div class="page-wrapper">
+        <div class="page-body">
+            <div class="container-xl py-3">
+                <div class="page-header d-print-none mb-3">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="page-pretitle">Tache</div>
+                            <h2 class="page-title">{{ tache.titre }}</h2>
+                            <div class="text-muted">Projet: {{ projet.nom }}</div>
+                        </div>
+                        <div class="col-auto ms-auto">
+                            <div class="btn-list">
+                                {% if canEditTask|default(false) %}
+                                    <a href="{{ path('app_tache_edit', {'id_projet': projet.idProjet, 'id_tache': tache.idTache}) }}" class="btn btn-primary">
+                                        <i class="ti ti-edit me-1"></i>Modifier
+                                    </a>
+                                {% endif %}
+                                <a href="{{ path('app_projet_index', {'projet': projet.idProjet}) }}" class="btn btn-outline-secondary">
+                                    <i class="ti ti-arrow-left me-1"></i>Retour
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+    <div class="card">
+        <div class="card-body">
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="small text-secondary mb-1">Description</div>
+                <div>{{ tache.description }}</div>
+            </div>
+            <div class="col-md-3">
+                <div class="small text-secondary mb-1">Statut</div>
+                <div>{{ tache.statutTache }}</div>
+            </div>
+            <div class="col-md-3">
+                <div class="small text-secondary mb-1">Priorite</div>
+                <div>{{ tache.priorite }}</div>
+            </div>
+            <div class="col-md-3">
+                <div class="small text-secondary mb-1">Date debut</div>
+                <div>{{ tache.dateDeb ? tache.dateDeb|date('d/m/Y') : '-' }}</div>
+            </div>
+            <div class="col-md-3">
+                <div class="small text-secondary mb-1">Date limite</div>
+                <div>{{ tache.dateLimite ? tache.dateLimite|date('d/m/Y') : '-' }}</div>
+            </div>
+            <div class="col-md-6">
+                <div class="small text-secondary mb-1">Assigne a</div>
+                <div>{{ tache.employe ? (tache.employe.nom ~ ' ' ~ tache.employe.prenom) : '-' }}</div>
+            </div>
+            <div class="col-md-6">
+                <div class="small text-secondary mb-1">Progression</div>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="progress flex-grow-1" style="height: 8px;">
+                        <div class="progress-bar bg-azure" role="progressbar" style="width: {{ tache.progression is not null ? tache.progression : 0 }}%;"></div>
+                    </div>
+                    <span>{{ tache.progression is not null ? tache.progression : 0 }}%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

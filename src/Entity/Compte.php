@@ -2,8 +2,11 @@
 
 namespace App\Entity;
 
-use App\Repository\CompteRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+
+use App\Repository\CompteRepository;
 
 #[ORM\Entity(repositoryClass: CompteRepository::class)]
 #[ORM\Table(name: 'compte')]
@@ -11,57 +14,64 @@ class Compte
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(name: 'id_compte')]
-    private ?int $id = null;
+    #[ORM\Column(type: 'integer')]
+    private ?int $id_compte = null;
 
-    #[ORM\Column(name: 'e_mail', length: 255)]
-    private string $email = '';
-
-    #[ORM\Column(name: 'mot_de_passe', length: 255)]
-    private string $motDePasse = '';
-
-    #[ORM\ManyToOne(targetEntity: Employe::class)]
-    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe', nullable: false, onDelete: 'CASCADE')]
-    private ?Employe $employe = null;
-
-    public function getId(): ?int
+    public function getId_compte(): ?int
     {
-        return $this->id;
+        return $this->id_compte;
     }
 
-    public function getEmail(): string
+    public function setId_compte(int $id_compte): self
     {
-        return $this->email;
+        $this->id_compte = $id_compte;
+        return $this;
     }
 
-    public function setEmail(string $email): static
+    #[ORM\Column(type: 'string', nullable: false)]
+    private ?string $mot_de_passe = null;
+
+    public function getMot_de_passe(): ?string
     {
-        $this->email = $email;
+        return $this->mot_de_passe;
+    }
+
+    public function setMot_de_passe(string $mot_de_passe): self
+    {
+        $this->mot_de_passe = $mot_de_passe;
+        return $this;
+    }
+
+    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'comptes')]
+    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
+    private ?Employe $employé = null;
+
+    public function getEmployé(): ?Employe
+    {
+        return $this->employé;
+    }
+
+    public function setEmployé(?Employe $employé): self
+    {
+        $this->employé = $employé;
+        return $this;
+    }
+
+    public function getIdCompte(): ?int
+    {
+        return $this->id_compte;
+    }
+
+    public function getMotDePasse(): ?string
+    {
+        return $this->mot_de_passe;
+    }
+
+    public function setMotDePasse(string $mot_de_passe): static
+    {
+        $this->mot_de_passe = $mot_de_passe;
 
         return $this;
     }
 
-    public function getMotDePasse(): string
-    {
-        return $this->motDePasse;
-    }
-
-    public function setMotDePasse(string $motDePasse): static
-    {
-        $this->motDePasse = $motDePasse;
-
-        return $this;
-    }
-
-    public function getEmploye(): ?Employe
-    {
-        return $this->employe;
-    }
-
-    public function setEmploye(?Employe $employe): static
-    {
-        $this->employe = $employe;
-
-        return $this;
-    }
 }

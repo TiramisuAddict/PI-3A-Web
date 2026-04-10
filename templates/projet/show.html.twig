@@ -1,0 +1,168 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Details projet{% endblock %}
+
+{% block body %}
+<div class="page">
+    {{ include('components/navbar.html.twig') }}
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+        {{ include('components/sidebar.html.twig', {'active_page': 'projets','sidebar_role': role}) }}
+        <div class="flex-fill overflow-auto p-3">
+
+    {% set statutColor = 'secondary' %}
+    {% if projet.statut == 'EN_COURS' %}{% set statutColor = 'azure' %}{% endif %}
+    {% if projet.statut == 'TERMINE' %}{% set statutColor = 'green' %}{% endif %}
+    {% if projet.statut == 'EN_ATTENTE' %}{% set statutColor = 'orange' %}{% endif %}
+
+    {% set prioriteColor = 'secondary' %}
+    {% if projet.priorite == 'HAUTE' %}{% set prioriteColor = 'red' %}{% endif %}
+    {% if projet.priorite == 'MOYENNE' %}{% set prioriteColor = 'orange' %}{% endif %}
+    {% if projet.priorite == 'BASSE' %}{% set prioriteColor = 'green' %}{% endif %}
+
+    {% set today = 'now'|date('Y-m-d') %}
+    {% set healthLabel = 'En bonne voie' %}
+    {% set healthColor = 'green' %}
+    {% if projet.statut == 'TERMINE' %}
+        {% set healthLabel = 'Termine' %}
+        {% set healthColor = 'green' %}
+    {% elseif projet.dateFinPrevue and projet.dateFinPrevue|date('Y-m-d') < today %}
+        {% set healthLabel = 'En retard' %}
+        {% set healthColor = 'red' %}
+    {% elseif projet.statut == 'EN_ATTENTE' %}
+        {% set healthLabel = 'En attente' %}
+        {% set healthColor = 'orange' %}
+    {% endif %}
+
+    <div class="page-header d-print-none mb-3">
+        <div class="row align-items-center">
+            <div class="col">
+                <div class="page-pretitle">Fiche projet</div>
+                <h2 class="page-title">{{ projet.nom }}</h2>
+                <div class="text-muted">Reference #{{ projet.idProjet }}</div>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary">
+                        <i class="ti ti-arrow-left me-1"></i>Retour
+                    </a>
+                    <a href="{{ path('app_projet_index', {projet: projet.idProjet}) }}" class="btn btn-outline-secondary">
+                        <i class="ti ti-layout-kanban me-1"></i>Voir les taches
+                    </a>
+                    {% if canManageProjects|default(false) %}
+                        <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-primary">
+                            <i class="ti ti-edit me-1"></i>Modifier
+                        </a>
+                        <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-outline-secondary">
+                            <i class="ti ti-users me-1"></i>Gerer l'equipe
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Description</h3>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ projet.description }}</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Chronologie</h3>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-column gap-3">
+                        <div class="d-flex align-items-start gap-3">
+                            <span class="avatar avatar-sm bg-blue-lt text-blue"><i class="ti ti-calendar-event"></i></span>
+                            <div>
+                                <div class="text-secondary">Date de debut</div>
+                                <div class="fw-semibold">{{ projet.dateDebut ? projet.dateDebut|date('d/m/Y') : '-' }}</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-start gap-3">
+                            <span class="avatar avatar-sm bg-orange-lt text-orange"><i class="ti ti-flag"></i></span>
+                            <div>
+                                <div class="text-secondary">Date de fin prevue</div>
+                                <div class="fw-semibold">{{ projet.dateFinPrevue ? projet.dateFinPrevue|date('d/m/Y') : '-' }}</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-start gap-3">
+                            <span class="avatar avatar-sm bg-green-lt text-green"><i class="ti ti-circle-check"></i></span>
+                            <div>
+                                <div class="text-secondary">Date de fin reelle</div>
+                                <div class="fw-semibold">{{ projet.dateFinReelle ? projet.dateFinReelle|date('d/m/Y') : 'Non renseignee' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Pilotage</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="text-secondary">Statut</div>
+                        <span class="badge bg-{{ statutColor }}-lt mt-1">{{ projet.statut }}</span>
+                    </div>
+                    <div>
+                        <div class="text-secondary">Priorite</div>
+                        <span class="badge bg-{{ prioriteColor }}-lt mt-1">{{ projet.priorite is empty ? '-' : projet.priorite }}</span>
+                    </div>
+                    <hr class="my-3">
+                    <div>
+                        <div class="text-secondary">Sante du projet</div>
+                        <span class="badge bg-{{ healthColor }}-lt mt-1">{{ healthLabel }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Equipe</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <div class="text-secondary">Chef projet</div>
+                        {% if projet.responsable %}
+                            <div class="fw-semibold mt-1">{{ projet.responsable.nom }} {{ projet.responsable.prenom }}</div>
+                        {% else %}
+                            <div class="text-muted mt-1">Non defini</div>
+                        {% endif %}
+                    </div>
+                    <div class="mt-3">
+                        <div class="text-secondary mb-2">Membres</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for employe in projet.membresEquipe %}
+                                <span class="badge bg-blue-lt">{{ employe.nom }} {{ employe.prenom }}</span>
+                            {% else %}
+                                <span class="text-muted">Aucun membre</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if canManageProjects|default(false) %}
+                <div class="d-flex justify-content-end">
+                    {{ include('projet/_delete_form.html.twig') }}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
