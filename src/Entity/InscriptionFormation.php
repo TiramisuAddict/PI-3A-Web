@@ -2,11 +2,10 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-
+use App\Enum\StatutInscription;
 use App\Repository\InscriptionFormationRepository;
+use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: InscriptionFormationRepository::class)]
 #[ORM\Table(name: 'inscription_formation')]
@@ -14,74 +13,73 @@ class InscriptionFormation
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'integer')]
-    private ?int $id_inscription = null;
+    #[ORM\Column(name: 'id_inscription')]
+    private ?int $id = null;
 
-    public function getId_inscription(): ?int
+    #[ORM\ManyToOne(targetEntity: Formation::class)]
+    #[ORM\JoinColumn(name: 'id_formation', referencedColumnName: 'id_formation', nullable: false, onDelete: 'CASCADE')]
+    private ?Formation $formation = null;
+
+    #[ORM\Column(name: 'id_employe')]
+    private int $employeeId;
+
+    #[ORM\Column(length: 20)]
+    private string $statut = 'EN_ATTENTE';
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    #[Assert\Length(max: 500, maxMessage: 'La raison ne peut pas depasser {{ limit }} caracteres.')]
+    private ?string $raison = null;
+
+    public function getId(): ?int
     {
-        return $this->id_inscription;
+        return $this->id;
     }
 
-    public function setId_inscription(int $id_inscription): self
+    public function getFormation(): ?Formation
     {
-        $this->id_inscription = $id_inscription;
+        return $this->formation;
+    }
+
+    public function setFormation(?Formation $formation): static
+    {
+        $this->formation = $formation;
+
         return $this;
     }
 
-    #[ORM\Column(type: 'integer', nullable: false)]
-    private ?int $id_formation = null;
-
-    public function getId_formation(): ?int
+    public function getEmployeeId(): int
     {
-        return $this->id_formation;
+        return $this->employeeId;
     }
 
-    public function setId_formation(int $id_formation): self
+    public function setEmployeeId(int $employeeId): static
     {
-        $this->id_formation = $id_formation;
+        $this->employeeId = $employeeId;
+
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $statut = null;
-
-    public function getStatut(): ?string
+    public function getStatut(): string
     {
         return $this->statut;
     }
 
-    public function setStatut(string $statut): self
+    public function setStatut(string|StatutInscription $statut): static
     {
-        $this->statut = $statut;
+        $this->statut = $statut instanceof StatutInscription ? $statut->value : $statut;
+
         return $this;
     }
-
-    #[ORM\Column(type: 'integer', nullable: false)]
-    private ?int $id_employe = null;
-
-    public function getId_employe(): ?int
-    {
-        return $this->id_employe;
-    }
-
-    public function setId_employe(int $id_employe): self
-    {
-        $this->id_employe = $id_employe;
-        return $this;
-    }
-
-    #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $raison = null;
 
     public function getRaison(): ?string
     {
         return $this->raison;
     }
 
-    public function setRaison(?string $raison): self
+    public function setRaison(?string $raison): static
     {
         $this->raison = $raison;
+
         return $this;
     }
-
 }

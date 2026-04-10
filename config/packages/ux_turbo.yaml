@@ -1,0 +1,3 @@
+# CSRF protection for Turbo requests (Symfony 6.4 compatible)
+framework:
+    csrf_protection: true

@@ -1,0 +1,39 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Modifier Formation{% endblock %}
+
+{% block body %}
+    <div class="page-wrapper">
+        <div class="container-xl py-4">
+            <div class="page-header d-print-none mb-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">Modifier la formation #{{ formation.id }}</h2>
+                        <div class="text-secondary">Mettez a jour les informations puis enregistrez.</div>
+                    </div>
+                    <div class="col-auto ms-auto d-print-none">
+                        <a class="btn btn-outline-secondary" href="{{ path('app_formation_rh') }}">Retour liste</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Mise a jour des informations</h3>
+                </div>
+                <div class="card-body">
+                {{ include('formation/_form.html.twig', {'button_label': 'Mettre a jour'}) }}
+                </div>
+            </div>
+
+            <div class="card border-danger-subtle">
+                <div class="card-header">
+                    <h3 class="card-title text-danger">Suppression</h3>
+                </div>
+                <div class="card-body">
+                {{ include('formation/_delete_form.html.twig') }}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
