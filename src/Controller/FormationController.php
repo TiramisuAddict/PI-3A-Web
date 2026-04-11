@@ -41,66 +41,18 @@ final class FormationController extends AbstractController
             'pending' => (int) $pending,
             'showUrl' => $this->generateUrl('app_formation_show', ['id' => $formation->getId()]),
             'editUrl' => $this->generateUrl('app_formation_edit', ['id' => $formation->getId()]),
-        ]);
+          ]);
     }
 
-    #[Route('/rh', name: 'app_formation_rh', methods: ['GET', 'POST'])]
+    #[Route('/rh', name: 'app_formation_rh', methods: ['GET'])]
     public function index(Request $request, FormationRepository $formationRepository, Connection $connection, EvaluationFormationRepository $evaluationFormationRepository): Response
     {
         $session = $request->getSession();
-
-        if ($request->isMethod('POST')) {
-            $action = (string) $request->request->get('action', '');
-
-            if ($action === 'login') {
-                $rhId = (int) $request->request->get('rh_id', 0);
-
-                if ($rhId > 0) {
-                    $rh = $connection->fetchAssociative(
-                        'SELECT id_employe, prenom, nom, role FROM employe WHERE id_employe = ? LIMIT 1',
-                        [$rhId]
-                    );
-
-                    if ($rh !== false) {
-                        $rhRole = strtolower(trim((string) $rh['role']));
-                        if (!str_contains($rhRole, 'rh')) {
-                            $this->addFlash('error', 'Cette page est reservee aux RH.');
-
-                            return $this->redirectToRoute('app_formation_rh');
-                        }
-
-                        $rhName = trim((string) $rh['prenom'] . ' ' . (string) $rh['nom']);
-                        $session->set('rh_id', (int) $rh['id_employe']);
-                        $session->set('rh_name', $rhName);
-                        $session->set('rh_role', $rhRole);
-
-                        $this->addFlash('success', sprintf('Bienvenue %s.', $rhName));
-
-                        return $this->redirectToRoute('app_formation_rh');
-                    }
-                }
-
-                $this->addFlash('error', 'ID RH invalide.');
-
-                return $this->redirectToRoute('app_formation_rh');
-            }
-
-            if ($action === 'logout') {
-                $session->remove('rh_id');
-                $session->remove('rh_name');
-                $session->remove('rh_role');
-
-                return $this->redirectToRoute('app_formation_rh');
-            }
-        }
-
-        $rhId = (int) $session->get('rh_id', 0);
-        $rhRole = strtolower(trim((string) $session->get('rh_role', '')));
-        $rhLogged = $rhId > 0 && str_contains($rhRole, 'rh');
-
-        $rhUsers = $connection->fetchAllAssociative(
-            'SELECT id_employe, prenom, nom, role FROM employe WHERE LOWER(role) LIKE ? ORDER BY prenom, nom',
-            ['%rh%']
+        $role = strtolower(trim((string) $session->get('employe_role', '')));
+        $isLogged = $session->get('employe_logged_in') === true;
+        $rhLogged = $isLogged && (
+            str_contains($role, 'rh')
+            || str_contains($role, 'administrateur entreprise')
         );
 
         $q = trim($request->query->getString('q', ''));
@@ -120,20 +72,13 @@ final class FormationController extends AbstractController
         }
 
         if (!$rhLogged) {
-            return $this->render('formation/index.html.twig', [
-                'formations' => [],
-                'pending_inscriptions' => [],
-                'pending_by_formation' => [],
-                'pending_inscriptions_by_formation' => [],
-                'rh_logged' => false,
-                'rh_users' => $rhUsers,
-                'best_reviewed_formation' => null,
-                'q' => $q,
-                'sort' => $sort,
-                'date_scope' => $dateScope,
-                'min_capacite' => $minCapacite,
-                'selected_formation' => null,
-            ]);
+            if (!$isLogged) {
+                return $this->redirectToRoute('login');
+            }
+
+            $this->addFlash('error', 'Cette page est reservee aux RH.');
+
+            return $this->redirectToRoute('employe_Home');
         }
 
         $selectedFormation = $selectedFormationId > 0 ? $formationRepository->find($selectedFormationId) : null;
@@ -163,8 +108,9 @@ final class FormationController extends AbstractController
             'pending_by_formation' => $pendingByFormation,
             'pending_inscriptions_by_formation' => $pendingInscriptionByFormation,
             'rh_logged' => true,
-            'rh_users' => $rhUsers,
             'best_reviewed_formation' => $evaluationFormationRepository->findBestReviewedFormation(),
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
             'q' => $q,
             'sort' => $sort,
             'date_scope' => $dateScope,
@@ -196,6 +142,8 @@ final class FormationController extends AbstractController
         return $this->render('formation/new.html.twig', [
             'formation' => $formation,
             'form' => $form,
+            'email' => $request->getSession()->get('employe_email') ?? '',
+            'role' => $request->getSession()->get('employe_role') ?? '',
         ]);
     }
 
@@ -208,6 +156,8 @@ final class FormationController extends AbstractController
 
         return $this->render('formation/show.html.twig', [
             'formation' => $formation,
+            'email' => $request->getSession()->get('employe_email') ?? '',
+            'role' => $request->getSession()->get('employe_role') ?? '',
         ]);
     }
 
@@ -231,6 +181,8 @@ final class FormationController extends AbstractController
         return $this->render('formation/edit.html.twig', [
             'formation' => $formation,
             'form' => $form,
+            'email' => $request->getSession()->get('employe_email') ?? '',
+            'role' => $request->getSession()->get('employe_role') ?? '',
         ]);
     }
 
@@ -257,13 +209,13 @@ final class FormationController extends AbstractController
         }
 
         $session = $request->getSession();
-        $rhId = (int) $session->get('rh_id', 0);
-        $rhRole = strtolower(trim((string) $session->get('rh_role', '')));
+        $role = strtolower(trim((string) $session->get('employe_role', '')));
+        $isLogged = $session->get('employe_logged_in') === true;
 
-        if ($rhId <= 0 || !str_contains($rhRole, 'rh')) {
-            $this->addFlash('error', 'Veuillez choisir votre ID RH avant de continuer.');
+        if (!$isLogged || (!str_contains($role, 'rh') && !str_contains($role, 'administrateur entreprise'))) {
+            $this->addFlash('error', 'Cette page est reservee aux RH.');
 
-            return $this->redirectToRoute('app_formation_rh');
+            return $this->redirectToRoute($isLogged ? 'employe_Home' : 'login');
         }
 
         return null;
