@@ -31,15 +31,19 @@ class DemandeRepository extends ServiceEntityRepository
 
     public function countGroupByStatus(?int $employeId = null, array $filters = []): array
     {
-        $results = $this->createFilteredQueryBuilder($filters, $employeId)
-            ->select('d.status, COUNT(d.id_demande) as count')
-            ->groupBy('d.status')
-            ->getQuery()
-            ->getResult();
+        $qb = $this->createFilteredQueryBuilder($filters, $employeId)
+            ->select('d.status AS status, COUNT(d.id_demande) as cnt')
+            ->groupBy('d.status');
+        
+        $results = $qb->getQuery()->getResult();
 
         $grouped = [];
         foreach ($results as $result) {
-            $grouped[$result['status']] = (int) $result['count'];
+            $status = $result['status'] ?? null;
+            $count = (int) ($result['cnt'] ?? 0);
+            if ($status !== null) {
+                $grouped[$status] = $count;
+            }
         }
         return $grouped;
     }

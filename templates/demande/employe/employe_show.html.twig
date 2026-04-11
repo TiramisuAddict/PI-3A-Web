@@ -34,9 +34,9 @@
         width: 12px;
         height: 12px;
         border-radius: 50%;
-        background: #4a5def;
+        background: var(--tblr-primary);
         border: 2px solid #fff;
-        box-shadow: 0 0 0 2px #4a5def;
+        box-shadow: 0 0 0 2px var(--tblr-primary);
     }
     .badge {
         padding: 4px 8px;
@@ -45,26 +45,12 @@
         border-radius: 4px;
         display: inline-block;
     }
-    .badge.bg-danger {
-        background-color: #dc3545 !important;
-        color: white;
-    }
-    .badge.bg-warning {
-        background-color: #ffc107 !important;
-        color: #333;
-    }
-    .badge.bg-success {
-        background-color: #28a745 !important;
-        color: white;
-    }
-    .badge.bg-info {
-        background-color: #17a2b8 !important;
-        color: white;
-    }
-    .badge.bg-secondary {
-        background-color: #6c757d !important;
-        color: white;
-    }
+    .badge.bg-danger    { background-color: #dc3545 !important; color: white; }
+    .badge.bg-warning   { background-color: #ffc107 !important; color: #333; }
+    .badge.bg-success   { background-color: #28a745 !important; color: white; }
+    .badge.bg-info      { background-color: #17a2b8 !important; color: white; }
+    .badge.bg-orange    { background-color: #fd7e14 !important; color: white; }
+    .badge.bg-secondary { background-color: #6c757d !important; color: white; }
 </style>
 {% endblock %}
 
@@ -77,21 +63,50 @@
         <div class="container-xl">
             <div class="row align-items-center">
                 <div class="col">
-                    <h2 class="page-title">
-                        <i class="ti ti-file-description me-2"></i>{{ demande.titre }}
-                    </h2>
+                    <div class="page-pretitle">
+                        <a href="{{ path('demande_index') }}" class="text-secondary text-decoration-none">
+                            <i class="ti ti-arrow-left me-1"></i>Retour a mes demandes
+                        </a>
+                    </div>
+                    <h2 class="page-title mt-1">{{ demande.titre }}</h2>
                     <div class="text-secondary">Consultez l'etat et l'historique de votre demande.</div>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="page-body">
         <div class="container-xl">
+
+            {# Flash messages #}
+            {% for message in app.flashes('success') %}
+                <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+                    <i class="ti ti-check me-2"></i>{{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+            {% for message in app.flashes('warning') %}
+                <div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>{{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+            {% for message in app.flashes('danger') %}
+                <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>{{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+
             <div class="row">
+                {# ── LEFT COLUMN ── #}
                 <div class="col-lg-8">
+
                     <div class="card mb-3">
                         <div class="card-header">
-                            <h3 class="card-title"><i class="ti ti-info-circle me-2"></i>Informations generales</h3>
+                            <h3 class="card-title">
+                                <i class="ti ti-info-circle me-2"></i>Informations generales
+                            </h3>
                         </div>
                         <div class="card-body">
                             <div class="row g-3">
@@ -107,11 +122,17 @@
                                     <div class="detail-label">Priorite</div>
                                     <div class="detail-value">
                                         {% if demande.priorite == 'HAUTE' %}
-                                            <span class="badge bg-danger"><i class="ti ti-alert-triangle me-1"></i>{{ demande.priorite }}</span>
+                                            <span class="badge bg-danger">
+                                                <i class="ti ti-alert-triangle me-1"></i>{{ demande.priorite }}
+                                            </span>
                                         {% elseif demande.priorite == 'NORMALE' %}
-                                            <span class="badge bg-info"><i class="ti ti-minus me-1"></i>{{ demande.priorite }}</span>
+                                            <span class="badge bg-info">
+                                                <i class="ti ti-minus me-1"></i>{{ demande.priorite }}
+                                            </span>
                                         {% else %}
-                                            <span class="badge bg-success"><i class="ti ti-arrow-down me-1"></i>{{ demande.priorite }}</span>
+                                            <span class="badge bg-success">
+                                                <i class="ti ti-arrow-down me-1"></i>{{ demande.priorite }}
+                                            </span>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -119,21 +140,37 @@
                                     <div class="detail-label">Statut actuel</div>
                                     <div class="detail-value">
                                         {% if demande.status == 'Nouvelle' %}
-                                            <span class="badge bg-info"><i class="ti ti-sparkles me-1"></i>{{ demande.status }}</span>
+                                            <span class="badge bg-info">
+                                                <i class="ti ti-sparkles me-1"></i>{{ demande.status }}
+                                            </span>
                                         {% elseif demande.status == 'En cours' %}
-                                            <span class="badge bg-warning"><i class="ti ti-loader me-1"></i>{{ demande.status }}</span>
+                                            <span class="badge bg-warning">
+                                                <i class="ti ti-loader me-1"></i>{{ demande.status }}
+                                            </span>
+                                        {% elseif demande.status == 'En attente' %}
+                                            <span class="badge bg-orange">
+                                                <i class="ti ti-clock me-1"></i>{{ demande.status }}
+                                            </span>
                                         {% elseif demande.status == 'Resolue' %}
-                                            <span class="badge bg-success"><i class="ti ti-check me-1"></i>{{ demande.status }}</span>
+                                            <span class="badge bg-success">
+                                                <i class="ti ti-check me-1"></i>{{ demande.status }}
+                                            </span>
                                         {% elseif demande.status == 'Annulee' %}
-                                            <span class="badge bg-danger"><i class="ti ti-x me-1"></i>{{ demande.status }}</span>
+                                            <span class="badge bg-danger">
+                                                <i class="ti ti-x me-1"></i>{{ demande.status }}
+                                            </span>
                                         {% else %}
-                                            <span class="badge bg-secondary"><i class="ti ti-lock me-1"></i>{{ demande.status }}</span>
+                                            <span class="badge bg-secondary">
+                                                <i class="ti ti-lock me-1"></i>{{ demande.status }}
+                                            </span>
                                         {% endif %}
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="detail-label">Date de creation</div>
-                                    <div class="detail-value">{{ demande.dateCreation ? demande.dateCreation|date('d/m/Y H:i') : 'N/A' }}</div>
+                                    <div class="detail-value">
+                                        {{ demande.dateCreation ? demande.dateCreation|date('d/m/Y H:i') : 'N/A' }}
+                                    </div>
                                 </div>
                                 {% if demande.description %}
                                     <div class="col-12">
@@ -148,7 +185,9 @@
                     {% if detailsData|length > 0 %}
                         <div class="card mb-3">
                             <div class="card-header">
-                                <h3 class="card-title"><i class="ti ti-forms me-2"></i>Informations specifiques</h3>
+                                <h3 class="card-title">
+                                    <i class="ti ti-forms me-2"></i>Informations specifiques
+                                </h3>
                             </div>
                             <div class="card-body">
                                 <div class="row g-3">
@@ -168,7 +207,9 @@
                     {% if demande.historiqueDemandes|length > 0 %}
                         <div class="card mb-3">
                             <div class="card-header">
-                                <h3 class="card-title"><i class="ti ti-history me-2"></i>Historique des changements</h3>
+                                <h3 class="card-title">
+                                    <i class="ti ti-history me-2"></i>Historique des changements
+                                </h3>
                             </div>
                             <div class="card-body">
                                 {% for historique in demande.historiqueDemandes|reverse %}
@@ -176,12 +217,18 @@
                                         <div class="d-flex justify-content-between align-items-start">
                                             <div>
                                                 {% if historique.ancienStatut %}
-                                                    <span class="badge bg-secondary">{{ historique.ancienStatut }}</span>
+                                                    <span class="badge bg-secondary">
+                                                        {{ historique.ancienStatut }}
+                                                    </span>
                                                     <i class="ti ti-arrow-right mx-2"></i>
                                                 {% endif %}
-                                                <span class="badge bg-info">{{ historique.nouveauStatut }}</span>
+                                                <span class="badge bg-info">
+                                                    {{ historique.nouveauStatut }}
+                                                </span>
                                                 {% if historique.commentaire %}
-                                                    <div class="text-muted mt-2" style="font-size:.85rem;">{{ historique.commentaire }}</div>
+                                                    <div class="text-muted mt-2" style="font-size:.85rem;">
+                                                        {{ historique.commentaire }}
+                                                    </div>
                                                 {% endif %}
                                             </div>
                                             <div class="text-end text-muted" style="font-size:.8rem;">
@@ -194,22 +241,107 @@
                             </div>
                         </div>
                     {% endif %}
-                </div>
 
+                </div>{# end col-lg-8 #}
+
+                {# ── RIGHT COLUMN ── #}
                 <div class="col-lg-4">
+
+                    {% if demande.status == 'Nouvelle' %}
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="ti ti-alert-circle me-2"></i>Actions
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            {# Trigger modal — pure Bootstrap, zero JS needed #}
+                            <button type="button"
+                                    class="btn btn-danger w-100"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#cancelDemandeModal">
+                                <i class="ti ti-x me-1"></i>Annuler la demande
+                            </button>
+                            <p class="text-muted mt-2 mb-0" style="font-size: 0.85rem;">
+                                Vous pouvez annuler cette demande tant que le RH ou
+                                l'administrateur n'a pas encore change son statut.
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title"><i class="ti ti-eye me-2"></i>Suivi</h3>
                         </div>
                         <div class="card-body">
-                            <p class="text-muted mb-3">Cette vue est en lecture seule. Vous pouvez suivre ici les changements de statut faits par le RH ou l'administrateur entreprise.</p>
+                            <p class="text-muted mb-0">
+                                Cette vue est en lecture seule. Vous pouvez suivre ici
+                                les changements de statut faits par le RH ou
+                                l'administrateur entreprise.
+                            </p>
                         </div>
                     </div>
-                </div>
+
+                </div>{# end col-lg-4 #}
             </div>
         </div>
     </div>
 </div>
 </div>
+
 {{ include('demande/_logout_modal.html.twig') }}
+
+{# ── Cancel modal — same structure as logout modal, form POST instead of XHR ── #}
+<div class="modal" id="cancelDemandeModal" tabindex="-1">
+  <div class="modal-dialog modal-sm" role="document">
+    <div class="modal-content">
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-body text-center py-4">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="icon mb-2 text-danger icon-lg"
+             width="24" height="24" viewBox="0 0 24 24"
+             stroke-width="2" stroke="currentColor"
+             fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+          <path d="M12 9v2m0 4v.01"/>
+          <path d="M5 19h14a2 2 0 0 0 1.84-2.75l-7.1-12.25a2 2 0 0 0-3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75"/>
+        </svg>
+        <h3>Annuler la demande ?</h3>
+        <div class="text-secondary">
+          Etes-vous sur de vouloir annuler cette demande ?<br>
+          <strong>Cette action est irreversible.</strong>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="w-100">
+          <div class="row">
+            <div class="col">
+              <button type="button" class="btn w-100" data-bs-dismiss="modal">
+                Retour
+              </button>
+            </div>
+            <div class="col">
+              {# Plain HTML form POST — exactly like the logout link, no XHR, no session lock #}
+              <form method="post"
+                    action="{{ path('demande_cancel', {id: demande.idDemande}) }}"
+                    style="margin:0;">
+                <button type="submit" class="btn btn-danger w-100">
+                  <i class="ti ti-x me-1"></i>Confirmer
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script src="{{ asset('js/demande-sync.js') }}"></script>
 {% endblock %}

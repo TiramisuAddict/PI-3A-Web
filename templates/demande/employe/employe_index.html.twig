@@ -185,7 +185,7 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <i class="ti ti-file-text me-2"></i>Mes demandes
+                    Mes demandes
                     </h2>
                     <div class="text-secondary">Visualisez et suivez vos demandes.</div>
                 </div>
@@ -238,39 +238,39 @@
             {% endfor %}
 
             <div class="stats-row">
-                <div class="stat-card" onclick="filterByStatus('')">
+                <div class="stat-card" onclick="filterByStatus('')" data-stat-card="total">
                     <div class="stat-icon bg-primary-lt text-primary">
                         <i class="ti ti-files"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value text-primary">{{ stats.total }}</div>
+                        <div class="stat-value text-primary" data-stat-value="total">{{ stats.total }}</div>
                         <div class="stat-label">Total</div>
                     </div>
                 </div>
-                <div class="stat-card" onclick="filterByStatus('Nouvelle')">
+                <div class="stat-card" onclick="filterByStatus('Nouvelle')" data-stat-card="Nouvelle">
                     <div class="stat-icon bg-blue-lt text-blue">
                         <i class="ti ti-clock"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value text-blue">{{ stats.byStatus['Nouvelle'] | default(0) }}</div>
+                        <div class="stat-value text-blue" data-stat-value="Nouvelle">{{ stats.byStatus['Nouvelle'] | default(0) }}</div>
                         <div class="stat-label">Nouvelles</div>
                     </div>
                 </div>
-                <div class="stat-card" onclick="filterByStatus('En cours')">
+                <div class="stat-card" onclick="filterByStatus('En cours')" data-stat-card="En cours">
                     <div class="stat-icon bg-yellow-lt text-yellow">
                         <i class="ti ti-loader"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value text-yellow">{{ stats.byStatus['En cours'] | default(0) }}</div>
+                        <div class="stat-value text-yellow" data-stat-value="En cours">{{ stats.byStatus['En cours'] | default(0) }}</div>
                         <div class="stat-label">En cours</div>
                     </div>
                 </div>
-                <div class="stat-card" onclick="filterByStatus('Resolue')">
+                <div class="stat-card" onclick="filterByStatus('Resolue')" data-stat-card="Resolue">
                     <div class="stat-icon bg-green-lt text-green">
                         <i class="ti ti-check"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value text-green">{{ stats.byStatus['Resolue'] | default(0) }}</div>
+                        <div class="stat-value text-green" data-stat-value="Resolue">{{ stats.byStatus['Resolue'] | default(0) }}</div>
                         <div class="stat-label">Resolues</div>
                     </div>
                 </div>
@@ -403,6 +403,7 @@
 
 {% block javascripts %}
 {{ parent() }}
+<script src="{{ asset('js/demande-sync.js') }}"></script>
 <script>
 (function() {
     "use strict";
@@ -436,6 +437,48 @@
                 performSearch();
             });
         });
+
+        // Listen for status updates from other tabs/windows
+        if (window.DemandeSyncManager) {
+            window.DemandeSyncManager.onStatusUpdate(function(data) {
+                if (data.type === 'status-update' && data.stats) {
+                    console.log('[Employee Index] Received status update:', data);
+                    updateStatsDisplay(data.stats);
+                }
+            });
+        }
+    }
+
+    function updateStatsDisplay(stats) {
+        if (!stats) return;
+
+        // Update total
+        updateStatValue('total', stats.total);
+
+        // Update by status
+        if (stats.byStatus) {
+            Object.keys(stats.byStatus).forEach(function(status) {
+                updateStatValue(status, stats.byStatus[status]);
+            });
+        }
+
+        console.log('[Employee Index] Stats updated successfully');
+    }
+
+    function updateStatValue(key, value) {
+        var element = document.querySelector('[data-stat-value="' + key + '"]');
+        if (element) {
+            var currentValue = parseInt(element.textContent) || 0;
+            if (currentValue !== value) {
+                // Add animation effect
+                element.style.opacity = '0.5';
+                element.textContent = value;
+                setTimeout(function() {
+                    element.style.transition = 'opacity 0.3s ease';
+                    element.style.opacity = '1';
+                }, 10);
+            }
+        }
     }
 
     function performSearch() {

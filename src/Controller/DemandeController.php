@@ -202,8 +202,24 @@ class DemandeController extends AbstractController
                 return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
             }
 
-            $data = json_decode($request->getContent(), true);
-            $newStatus = $data['status'] ?? null;
+            // Block if cancelled
+            if ($demande->getStatus() === 'Annulee') {
+                return new JsonResponse([
+                    'success' => false,
+                    'message' => 'Vous ne pouvez pas modifier le statut d\'une demande annulee.'
+                ], 400);
+            }
+
+            // Block if already resolved
+            if ($demande->getStatus() === 'Resolue') {
+                return new JsonResponse([
+                    'success' => false,
+                    'message' => 'Cette demande est deja resolue. Le statut ne peut plus etre modifie.'
+                ], 400);
+            }
+
+            $data        = json_decode($request->getContent(), true);
+            $newStatus   = $data['status'] ?? null;
             $commentaire = $data['commentaire'] ?? '';
 
             if (!$newStatus) {
@@ -224,20 +240,96 @@ class DemandeController extends AbstractController
             $this->em->persist($historique);
             $this->em->flush();
 
-            return new JsonResponse(['success' => true, 'message' => 'Statut mis a jour']);
+            $stats = [
+                'total'    => $this->demandeRepository->countAll(null),
+                'byStatus' => $this->demandeRepository->countGroupByStatus(null),
+            ];
+
+            $session->save();
+
+            return new JsonResponse([
+                'success'   => true,
+                'message'   => 'Statut mis a jour',
+                'newStatus' => $newStatus,
+                'stats'     => $stats
+            ]);
+
         } catch (\Exception $e) {
             return new JsonResponse(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()], 500);
         }
     }
 
-    #[Route('/demande/action/delete/{id}', name: 'demande_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function delete(int $id, SessionInterface $session): JsonResponse
+    #[Route('/demande/{id}/cancel', name: 'demande_cancel', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function cancel(int $id, SessionInterface $session): Response
     {
         if (!$this->isEmployeLoggedIn($session)) {
-            return $this->jsonAccessDenied('Vous devez etre connecte pour supprimer une demande.', 401);
+            return $this->redirectToRoute('login');
         }
 
-        return $this->jsonAccessDenied('La suppression des demandes est desactivee pour le moment.');
+        if ($this->canManageDemandes($session)) {
+            $this->addFlash('danger', 'Seuls les employes peuvent annuler leurs demandes.');
+            return $this->redirectToRoute('demande_show', ['id' => $id]);
+        }
+
+        $demande = $this->demandeRepository->find($id);
+
+        if (!$demande) {
+            $this->addFlash('danger', 'Demande non trouvee.');
+            return $this->redirectToRoute('demande_index');
+        }
+
+        if ($demande->getEmploye()?->getId_employe() !== $this->getLoggedInEmployeId($session)) {
+            $this->addFlash('danger', 'Vous ne pouvez annuler que vos propres demandes.');
+            return $this->redirectToRoute('demande_show', ['id' => $id]);
+        }
+
+        if ($demande->getStatus() !== 'Nouvelle') {
+            $this->addFlash('warning', 'Vous ne pouvez annuler que les demandes avec le statut Nouvelle.');
+            return $this->redirectToRoute('demande_show', ['id' => $id]);
+        }
+
+        $oldStatus = $demande->getStatus();
+        $demande->setStatus('Annulee');
+
+        $historique = new HistoriqueDemande();
+        $historique->setDemande($demande);
+        $historique->setAncienStatut($oldStatus);
+        $historique->setNouveauStatut('Annulee');
+        $historique->setActeur($this->getActorLabel($session));
+        $historique->setCommentaire('Demande annulee par l employe');
+        $historique->setDateAction(new \DateTime());
+
+        $this->em->persist($historique);
+        $this->em->flush();
+
+        $this->addFlash('success', 'Demande annulee avec succes.');
+        return $this->redirectToRoute('demande_show', ['id' => $id]);
+    }
+
+    #[Route('/demande/action/delete/{id}', name: 'demande_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function delete(int $id, SessionInterface $session): Response
+    {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return $this->redirectToRoute('login');
+        }
+
+        if (!$this->canManageDemandes($session)) {
+            $this->addFlash('danger', 'Seuls les comptes RH et administrateur entreprise peuvent supprimer une demande.');
+            return $this->redirectToRoute('demande_index');
+        }
+
+        $demande = $this->demandeRepository->find($id);
+
+        if (!$demande) {
+            $this->addFlash('danger', 'Demande non trouvee.');
+            return $this->redirectToRoute('demande_index');
+        }
+
+        $this->em->remove($demande);
+        $this->em->flush();
+
+        $this->addFlash('success', 'Demande supprimee avec succes.');
+        return $this->redirectToRoute('demande_index');
     }
 
     #[Route('/demande/{id}', name: 'demande_show', requirements: ['id' => '\d+'], methods: ['GET'])]
@@ -280,6 +372,60 @@ class DemandeController extends AbstractController
         ]);
     }
 
+    #[Route('/demande/action/status-form/{id}', name: 'demande_update_status_form', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function updateStatusForm(int $id, Request $request, SessionInterface $session): Response
+    {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return $this->redirectToRoute('login');
+        }
+
+        if (!$this->canManageDemandes($session)) {
+            $this->addFlash('danger', 'Acces refuse.');
+            return $this->redirectToRoute('demande_show', ['id' => $id]);
+        }
+
+        $demande = $this->demandeRepository->find($id);
+
+        if (!$demande) {
+            $this->addFlash('danger', 'Demande non trouvee.');
+            return $this->redirectToRoute('demande_index');
+        }
+
+        if ($demande->getStatus() === 'Annulee') {
+            $this->addFlash('warning', 'Cette demande est annulee. Le statut ne peut pas etre modifie.');
+            return $this->redirectToRoute('demande_show', ['id' => $id]);
+        }
+
+        if ($demande->getStatus() === 'Resolue') {
+            $this->addFlash('warning', 'Cette demande est deja resolue. Le statut ne peut plus etre modifie.');
+            return $this->redirectToRoute('demande_show', ['id' => $id]);
+        }
+
+        $newStatus = $request->request->get('status');
+
+        if (!$newStatus) {
+            $this->addFlash('danger', 'Statut manquant.');
+            return $this->redirectToRoute('demande_show', ['id' => $id]);
+        }
+
+        $oldStatus = $demande->getStatus();
+        $demande->setStatus($newStatus);
+
+        $historique = new HistoriqueDemande();
+        $historique->setDemande($demande);
+        $historique->setAncienStatut($oldStatus);
+        $historique->setNouveauStatut($newStatus);
+        $historique->setActeur($this->getActorLabel($session));
+        $historique->setCommentaire('Statut mis a jour');
+        $historique->setDateAction(new \DateTime());
+
+        $this->em->persist($historique);
+        $this->em->flush();
+
+        $this->addFlash('success', 'Statut mis a jour : ' . $newStatus . '.');
+        return $this->redirectToRoute('demande_show', ['id' => $id]);
+    }
+
     #[Route('/demande/{id}/edit', name: 'demande_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
     public function edit(int $id, Request $request, SessionInterface $session): Response
     {
@@ -295,6 +441,16 @@ class DemandeController extends AbstractController
 
         if (!$demande) {
             throw $this->createNotFoundException('Demande non trouvee');
+        }
+
+        // Prevent editing if demande is canceled
+        if ($demande->getStatus() === 'Annulee') {
+            throw $this->createAccessDeniedException('Vous ne pouvez pas modifier une demande annulee par l\'employe.');
+        }
+
+        if ($demande->getStatus() === 'Annulee') {
+        $this->addFlash('warning', 'Cette demande a ete annulee par l\'employe. Elle ne peut pas etre modifiee.');
+        return $this->redirectToRoute('demande_show', ['id' => $demande->getIdDemande()]);
         }
 
         $existingDetails = [];

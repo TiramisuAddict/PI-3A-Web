@@ -73,30 +73,12 @@
         border-radius: 4px;
         display: inline-block;
     }
-    .badge.bg-danger {
-        background-color: #dc3545 !important;
-        color: white;
-    }
-    .badge.bg-warning {
-        background-color: #ffc107 !important;
-        color: #333;
-    }
-    .badge.bg-success {
-        background-color: #28a745 !important;
-        color: white;
-    }
-    .badge.bg-info {
-        background-color: #17a2b8 !important;
-        color: white;
-    }
-    .badge.bg-orange {
-        background-color: #fd7e14 !important;
-        color: white;
-    }
-    .badge.bg-secondary {
-        background-color: #6c757d !important;
-        color: white;
-    }
+    .badge.bg-danger    { background-color: #dc3545 !important; color: white; }
+    .badge.bg-warning   { background-color: #ffc107 !important; color: #333; }
+    .badge.bg-success   { background-color: #28a745 !important; color: white; }
+    .badge.bg-info      { background-color: #17a2b8 !important; color: white; }
+    .badge.bg-orange    { background-color: #fd7e14 !important; color: white; }
+    .badge.bg-secondary { background-color: #6c757d !important; color: white; }
     .titre-link {
         color: #1f2937;
         font-weight: 600;
@@ -190,6 +172,15 @@
         background-color: #17a2b8;
         color: white;
     }
+    .action-btn-delete {
+        color: #dc3545;
+        border-color: #dc3545;
+        background-color: rgba(220, 53, 69, 0.08);
+    }
+    .action-btn-delete:hover {
+        background-color: #dc3545;
+        color: white;
+    }
     .empty-state {
         padding: 60px 20px;
         text-align: center;
@@ -225,9 +216,7 @@
         <div class="page-header d-print-none mb-3">
             <div class="row align-items-center">
                 <div class="col">
-                    <h2 class="page-title">
-                        <i class="ti ti-file-text me-2"></i>Gestion des demandes
-                    </h2>
+                    <h2 class="page-title">Gestion des demandes</h2>
                     <div class="text-secondary">Les comptes RH et administrateur entreprise peuvent consulter, modifier et repondre aux demandes.</div>
                 </div>
                 <div class="col-auto">
@@ -243,44 +232,60 @@
 
     <div class="page-body">
         <div class="container-xl">
+
+            {% for message in app.flashes('success') %}
+                <div class="alert alert-success alert-dismissible fade show mb-3">
+                    <i class="ti ti-check me-2"></i>{{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
             {% for message in app.flashes('warning') %}
-                <div class="alert alert-warning mb-3">{{ message }}</div>
+                <div class="alert alert-warning alert-dismissible fade show mb-3">
+                    <i class="ti ti-alert-circle me-2"></i>{{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+            {% for message in app.flashes('danger') %}
+                <div class="alert alert-danger alert-dismissible fade show mb-3">
+                    <i class="ti ti-alert-circle me-2"></i>{{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
             {% endfor %}
 
             <div class="stats-row">
-                <div class="stat-card" onclick="filterByStatus('')">
+                <div class="stat-card" onclick="filterByStatus('')" data-stat-card="total">
                     <div class="stat-icon bg-primary-lt text-primary">
                         <i class="ti ti-files"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value text-primary">{{ stats.total }}</div>
+                        <div class="stat-value text-primary" data-stat-value="total">{{ stats.total }}</div>
                         <div class="stat-label">Total</div>
                     </div>
                 </div>
-                <div class="stat-card" onclick="filterByStatus('Nouvelle')">
+                <div class="stat-card" onclick="filterByStatus('Nouvelle')" data-stat-card="Nouvelle">
                     <div class="stat-icon bg-blue-lt text-blue">
                         <i class="ti ti-clock"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value text-blue">{{ stats.byStatus['Nouvelle'] | default(0) }}</div>
+                        <div class="stat-value text-blue" data-stat-value="Nouvelle">{{ stats.byStatus['Nouvelle'] | default(0) }}</div>
                         <div class="stat-label">Nouvelles</div>
                     </div>
                 </div>
-                <div class="stat-card" onclick="filterByStatus('En cours')">
+                <div class="stat-card" onclick="filterByStatus('En cours')" data-stat-card="En cours">
                     <div class="stat-icon bg-yellow-lt text-yellow">
                         <i class="ti ti-loader"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value text-yellow">{{ stats.byStatus['En cours'] | default(0) }}</div>
+                        <div class="stat-value text-yellow" data-stat-value="En cours">{{ stats.byStatus['En cours'] | default(0) }}</div>
                         <div class="stat-label">En cours</div>
                     </div>
                 </div>
-                <div class="stat-card" onclick="filterByStatus('Resolue')">
+                <div class="stat-card" onclick="filterByStatus('Resolue')" data-stat-card="Resolue">
                     <div class="stat-icon bg-green-lt text-green">
                         <i class="ti ti-check"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value text-green">{{ stats.byStatus['Resolue'] | default(0) }}</div>
+                        <div class="stat-value text-green" data-stat-value="Resolue">{{ stats.byStatus['Resolue'] | default(0) }}</div>
                         <div class="stat-label">Resolues</div>
                     </div>
                 </div>
@@ -290,7 +295,9 @@
                 <div class="card-body filter-card">
                     <div class="row align-items-center g-2">
                         <div class="col-12 col-md-6">
-                            <input type="text" id="searchInput" class="form-control" placeholder="Rechercher par titre, categorie, type ou statut" autocomplete="off">
+                            <input type="text" id="searchInput" class="form-control"
+                                   placeholder="Rechercher par titre, categorie, type ou statut"
+                                   autocomplete="off">
                         </div>
                         <div class="col-12 col-md-6">
                             <div class="d-flex flex-wrap gap-2 justify-content-md-end">
@@ -317,16 +324,16 @@
                     <table class="table table-vcenter table-hover card-table">
                         <thead>
                             <tr>
-                                <th style="width: 30%">Titre</th>
+                                <th style="width: 28%">Titre</th>
                                 <th>Categorie</th>
                                 <th>Type</th>
                                 <th>Priorite</th>
                                 <th>Statut</th>
                                 <th>Date creation</th>
-                                <th class="text-end" style="width: 100px;">Actions</th>
+                                <th class="text-end" style="width: 130px;">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                                                <tbody>
                             {% for demande in demandes %}
                                 <tr class="demande-row"
                                     data-titre="{{ demande.titre|lower }}"
@@ -376,15 +383,111 @@
                                     </td>
                                     <td class="text-end">
                                         <div class="action-buttons">
-                                            <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="action-btn action-btn-view" title="Afficher">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+
+                                            {# View #}
+                                            <a href="{{ path('demande_show', {id: demande.idDemande}) }}"
+                                            class="action-btn action-btn-view" title="Afficher">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                    <circle cx="12" cy="12" r="3"></circle>
+                                                </svg>
                                             </a>
-                                            <a href="{{ path('demande_edit', {id: demande.idDemande}) }}" class="action-btn action-btn-edit" title="Modifier">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                                            </a>
+
+                                            {# Edit #}
+                                            {% if demande.status != 'Annulee' %}
+                                                <a href="{{ path('demande_edit', {id: demande.idDemande}) }}"
+                                                class="action-btn action-btn-edit" title="Modifier">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                    </svg>
+                                                </a>
+                                            {% else %}
+                                                <span class="action-btn action-btn-edit"
+                                                    style="opacity:0.35;cursor:not-allowed;"
+                                                    title="Modification impossible">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                    </svg>
+                                                </span>
+                                            {% endif %}
+
+                                            {# Delete #}
+                                            <button type="button"
+                                                    class="action-btn action-btn-delete"
+                                                    title="Supprimer"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#deleteDemandeModal-{{ demande.idDemande }}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                                                    <path d="M10 11v6"></path>
+                                                    <path d="M14 11v6"></path>
+                                                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                                                </svg>
+                                            </button>
+
                                         </div>
                                     </td>
                                 </tr>
+                                <div class="modal" id="deleteDemandeModal-{{ demande.idDemande }}" tabindex="-1">
+                                <div class="modal-dialog modal-sm" role="document">
+                                    <div class="modal-content">
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                                    <div class="modal-status bg-danger"></div>
+                                    <div class="modal-body text-center py-4">
+                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                            class="icon mb-2 text-danger icon-lg"
+                                            width="24" height="24" viewBox="0 0 24 24"
+                                            stroke-width="2" stroke="currentColor" fill="none"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                                        <path d="M10 11v6"></path>
+                                        <path d="M14 11v6"></path>
+                                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                                        </svg>
+                                        <h3>Supprimer la demande ?</h3>
+                                        <div class="text-secondary">
+                                        Vous allez supprimer :<br>
+                                        <strong class="text-dark">{{ demande.titre }}</strong><br><br>
+                                        Cette action est <strong>irreversible</strong>.
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <div class="w-100">
+                                        <div class="row">
+                                            <div class="col">
+                                            <button type="button" class="btn w-100" data-bs-dismiss="modal">
+                                                Annuler
+                                            </button>
+                                            </div>
+                                            <div class="col">
+                                            <form method="post"
+                                                    action="{{ path('demande_delete', {id: demande.idDemande}) }}"
+                                                    style="margin:0;">
+                                                <button type="submit" class="btn btn-danger w-100">
+                                                <i class="ti ti-trash me-1"></i>Supprimer
+                                                </button>
+                                            </form>
+                                            </div>
+                                        </div>
+                                        </div>
+                                    </div>
+                                    </div>
+                                </div>
+                                </div>
+
                             {% else %}
                                 <tr>
                                     <td colspan="7">
@@ -409,41 +512,108 @@
                     <i class="ti ti-refresh me-1"></i>Reinitialiser
                 </button>
             </div>
+
         </div>
     </div>
 </div>
 </div>
+
 {{ include('demande/_logout_modal.html.twig') }}
+
+{# ── Delete modal — same style as logout / cancel modals ── #}
+<div class="modal" id="deleteDemandeModal" tabindex="-1">
+  <div class="modal-dialog modal-sm" role="document">
+    <div class="modal-content">
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-body text-center py-4">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="icon mb-2 text-danger icon-lg"
+             width="24" height="24" viewBox="0 0 24 24"
+             stroke-width="2" stroke="currentColor" fill="none"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+          <path d="M10 11v6"></path>
+          <path d="M14 11v6"></path>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+        </svg>
+        <h3>Supprimer la demande ?</h3>
+        <div class="text-secondary">
+          Vous allez supprimer :<br>
+          <strong id="deleteDemandeTitre" class="text-dark"></strong><br><br>
+          Cette action est <strong>irreversible</strong>.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="w-100">
+          <div class="row">
+            <div class="col">
+              <button type="button" class="btn w-100" data-bs-dismiss="modal">
+                Annuler
+              </button>
+            </div>
+            <div class="col">
+              <form id="deleteDemandeForm" method="post" action="" style="margin:0;">
+                <button type="submit" class="btn btn-danger w-100">
+                  <i class="ti ti-trash me-1"></i>Supprimer
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block javascripts %}
 {{ parent() }}
+<script src="{{ asset('js/demande-sync.js') }}"></script>
 <script>
-(function() {
+(function () {
     "use strict";
 
     var searchInput;
     var noResults;
     var currentFilter = "all";
 
-    document.addEventListener("DOMContentLoaded", init);
+    /* ── Called directly from onclick on each delete button ── */
+    window.openDeleteModal = function (btn) {
+        var id    = btn.getAttribute("data-demande-id");
+        var titre = btn.getAttribute("data-demande-titre");
+        var url   = btn.getAttribute("data-delete-url");
 
-    function init() {
+        /* Populate modal */
+        document.getElementById("deleteDemandeTitre").textContent = titre;
+        document.getElementById("deleteDemandeForm").setAttribute("action", url);
+
+        /* Show modal */
+        var modalEl = document.getElementById("deleteDemandeModal");
+        var modal   = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    };
+
+    document.addEventListener("DOMContentLoaded", function () {
+
         searchInput = document.getElementById("searchInput");
-        noResults = document.getElementById("noResults");
+        noResults   = document.getElementById("noResults");
 
+        /* ── Search ── */
         if (searchInput) {
             searchInput.addEventListener("input", debounce(performSearch, 300));
-            searchInput.addEventListener("keyup", function(e) {
-                if (e.key === "Escape") {
-                    clearSearch();
-                }
+            searchInput.addEventListener("keyup", function (e) {
+                if (e.key === "Escape") clearSearch();
             });
         }
 
-        document.querySelectorAll(".quick-filter-btn").forEach(function(btn) {
-            btn.addEventListener("click", function() {
-                document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+        /* ── Quick filters ── */
+        document.querySelectorAll(".quick-filter-btn").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                document.querySelectorAll(".quick-filter-btn").forEach(function (b) {
                     b.classList.remove("active");
                 });
                 this.classList.add("active");
@@ -451,92 +621,118 @@
                 performSearch();
             });
         });
+
+        /* ── Real-time sync ── */
+        if (window.DemandeSyncManager) {
+            window.DemandeSyncManager.onStatusUpdate(function (data) {
+                if (data.type === "status-update" && data.stats) {
+                    updateStatsDisplay(data.stats);
+                }
+            });
+        }
+    });
+
+    function updateStatsDisplay(stats) {
+        if (!stats) return;
+        updateStatValue("total", stats.total);
+        if (stats.byStatus) {
+            Object.keys(stats.byStatus).forEach(function (s) {
+                updateStatValue(s, stats.byStatus[s]);
+            });
+        }
+    }
+
+    function updateStatValue(key, value) {
+        var el = document.querySelector('[data-stat-value="' + key + '"]');
+        if (!el) return;
+        var current = parseInt(el.textContent) || 0;
+        if (current !== value) {
+            el.style.opacity = "0.5";
+            el.textContent   = value;
+            setTimeout(function () {
+                el.style.transition = "opacity 0.3s ease";
+                el.style.opacity    = "1";
+            }, 10);
+        }
     }
 
     function performSearch() {
-        var searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : "";
-        var rows = document.querySelectorAll(".demande-row");
-        var visibleCount = 0;
+        var term    = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        var rows    = document.querySelectorAll(".demande-row");
+        var visible = 0;
 
-        rows.forEach(function(row) {
-            var titre = row.getAttribute("data-titre") || "";
+        rows.forEach(function (row) {
+            var titre     = row.getAttribute("data-titre")     || "";
             var categorie = row.getAttribute("data-categorie") || "";
-            var type = row.getAttribute("data-type") || "";
-            var priorite = row.getAttribute("data-priorite") || "";
-            var status = row.getAttribute("data-status") || "";
+            var type      = row.getAttribute("data-type")      || "";
+            var priorite  = row.getAttribute("data-priorite")  || "";
+            var status    = row.getAttribute("data-status")    || "";
 
-            var matchesSearch = searchTerm === "" ||
-                titre.indexOf(searchTerm) !== -1 ||
-                categorie.indexOf(searchTerm) !== -1 ||
-                type.indexOf(searchTerm) !== -1 ||
-                priorite.toLowerCase().indexOf(searchTerm) !== -1 ||
-                status.toLowerCase().indexOf(searchTerm) !== -1;
+            var matchSearch =
+                term === "" ||
+                titre.indexOf(term)                  !== -1 ||
+                categorie.indexOf(term)              !== -1 ||
+                type.indexOf(term)                   !== -1 ||
+                priorite.toLowerCase().indexOf(term) !== -1 ||
+                status.toLowerCase().indexOf(term)   !== -1;
 
-            var matchesFilter = currentFilter === "all" ||
+            var matchFilter =
+                currentFilter === "all" ||
                 priorite === currentFilter ||
-                status === currentFilter;
+                status   === currentFilter;
 
-            if (matchesSearch && matchesFilter) {
+            if (matchSearch && matchFilter) {
                 row.classList.remove("hidden");
-                visibleCount++;
+                visible++;
             } else {
                 row.classList.add("hidden");
             }
         });
 
-        var tableResponsive = document.querySelector(".table-responsive");
-        if (visibleCount === 0 && rows.length > 0) {
+        var table = document.querySelector(".table-responsive");
+        if (visible === 0 && rows.length > 0) {
             if (noResults) noResults.style.display = "block";
-            if (tableResponsive) tableResponsive.style.display = "none";
+            if (table)     table.style.display     = "none";
         } else {
             if (noResults) noResults.style.display = "none";
-            if (tableResponsive) tableResponsive.style.display = "block";
+            if (table)     table.style.display     = "block";
         }
     }
 
     function clearSearch() {
-        if (searchInput) {
-            searchInput.value = "";
-        }
+        if (searchInput) searchInput.value = "";
         currentFilter = "all";
-        document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+        document.querySelectorAll(".quick-filter-btn").forEach(function (b) {
             b.classList.remove("active");
         });
         var allBtn = document.querySelector('.quick-filter-btn[data-filter="all"]');
-        if (allBtn) {
-            allBtn.classList.add("active");
-        }
+        if (allBtn) allBtn.classList.add("active");
         performSearch();
     }
 
     function filterByStatus(status) {
-        if (searchInput) {
-            searchInput.value = "";
-        }
+        if (searchInput) searchInput.value = "";
         currentFilter = status || "all";
-        document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+        document.querySelectorAll(".quick-filter-btn").forEach(function (b) {
             b.classList.remove("active");
-            if (b.getAttribute("data-filter") === currentFilter) {
-                b.classList.add("active");
-            }
+            if (b.getAttribute("data-filter") === currentFilter) b.classList.add("active");
         });
         performSearch();
     }
 
     function debounce(func, wait) {
         var timeout;
-        return function() {
-            var context = this;
+        return function () {
+            var ctx  = this;
             var args = arguments;
             clearTimeout(timeout);
-            timeout = setTimeout(function() {
-                func.apply(context, args);
-            }, wait);
+            timeout = setTimeout(function () { func.apply(ctx, args); }, wait);
         };
     }
 
     window.filterByStatus = filterByStatus;
-    window.clearSearch = clearSearch;
-})();
+    window.clearSearch    = clearSearch;
+
+}());
 </script>
 {% endblock %}
