@@ -202,7 +202,6 @@ class DemandeController extends AbstractController
                 return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
             }
 
-            // Block if cancelled
             if ($demande->getStatus() === 'Annulee') {
                 return new JsonResponse([
                     'success' => false,
@@ -210,7 +209,6 @@ class DemandeController extends AbstractController
                 ], 400);
             }
 
-            // Block if already resolved
             if ($demande->getStatus() === 'Resolue') {
                 return new JsonResponse([
                     'success' => false,
@@ -443,8 +441,6 @@ class DemandeController extends AbstractController
         if (!$demande) {
             throw $this->createNotFoundException('Demande non trouvee');
         }
-
-        // Prevent editing if demande is canceled
         if ($demande->getStatus() === 'Annulee') {
             throw $this->createAccessDeniedException('Vous ne pouvez pas modifier une demande annulee par l\'employe.');
         }
