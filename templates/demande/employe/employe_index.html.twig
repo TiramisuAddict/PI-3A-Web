@@ -405,31 +405,27 @@
 {{ parent() }}
 <script src="{{ asset('js/demande-sync.js') }}"></script>
 <script>
-(function() {
+(function () {
     "use strict";
 
     var searchInput;
     var noResults;
     var currentFilter = "all";
 
-    document.addEventListener("DOMContentLoaded", init);
-
-    function init() {
+    document.addEventListener("DOMContentLoaded", function () {
         searchInput = document.getElementById("searchInput");
-        noResults = document.getElementById("noResults");
+        noResults   = document.getElementById("noResults");
 
         if (searchInput) {
             searchInput.addEventListener("input", debounce(performSearch, 300));
-            searchInput.addEventListener("keyup", function(e) {
-                if (e.key === "Escape") {
-                    clearSearch();
-                }
+            searchInput.addEventListener("keyup", function (e) {
+                if (e.key === "Escape") clearSearch();
             });
         }
 
-        document.querySelectorAll(".quick-filter-btn").forEach(function(btn) {
-            btn.addEventListener("click", function() {
-                document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+        document.querySelectorAll(".quick-filter-btn").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                document.querySelectorAll(".quick-filter-btn").forEach(function (b) {
                     b.classList.remove("active");
                 });
                 this.classList.add("active");
@@ -438,133 +434,124 @@
             });
         });
 
-        // Listen for status updates from other tabs/windows
         if (window.DemandeSyncManager) {
-            window.DemandeSyncManager.onStatusUpdate(function(data) {
-                if (data.type === 'status-update' && data.stats) {
-                    console.log('[Employee Index] Received status update:', data);
-                    updateStatsDisplay(data.stats);
+            window.DemandeSyncManager.onStatusUpdate(function (data) {
+                if (data.type === "status-update") {
+                    window.location.reload();
                 }
             });
         }
-    }
 
-    function updateStatsDisplay(stats) {
-        if (!stats) return;
-
-        // Update total
-        updateStatValue('total', stats.total);
-
-        // Update by status
-        if (stats.byStatus) {
-            Object.keys(stats.byStatus).forEach(function(status) {
-                updateStatValue(status, stats.byStatus[status]);
-            });
-        }
-
-        console.log('[Employee Index] Stats updated successfully');
-    }
-
-    function updateStatValue(key, value) {
-        var element = document.querySelector('[data-stat-value="' + key + '"]');
-        if (element) {
-            var currentValue = parseInt(element.textContent) || 0;
-            if (currentValue !== value) {
-                // Add animation effect
-                element.style.opacity = '0.5';
-                element.textContent = value;
-                setTimeout(function() {
-                    element.style.transition = 'opacity 0.3s ease';
-                    element.style.opacity = '1';
-                }, 10);
-            }
-        }
-    }
+        /* Run immediately on page load so numbers are correct from the start */
+        performSearch();
+    });
 
     function performSearch() {
-        var searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : "";
-        var rows = document.querySelectorAll(".demande-row");
-        var visibleCount = 0;
+        var term    = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        var rows    = document.querySelectorAll(".demande-row");
+        var visible = 0;
 
-        rows.forEach(function(row) {
-            var titre = row.getAttribute("data-titre") || "";
+        var counts = {
+            total      : 0,
+            "Nouvelle" : 0,
+            "En cours" : 0,
+            "Resolue"  : 0
+        };
+
+        rows.forEach(function (row) {
+            var titre     = row.getAttribute("data-titre")     || "";
             var categorie = row.getAttribute("data-categorie") || "";
-            var type = row.getAttribute("data-type") || "";
-            var priorite = row.getAttribute("data-priorite") || "";
-            var status = row.getAttribute("data-status") || "";
+            var type      = row.getAttribute("data-type")      || "";
+            var priorite  = row.getAttribute("data-priorite")  || "";
+            var status    = row.getAttribute("data-status")    || "";
 
-            var matchesSearch = searchTerm === "" ||
-                titre.indexOf(searchTerm) !== -1 ||
-                categorie.indexOf(searchTerm) !== -1 ||
-                type.indexOf(searchTerm) !== -1 ||
-                priorite.toLowerCase().indexOf(searchTerm) !== -1 ||
-                status.toLowerCase().indexOf(searchTerm) !== -1;
+            var matchSearch =
+                term === "" ||
+                titre.indexOf(term)                  !== -1 ||
+                categorie.indexOf(term)              !== -1 ||
+                type.indexOf(term)                   !== -1 ||
+                priorite.toLowerCase().indexOf(term) !== -1 ||
+                status.toLowerCase().indexOf(term)   !== -1;
 
-            var matchesFilter = currentFilter === "all" ||
+            var matchFilter =
+                currentFilter === "all" ||
                 priorite === currentFilter ||
-                status === currentFilter;
+                status   === currentFilter;
 
-            if (matchesSearch && matchesFilter) {
+            if (matchSearch && matchFilter) {
                 row.classList.remove("hidden");
-                visibleCount++;
+                visible++;
+                counts.total++;
+                if (counts[status] !== undefined) {
+                    counts[status]++;
+                }
             } else {
                 row.classList.add("hidden");
             }
         });
 
-        var tableResponsive = document.querySelector(".table-responsive");
-        if (visibleCount === 0 && rows.length > 0) {
+        animateStat("total",    counts["total"]);
+        animateStat("Nouvelle", counts["Nouvelle"]);
+        animateStat("En cours", counts["En cours"]);
+        animateStat("Resolue",  counts["Resolue"]);
+
+        var table = document.querySelector(".table-responsive");
+        if (visible === 0 && rows.length > 0) {
             if (noResults) noResults.style.display = "block";
-            if (tableResponsive) tableResponsive.style.display = "none";
+            if (table)     table.style.display     = "none";
         } else {
             if (noResults) noResults.style.display = "none";
-            if (tableResponsive) tableResponsive.style.display = "block";
+            if (table)     table.style.display     = "block";
         }
     }
 
+    function animateStat(key, value) {
+        var el = document.querySelector('[data-stat-value="' + key + '"]');
+        if (!el) return;
+        var current = parseInt(el.textContent) || 0;
+        if (current === value) return;
+        el.style.transition = "opacity 0.15s ease";
+        el.style.opacity    = "0.3";
+        setTimeout(function () {
+            el.textContent   = value;
+            el.style.opacity = "1";
+        }, 150);
+    }
+
     function clearSearch() {
-        if (searchInput) {
-            searchInput.value = "";
-        }
+        if (searchInput) searchInput.value = "";
         currentFilter = "all";
-        document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+        document.querySelectorAll(".quick-filter-btn").forEach(function (b) {
             b.classList.remove("active");
         });
         var allBtn = document.querySelector('.quick-filter-btn[data-filter="all"]');
-        if (allBtn) {
-            allBtn.classList.add("active");
-        }
+        if (allBtn) allBtn.classList.add("active");
         performSearch();
     }
 
     function filterByStatus(status) {
-        if (searchInput) {
-            searchInput.value = "";
-        }
+        if (searchInput) searchInput.value = "";
         currentFilter = status || "all";
-        document.querySelectorAll(".quick-filter-btn").forEach(function(b) {
+        document.querySelectorAll(".quick-filter-btn").forEach(function (b) {
             b.classList.remove("active");
-            if (b.getAttribute("data-filter") === currentFilter) {
-                b.classList.add("active");
-            }
+            if (b.getAttribute("data-filter") === currentFilter) b.classList.add("active");
         });
         performSearch();
     }
 
     function debounce(func, wait) {
         var timeout;
-        return function() {
-            var context = this;
+        return function () {
+            var ctx  = this;
             var args = arguments;
             clearTimeout(timeout);
-            timeout = setTimeout(function() {
-                func.apply(context, args);
-            }, wait);
+            timeout = setTimeout(function () { func.apply(ctx, args); }, wait);
         };
     }
 
     window.filterByStatus = filterByStatus;
-    window.clearSearch = clearSearch;
-})();
+    window.clearSearch    = clearSearch;
+
+}());
 </script>
 {% endblock %}

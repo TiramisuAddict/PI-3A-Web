@@ -581,28 +581,10 @@
     var noResults;
     var currentFilter = "all";
 
-    /* ── Called directly from onclick on each delete button ── */
-    window.openDeleteModal = function (btn) {
-        var id    = btn.getAttribute("data-demande-id");
-        var titre = btn.getAttribute("data-demande-titre");
-        var url   = btn.getAttribute("data-delete-url");
-
-        /* Populate modal */
-        document.getElementById("deleteDemandeTitre").textContent = titre;
-        document.getElementById("deleteDemandeForm").setAttribute("action", url);
-
-        /* Show modal */
-        var modalEl = document.getElementById("deleteDemandeModal");
-        var modal   = bootstrap.Modal.getOrCreateInstance(modalEl);
-        modal.show();
-    };
-
     document.addEventListener("DOMContentLoaded", function () {
-
         searchInput = document.getElementById("searchInput");
         noResults   = document.getElementById("noResults");
 
-        /* ── Search ── */
         if (searchInput) {
             searchInput.addEventListener("input", debounce(performSearch, 300));
             searchInput.addEventListener("keyup", function (e) {
@@ -610,7 +592,6 @@
             });
         }
 
-        /* ── Quick filters ── */
         document.querySelectorAll(".quick-filter-btn").forEach(function (btn) {
             btn.addEventListener("click", function () {
                 document.querySelectorAll(".quick-filter-btn").forEach(function (b) {
@@ -622,44 +603,29 @@
             });
         });
 
-        /* ── Real-time sync ── */
         if (window.DemandeSyncManager) {
             window.DemandeSyncManager.onStatusUpdate(function (data) {
-                if (data.type === "status-update" && data.stats) {
-                    updateStatsDisplay(data.stats);
+                if (data.type === "status-update") {
+                    window.location.reload();
                 }
             });
         }
+
+        /* Run immediately on page load so numbers are correct from the start */
+        performSearch();
     });
-
-    function updateStatsDisplay(stats) {
-        if (!stats) return;
-        updateStatValue("total", stats.total);
-        if (stats.byStatus) {
-            Object.keys(stats.byStatus).forEach(function (s) {
-                updateStatValue(s, stats.byStatus[s]);
-            });
-        }
-    }
-
-    function updateStatValue(key, value) {
-        var el = document.querySelector('[data-stat-value="' + key + '"]');
-        if (!el) return;
-        var current = parseInt(el.textContent) || 0;
-        if (current !== value) {
-            el.style.opacity = "0.5";
-            el.textContent   = value;
-            setTimeout(function () {
-                el.style.transition = "opacity 0.3s ease";
-                el.style.opacity    = "1";
-            }, 10);
-        }
-    }
 
     function performSearch() {
         var term    = searchInput ? searchInput.value.toLowerCase().trim() : "";
         var rows    = document.querySelectorAll(".demande-row");
         var visible = 0;
+
+        var counts = {
+            total      : 0,
+            "Nouvelle" : 0,
+            "En cours" : 0,
+            "Resolue"  : 0
+        };
 
         rows.forEach(function (row) {
             var titre     = row.getAttribute("data-titre")     || "";
@@ -684,10 +650,19 @@
             if (matchSearch && matchFilter) {
                 row.classList.remove("hidden");
                 visible++;
+                counts.total++;
+                if (counts[status] !== undefined) {
+                    counts[status]++;
+                }
             } else {
                 row.classList.add("hidden");
             }
         });
+
+        animateStat("total",     counts["total"]);
+        animateStat("Nouvelle",  counts["Nouvelle"]);
+        animateStat("En cours",  counts["En cours"]);
+        animateStat("Resolue",   counts["Resolue"]);
 
         var table = document.querySelector(".table-responsive");
         if (visible === 0 && rows.length > 0) {
@@ -697,6 +672,19 @@
             if (noResults) noResults.style.display = "none";
             if (table)     table.style.display     = "block";
         }
+    }
+
+    function animateStat(key, value) {
+        var el = document.querySelector('[data-stat-value="' + key + '"]');
+        if (!el) return;
+        var current = parseInt(el.textContent) || 0;
+        if (current === value) return;
+        el.style.transition = "opacity 0.15s ease";
+        el.style.opacity    = "0.3";
+        setTimeout(function () {
+            el.textContent   = value;
+            el.style.opacity = "1";
+        }, 150);
     }
 
     function clearSearch() {
