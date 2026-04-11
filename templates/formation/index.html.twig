@@ -204,6 +204,9 @@
 
 {% block body %}
     <div class="dashboard-formation">
+     {{ include('components/navbar.html.twig') }}
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+        {{ include('components/sidebar.html.twig', {'active_page': 'formations','sidebar_role': role}) }}
     <div class="rh-shell">
     <div class="rh-hero">
         <div class="row align-items-center g-4 position-relative">
@@ -260,48 +263,6 @@
     {% for message in app.flashes('error') %}
         <div class="alert alert-danger" role="alert">{{ message }}</div>
     {% endfor %}
-
-    <div class="card mb-3">
-        <div class="card-header">
-            <h3 class="card-title">Identification RH</h3>
-        </div>
-        <div class="card-body">
-            {% if not rh_logged %}
-                <form method="post" action="{{ path('app_formation_rh') }}">
-                    <input type="hidden" name="action" value="login">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-8">
-                            <label class="form-label" for="rh_id">RH</label>
-                            <select class="form-select" id="rh_id" name="rh_id" required>
-                                <option value="">Choisir un RH</option>
-                                {% for rh in rh_users %}
-                                    <option value="{{ rh.id_employe }}">{{ rh.prenom }} {{ rh.nom }} ({{ rh.role }})</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <button class="btn btn-primary w-100" type="submit">Entrer</button>
-                        </div>
-                    </div>
-                </form>
-            {% else %}
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div>
-                        <span class="badge bg-green-lt">RH connecte</span>
-                        <span class="ms-2">{{ app.session.get('rh_name') }}</span>
-                    </div>
-                    <form method="post" action="{{ path('app_formation_rh') }}">
-                        <input type="hidden" name="action" value="logout">
-                        <button class="btn btn-outline-secondary btn-sm" type="submit">Changer ID</button>
-                    </form>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-
-    {% if not rh_logged %}
-        <div class="alert alert-info">Choisissez votre ID RH pour afficher les formations et gerer les demandes.</div>
-    {% endif %}
 
     {% if rh_logged %}
     <div class="card">
@@ -703,6 +664,7 @@
             }
         })();
     </script>
+    </div>
     </div>
     </div>
 {% endblock %}

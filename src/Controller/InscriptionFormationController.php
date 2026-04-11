@@ -127,6 +127,20 @@ final class InscriptionFormationController extends AbstractController
     public function employe(Request $request, Connection $connection, FormationRepository $formationRepository, EntityManagerInterface $entityManager, InscriptionFormationRepository $inscriptionRepository, EvaluationFormationRepository $evaluationFormationRepository, ReasonAssistantService $reasonAssistantService, FeedbackAnalysisService $feedbackAnalysisService): Response
     {
         $session = $request->getSession();
+        $employeeId = (int) $session->get('employe_id', 0);
+        $employeeRole = strtolower(trim((string) $session->get('employe_role', '')));
+        $employeeLogged = $session->get('employe_logged_in') === true && in_array($employeeRole, ['employé', 'employe'], true);
+
+        if (!$employeeLogged) {
+            if ($session->get('employe_logged_in') === true) {
+                $this->addFlash('error', 'Cette page est reservee aux employes.');
+
+                return $this->redirectToRoute('RH_Home');
+            }
+
+            return $this->redirectToRoute('login');
+        }
+
         $analysisResult = null;
         $typedReason = '';
         $assistantNotice = null;
@@ -153,51 +167,10 @@ final class InscriptionFormationController extends AbstractController
 
         if ($request->isMethod('POST')) {
             $action = (string) $request->request->get('action', '');
-
-            if ($action === 'login') {
-                $employeeId = (int) $request->request->get('employee_id', 0);
-
-                if ($employeeId > 0) {
-                    $employee = $connection->fetchAssociative(
-                        'SELECT id_employe, prenom, nom, role FROM employe WHERE id_employe = ? LIMIT 1',
-                        [$employeeId]
-                    );
-
-                    if ($employee !== false) {
-                        $employeeRole = strtolower(trim((string) $employee['role']));
-                        if (!in_array($employeeRole, ['employé', 'employe'], true)) {
-                            $this->addFlash('error', 'Cette page est reservee aux employes.');
-
-                            return $this->redirectToRoute('app_inscription_employe');
-                        }
-
-                        $employeeName = trim((string) $employee['prenom'] . ' ' . (string) $employee['nom']);
-                        $session->set('employee_id', (int) $employee['id_employe']);
-                        $session->set('employee_name', $employeeName);
-                        $session->set('employee_role', $employeeRole);
-
-                        $this->addFlash('success', sprintf('Bienvenue %s.', $employeeName));
-
-                        return $this->redirectToRoute('app_inscription_employe');
-                    }
-                }
-
-                $this->addFlash('error', 'ID employe invalide.');
-
-                return $this->redirectToRoute('app_inscription_employe');
-            }
-
-            if ($action === 'logout') {
-                $session->remove('employee_id');
-                $session->remove('employee_name');
-                $session->remove('employee_role');
-
-                return $this->redirectToRoute('app_inscription_employe');
-            }
 //ajout, annulation, modification raison, evaluation
             if ($action === 'inscrire') {
-                $employeeId = (int) $session->get('employee_id', 0);
-                $employeeRole = strtolower(trim((string) $session->get('employee_role', '')));
+                $employeeId = (int) $session->get('employe_id', 0);
+                $employeeRole = strtolower(trim((string) $session->get('employe_role', '')));
                 $formationId = (int) $request->request->get('formation_id', 0);
                 $raison = trim((string) $request->request->get('raison', ''));
 
@@ -245,7 +218,7 @@ final class InscriptionFormationController extends AbstractController
             }
 
             if ($action === 'annuler') {
-                $employeeId = (int) $session->get('employee_id', 0);
+                $employeeId = (int) $session->get('employe_id', 0);
                 $inscriptionId = (int) $request->request->get('inscription_id', 0);
 
                 if ($employeeId <= 0 || $inscriptionId <= 0) {
@@ -275,7 +248,7 @@ final class InscriptionFormationController extends AbstractController
             }
 
             if ($action === 'modifier_raison') {
-                $employeeId = (int) $session->get('employee_id', 0);
+                $employeeId = (int) $session->get('employe_id', 0);
                 $inscriptionId = (int) $request->request->get('inscription_id', 0);
                 $formationId = (int) $request->request->get('formation_id', 0);
                 $raison = trim((string) $request->request->get('raison', ''));
@@ -317,8 +290,8 @@ final class InscriptionFormationController extends AbstractController
             }
 
             if ($action === 'evaluer') {
-                $employeeId = (int) $session->get('employee_id', 0);
-                $employeeRole = strtolower(trim((string) $session->get('employee_role', '')));
+                $employeeId = (int) $session->get('employe_id', 0);
+                $employeeRole = strtolower(trim((string) $session->get('employe_role', '')));
                 $formationId = (int) $request->request->get('formation_id', 0);
                 $note = (int) $request->request->get('note', 0);
                 $commentaire = trim((string) $request->request->get('commentaire', ''));
@@ -367,15 +340,7 @@ final class InscriptionFormationController extends AbstractController
                 return $this->redirectToRoute('app_inscription_employe', ['formation' => $formationId]);
             }
         }
-
-        $employeeId = (int) $session->get('employee_id', 0);
-        $employeeRole = strtolower(trim((string) $session->get('employee_role', '')));
-        $employeeLogged = $employeeId > 0 && in_array($employeeRole, ['employé', 'employe'], true);
         $selectedFormation = $selectedFormationId > 0 ? $formationRepository->find($selectedFormationId) : null;
-
-        $employees = $connection->fetchAllAssociative(
-            'SELECT id_employe, prenom, nom, role FROM employe WHERE LOWER(role) IN (\'employé\', \'employe\') ORDER BY prenom, nom'
-        );
 
         $formations = $formationRepository->findBy([], ['dateDebut' => 'DESC']);
 
@@ -504,10 +469,11 @@ final class InscriptionFormationController extends AbstractController
         }
 
         return $this->render('inscription/employe.html.twig', [
-            'employees' => $employees,
             'formations' => $formations,
             'employee_logged' => $employeeLogged,
             'employee_id' => $employeeId,
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
             'formation_review_summary' => $formationReviewSummary,
             'selected_formation' => $selectedFormation,
             'already_inscrit' => $alreadyInscrit,
@@ -528,8 +494,8 @@ final class InscriptionFormationController extends AbstractController
     private function handleReasonAction(Request $request, FormationRepository $formationRepository, ReasonAssistantService $reasonAssistantService, string $type): JsonResponse
     {
         $session = $request->getSession();
-        $employeeId = (int) $session->get('employee_id', 0);
-        $employeeRole = strtolower(trim((string) $session->get('employee_role', '')));
+        $employeeId = (int) $session->get('employe_id', 0);
+        $employeeRole = strtolower(trim((string) $session->get('employe_role', '')));
         $formationId = (int) $request->request->get('formation_id', 0);
         $reason = trim((string) $request->request->get('raison', ''));
 
@@ -600,13 +566,13 @@ final class InscriptionFormationController extends AbstractController
     private function denyUnlessRhLogged(Request $request): ?Response
     {
         $session = $request->getSession();
-        $rhId = (int) $session->get('rh_id', 0);
-        $rhRole = strtolower(trim((string) $session->get('rh_role', '')));
+        $role = strtolower(trim((string) $session->get('employe_role', '')));
+        $isLogged = $session->get('employe_logged_in') === true;
 
-        if ($rhId <= 0 || !str_contains($rhRole, 'rh')) {
-            $this->addFlash('error', 'Veuillez choisir votre ID RH avant de continuer.');
+        if (!$isLogged || (!str_contains($role, 'rh') && !str_contains($role, 'administrateur entreprise'))) {
+            $this->addFlash('error', 'Cette action est reservee aux RH.');
 
-            return $this->redirectToRoute('app_formation_rh');
+            return $this->redirectToRoute($isLogged ? 'employe_Home' : 'login');
         }
 
         return null;

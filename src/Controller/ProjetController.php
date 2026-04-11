@@ -21,7 +21,7 @@ use Symfony\Component\HttpFoundation\Session\SessionInterface;
 #[Route('/projet')]
 final class ProjetController extends AbstractController
 {
-    private const MANAGER_ROLES = ['rh', 'chef projet', 'chef_projet', 'chefprojet', 'responsable', 'administrateur systeme', 'administrateur_systeme', 'administrateur système'];
+    private const MANAGER_ROLES = ['rh', 'chef projet', 'chef_projet', 'chefprojet', 'responsable', 'administrateur entreprise', 'administrateur_systeme', 'administrateur système'];
 
     private function resolveCurrentEmploye(SessionInterface $session, EmployeRepository $employeRepository): ?Employe
     {

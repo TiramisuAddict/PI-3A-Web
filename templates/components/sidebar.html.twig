@@ -32,7 +32,7 @@
     </li>
 
     <li>
-      <a href="#"
+      <a href="{{ (sidebar_role is defined and sidebar_role in ['RH', 'administrateur entreprise']) ? path('app_formation_rh') : path('app_inscription_employe') }}"
         class="d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none
         {{ active_page is defined and active_page == 'formations' ? 'bg-blue-lt text-blue fw-medium' : 'text-secondary' }}">
         <i class="ti ti-school" style="font-size:18px;"></i>
