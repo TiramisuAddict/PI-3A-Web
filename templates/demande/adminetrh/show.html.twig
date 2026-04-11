@@ -125,6 +125,17 @@
     }
     .cancelled-banner h4 { margin:0 0 4px; font-size:1rem; font-weight:700; color:#842029; }
     .cancelled-banner p  { margin:0; color:#b02a37; font-size:.875rem; }
+
+    .modal-comment-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 6px;
+        display: block;
+        text-align: left;
+    }
 </style>
 {% endblock %}
 
@@ -370,7 +381,6 @@
                         </div>
 
                     {% else %}
-                        {# Status buttons — each opens its own dedicated modal #}
                         <div class="card mb-3">
                             <div class="card-header">
                                 <h3 class="card-title">
@@ -449,9 +459,7 @@
 
 {{ include('demande/_logout_modal.html.twig') }}
 
-{# ── One modal per status — plain form POST, zero JS, same as cancel/delete ── #}
-
-{# En cours #}
+{# ── En cours modal ── #}
 <div class="modal" id="modalStatus-encours" tabindex="-1">
   <div class="modal-dialog modal-sm" role="document">
     <div class="modal-content">
@@ -466,7 +474,23 @@
           <path d="M5 19h14a2 2 0 0 0 1.84-2.75l-7.1-12.25a2 2 0 0 0-3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75"/>
         </svg>
         <h3>Passer en cours ?</h3>
-        <div class="text-secondary">Cette demande sera marquee comme <strong>En cours</strong>.</div>
+        <div class="text-secondary mb-3">
+            Cette demande sera marquee comme <strong>En cours</strong>.
+        </div>
+        <form method="post"
+              action="{{ path('demande_update_status_form', {id: demande.idDemande}) }}"
+              id="form-encours">
+            <input type="hidden" name="status" value="En cours">
+            <div class="text-start">
+                <label class="modal-comment-label">
+                    <i class="ti ti-message me-1"></i>Commentaire (optionnel)
+                </label>
+                <textarea class="form-control"
+                          name="commentaire"
+                          rows="3"
+                          placeholder="Ajouter un commentaire sur ce changement de statut..."></textarea>
+            </div>
+        </form>
       </div>
       <div class="modal-footer">
         <div class="w-100">
@@ -475,12 +499,9 @@
               <button type="button" class="btn w-100" data-bs-dismiss="modal">Annuler</button>
             </div>
             <div class="col">
-              <form method="post" action="{{ path('demande_update_status_form', {id: demande.idDemande}) }}" style="margin:0;">
-                <input type="hidden" name="status" value="En cours">
-                <button type="submit" class="btn btn-warning w-100">
-                  <i class="ti ti-check me-1"></i>Confirmer
-                </button>
-              </form>
+              <button type="submit" form="form-encours" class="btn btn-warning w-100">
+                <i class="ti ti-check me-1"></i>Confirmer
+              </button>
             </div>
           </div>
         </div>
@@ -489,7 +510,7 @@
   </div>
 </div>
 
-{# En attente #}
+{# ── En attente modal ── #}
 <div class="modal" id="modalStatus-attente" tabindex="-1">
   <div class="modal-dialog modal-sm" role="document">
     <div class="modal-content">
@@ -504,7 +525,23 @@
           <path d="M5 19h14a2 2 0 0 0 1.84-2.75l-7.1-12.25a2 2 0 0 0-3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75"/>
         </svg>
         <h3>Mettre en attente ?</h3>
-        <div class="text-secondary">Cette demande sera marquee comme <strong>En attente</strong>.</div>
+        <div class="text-secondary mb-3">
+            Cette demande sera marquee comme <strong>En attente</strong>.
+        </div>
+        <form method="post"
+              action="{{ path('demande_update_status_form', {id: demande.idDemande}) }}"
+              id="form-attente">
+            <input type="hidden" name="status" value="En attente">
+            <div class="text-start">
+                <label class="modal-comment-label">
+                    <i class="ti ti-message me-1"></i>Commentaire (optionnel)
+                </label>
+                <textarea class="form-control"
+                          name="commentaire"
+                          rows="3"
+                          placeholder="Ajouter un commentaire sur ce changement de statut..."></textarea>
+            </div>
+        </form>
       </div>
       <div class="modal-footer">
         <div class="w-100">
@@ -513,12 +550,9 @@
               <button type="button" class="btn w-100" data-bs-dismiss="modal">Annuler</button>
             </div>
             <div class="col">
-              <form method="post" action="{{ path('demande_update_status_form', {id: demande.idDemande}) }}" style="margin:0;">
-                <input type="hidden" name="status" value="En attente">
-                <button type="submit" class="btn btn-warning w-100">
-                  <i class="ti ti-check me-1"></i>Confirmer
-                </button>
-              </form>
+              <button type="submit" form="form-attente" class="btn btn-warning w-100">
+                <i class="ti ti-check me-1"></i>Confirmer
+              </button>
             </div>
           </div>
         </div>
@@ -527,7 +561,7 @@
   </div>
 </div>
 
-{# Resolue #}
+{# ── Resolue modal ── #}
 <div class="modal" id="modalStatus-resolue" tabindex="-1">
   <div class="modal-dialog modal-sm" role="document">
     <div class="modal-content">
@@ -541,10 +575,24 @@
           <polyline points="20 6 9 17 4 12"></polyline>
         </svg>
         <h3>Marquer comme resolue ?</h3>
-        <div class="text-secondary">
-          Cette demande sera marquee comme <strong>Resolue</strong>.<br>
-          <strong>Cette action est definitive.</strong>
+        <div class="text-secondary mb-3">
+            Cette demande sera marquee comme <strong>Resolue</strong>.<br>
+            <strong>Cette action est definitive.</strong>
         </div>
+        <form method="post"
+              action="{{ path('demande_update_status_form', {id: demande.idDemande}) }}"
+              id="form-resolue">
+            <input type="hidden" name="status" value="Resolue">
+            <div class="text-start">
+                <label class="modal-comment-label">
+                    <i class="ti ti-message me-1"></i>Commentaire (optionnel)
+                </label>
+                <textarea class="form-control"
+                          name="commentaire"
+                          rows="3"
+                          placeholder="Ajouter un commentaire sur la resolution..."></textarea>
+            </div>
+        </form>
       </div>
       <div class="modal-footer">
         <div class="w-100">
@@ -553,12 +601,9 @@
               <button type="button" class="btn w-100" data-bs-dismiss="modal">Annuler</button>
             </div>
             <div class="col">
-              <form method="post" action="{{ path('demande_update_status_form', {id: demande.idDemande}) }}" style="margin:0;">
-                <input type="hidden" name="status" value="Resolue">
-                <button type="submit" class="btn btn-success w-100">
-                  <i class="ti ti-check me-1"></i>Confirmer
-                </button>
-              </form>
+              <button type="submit" form="form-resolue" class="btn btn-success w-100">
+                <i class="ti ti-check me-1"></i>Confirmer
+              </button>
             </div>
           </div>
         </div>
@@ -567,7 +612,7 @@
   </div>
 </div>
 
-{# Rejetee #}
+{# ── Rejetee modal ── #}
 <div class="modal" id="modalStatus-rejetee" tabindex="-1">
   <div class="modal-dialog modal-sm" role="document">
     <div class="modal-content">
@@ -582,10 +627,24 @@
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
         <h3>Rejeter la demande ?</h3>
-        <div class="text-secondary">
-          Cette demande sera marquee comme <strong>Rejetee</strong>.<br>
-          <strong>Cette action est definitive.</strong>
+        <div class="text-secondary mb-3">
+            Cette demande sera marquee comme <strong>Rejetee</strong>.<br>
+            <strong>Cette action est definitive.</strong>
         </div>
+        <form method="post"
+              action="{{ path('demande_update_status_form', {id: demande.idDemande}) }}"
+              id="form-rejetee">
+            <input type="hidden" name="status" value="Rejetee">
+            <div class="text-start">
+                <label class="modal-comment-label">
+                    <i class="ti ti-message me-1"></i>Motif du rejet (optionnel)
+                </label>
+                <textarea class="form-control"
+                          name="commentaire"
+                          rows="3"
+                          placeholder="Expliquer la raison du rejet..."></textarea>
+            </div>
+        </form>
       </div>
       <div class="modal-footer">
         <div class="w-100">
@@ -594,12 +653,9 @@
               <button type="button" class="btn w-100" data-bs-dismiss="modal">Annuler</button>
             </div>
             <div class="col">
-              <form method="post" action="{{ path('demande_update_status_form', {id: demande.idDemande}) }}" style="margin:0;">
-                <input type="hidden" name="status" value="Rejetee">
-                <button type="submit" class="btn btn-danger w-100">
-                  <i class="ti ti-x me-1"></i>Confirmer
-                </button>
-              </form>
+              <button type="submit" form="form-rejetee" class="btn btn-danger w-100">
+                <i class="ti ti-x me-1"></i>Confirmer
+              </button>
             </div>
           </div>
         </div>

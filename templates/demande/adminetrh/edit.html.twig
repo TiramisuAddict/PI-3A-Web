@@ -30,6 +30,19 @@
     .inline-map-section { margin-top: 8px; border: 1px solid #c0d0ff; border-radius: 6px; overflow: hidden; background: white; }
     #map { height: 400px; width: 100%; background: #aad3df; border-radius: 4px; }
     .location-input-group input { background: #f8fafc !important; }
+    .resolved-info-bar {
+        background: linear-gradient(135deg,#f0fff4 0%,#d4edda 100%);
+        border: 1.5px solid #c3e6cb;
+        border-radius: 8px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+        font-size: 0.9rem;
+        color: #155724;
+    }
+    .resolved-info-bar i { font-size: 1.2rem; }
 </style>
 {% endblock %}
 
@@ -42,9 +55,7 @@
         <div class="container-xl">
             <div class="row align-items-center">
                 <div class="col">
-                    <h2 class="page-title">
-                    Modifier la Demande
-                    </h2>
+                    <h2 class="page-title">Modifier la Demande</h2>
                 </div>
             </div>
         </div>
@@ -52,6 +63,17 @@
 
     <div class="page-body">
         <div class="container-xl">
+
+            {% if demande.status == 'Resolue' %}
+            <div class="resolved-info-bar">
+                <i class="ti ti-lock"></i>
+                <span>
+                    <strong>Demande resolue :</strong> le statut ne peut plus etre modifie, mais vous pouvez
+                    modifier les autres informations (titre, description, priorite, champs specifiques).
+                </span>
+            </div>
+            {% endif %}
+
             {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'id': 'demandeForm'}}) }}
 
             <div class="row">
@@ -96,11 +118,23 @@
                                     </div>
                                     <div class="col-md-6">
                                         {{ form_label(form.status, null, {'label_attr': {'class': 'form-label required'}}) }}
-                                        {{ form_widget(form.status, {'attr': {'class': 'form-select' ~ (form.status.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
-                                        {% if form.status.vars.errors %}
-                                            <div class="field-error">
-                                                {% for error in form.status.vars.errors %}{{ error.message }}{% endfor %}
-                                            </div>
+                                        {% if demande.status == 'Resolue' %}
+                                            {# Status locked — show as disabled, send hidden value #}
+                                            <input type="hidden" name="{{ form.status.vars.full_name }}" value="{{ demande.status }}">
+                                            <select class="form-select" disabled>
+                                                <option selected>{{ demande.status }}</option>
+                                            </select>
+                                            <small class="text-muted">
+                                                <i class="ti ti-lock" style="font-size:0.75rem;"></i>
+                                                Le statut d'une demande resolue est definitif.
+                                            </small>
+                                        {% else %}
+                                            {{ form_widget(form.status, {'attr': {'class': 'form-select' ~ (form.status.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                            {% if form.status.vars.errors %}
+                                                <div class="field-error">
+                                                    {% for error in form.status.vars.errors %}{{ error.message }}{% endfor %}
+                                                </div>
+                                            {% endif %}
                                         {% endif %}
                                     </div>
                                 </div>
@@ -225,8 +259,7 @@
                 var types = CATEGORIES[cat];
                 for (var i = 0; i < types.length; i++) {
                     var o = document.createElement("option");
-                    o.value = types[i];
-                    o.textContent = types[i];
+                    o.value = types[i]; o.textContent = types[i];
                     typeSelect.appendChild(o);
                 }
                 typeInfo.textContent = types.length + " types disponibles";
@@ -299,12 +332,15 @@
                 container.appendChild(col);
             }
         }
+
+        setTimeout(function () {
+            autoFillNombreJours();
+        }, 100);
     }
 
     function appendFieldError(container, key) {
         var message = getFieldErrorMessage(key);
         if (!message) return;
-
         var error = document.createElement("div");
         error.className = "field-error";
         error.textContent = message;
@@ -335,6 +371,9 @@
                 inp = document.createElement("input");
                 inp.type = "date"; inp.className = "form-control" + err;
                 inp.name = "details[" + f.key + "]"; inp.value = val;
+                inp.addEventListener("change", function () {
+                    autoFillNombreJours();
+                });
                 return inp;
             case "textarea":
                 inp = document.createElement("textarea");
@@ -363,6 +402,59 @@
                 inp.name = "details[" + f.key + "]"; inp.value = val;
                 return inp;
         }
+    }
+
+    function autoFillNombreJours() {
+        var container = document.getElementById("dynamicFields");
+        if (!container) return;
+
+        var startKeys = [
+            "dateDebut", "dateDebutConge", "dateDebutTeletravail",
+            "dateDebutFormation", "dateDebutHoraires", "dateDebutMission"
+        ];
+        var endKeys = [
+            "dateFin", "dateFinConge", "dateFinTeletravail",
+            "dateFinFormation", "dateFinHoraires", "dateFinMission"
+        ];
+        var joursKeys = [
+            "nombreJours", "nombreJoursConge", "nombreJoursTeletravail",
+            "nombreJoursFormation", "duree", "nombreJoursMission"
+        ];
+
+        var startInput = null;
+        var endInput   = null;
+        var joursInput = null;
+
+        for (var i = 0; i < startKeys.length; i++) {
+            var el = container.querySelector('[name="details[' + startKeys[i] + ']"]');
+            if (el) { startInput = el; break; }
+        }
+        for (var j = 0; j < endKeys.length; j++) {
+            var el2 = container.querySelector('[name="details[' + endKeys[j] + ']"]');
+            if (el2) { endInput = el2; break; }
+        }
+        for (var k = 0; k < joursKeys.length; k++) {
+            var el3 = container.querySelector('[name="details[' + joursKeys[k] + ']"]');
+            if (el3) { joursInput = el3; break; }
+        }
+
+        if (!startInput || !endInput || !joursInput) return;
+
+        var startVal = startInput.value;
+        var endVal   = endInput.value;
+
+        if (!startVal || !endVal) return;
+
+        var startDate = new Date(startVal);
+        var endDate   = new Date(endVal);
+
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return;
+        if (endDate < startDate) return;
+
+        var diffMs   = endDate.getTime() - startDate.getTime();
+        var diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+
+        joursInput.value = diffDays;
     }
 
     function buildLocationField(f, val, values) {
@@ -412,8 +504,7 @@
         searchInput.placeholder = "Rechercher une ville ou adresse...";
         searchInput.id = "mapsearch-" + f.key;
         var searchBtn = document.createElement("button");
-        searchBtn.type = "button";
-        searchBtn.textContent = "Rechercher";
+        searchBtn.type = "button"; searchBtn.textContent = "Rechercher";
         searchBtn.onclick = (function (k) {
             return function () { searchOnMap(k, document.getElementById("mapsearch-" + k).value); };
         })(f.key);
@@ -551,9 +642,7 @@
                     var lon = parseFloat(r.lon);
                     var m = maps[key];
                     if (m) { m.setView([lat, lon], 13); pickLocationOnMap(key, lat, lon); }
-                } else {
-                    updateMapInfo(key, "Aucun resultat trouve");
-                }
+                } else { updateMapInfo(key, "Aucun resultat trouve"); }
             })
             .catch(function () { updateMapInfo(key, "Erreur de recherche"); });
     }

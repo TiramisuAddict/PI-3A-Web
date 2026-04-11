@@ -401,7 +401,8 @@ class DemandeController extends AbstractController
             return $this->redirectToRoute('demande_show', ['id' => $id]);
         }
 
-        $newStatus = $request->request->get('status');
+        $newStatus   = $request->request->get('status');
+        $commentaire = trim((string) $request->request->get('commentaire', ''));
 
         if (!$newStatus) {
             $this->addFlash('danger', 'Statut manquant.');
@@ -416,7 +417,7 @@ class DemandeController extends AbstractController
         $historique->setAncienStatut($oldStatus);
         $historique->setNouveauStatut($newStatus);
         $historique->setActeur($this->getActorLabel($session));
-        $historique->setCommentaire('Statut mis a jour');
+        $historique->setCommentaire($commentaire !== '' ? $commentaire : 'Statut mis a jour');
         $historique->setDateAction(new \DateTime());
 
         $this->em->persist($historique);
