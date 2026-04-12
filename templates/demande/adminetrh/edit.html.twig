@@ -119,7 +119,6 @@
                                     <div class="col-md-6">
                                         {{ form_label(form.status, null, {'label_attr': {'class': 'form-label required'}}) }}
                                         {% if demande.status == 'Resolue' %}
-                                            {# Status locked — show as disabled, send hidden value #}
                                             <input type="hidden" name="{{ form.status.vars.full_name }}" value="{{ demande.status }}">
                                             <select class="form-select" disabled>
                                                 <option selected>{{ demande.status }}</option>
@@ -128,6 +127,26 @@
                                                 <i class="ti ti-lock" style="font-size:0.75rem;"></i>
                                                 Le statut d'une demande resolue est definitif.
                                             </small>
+                                        {% elseif demande.status == 'Annulee' %}
+                                            <input type="hidden" name="{{ form.status.vars.full_name }}" value="{{ demande.status }}">
+                                            <select class="form-select" disabled>
+                                                <option selected>{{ demande.status }}</option>
+                                            </select>
+                                            <small class="text-muted d-block mt-2">
+                                                <i class="ti ti-lock" style="font-size:0.75rem;"></i>
+                                                Demande annulee : le statut reste verrouille, mais vous pouvez modifier les autres informations.
+                                            </small>
+                                        {% elseif demande.status == 'Rejetee' %}
+                                            {{ form_widget(form.status, {'attr': {'class': 'form-select' ~ (form.status.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                            <small class="text-muted d-block mt-2">
+                                                <i class="ti ti-lock-open" style="font-size:0.75rem;"></i>
+                                                Choisissez <strong>Reconsideration</strong> pour rouvrir les changements de statut.
+                                            </small>
+                                            {% if form.status.vars.errors %}
+                                                <div class="field-error">
+                                                    {% for error in form.status.vars.errors %}{{ error.message }}{% endfor %}
+                                                </div>
+                                            {% endif %}
                                         {% else %}
                                             {{ form_widget(form.status, {'attr': {'class': 'form-select' ~ (form.status.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
                                             {% if form.status.vars.errors %}

@@ -54,6 +54,8 @@ class DemandeFormHelper
         'En cours',
         'En attente',
         'Resolue',
+        'Rejetee',
+        'Reconsideration',
         'Fermee',
         'Annulee'
     ];

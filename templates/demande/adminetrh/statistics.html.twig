@@ -6,28 +6,19 @@
 {{ parent() }}
 <style>
     .stat-card {
-        background: linear-gradient(135deg, var(--tblr-primary), #6b7ae0);
-        color: white;
+        border: 1px solid rgba(15, 23, 42, 0.08);
         border-radius: 10px;
+        background: #fff;
         padding: 24px;
         text-align: center;
-        box-shadow: 0 4px 16px rgba(74, 93, 239, 0.2);
-        transition: transform 0.2s ease;
+        box-shadow: 0 4px 16px rgba(74, 93, 239, 0.08);
+        transition: border-color .2s ease, box-shadow .2s ease;
+        color: #1f2937;
     }
     .stat-card:hover {
-        transform: translateY(-4px);
-    }
-    .stat-card.green {
-        background: linear-gradient(135deg, #10b981, #059669);
-        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
-    }
-    .stat-card.yellow {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        box-shadow: 0 4px 16px rgba(245, 158, 11, 0.2);
-    }
-    .stat-card.red {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-        box-shadow: 0 4px 16px rgba(239, 68, 68, 0.2);
+        border-color: rgba(74, 93, 239, 0.35);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+        transform: translateY(-2px);
     }
     .stat-value {
         font-size: 2.5rem;
@@ -68,14 +59,14 @@
         font-weight: 600;
         border-radius: 4px;
         display: inline-block;
-        color: white !important;
+            color: #fff !important;
     }
     .badge.bg-danger {
         background-color: #dc3545 !important;
     }
     .badge.bg-warning {
-        background-color: #ffc107 !important;
-        color: #333 !important;
+            background-color: #ffc107 !important;
+            color: #fff !important;
     }
     .badge.bg-success {
         background-color: #28a745 !important;
@@ -153,6 +144,8 @@
                                             'En cours': '#f59e0b', 
                                             'En attente': '#f97316',
                                             'Resolue': '#10b981',
+                                            'Rejetee': '#ef4444',
+                                            'Reconsideration': '#4a5def',
                                             'Fermee': '#6b7280',
                                             'Annulee': '#ef4444'
                                         } %}

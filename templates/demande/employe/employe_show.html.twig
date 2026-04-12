@@ -44,13 +44,25 @@
         font-weight: 600;
         border-radius: 4px;
         display: inline-block;
+        color: #fff !important;
     }
     .badge.bg-danger    { background-color: #dc3545 !important; color: white; }
-    .badge.bg-warning   { background-color: #ffc107 !important; color: #333; }
+    .badge.bg-warning   { background-color: #ffc107 !important; color: #fff !important; }
     .badge.bg-success   { background-color: #28a745 !important; color: white; }
     .badge.bg-info      { background-color: #17a2b8 !important; color: white; }
     .badge.bg-orange    { background-color: #fd7e14 !important; color: white; }
     .badge.bg-secondary { background-color: #6c757d !important; color: white; }
+    .card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 4px 16px rgba(74, 93, 239, 0.08);
+    }
+    .card-header {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        background: #f5f7fb;
+        border-radius: 10px 10px 0 0;
+    }
 </style>
 {% endblock %}
 
@@ -154,6 +166,14 @@
                                         {% elseif demande.status == 'Resolue' %}
                                             <span class="badge bg-success">
                                                 <i class="ti ti-check me-1"></i>{{ demande.status }}
+                                            </span>
+                                        {% elseif demande.status == 'Rejetee' %}
+                                            <span class="badge bg-danger">
+                                                <i class="ti ti-x me-1"></i>{{ demande.status }}
+                                            </span>
+                                        {% elseif demande.status == 'Reconsideration' %}
+                                            <span class="badge bg-primary">
+                                                <i class="ti ti-lock-open me-1"></i>{{ demande.status }}
                                             </span>
                                         {% elseif demande.status == 'Annulee' %}
                                             <span class="badge bg-danger">

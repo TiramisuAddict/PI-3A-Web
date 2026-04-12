@@ -202,26 +202,21 @@ class DemandeController extends AbstractController
                 return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
             }
 
-            if ($demande->getStatus() === 'Annulee') {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Vous ne pouvez pas modifier le statut d\'une demande annulee.'
-                ], 400);
-            }
-
-            if ($demande->getStatus() === 'Resolue') {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Cette demande est deja resolue. Le statut ne peut plus etre modifie.'
-                ], 400);
-            }
-
             $data        = json_decode($request->getContent(), true);
             $newStatus   = $data['status'] ?? null;
             $commentaire = $data['commentaire'] ?? '';
 
             if (!$newStatus) {
                 return new JsonResponse(['success' => false, 'message' => 'Statut requis'], 400);
+            }
+
+            $currentStatus = $demande->getStatus();
+
+            if (!$this->canTransitionStatus($currentStatus, $newStatus)) {
+                return new JsonResponse([
+                    'success' => false,
+                    'message' => $this->getStatusTransitionBlockedMessage($currentStatus)
+                ], 400);
             }
 
             $oldStatus = $demande->getStatus();
@@ -389,21 +384,17 @@ class DemandeController extends AbstractController
             return $this->redirectToRoute('demande_index');
         }
 
-        if ($demande->getStatus() === 'Annulee') {
-            $this->addFlash('warning', 'Cette demande est annulee. Le statut ne peut pas etre modifie.');
-            return $this->redirectToRoute('demande_show', ['id' => $id]);
-        }
-
-        if ($demande->getStatus() === 'Resolue') {
-            $this->addFlash('warning', 'Cette demande est deja resolue. Le statut ne peut plus etre modifie.');
-            return $this->redirectToRoute('demande_show', ['id' => $id]);
-        }
-
         $newStatus   = $request->request->get('status');
         $commentaire = trim((string) $request->request->get('commentaire', ''));
 
         if (!$newStatus) {
             $this->addFlash('danger', 'Statut manquant.');
+            return $this->redirectToRoute('demande_show', ['id' => $id]);
+        }
+
+        $currentStatus = $demande->getStatus();
+        if (!$this->canTransitionStatus($currentStatus, $newStatus)) {
+            $this->addFlash('warning', $this->getStatusTransitionBlockedMessage($currentStatus));
             return $this->redirectToRoute('demande_show', ['id' => $id]);
         }
 
@@ -441,14 +432,16 @@ class DemandeController extends AbstractController
         if (!$demande) {
             throw $this->createNotFoundException('Demande non trouvee');
         }
+
         if ($demande->getStatus() === 'Annulee') {
             throw $this->createAccessDeniedException('Vous ne pouvez pas modifier une demande annulee par l\'employe.');
         }
 
-        if ($demande->getStatus() === 'Annulee') {
-        $this->addFlash('warning', 'Cette demande a ete annulee par l\'employe. Elle ne peut pas etre modifiee.');
-        return $this->redirectToRoute('demande_show', ['id' => $demande->getIdDemande()]);
-        }
+        $statusChoices = $demande->getStatus() === 'Rejetee'
+            ? ['Rejetee', 'Reconsideration']
+            : ($demande->getStatus() === 'Resolue'
+                ? ['Resolue']
+                : $this->formHelper->getStatuses());
 
         $existingDetails = [];
         $demandeDetails = $demande->getDemandeDetails();
@@ -457,7 +450,10 @@ class DemandeController extends AbstractController
             $existingDetails = json_decode($firstDetail->getDetails(), true) ?? [];
         }
 
-        $form = $this->createForm(DemandeType::class, $demande, ['is_edit' => true]);
+        $form = $this->createForm(DemandeType::class, $demande, [
+            'is_edit' => true,
+            'status_choices' => $statusChoices,
+        ]);
         $form->handleRequest($request);
 
         $detailErrors = [];
@@ -477,6 +473,11 @@ class DemandeController extends AbstractController
                 $oldStatus = $this->em->getUnitOfWork()->getOriginalEntityData($demande)['status'] ?? $demande->getStatus();
                 $newStatus = $demande->getStatus();
                 $commentaire = $form->get('commentaire')->getData();
+
+                if (!$this->canTransitionStatus($oldStatus, $newStatus)) {
+                    $this->addFlash('danger', $this->getStatusTransitionBlockedMessage($oldStatus));
+                    return $this->redirectToRoute('demande_show', ['id' => $demande->getIdDemande()]);
+                }
 
                 if ($oldStatus !== $newStatus) {
                     $historique = new HistoriqueDemande();
@@ -530,6 +531,40 @@ class DemandeController extends AbstractController
     {
         return $this->isEmployeLoggedIn($session)
             && in_array((string) $session->get('employe_role'), ['RH', 'administrateur entreprise'], true);
+    }
+
+    private function canTransitionStatus(?string $currentStatus, ?string $newStatus): bool
+    {
+        if (null === $currentStatus || null === $newStatus) {
+            return false;
+        }
+
+        if ($currentStatus === 'Annulee' || $currentStatus === 'Resolue') {
+            return $newStatus === $currentStatus;
+        }
+
+        if ($currentStatus === 'Rejetee') {
+            return in_array($newStatus, ['Rejetee', 'Reconsideration'], true);
+        }
+
+        return true;
+    }
+
+    private function getStatusTransitionBlockedMessage(?string $currentStatus): string
+    {
+        if ($currentStatus === 'Annulee') {
+            return 'Cette demande est annulee. Son statut ne peut pas etre modifie.';
+        }
+
+        if ($currentStatus === 'Resolue') {
+            return 'Cette demande est deja resolue. Le statut ne peut plus etre modifie.';
+        }
+
+        if ($currentStatus === 'Rejetee') {
+            return 'Cette demande est rejetee. Utilisez le bouton Reconsideration dans la page de details pour rouvrir les changements de statut.';
+        }
+
+        return 'Le statut ne peut pas etre modifie dans cet etat.';
     }
 
     private function getLoggedInEmployeId(SessionInterface $session): ?int

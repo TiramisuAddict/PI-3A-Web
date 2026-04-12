@@ -37,7 +37,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.25rem;
+            color: #fff !important;
         flex-shrink: 0;
     }
     .stat-content {
@@ -57,14 +57,36 @@
         font-weight: 500;
         white-space: nowrap;
     }
-    .demande-row {
-        transition: all 0.2s ease;
-    }
-    .demande-row:hover {
-        background: rgba(31, 111, 235, 0.05) !important;
-    }
     .demande-row.hidden {
         display: none;
+    }
+    .stat-card {
+        flex: 1;
+        min-width: 140px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 10px;
+        background: #fff;
+        transition: border-color .2s ease, box-shadow .2s ease;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 4px 16px rgba(74, 93, 239, 0.08);
+    }
+    .stat-card:hover {
+        border-color: rgba(74, 93, 239, 0.35);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+        transform: translateY(-2px);
+    }
+    .stat-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        background: #f5f7fb;
     }
     .badge {
         padding: 4px 8px;
@@ -72,18 +94,7 @@
         font-weight: 600;
         border-radius: 4px;
         display: inline-block;
-    }
-    .badge.bg-danger    { background-color: #dc3545 !important; color: white; }
-    .badge.bg-warning   { background-color: #ffc107 !important; color: #333; }
-    .badge.bg-success   { background-color: #28a745 !important; color: white; }
-    .badge.bg-info      { background-color: #17a2b8 !important; color: white; }
-    .badge.bg-orange    { background-color: #fd7e14 !important; color: white; }
-    .badge.bg-secondary { background-color: #6c757d !important; color: white; }
-    .titre-link {
-        color: #1f2937;
-        font-weight: 600;
-        text-decoration: none;
-        transition: color 0.2s ease;
+        color: #fff !important;
     }
     .titre-link:hover {
         color: var(--tblr-primary);
@@ -370,6 +381,10 @@
                                             <span class="badge bg-orange"><i class="ti ti-clock me-1"></i>{{ demande.status }}</span>
                                         {% elseif demande.status == 'Resolue' %}
                                             <span class="badge bg-success"><i class="ti ti-check me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Rejetee' %}
+                                            <span class="badge bg-danger"><i class="ti ti-x me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Reconsideration' %}
+                                            <span class="badge bg-primary"><i class="ti ti-lock-open me-1"></i>{{ demande.status }}</span>
                                         {% elseif demande.status == 'Annulee' %}
                                             <span class="badge bg-danger"><i class="ti ti-x me-1"></i>{{ demande.status }}</span>
                                         {% else %}
@@ -631,26 +646,30 @@
             var type      = row.getAttribute("data-type")      || "";
             var priorite  = row.getAttribute("data-priorite")  || "";
             var status    = row.getAttribute("data-status")    || "";
+            var normalizedPriorite = normalizeValue(priorite);
+            var normalizedStatus   = normalizeValue(status);
+            var normalizedFilter   = normalizeValue(currentFilter);
 
             var matchSearch =
                 term === "" ||
                 titre.indexOf(term)                  !== -1 ||
                 categorie.indexOf(term)              !== -1 ||
                 type.indexOf(term)                   !== -1 ||
-                priorite.toLowerCase().indexOf(term) !== -1 ||
-                status.toLowerCase().indexOf(term)   !== -1;
+                normalizedPriorite.indexOf(term)     !== -1 ||
+                normalizedStatus.indexOf(term)       !== -1;
 
             var matchFilter =
                 currentFilter === "all" ||
-                priorite === currentFilter ||
-                status   === currentFilter;
+                normalizedPriorite === normalizedFilter ||
+                normalizedStatus   === normalizedFilter;
 
             if (matchSearch && matchFilter) {
                 row.classList.remove("hidden");
                 visible++;
                 counts.total++;
-                if (counts[status] !== undefined) {
-                    counts[status]++;
+                var trackedStatus = toTrackedStatus(status);
+                if (trackedStatus && counts[trackedStatus] !== undefined) {
+                    counts[trackedStatus]++;
                 }
             } else {
                 row.classList.add("hidden");
@@ -701,9 +720,28 @@
         currentFilter = status || "all";
         document.querySelectorAll(".quick-filter-btn").forEach(function (b) {
             b.classList.remove("active");
-            if (b.getAttribute("data-filter") === currentFilter) b.classList.add("active");
+            if (normalizeValue(b.getAttribute("data-filter") || "") === normalizeValue(currentFilter)) {
+                b.classList.add("active");
+            }
         });
         performSearch();
+    }
+
+    function normalizeValue(value) {
+        return (value || "")
+            .toString()
+            .trim()
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+    }
+
+    function toTrackedStatus(status) {
+        var normalized = normalizeValue(status);
+        if (normalized === "nouvelle") return "Nouvelle";
+        if (normalized === "en cours") return "En cours";
+        if (normalized === "resolue") return "Resolue";
+        return null;
     }
 
     function debounce(func, wait) {

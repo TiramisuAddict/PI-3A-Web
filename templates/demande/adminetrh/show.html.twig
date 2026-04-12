@@ -44,9 +44,10 @@
         font-weight: 600;
         border-radius: 4px;
         display: inline-block;
+        color: #fff !important;
     }
     .badge.bg-danger    { background-color: #dc3545 !important; color: white; }
-    .badge.bg-warning   { background-color: #ffc107 !important; color: #333; }
+    .badge.bg-warning   { background-color: #ffc107 !important; color: #fff !important; }
     .badge.bg-success   { background-color: #28a745 !important; color: white; }
     .badge.bg-info      { background-color: #17a2b8 !important; color: white; }
     .badge.bg-orange    { background-color: #fd7e14 !important; color: white; }
@@ -156,17 +157,6 @@
                     <h2 class="page-title mt-1">{{ demande.titre }}</h2>
                     <div class="text-secondary">Consultez les details et repondez a cette demande.</div>
                 </div>
-                <div class="col-auto">
-                    {% if demande.status != 'Annulee' %}
-                        <a href="{{ path('demande_edit', {id: demande.idDemande}) }}" class="btn btn-primary">
-                            <i class="ti ti-edit me-1"></i>Modifier
-                        </a>
-                    {% else %}
-                        <span class="badge bg-danger px-3 py-2" style="font-size:0.85rem;">
-                            <i class="ti ti-ban me-1"></i>Annulee — non modifiable
-                        </span>
-                    {% endif %}
-                </div>
             </div>
         </div>
     </div>
@@ -270,6 +260,10 @@
                                             <span class="badge bg-orange"><i class="ti ti-clock me-1"></i>{{ demande.status }}</span>
                                         {% elseif demande.status == 'Resolue' %}
                                             <span class="badge bg-success"><i class="ti ti-check me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Rejetee' %}
+                                            <span class="badge bg-danger"><i class="ti ti-x me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Reconsideration' %}
+                                            <span class="badge bg-primary"><i class="ti ti-lock-open me-1"></i>{{ demande.status }}</span>
                                         {% elseif demande.status == 'Annulee' %}
                                             <span class="badge bg-danger"><i class="ti ti-x me-1"></i>{{ demande.status }}</span>
                                         {% else %}
@@ -359,8 +353,32 @@
                             <div class="card-body">
                                 <p class="text-muted mb-0">
                                     <i class="ti ti-alert-circle me-1 text-danger"></i>
-                                    Cette demande a ete annulee. Aucune action n'est possible.
+                                    Cette demande a ete annulee par l'employe. Aucune action de modification n'est possible.
                                 </p>
+                            </div>
+                        </div>
+
+                    {% elseif demande.status == 'Rejetee' %}
+                        <div class="card mb-3">
+                            <div class="card-header" style="background:#dc3545;border-color:#dc3545;">
+                                <h3 class="card-title text-white">
+                                    <i class="ti ti-x me-2"></i>Demande rejetee
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted mb-2">
+                                    <i class="ti ti-alert-circle me-1 text-danger"></i>
+                                    Cette demande est verrouillee pour les changements de statut.
+                                </p>
+                                <p class="text-muted mb-3">
+                                    Cliquez sur <strong>Reconsideration</strong> pour rouvrir les changements de statut.
+                                </p>
+                                <button type="button"
+                                        class="btn btn-primary w-100"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalStatus-reconsideration">
+                                        <i class="ti ti-lock-open me-1"></i>Passer en reconsideration
+                                </button>
                             </div>
                         </div>
 
@@ -612,6 +630,58 @@
   </div>
 </div>
 
+{# ── Reconsideration modal ── #}
+<div class="modal" id="modalStatus-reconsideration" tabindex="-1">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-status bg-primary"></div>
+            <div class="modal-body text-center py-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon mb-2 text-primary icon-lg"
+                         width="24" height="24" viewBox="0 0 24 24" stroke-width="2"
+                         stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M12 17l4 -4l-4 -4"/>
+                    <path d="M8 11v-1a4 4 0 1 1 8 0v1"/>
+                    <rect x="6" y="11" width="12" height="9" rx="2"/>
+                </svg>
+                <h3>Passer en reconsideration ?</h3>
+                <div class="text-secondary mb-3">
+                        Cette demande sera marquee comme <strong>Reconsideration</strong>.
+                </div>
+                <form method="post"
+                            action="{{ path('demande_update_status_form', {id: demande.idDemande}) }}"
+                            id="form-reconsideration">
+                        <input type="hidden" name="status" value="Reconsideration">
+                        <div class="text-start">
+                                <label class="modal-comment-label">
+                                        <i class="ti ti-message me-1"></i>Commentaire (optionnel)
+                                </label>
+                                <textarea class="form-control"
+                                                    name="commentaire"
+                                                    rows="3"
+                                                    placeholder="Ajouter un commentaire sur la reconsideration..."></textarea>
+                        </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn w-100" data-bs-dismiss="modal">Annuler</button>
+                        </div>
+                        <div class="col">
+                            <button type="submit" form="form-reconsideration" class="btn btn-primary w-100">
+                                <i class="ti ti-check me-1"></i>Confirmer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {# ── Rejetee modal ── #}
 <div class="modal" id="modalStatus-rejetee" tabindex="-1">
   <div class="modal-dialog modal-sm" role="document">
@@ -629,7 +699,7 @@
         <h3>Rejeter la demande ?</h3>
         <div class="text-secondary mb-3">
             Cette demande sera marquee comme <strong>Rejetee</strong>.<br>
-            <strong>Cette action est definitive.</strong>
+            <strong>Les changements de statut seront verrouilles jusqu'a une reconsideration.</strong>
         </div>
         <form method="post"
               action="{{ path('demande_update_status_form', {id: demande.idDemande}) }}"

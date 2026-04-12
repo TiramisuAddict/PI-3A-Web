@@ -31,6 +31,7 @@ class DemandeType extends AbstractType
         $isEdit = $options['is_edit'];
         $includeEmploye = $options['include_employe'];
         $employeChoices = $options['employe_choices'];
+        $statusChoicesOption = $options['status_choices'];
         $categories = $this->formHelper->getCategoryTypes();
         $priorites = $this->formHelper->getPriorites();
         $statuses = $this->formHelper->getStatuses();
@@ -104,6 +105,12 @@ class DemandeType extends AbstractType
             ]);
 
         if ($isEdit) {
+            $statusChoices = [];
+            $sourceStatuses = !empty($statusChoicesOption) ? $statusChoicesOption : $statuses;
+            foreach ($sourceStatuses as $status) {
+                $statusChoices[$status] = $status;
+            }
+
             $builder->add('status', ChoiceType::class, [
                 'choices' => $statusChoices,
                 'label' => 'Statut',
@@ -162,6 +169,7 @@ class DemandeType extends AbstractType
             'is_edit' => false,
             'include_employe' => true,
             'employe_choices' => [],
+            'status_choices' => [],
         ]);
     }
 }
