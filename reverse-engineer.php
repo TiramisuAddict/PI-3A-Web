@@ -4,7 +4,8 @@ require_once 'vendor/autoload.php';
 
 // Database configuration - MODIFY THESE VALUES
 $dbHost = 'localhost';
-$dbName = 'momentumdb';
+$dbName = 'Momentum';
+$dbName = 'momentum';
 $dbUser = 'root';
 $dbPass = '';
 $dbPort = 3306;

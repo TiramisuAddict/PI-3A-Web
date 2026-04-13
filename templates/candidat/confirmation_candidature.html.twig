@@ -1,0 +1,47 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Confirmation de candidature | Momentum{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="row justify-content-center">
+                <div class="col-12 col-md-10 col-lg-8">
+                    <div class="card mt-4">
+                        <div class="card-body p-4 p-md-5">
+                            <div class="text-center mb-4">
+                                <h1 class="h2 mb-2">Candidature envoyee avec succes</h1>
+                                <p class="text-secondary mb-0">
+                                    Votre candidature pour le poste
+                                    <strong>{{ candidature.offre.titrePoste }}</strong>
+                                    a bien ete enregistree.
+                                </p>
+                            </div>
+
+                            <div class="alert alert-success" role="alert">
+                                <div class="fw-bold mb-1">Votre code de suivi</div>
+                                <div class="h3 mb-0">{{ code }}</div>
+                            </div>
+
+                            <div class="mb-4">
+                                <h2 class="h4 mb-2">Important</h2>
+                                <p class="mb-2">Gardez ce code dans un endroit sur.</p>
+                                <p class="mb-0 text-secondary">
+                                    Ce code vous permettra de suivre l'etat de votre candidature et de la retrouver facilement par la suite.
+                                </p>
+                            </div>
+
+                            <div class="d-grid">
+                                <a href="{{ path('app_offre_list') }}" class="btn btn-primary btn-lg">
+                                    Retourner a la liste des offres
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

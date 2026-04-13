@@ -1,0 +1,28 @@
+<header class="navbar navbar-expand-md navbar-light border-bottom bg-white" style="height:56px;">
+  <div class="container-fluid">
+    <a href="#" class="navbar-brand py-0">
+      <img src="/images/WKlogo.svg" height="150"  width="150" alt="Logo">
+    </a>
+    <div class="navbar-nav flex-row order-md-last ms-auto">
+      <div class="nav-item dropdown">
+        <a href="#" class="nav-link d-flex lh-1 text-reset align-items-center gap-2"
+          data-bs-toggle="dropdown">
+          <span class="avatar avatar-sm" style="background-image:url(/static/avatars/044m.jpg)"></span>
+          <div class="d-none d-xl-block">
+            <div style="font-size:0.875rem;">{{ email|default('') }}</div>
+            <div class="small text-secondary">{{ role|default('') }}</div>
+          </div>
+        </a>
+        <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+          <a href="#" class="dropdown-item">Profil</a>
+          <a href="#" class="dropdown-item">Paramètres</a>
+          <div class="dropdown-divider"></div>
+          <a href="#" class="dropdown-item text-danger"
+            data-bs-toggle="modal" data-bs-target="#logoutModal">
+            Se déconnecter
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>

@@ -1,0 +1,415 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Demande #{{ demande.idDemande }}{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<style>
+    .detail-label { 
+        font-weight: 600; 
+        color: #64748b; 
+        font-size: .8rem; 
+        text-transform: uppercase; 
+        letter-spacing: .5px; 
+        margin-bottom: 6px;
+    }
+    .detail-value { 
+        font-size: .95rem;
+        color: #1f2937;
+    }
+    .timeline-item { 
+        position: relative; 
+        padding-left: 24px; 
+        padding-bottom: 16px; 
+        border-left: 2px solid #e2e8f0; 
+    }
+    .timeline-item:last-child { 
+        border-left: 2px solid transparent; 
+    }
+    .timeline-item::before { 
+        content: ''; 
+        position: absolute; 
+        left: -8px; 
+        top: 4px; 
+        width: 12px; 
+        height: 12px; 
+        border-radius: 50%; 
+        background: #4a5def; 
+        border: 2px solid #fff; 
+        box-shadow: 0 0 0 2px #4a5def;
+    }
+    .badge {
+        padding: 4px 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    .badge.bg-danger {
+        background-color: #dc3545 !important;
+        color: white;
+    }
+    .badge.bg-warning {
+        background-color: #ffc107 !important;
+        color: #333;
+    }
+    .badge.bg-success {
+        background-color: #28a745 !important;
+        color: white;
+    }
+    .badge.bg-info {
+        background-color: #17a2b8 !important;
+        color: white;
+    }
+    .badge.bg-secondary {
+        background-color: #6c757d !important;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+{{ include('components/navbar.html.twig') }}
+<div class="d-flex" style="min-height:calc(100vh - 56px);">
+{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': role}) }}
+<div class="page-wrapper">
+    <div class="page-header d-print-none mb-3">
+        <div class="container-xl">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">
+                        <i class="ti ti-file-description me-2"></i>{{ demande.titre }}
+                    </h2>
+                    <div class="text-secondary">Demande #{{ demande.idDemande }}</div>
+                </div>
+                <div class="col-auto">
+                    <div class="btn-list">
+                        <a href="{{ path('demande_edit', {id: demande.idDemande}) }}" class="btn btn-primary">
+                            <i class="ti ti-edit me-2"></i>Modifier
+                        </a>
+                        <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                            <i class="ti ti-trash me-2"></i>Supprimer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            {% for message in app.flashes('success') %}
+                <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+                    <i class="ti ti-check me-2"></i>{{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-info-circle me-2"></i>Informations générales</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div>
+                                        <div class="detail-label">Catégorie</div>
+                                        <div class="detail-value">{{ demande.categorie }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div>
+                                        <div class="detail-label">Type de demande</div>
+                                        <div class="detail-value">{{ demande.typeDemande }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div>
+                                        <div class="detail-label">Priorité</div>
+                                        <div class="detail-value">
+                                            {% if demande.priorite == 'HAUTE' %}
+                                                <span class="badge bg-danger"><i class="ti ti-alert-triangle me-1"></i>{{ demande.priorite }}</span>
+                                            {% elseif demande.priorite == 'NORMALE' %}
+                                                <span class="badge bg-info"><i class="ti ti-minus me-1"></i>{{ demande.priorite }}</span>
+                                            {% else %}
+                                                <span class="badge bg-success"><i class="ti ti-arrow-down me-1"></i>{{ demande.priorite }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div>
+                                        <div class="detail-label">Statut</div>
+                                        <div class="detail-value">
+                                            {% if demande.status == 'Nouvelle' %}
+                                                <span class="badge bg-info"><i class="ti ti-sparkles me-1"></i>{{ demande.status }}</span>
+                                            {% elseif demande.status == 'En cours' %}
+                                                <span class="badge bg-warning"><i class="ti ti-loader me-1"></i>{{ demande.status }}</span>
+                                            {% elseif demande.status == 'Resolue' %}
+                                                <span class="badge bg-success"><i class="ti ti-check me-1"></i>{{ demande.status }}</span>
+                                            {% elseif demande.status == 'Annulee' %}
+                                                <span class="badge bg-danger"><i class="ti ti-x me-1"></i>{{ demande.status }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary"><i class="ti ti-lock me-1"></i>{{ demande.status }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div>
+                                        <div class="detail-label">Employé</div>
+                                        <div class="detail-value">
+                                            {% if demande.employe %}
+                                                {{ demande.employe.nom }} {{ demande.employe.prenom }}
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div>
+                                        <div class="detail-label">Date de création</div>
+                                        <div class="detail-value">{{ demande.dateCreation ? demande.dateCreation|date('d/m/Y H:i') : 'N/A' }}</div>
+                                    </div>
+                                </div>
+                                {% if demande.description %}
+                                <div class="col-12">
+                                    <div>
+                                        <div class="detail-label">Description</div>
+                                        <div class="detail-value">{{ demande.description }}</div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if detailsData|length > 0 %}
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-forms me-2"></i>Informations spécifiques</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                {% for key, value in detailsData %}
+                                    {% if not (key ends with 'Lat' or key ends with 'Lon') %}
+                                    <div class="col-md-6">
+                                        <div>
+                                            <div class="detail-label">{{ fieldLabels[key] ?? key }}</div>
+                                            <div class="detail-value">{{ value }}</div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if demande.historiqueDemandes|length > 0 %}
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-history me-2"></i>Historique des modifications</h3>
+                        </div>
+                        <div class="card-body">
+                            {% for historique in demande.historiqueDemandes|reverse %}
+                            <div class="timeline-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        {% if historique.ancienStatut %}
+                                            <span class="badge bg-secondary">{{ historique.ancienStatut }}</span>
+                                            <i class="ti ti-arrow-right mx-2"></i>
+                                        {% endif %}
+                                        <span class="badge bg-info">{{ historique.nouveauStatut }}</span>
+                                        {% if historique.commentaire %}
+                                            <div class="text-muted mt-2" style="font-size:.85rem;">{{ historique.commentaire }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-end text-muted" style="font-size:.8rem;">
+                                        <div>{{ historique.acteur }}</div>
+                                        <div>{{ historique.dateAction|date('d/m/Y H:i') }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-settings me-2"></i>Changer le statut</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Nouveau statut</label>
+                                <select class="form-select" id="newStatus">
+                                    {% for status in statuses %}
+                                        <option value="{{ status }}" {{ demande.status == status ? 'selected' : '' }}>{{ status }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Commentaire</label>
+                                <textarea class="form-control" id="statusComment" rows="3" placeholder="Commentaire (optionnel)"></textarea>
+                            </div>
+                            <button class="btn btn-primary w-100" id="updateStatusBtn">
+                                <i class="ti ti-check me-1"></i>Mettre à jour
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-link me-2"></i>Actions rapides</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="{{ path('demande_edit', {id: demande.idDemande}) }}" class="btn btn-outline-primary">
+                                    <i class="ti ti-edit me-1"></i>Modifier
+                                </a>
+                                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                    <i class="ti ti-trash me-1"></i>Supprimer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal modal-blur fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-body text-center py-4">
+                <i class="ti ti-alert-triangle text-danger mb-3" style="font-size: 2.5rem;"></i>
+                <h3>Confirmer la suppression</h3>
+                <p class="text-muted">Cette action est irréversible. Voulez-vous vraiment supprimer cette demande?</p>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal">Annuler</button>
+                        </div>
+                        <div class="col">
+                            <button type="button" class="btn btn-danger w-100" id="confirmDeleteBtn">
+                                <i class="ti ti-trash me-1"></i>Supprimer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+(function() {
+    "use strict";
+
+    var DELETE_URL = "{{ path('demande_delete', {id: demande.idDemande}) }}";
+    var STATUS_URL = "{{ path('demande_update_status', {id: demande.idDemande}) }}";
+    var INDEX_URL = "{{ path('demande_index') }}";
+
+    document.addEventListener("DOMContentLoaded", function() {
+
+        document.getElementById("confirmDeleteBtn").addEventListener("click", function() {
+            var btn = this;
+            btn.disabled = true;
+            btn.textContent = "Suppression...";
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", DELETE_URL, true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var result = JSON.parse(xhr.responseText);
+                            if (result.success) {
+                                window.location.href = INDEX_URL;
+                            } else {
+                                alert(result.message);
+                                btn.disabled = false;
+                                btn.textContent = "Supprimer";
+                            }
+                        } catch (e) {
+                            alert("Erreur lors du traitement de la reponse");
+                            btn.disabled = false;
+                            btn.textContent = "Supprimer";
+                        }
+                    } else {
+                        alert("Erreur serveur (code " + xhr.status + ")");
+                        btn.disabled = false;
+                        btn.textContent = "Supprimer";
+                    }
+                }
+            };
+            xhr.onerror = function() {
+                alert("Erreur de connexion au serveur");
+                btn.disabled = false;
+                btn.textContent = "Supprimer";
+            };
+            xhr.send(JSON.stringify({}));
+        });
+
+        document.getElementById("updateStatusBtn").addEventListener("click", function() {
+            var btn = this;
+            var newStatus = document.getElementById("newStatus").value;
+            var comment = document.getElementById("statusComment").value;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader me-1"></i>Mise a jour...';
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", STATUS_URL, true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var result = JSON.parse(xhr.responseText);
+                            if (result.success) {
+                                window.location.reload();
+                            } else {
+                                alert(result.message);
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="ti ti-check me-1"></i>Mettre a jour';
+                            }
+                        } catch (e) {
+                            alert("Erreur lors du traitement");
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="ti ti-check me-1"></i>Mettre a jour';
+                        }
+                    } else {
+                        alert("Erreur serveur (code " + xhr.status + ")");
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="ti ti-check me-1"></i>Mettre a jour';
+                    }
+                }
+            };
+            xhr.onerror = function() {
+                alert("Erreur de connexion au serveur");
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ti ti-check me-1"></i>Mettre a jour';
+            };
+            xhr.send(JSON.stringify({status: newStatus, commentaire: comment}));
+        });
+    });
+})();
+</script>
+{% endblock %}

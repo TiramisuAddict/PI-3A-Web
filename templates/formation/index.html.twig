@@ -1,0 +1,670 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Formations{% endblock %}
+
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .dashboard-formation {
+            background: #f5f7fb;
+            min-height: 100vh;
+            padding: 1.25rem 0 2rem;
+        }
+
+        .rh-shell {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 0 .75rem;
+        }
+
+        .rh-hero {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 10px;
+            background: #fff;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .rh-toolbar {
+            padding: 1rem 1.25rem;
+            background: #fff;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .rh-filter-grid {
+            margin-top: .9rem;
+        }
+
+        .rh-toolbar .form-label {
+            font-size: .78rem;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            color: #526070;
+            margin-bottom: .35rem;
+        }
+
+        .rh-offcanvas .surface-card {
+            background: #fff;
+        }
+
+        .rh-kpi-value {
+            line-height: 1.1;
+        }
+
+        .rh-actions .btn {
+            min-width: 5.4rem;
+        }
+
+        .rh-pending-card {
+            border-left: 3px solid #f59e0b;
+        }
+
+        .rh-status-pending {
+            background: #f59e0b;
+            color: #fff;
+        }
+
+        .rh-score-row {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            flex-wrap: wrap;
+        }
+
+        .rh-score-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+            padding: .2rem .55rem;
+            border-radius: 999px;
+            font-size: .78rem;
+            font-weight: 700;
+        }
+
+        .rh-score-pill.rating {
+            background: rgba(13, 110, 253, 0.14);
+            color: #0b57d0;
+        }
+
+        .rh-score-pill.rating::before {
+            content: '★';
+            line-height: 1;
+        }
+
+        .rh-score-pill.reviews {
+            background: rgba(13, 148, 136, 0.13);
+            color: #0f766e;
+        }
+
+        .rh-score-pill.reviews::before {
+            content: '👤';
+            line-height: 1;
+        }
+
+        .rh-formation-layout {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1rem;
+            padding: 1rem 1.25rem 1.25rem;
+        }
+
+        .rh-formation-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .9rem;
+        }
+
+        .rh-formation-item {
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            border-radius: 10px;
+            background: #fff;
+            padding: .9rem;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+            transition: transform .15s ease, box-shadow .15s ease;
+            cursor: pointer;
+        }
+
+        .rh-formation-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+            border-color: rgba(31, 111, 235, 0.32);
+        }
+
+        .rh-formation-item.is-selected {
+            border-color: rgba(31, 111, 235, 0.65);
+            box-shadow: 0 0 0 1px rgba(31, 111, 235, 0.25);
+        }
+
+        .rh-card-meta {
+            font-size: .78rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .rh-formation-item h4 {
+            margin: .2rem 0 .45rem;
+            font-size: 1.08rem;
+            line-height: 1.25;
+            color: #0f172a;
+        }
+
+        .rh-formation-item h4,
+        .rh-formation-item .mini-muted {
+            word-break: break-word;
+        }
+
+        .rh-card-divider {
+            border-top: 1px dashed #c9d5e7;
+            margin-top: .55rem;
+            padding-top: .55rem;
+        }
+
+        .rh-sidepanel {
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            border-radius: 10px;
+            background: #fff;
+            overflow: hidden;
+            height: fit-content;
+            position: sticky;
+            top: 5.75rem;
+        }
+
+        .rh-sidepanel-header {
+            padding: .9rem 1rem;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+            background: rgba(31, 111, 235, 0.07);
+        }
+
+        .rh-sidepanel-body {
+            padding: .9rem 1rem;
+        }
+
+        .rh-no-results {
+            grid-column: 1 / -1;
+            margin-bottom: 0;
+        }
+
+        @media (max-width: 991.98px) {
+            .rh-formation-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .rh-formation-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .rh-sidepanel {
+                position: static;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="dashboard-formation">
+     {{ include('components/navbar.html.twig') }}
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+        {{ include('components/sidebar.html.twig', {'active_page': 'formations','sidebar_role': role}) }}
+    <div class="rh-shell">
+    <div class="rh-hero">
+        <div class="row align-items-center g-4 position-relative">
+            <div class="col-lg-7">
+                <div class="text-secondary text-uppercase small fw-bold mb-2">Tableau RH</div>
+                <h2 class="h2 mb-2">Gestion des formations</h2>
+                <p class="text-secondary mb-0">Consultez, filtrez et pilotez les formations dans une interface Tabler simple et coherente.</p>
+            </div>
+            
+            <div class="col-lg-5 text-lg-end">
+                {% if rh_logged %}
+                    <a class="btn btn-primary" href="{{ path('app_formation_new') }}">
+                        <i class="ti ti-plus me-1"></i>
+                        Nouvelle formation
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row g-3 mt-4 rh-metrics">
+            <div class="col-md-4">
+                <div class="stat-card p-3 h-100">
+                    <div class="mini-muted">Formations</div>
+                    <div class="h2 mb-0 rh-kpi-value">{{ formations|length }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card p-3 h-100">
+                    <div class="mini-muted">Demandes en attente</div>
+                    <div class="h2 mb-0 rh-kpi-value">{{ pending_by_formation|reduce((carry, value) => carry + value, 0) }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card p-3 h-100">
+                    <div class="mini-muted">Meilleure formation (avis)</div>
+                    {% if best_reviewed_formation %}
+                        <div class="h5 mb-1">{{ best_reviewed_formation.formation_titre }}</div>
+                        <div class="rh-score-row">
+                            <span class="rh-score-pill rating">{{ best_reviewed_formation.average_note }}/5</span>
+                            <span class="rh-score-pill reviews">{{ best_reviewed_formation.reviews_count }} avis</span>
+                        </div>
+                    {% else %}
+                        <div class="h5 mb-0">Aucune evaluation</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% for message in app.flashes('success') %}
+        <div class="alert alert-success" role="alert">{{ message }}</div>
+    {% endfor %}
+
+    {% for message in app.flashes('error') %}
+        <div class="alert alert-danger" role="alert">{{ message }}</div>
+    {% endfor %}
+
+    {% if rh_logged %}
+    <div class="card">
+        <div class="rh-toolbar border-bottom">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <div class="mini-muted">Tableau de bord RH</div>
+                    <div class="fw-bold">Formations et demandes en attente</div>
+                </div>
+                <span class="soft-pill"><i class="ti ti-bell"></i>{{ pending_by_formation|reduce((carry, value) => carry + value, 0) }} demandes en attente</span>
+            </div>
+
+            <form method="get" action="{{ path('app_formation_rh') }}" id="rh-filter-form" class="row g-2 align-items-end rh-filter-grid">
+                <div class="col-lg-4 col-md-6">
+                    <label class="form-label" for="rh_q">Recherche</label>
+                    <div class="input-icon">
+                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                        <input id="rh_q" name="q" type="text" class="form-control" value="{{ q|default('') }}" placeholder="Titre, organisme, lieu...">
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label" for="rh_sort">Tri</label>
+                    <select id="rh_sort" name="sort" class="form-select">
+                        <option value="date_desc" {{ sort == 'date_desc' ? 'selected' : '' }}>Plus recentes</option>
+                        <option value="date_asc" {{ sort == 'date_asc' ? 'selected' : '' }}>Plus anciennes</option>
+                        <option value="title_asc" {{ sort == 'title_asc' ? 'selected' : '' }}>Titre A-Z</option>
+                        <option value="organisme_asc" {{ sort == 'organisme_asc' ? 'selected' : '' }}>Organisme A-Z</option>
+                        <option value="capacity_desc" {{ sort == 'capacity_desc' ? 'selected' : '' }}>Capacite max</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label" for="rh_date_scope">Periode</label>
+                    <select id="rh_date_scope" name="date_scope" class="form-select">
+                        <option value="all" {{ date_scope == 'all' ? 'selected' : '' }}>Toutes</option>
+                        <option value="upcoming" {{ date_scope == 'upcoming' ? 'selected' : '' }}>A venir</option>
+                        <option value="ongoing" {{ date_scope == 'ongoing' ? 'selected' : '' }}>En cours</option>
+                        <option value="finished" {{ date_scope == 'finished' ? 'selected' : '' }}>Terminees</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label" for="rh_min_capacite">Capacite min</label>
+                    <input id="rh_min_capacite" name="min_capacite" type="number" min="0" class="form-control" value="{{ min_capacite|default(0) }}">
+                </div>
+                <div class="col-lg-1 col-md-6">
+                    <a class="btn btn-outline-secondary w-100" href="{{ path('app_formation_rh') }}" title="Reinitialiser filtres">
+                        <i class="ti ti-refresh"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+        <div class="rh-formation-layout">
+            <div>
+                <div class="rh-formation-grid">
+                    {% for formation in formations %}
+                        {% set rowPending = pending_by_formation[formation.id] ?? 0 %}
+                        {% set formationQuery = app.request.query.all|merge({'formation': formation.id}) %}
+                        <article
+                            class="rh-formation-item {{ selected_formation and selected_formation.id == formation.id ? 'is-selected' : '' }}"
+                            tabindex="0"
+                            role="button"
+                            data-formation-id="{{ formation.id }}"
+                            data-title="{{ formation.titre }}"
+                            data-organisme="{{ formation.organisme }}"
+                            data-date-debut="{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}"
+                            data-date-fin="{{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}"
+                            data-lieu="{{ formation.lieu }}"
+                            data-capacite="{{ formation.capacite }}"
+                            data-pending="{{ rowPending }}"
+                            data-show-url="{{ path('app_formation_show', {'id': formation.id}) }}"
+                            data-edit-url="{{ path('app_formation_edit', {'id': formation.id}) }}"
+                        >
+                            <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
+                                <div class="rh-card-meta">{{ formation.dateDebut ? formation.dateDebut|date('d M Y') : '' }}</div>
+                                {% if rowPending > 0 %}
+                                    <span class="badge rh-status-pending">{{ rowPending }} en attente</span>
+                                {% else %}
+                                    <span class="badge bg-green-lt text-green">Stable</span>
+                                {% endif %}
+                            </div>
+
+                            <h4>{{ formation.titre }}</h4>
+                            <div class="mini-muted mb-2">{{ formation.organisme }}</div>
+                            <div class="mini-muted mb-2">{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }} - {{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}</div>
+
+                            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                                <span class="badge bg-secondary-lt text-secondary">{{ formation.lieu }}</span>
+                                <span class="badge bg-indigo-lt text-indigo">Capacite {{ formation.capacite }}</span>
+                            </div>
+
+                            <div class="rh-card-divider d-flex flex-wrap gap-2 align-items-center">
+                                {% if rowPending > 0 %}
+                                    <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="offcanvas" data-bs-target="#pendingInscriptionsPanel{{ formation.id }}" aria-controls="pendingInscriptionsPanel{{ formation.id }}">
+                                        <i class="ti ti-bell me-1"></i>Demandes
+                                    </button>
+                                {% endif %}
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_formation_show', {'id': formation.id}) }}">Voir</a>
+                                <a class="btn btn-sm btn-primary" href="{{ path('app_formation_edit', {'id': formation.id}) }}">Modifier</a>
+                            </div>
+                        </article>
+                    {% else %}
+                        <div class="alert alert-secondary mb-0">Aucune formation trouvee.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <aside class="rh-sidepanel">
+                <div class="rh-sidepanel-header">
+                    <div class="mini-muted">Formation selectionnee</div>
+                    <div class="fw-bold" id="rh-panel-title">{{ selected_formation ? selected_formation.titre : 'Aucune selection' }}</div>
+                </div>
+                <div class="rh-sidepanel-body">
+                    <div id="rh-panel-content" class="{% if not selected_formation %}text-secondary{% endif %}">
+                        {% if selected_formation %}
+                            {% set selectedPending = pending_by_formation[selected_formation.id] ?? 0 %}
+                            <div class="mini-muted mb-2" id="rh-panel-organisme">{{ selected_formation.organisme }}</div>
+                            <div class="mb-2" id="rh-panel-dates">{{ selected_formation.dateDebut ? selected_formation.dateDebut|date('Y-m-d') : '' }} - {{ selected_formation.dateFin ? selected_formation.dateFin|date('Y-m-d') : '' }}</div>
+                            <div class="d-flex flex-wrap gap-2 mb-3" id="rh-panel-badges">
+                                <span class="badge bg-secondary-lt text-secondary" id="rh-panel-lieu">{{ selected_formation.lieu }}</span>
+                                <span class="badge bg-indigo-lt text-indigo" id="rh-panel-capacite">Capacite {{ selected_formation.capacite }}</span>
+                                <span class="badge {{ selectedPending > 0 ? 'rh-status-pending' : 'bg-green-lt text-green' }}" id="rh-panel-pending">{{ selectedPending > 0 ? selectedPending ~ ' demande(s)' : 'Aucune demande en attente' }}</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2" id="rh-panel-actions">
+                                <a class="btn btn-sm btn-outline-secondary" id="rh-panel-show" href="{{ path('app_formation_show', {'id': selected_formation.id}) }}">Voir fiche</a>
+                                <a class="btn btn-sm btn-primary" id="rh-panel-edit" href="{{ path('app_formation_edit', {'id': selected_formation.id}) }}">Modifier</a>
+                            </div>
+                        {% else %}
+                            <div id="rh-panel-empty">Choisissez une formation pour afficher son resume ici.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if rh_logged %}
+    {% for formation in formations %}
+        {% set formationPendingRequests = pending_inscriptions_by_formation[formation.id] ?? [] %}
+        {% if formationPendingRequests is not empty %}
+            <div class="offcanvas offcanvas-end rh-offcanvas" tabindex="-1" id="pendingInscriptionsPanel{{ formation.id }}" aria-labelledby="pendingInscriptionsLabel{{ formation.id }}">
+                <div class="offcanvas-header">
+                    <h2 class="offcanvas-title" id="pendingInscriptionsLabel{{ formation.id }}">Demandes en attente - {{ formation.titre }}</h2>
+                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body">
+                    <div class="d-flex flex-column gap-3">
+                        {% for ins in formationPendingRequests %}
+                            <div class="surface-card p-3 rh-pending-card">
+                                <div>
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <div class="fw-bold">{{ ins.prenom }} {{ ins.nom }}</div>
+                                            <div class="text-secondary small">{{ ins.formation_titre }}</div>
+                                        </div>
+                                        <span class="badge rh-status-pending">En attente</span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <div class="text-secondary small mb-1">Raison</div>
+                                        <div>{{ ins.raison ?: 'Aucune raison saisie.' }}</div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <form method="post" action="{{ path('app_inscription_rh_accept', {'id': ins.id_inscription}) }}">
+                                            <button type="submit" class="btn btn-success btn-sm">Accepter</button>
+                                        </form>
+                                        <form method="post" action="{{ path('app_inscription_rh_refuse', {'id': ins.id_inscription}) }}">
+                                            <button type="submit" class="btn btn-danger btn-sm">Refuser</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    <script>
+        (function () {
+            const filterForm = document.getElementById('rh-filter-form');
+            const grid = document.querySelector('.rh-formation-grid');
+            const cards = Array.from(document.querySelectorAll('.rh-formation-item'));
+            let noResults = document.getElementById('rh-no-results');
+
+            const parseDate = (dateValue) => {
+                if (!dateValue) {
+                    return null;
+                }
+
+                const date = new Date(dateValue + 'T00:00:00');
+                return Number.isNaN(date.getTime()) ? null : date;
+            };
+
+            if (filterForm) {
+                const searchInput = filterForm.querySelector('input[name="q"]');
+                const sortSelect = filterForm.querySelector('select[name="sort"]');
+                const periodSelect = filterForm.querySelector('select[name="date_scope"]');
+                const minCapInput = filterForm.querySelector('input[name="min_capacite"]');
+
+                if (!noResults && grid) {
+                    noResults = document.createElement('div');
+                    noResults.id = 'rh-no-results';
+                    noResults.className = 'alert alert-secondary rh-no-results d-none';
+                    noResults.textContent = 'Aucune formation ne correspond a vos filtres.';
+                    grid.appendChild(noResults);
+                }
+
+                const applyClientFilters = () => {
+                    const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+                    const sort = sortSelect ? sortSelect.value : 'date_desc';
+                    const period = periodSelect ? periodSelect.value : 'all';
+                    const minCap = Math.max(0, parseInt(minCapInput ? minCapInput.value : '0', 10) || 0);
+
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+
+                    const visibleCards = [];
+                    cards.forEach((card) => {
+                        const title = (card.dataset.title || '').toLowerCase();
+                        const organisme = (card.dataset.organisme || '').toLowerCase();
+                        const lieu = (card.dataset.lieu || '').toLowerCase();
+                        const capacite = parseInt(card.dataset.capacite || '0', 10) || 0;
+                        const startDate = parseDate(card.dataset.dateDebut || '');
+                        const endDate = parseDate(card.dataset.dateFin || '');
+
+                        const matchesQuery = query === '' || (title + ' ' + organisme + ' ' + lieu).includes(query);
+                        const matchesCap = capacite >= minCap;
+
+                        let matchesPeriod = true;
+                        if (period === 'upcoming') {
+                            matchesPeriod = !!startDate && startDate >= today;
+                        } else if (period === 'ongoing') {
+                            matchesPeriod = !!startDate && !!endDate && startDate <= today && endDate >= today;
+                        } else if (period === 'finished') {
+                            matchesPeriod = !!endDate && endDate < today;
+                        }
+
+                        const isVisible = matchesQuery && matchesCap && matchesPeriod;
+                        card.classList.toggle('d-none', !isVisible);
+                        if (isVisible) {
+                            visibleCards.push(card);
+                        }
+                    });
+
+                    visibleCards.sort((a, b) => {
+                        const startA = parseDate(a.dataset.dateDebut || '');
+                        const startB = parseDate(b.dataset.dateDebut || '');
+                        const capA = parseInt(a.dataset.capacite || '0', 10) || 0;
+                        const capB = parseInt(b.dataset.capacite || '0', 10) || 0;
+                        const titleA = (a.dataset.title || '').toLowerCase();
+                        const titleB = (b.dataset.title || '').toLowerCase();
+                        const orgA = (a.dataset.organisme || '').toLowerCase();
+                        const orgB = (b.dataset.organisme || '').toLowerCase();
+
+                        if (sort === 'date_asc') {
+                            return (startA?.getTime() || 0) - (startB?.getTime() || 0);
+                        }
+                        if (sort === 'title_asc') {
+                            return titleA.localeCompare(titleB);
+                        }
+                        if (sort === 'organisme_asc') {
+                            return orgA.localeCompare(orgB);
+                        }
+                        if (sort === 'capacity_desc') {
+                            return capB - capA;
+                        }
+
+                        return (startB?.getTime() || 0) - (startA?.getTime() || 0);
+                    });
+
+                    if (grid) {
+                        visibleCards.forEach((card) => grid.appendChild(card));
+                        if (noResults) {
+                            grid.appendChild(noResults);
+                        }
+                    }
+
+                    if (noResults) {
+                        noResults.classList.toggle('d-none', visibleCards.length > 0);
+                    }
+                };
+
+                if (searchInput) {
+                    searchInput.addEventListener('input', applyClientFilters);
+                    searchInput.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                            applyClientFilters();
+                        }
+                    });
+                }
+
+                [sortSelect, periodSelect, minCapInput].forEach((control) => {
+                    if (control) {
+                        control.addEventListener('input', applyClientFilters);
+                        control.addEventListener('change', applyClientFilters);
+                    }
+                });
+
+                const resetLink = filterForm.querySelector('a[title="Reinitialiser filtres"]');
+                if (resetLink && searchInput && sortSelect && periodSelect && minCapInput) {
+                    resetLink.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        searchInput.value = '';
+                        sortSelect.value = 'date_desc';
+                        periodSelect.value = 'all';
+                        minCapInput.value = '0';
+                        applyClientFilters();
+                    });
+                }
+
+                applyClientFilters();
+            }
+
+            const panelTitle = document.getElementById('rh-panel-title');
+            const panelContent = document.getElementById('rh-panel-content');
+            const panelOrganisme = document.getElementById('rh-panel-organisme');
+            const panelDates = document.getElementById('rh-panel-dates');
+            const panelLieu = document.getElementById('rh-panel-lieu');
+            const panelCapacite = document.getElementById('rh-panel-capacite');
+            const panelPending = document.getElementById('rh-panel-pending');
+            const panelShow = document.getElementById('rh-panel-show');
+            const panelEdit = document.getElementById('rh-panel-edit');
+
+            const selectCard = (card) => {
+                if (!card || !panelTitle || !panelContent || !panelOrganisme || !panelDates || !panelLieu || !panelCapacite || !panelPending || !panelShow || !panelEdit) {
+                    return;
+                }
+
+                document.querySelectorAll('.rh-formation-item').forEach((item) => item.classList.remove('is-selected'));
+                card.classList.add('is-selected');
+
+                panelContent.classList.remove('text-secondary');
+                const panelEmpty = document.getElementById('rh-panel-empty');
+                if (panelEmpty) {
+                    panelEmpty.remove();
+                }
+
+                const pending = parseInt(card.dataset.pending || '0', 10);
+                panelTitle.textContent = card.dataset.title || 'Aucune selection';
+                panelOrganisme.textContent = card.dataset.organisme || '';
+                panelDates.textContent = (card.dataset.dateDebut || '') + ' - ' + (card.dataset.dateFin || '');
+                panelLieu.textContent = card.dataset.lieu || '';
+                panelCapacite.textContent = 'Capacite ' + (card.dataset.capacite || '0');
+                if (pending > 0) {
+                    panelPending.className = 'badge rh-status-pending';
+                    panelPending.textContent = pending + ' demande(s)';
+                } else {
+                    panelPending.className = 'badge bg-green-lt text-green';
+                    panelPending.textContent = 'Aucune demande en attente';
+                }
+                panelShow.href = card.dataset.showUrl || '#';
+                panelEdit.href = card.dataset.editUrl || '#';
+
+                if (window.history && window.history.replaceState) {
+                    const next = new URL(window.location.href);
+                    next.searchParams.set('formation', card.dataset.formationId || '');
+                    window.history.replaceState({}, '', next.toString());
+                }
+            };
+
+            if (grid) {
+                grid.addEventListener('click', (event) => {
+                    const clickInsideButton = event.target.closest('a, button, form, input, select, textarea');
+                    if (clickInsideButton) {
+                        return;
+                    }
+
+                    const card = event.target.closest('.rh-formation-item');
+                    if (!card) {
+                        return;
+                    }
+
+                    selectCard(card);
+                });
+
+                grid.addEventListener('keydown', (event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') {
+                        return;
+                    }
+
+                    const card = event.target.closest('.rh-formation-item');
+                    if (!card) {
+                        return;
+                    }
+
+                    if (event.target.closest('a, button, form, input, select, textarea')) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    selectCard(card);
+                });
+            }
+
+            if (cards.length > 0 && !document.querySelector('.rh-formation-item.is-selected')) {
+                selectCard(cards[0]);
+            }
+        })();
+    </script>
+    </div>
+    </div>
+    </div>
+{% endblock %}

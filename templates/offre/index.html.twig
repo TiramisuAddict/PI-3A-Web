@@ -1,0 +1,352 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Offres d'emploi | Momentum{% endblock %}
+
+{% block stylesheets %}
+    <style>
+        .offres-page {
+            background: #f5f7fb;
+            min-height: 100vh;
+            padding-bottom: 2rem;
+        }
+
+        .offres-carousel .carousel-item {
+            min-height: 220px;
+        }
+
+        .offres-carousel .carousel-panel {
+            border-radius: 10px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: #fff;
+            min-height: 220px;
+        }
+
+        .offres-filter-bar {
+            border-radius: 10px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: #fff;
+        }
+
+        .offre-card {
+            border-radius: 10px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: #fff;
+            transition: border-color .2s ease, box-shadow .2s ease;
+        }
+
+        .offre-card:hover {
+            border-color: rgba(31, 111, 235, 0.35);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+        }
+
+        .offre-card .card-body {
+            padding: 1rem;
+        }
+
+        .offre-title {
+            font-size: 1.05rem;
+            line-height: 1.35;
+            margin: 0;
+            color: #1f2937;
+        }
+
+        .offre-category {
+            font-size: .72rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 700;
+            margin-bottom: .35rem;
+        }
+
+        .offre-info {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .5rem;
+            margin-top: .9rem;
+        }
+
+        .offre-info-item {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 8px;
+            background: #f8fafc;
+            padding: .55rem .65rem;
+        }
+
+        .offre-info-label {
+            display: block;
+            font-size: .72rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 700;
+            margin-bottom: .1rem;
+        }
+
+        .offre-info-value {
+            display: block;
+            font-weight: 600;
+            color: #182433;
+            font-size: .9rem;
+        }
+
+        @media (max-width: 575.98px) {
+            .offre-info {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}
+
+{# clear form when modal is closed #}
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.modal[id^="postulerModal-"]').forEach(function (modal) {
+                modal.addEventListener('hidden.bs.modal', function () {
+                    modal.querySelectorAll('form').forEach(function (form) {
+                        form.reset();
+                        form.querySelectorAll('.is-valid, .is-invalid').forEach(function (field) {
+                            field.classList.remove('is-valid', 'is-invalid');
+                        });
+                    });
+                });
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block body %}
+{# filter parameters #}
+
+{% set queryName = app.request.query.get('q')|default('') %}
+{% set queryCategory = app.request.query.get('category')|default('') %}
+{% set queryContract = app.request.query.get('contract')|default('') %}
+
+{% set categories = [
+    'Informatique',
+    'Marketing',
+    'Vente',
+    'Finance',
+    'Ressources Humaines',
+    'Santé',
+    'Education',
+    'Art et Design',
+    'Autre'
+] %}
+
+{# check flashes #}
+
+
+{# navbar #}
+<div class="offres-page">
+    {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'offres', logged_user: true } %}
+
+    <section class="container-xl mt-3">
+        <div id="offresCarousel" class="carousel slide offres-carousel" data-bs-ride="carousel">
+            <div class="carousel-indicators">
+                <button type="button" data-bs-target="#offresCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+                <button type="button" data-bs-target="#offresCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
+                <button type="button" data-bs-target="#offresCarousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
+            </div>
+
+            <div class="carousel-inner">
+                <div class="carousel-item active">
+                    <div class="carousel-panel d-flex align-items-center p-4 p-md-5">
+                        <div>
+                            <h2 class="h1 mb-2">Trouvez l'offre qui vous correspond</h2>
+                            <p class="text-secondary mb-0">Parcourez les opportunites disponibles et postulez en quelques clics.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="carousel-item">
+                    <div class="carousel-panel d-flex align-items-center p-4 p-md-5">
+                        <div>
+                            <h2 class="h1 mb-2">Recrutement plus rapide pour les RH</h2>
+                            <p class="text-secondary mb-0">Filtrez les profils et suivez vos candidatures sur une interface unique.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="carousel-item">
+                    <div class="carousel-panel d-flex align-items-center p-4 p-md-5">
+                        <div>
+                            <h2 class="h1 mb-2">CDI, CDD, Stage ou CVP</h2>
+                            <p class="text-secondary mb-0">Explorez differents types de contrats selon vos objectifs professionnels.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="carousel-control-prev" type="button" data-bs-target="#offresCarousel" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Previous</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#offresCarousel" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Next</span>
+            </button>
+        </div>
+    </section>
+
+    <section class="container-xl mt-3">
+        <div class="card offres-filter-bar">
+            <div class="card-body">
+                <form method="get" action="{{ path('app_offre_list') }}" class="row g-3 align-items-end">
+                    <div class="col-12 col-lg-5">
+                        <label class="form-label" for="q">Rechercher par nom de poste</label>
+                        <input type="text" id="q" name="q" class="form-control" placeholder="Ex: Developpeur Full Stack" value="{{ queryName }}">
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label class="form-label" for="category">Categorie</label>
+                        <select id="category" name="category" class="form-select">
+                            <option value="">Toutes les categories</option>
+                            {% for category in categories %}
+                                <option value="{{ category }}" {{ queryCategory == category ? 'selected' : '' }}>{{ category }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label class="form-label" for="contract">Type de contrat</label>
+                        <select id="contract" name="contract" class="form-select">
+                            <option value="">Tous les contrats</option>
+                            <option value="CDI" {{ queryContract == 'CDI' ? 'selected' : '' }}>CDI</option>
+                            <option value="CDD" {{ queryContract == 'CDD' ? 'selected' : '' }}>CDD</option>
+                            <option value="STAGE" {{ queryContract == 'STAGE' ? 'selected' : '' }}>STAGE</option>
+                            <option value="CVP" {{ queryContract == 'CVP' ? 'selected' : '' }}>CVP</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-lg-1 d-grid">
+                        <button type="submit" class="btn btn-primary">Chercher</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <section class="container-xl mt-4">
+        {% if offres|length > 0 %}
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h2 mb-0">{{ offres|length }} offres disponibles</h2>
+            </div>
+
+            <div class="row g-3">
+                {% for offre in offres %}
+                    {% set applyModalId = 'postulerModal-' ~ offre.id %}
+                    {% set detailsModalId = 'detailsModal-' ~ offre.id %}
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <div class="card offre-card h-100">
+                            <div class="card-body d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                    <div>
+                                        <div class="offre-category">{{ offre.categorie }}</div>
+                                        <h3 class="offre-title">{{ offre.titrePoste }}</h3>
+                                    </div>
+                                    <span class="badge bg-blue-lt text-blue">{{ offre.typeContrat }}</span>
+                                </div>
+
+                                <div class="offre-info">
+                                    <div class="offre-info-item">
+                                        <span class="offre-info-label">Date limite</span>
+                                        <span class="offre-info-value">{{ offre.dateLimite|date('Y-m-d') }}</span>
+                                    </div>
+
+                                    <div class="offre-info-item">
+                                        <span class="offre-info-label">Candidats</span>
+                                        <span class="offre-info-value">{{ offre.candidats|length }} candidat(s)</span>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3 pt-1 mt-auto row g-2">
+                                    <div class="col-6 d-grid">
+                                        <button type="button" class="btn btn-primary" data-bs-toggle="modal"
+                                            data-bs-target="#{{ applyModalId }}">
+                                            Postuler
+                                        </button>
+
+                                        <div class="modal fade" id="{{ applyModalId }}" tabindex="-1" aria-labelledby="{{ applyModalId }}Label" aria-hidden="true">
+                                            <div class="modal-dialog modal-lg" role="document">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="{{ applyModalId }}Label">Postuler - {{ offre.titrePoste }}</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        {{ render(controller('App\\Controller\\CandidatController::postuler', {
+                                                            'offreId': offre.id,
+                                                            'visiteurId': 8
+                                                        })) }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-6 d-grid">
+                                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
+                                            data-bs-target="#{{ detailsModalId }}">
+                                            Détails
+                                        </button>
+
+                                        <div class="modal fade" id="{{ detailsModalId }}" tabindex="-1" aria-labelledby="{{ detailsModalId }}Label" aria-hidden="true">
+                                            <div class="modal-dialog" role="document">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="{{ detailsModalId }}Label">Poste {{ offre.titrePoste }}</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                        aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        {% set safeDescription = (offre.description|default(''))
+                                                            |replace({
+                                                                ' contenteditable="true"': '',
+                                                                ' contenteditable="false"': '',
+                                                                ' contenteditable=true': '',
+                                                                ' contenteditable=false': '',
+                                                                ' contenteditable': '',
+                                                                ' designmode="on"': '',
+                                                                ' designMode="on"': ''
+                                                            })
+                                                        %}
+                                                        {{ safeDescription|raw }}
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn me-auto"
+                                                        data-bs-dismiss="modal">Close</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="card">
+                <div class="card-body">
+                    <div class="empty">
+                        <div class="empty-img mb-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-briefcase" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+                                <path d="M8 7l0 -2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2l0 2" />
+                                <path d="M12 12l0 .01" />
+                                <path d="M3 13a20 20 0 0 0 18 0" />
+                            </svg>
+                        </div>
+                        <p class="empty-title">Aucune offre disponible</p>
+                        <p class="empty-subtitle text-secondary">Aucune offre ne correspond pour le moment. Revenez plus tard.</p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
