@@ -1,0 +1,6 @@
+# CSRF protection settings compatible with Symfony 6.4
+framework:
+    form:
+        csrf_protection: true
+
+    csrf_protection: true

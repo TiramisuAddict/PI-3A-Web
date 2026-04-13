@@ -1,0 +1,61 @@
+{{ form_start(form, {'attr': {'class': 'needs-validation', 'novalidate': 'novalidate'}}) }}
+    <div class="row g-3">
+        <div class="col-md-6">
+            {{ form_label(form.titre, 'Titre', {'label_attr': {'class': 'form-label required'}}) }}
+            {% set titreClass = 'form-control' ~ (form.titre.vars.errors|length > 0 ? ' is-invalid' : '') %}
+            {{ form_widget(form.titre, {'attr': {'class': titreClass, 'placeholder': 'Ex: Formation IA'}}) }}
+            {% if form.titre.vars.errors|length > 0 %}
+                <div class="invalid-feedback d-block">{{ form_errors(form.titre) }}</div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-6">
+            {{ form_label(form.organisme, 'Organisme', {'label_attr': {'class': 'form-label required'}}) }}
+            {% set organismeClass = 'form-control' ~ (form.organisme.vars.errors|length > 0 ? ' is-invalid' : '') %}
+            {{ form_widget(form.organisme, {'attr': {'class': organismeClass, 'placeholder': 'Ex: Tabler Academy'}}) }}
+            {% if form.organisme.vars.errors|length > 0 %}
+                <div class="invalid-feedback d-block">{{ form_errors(form.organisme) }}</div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-6">
+            {{ form_label(form.dateDebut, 'Date debut', {'label_attr': {'class': 'form-label required'}}) }}
+            {% set dateDebutClass = 'form-control' ~ (form.dateDebut.vars.errors|length > 0 ? ' is-invalid' : '') %}
+            {{ form_widget(form.dateDebut, {'attr': {'class': dateDebutClass}}) }}
+            {% if form.dateDebut.vars.errors|length > 0 %}
+                <div class="invalid-feedback d-block">{{ form_errors(form.dateDebut) }}</div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-6">
+            {{ form_label(form.dateFin, 'Date fin', {'label_attr': {'class': 'form-label required'}}) }}
+            {% set dateFinClass = 'form-control' ~ (form.dateFin.vars.errors|length > 0 ? ' is-invalid' : '') %}
+            {{ form_widget(form.dateFin, {'attr': {'class': dateFinClass}}) }}
+            {% if form.dateFin.vars.errors|length > 0 %}
+                <div class="invalid-feedback d-block">{{ form_errors(form.dateFin) }}</div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-7">
+            {{ form_label(form.lieu, 'Lieu', {'label_attr': {'class': 'form-label required'}}) }}
+            {% set lieuClass = 'form-control' ~ (form.lieu.vars.errors|length > 0 ? ' is-invalid' : '') %}
+            {{ form_widget(form.lieu, {'attr': {'class': lieuClass, 'placeholder': 'Ex: Tunis'}}) }}
+            {% if form.lieu.vars.errors|length > 0 %}
+                <div class="invalid-feedback d-block">{{ form_errors(form.lieu) }}</div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-5">
+            {{ form_label(form.capacite, 'Capacite', {'label_attr': {'class': 'form-label required'}}) }}
+            {% set capaciteClass = 'form-control' ~ (form.capacite.vars.errors|length > 0 ? ' is-invalid' : '') %}
+            {{ form_widget(form.capacite, {'attr': {'class': capaciteClass, 'placeholder': 'Ex: 25'}}) }}
+            {% if form.capacite.vars.errors|length > 0 %}
+                <div class="invalid-feedback d-block">{{ form_errors(form.capacite) }}</div>
+            {% endif %}
+        </div>
+
+        <div class="col-12 d-flex justify-content-end gap-2 pt-3 border-top mt-2">
+            <button class="btn btn-primary">{{ button_label|default('Enregistrer') }}</button>
+        </div>
+    </div>
+{{ form_end(form) }}
