@@ -112,23 +112,30 @@
                 }
             }) }}
         </div>
-        <div class="col-md-6">
-            {{ form_row(form.latitude, { 
-                label: 'Latitude',
-                attr: { 
-                    class: 'form-control',
-                    placeholder: 'Ex. 48.8566'
-                }
-            }) }}
-        </div>
-        <div class="col-md-6">
-            {{ form_row(form.longitude, { 
-                label: 'Longitude',
-                attr: { 
-                    class: 'form-control',
-                    placeholder: 'Ex. 2.3522'
-                }
-            }) }}
+        <div class="col-12 mt-4 pt-3 border-top">
+            <h4 class="mb-3">Images de l'événement</h4>
+            <div class="eventimages-collection">
+                {% for eventImageForm in form.eventImages %}
+                    <div class="card card-sm mb-2">
+                        <div class="card-body">
+                            <div class="row g-2">
+                                <div class="col-md-10">
+                                    {{ form_row(eventImageForm.image_path, {
+                                        label: 'Image',
+                                        attr: { class: 'form-control' }
+                                    }) }}
+                                </div>
+                                <div class="col-md-2">
+                                    {{ form_row(eventImageForm.ordre, {
+                                        label: 'Ordre',
+                                        attr: { class: 'form-control' }
+                                    }) }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 </div>

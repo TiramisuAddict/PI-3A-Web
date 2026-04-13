@@ -6,15 +6,16 @@ use App\Entity\Post;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
-use Symfony\Component\Form\Extension\Core\Type\NumberType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use App\Form\EventImageType;
 
 /**
  * Formulaire CRUD Post : ne mappe pas les associations inverses (like, participation).
@@ -67,6 +68,7 @@ class PostType extends AbstractType
                 'label' => 'Lieu',
                 'required' => false,
                 'attr' => ['class' => 'form-control'],
+                'help' => 'Un lien Google Maps sera généré automatiquement pour les employés.',
                 'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ])
             ->add('capacite_max', IntegerType::class, [
@@ -75,18 +77,13 @@ class PostType extends AbstractType
                 'attr' => ['class' => 'form-control', 'min' => 1],
                 'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ])
-            ->add('latitude', NumberType::class, [
-                'label' => 'Latitude',
+            ->add('eventImages', CollectionType::class, [
+                'label' => 'Images de l\'événement',
+                'entry_type' => EventImageType::class,
+                'allow_add' => true,
+                'allow_delete' => true,
+                'by_reference' => false,
                 'required' => false,
-                'scale' => 7,
-                'attr' => ['class' => 'form-control', 'step' => 'any'],
-                'row_attr' => ['class' => 'mb-3 post-form-row--event'],
-            ])
-            ->add('longitude', NumberType::class, [
-                'label' => 'Longitude',
-                'required' => false,
-                'scale' => 7,
-                'attr' => ['class' => 'form-control', 'step' => 'any'],
                 'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ]);
 
@@ -99,7 +96,7 @@ class PostType extends AbstractType
             $type = isset($data['type_post']) ? (int) $data['type_post'] : 1;
             $data['type_post'] = $type;
 
-            $eventKeys = ['date_evenement', 'date_fin_evenement', 'lieu', 'capacite_max', 'latitude', 'longitude'];
+            $eventKeys = ['date_evenement', 'date_fin_evenement', 'lieu', 'capacite_max', 'eventImages'];
             $dateKeys = ['date_evenement', 'date_fin_evenement'];
 
             if ($type !== 2) {
@@ -125,9 +122,6 @@ class PostType extends AbstractType
                 }
                 if (\in_array($key, ['capacite_max'], true) && $v !== '') {
                     $data[$key] = (int) $v;
-                }
-                if (\in_array($key, ['latitude', 'longitude'], true) && $v !== '' && is_numeric($v)) {
-                    $data[$key] = (float) $v;
                 }
             }
             $event->setData($data);

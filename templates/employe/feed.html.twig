@@ -355,26 +355,13 @@
                         {% endif %}
                     </div>
 
-                    {% if post.latitude is not null and post.longitude is not null and gkey %}
-                        <div class="feed-map-wrap">
-                            <img
-                                src="https://maps.googleapis.com/maps/api/staticmap?center={{ post.latitude }},{{ post.longitude }}&zoom=14&size=640x280&scale=2&maptype=roadmap&markers=color:red%7C{{ post.latitude }},{{ post.longitude }}&key={{ gkey|url_encode }}"
-                                alt="Carte : {{ post.lieu|default('Événement') }}"
-                                loading="lazy"
-                                width="640"
-                                height="280"
-                            >
-                            <div class="feed-map-expand">
-                                <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://www.google.com/maps/search/?api=1&query={{ post.latitude }},{{ post.longitude }}">
-                                    <i class="ti ti-external-link me-1"></i> Voir en grand
-                                </a>
-                            </div>
-                        </div>
-                    {% elseif post.latitude is not null and post.longitude is not null %}
-                        <div class="alert alert-warning alert-sm py-2 px-3 mt-2 mb-0 small">
-                            Définissez <code>google_maps_api_key</code> dans le contrôleur pour afficher la carte.
-                        </div>
-                    {% endif %}
+                {% if post.lieu %}
+                    <div style="margin-top: 0.75rem;">
+                        <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://www.google.com/maps/search/?api=1&query={{ post.lieu|url_encode }}">
+                            <i class="ti ti-map-pin me-1"></i> Voir sur Google Maps
+                        </a>
+                    </div>
+                {% endif %}
 
                     {% if post.eventImages|length > 0 %}
                         <div class="feed-gallery">
