@@ -10,8 +10,16 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: PostRepository::class)]
 #[ORM\Table(name: 'post')]
+#[Assert\Callback('validateEvenementFields')]
 class Post
 {
+    public function __construct()
+    {
+        $this->eventImages = new ArrayCollection();
+        $this->commentaires = new ArrayCollection();
+        $this->notifications = new ArrayCollection();
+    }
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
@@ -242,7 +250,7 @@ class Post
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: EventImage::class, mappedBy: 'post')]
+    #[ORM\OneToMany(targetEntity: EventImage::class, mappedBy: 'post', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $eventImages;
 
     /**
@@ -324,6 +332,78 @@ class Post
     {
         $this->participation = $participation;
         return $this;
+    }
+
+    /**
+     * Validates event-specific fields for Événement posts only.
+     * Required fields: dateDebut, dateFin, lieu, capaciteMax
+     * Constraints:
+     *   - dateDebut must be strictly before dateFin
+     *   - dateDebut must be at least 7 days after today
+     *   - capaciteMax must be >= 15
+     */
+    public function validateEvenementFields(\Symfony\Component\Validator\Context\ExecutionContextInterface $context): void
+    {
+        // Only validate event-specific fields when typePost = 2 (Événement)
+        if ($this->type_post !== 2) {
+            return;
+        }
+
+        // Validation 1: dateDebut (date_evenement) is required
+        if ($this->date_evenement === null) {
+            $context->buildViolation('La date de début est obligatoire pour un événement.')
+                ->atPath('date_evenement')
+                ->addViolation();
+        }
+
+        // Validation 2: dateFin (date_fin_evenement) is required
+        if ($this->date_fin_evenement === null) {
+            $context->buildViolation('La date de fin est obligatoire pour un événement.')
+                ->atPath('date_fin_evenement')
+                ->addViolation();
+        }
+
+        // Validation 3: lieu is required (not null or empty)
+        if ($this->lieu === null || trim($this->lieu) === '') {
+            $context->buildViolation('Le lieu est obligatoire pour un événement.')
+                ->atPath('lieu')
+                ->addViolation();
+        }
+
+        // Validation 4: capaciteMax is required
+        if ($this->capacite_max === null) {
+            $context->buildViolation('La capacité maximale est obligatoire pour un événement.')
+                ->atPath('capacite_max')
+                ->addViolation();
+        }
+
+        // Validation 5: capaciteMax must be >= 15
+        if ($this->capacite_max !== null && $this->capacite_max < 15) {
+            $context->buildViolation('La capacité maximale doit être d\'au moins 15 places pour un événement.')
+                ->atPath('capacite_max')
+                ->addViolation();
+        }
+
+        // Validation 6: dateDebut must be strictly before dateFin
+        if ($this->date_evenement !== null && $this->date_fin_evenement !== null) {
+            if ($this->date_evenement >= $this->date_fin_evenement) {
+                $context->buildViolation('La date de début doit être strictement antérieure à la date de fin.')
+                    ->atPath('date_evenement')
+                    ->addViolation();
+            }
+        }
+
+        // Validation 7: dateDebut must be at least 7 days after today
+        if ($this->date_evenement !== null) {
+            $today = new \DateTimeImmutable('today');
+            $minDate = $today->modify('+7 days');
+            
+            if ($this->date_evenement < $minDate) {
+                $context->buildViolation('La date de début doit être au moins 7 jours après la date d\'aujourd\'hui.')
+                    ->atPath('date_evenement')
+                    ->addViolation();
+            }
+        }
     }
 
 }

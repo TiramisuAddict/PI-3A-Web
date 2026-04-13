@@ -52,8 +52,7 @@ class FeedController extends AbstractController
             'user_liked_post_ids' => [],
             'user_participates_post_ids' => [],
             'current_user_id' => null,
-            'google_maps_api_key' => getenv('GOOGLE_MAPS_API_KEY') ?: null,
-            // Définir ces routes quand les actions POST existent :
+            'google_maps_api_key' => $this->getParameter('google_maps_api_key'),            // Définir ces routes quand les actions POST existent :
             'feed_route_comment'    => 'app_employe_feed_comment',
             'feed_route_participate' => 'app_employe_feed_participate',
             'current_user_id'       => 132,

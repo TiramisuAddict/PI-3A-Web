@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Post;
+use App\Entity\EventImage;
 use App\Form\PostType;
 use App\Repository\PostRepository;
 use Doctrine\DBAL\Connection;
@@ -11,6 +12,8 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Form\FormInterface;
 
 /**
  * CRUD administration des publications (posts / événements).
@@ -18,6 +21,13 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/post')]
 final class PostController extends AbstractController
 {
+    private Filesystem $filesystem;
+
+    public function __construct()
+    {
+        $this->filesystem = new Filesystem();
+    }
+
     /**
      * `post.utilisateur_id` référence `employé.id_employe` (contrainte FK en base).
      */
@@ -83,6 +93,12 @@ final class PostController extends AbstractController
         $post->setUtilisateurId($authorEmployeId);
         $post->setDateCreation(new \DateTimeImmutable());
 
+        // Add one empty EventImage BEFORE createForm()
+        // This ensures CollectionType has entities to render
+        // The template will hide/show this section based on typePost value
+        $newEventImage = new EventImage();
+        $post->addEventImage($newEventImage);
+
         $form = $this->createForm(PostType::class, $post);
         if ($request->isMethod('POST')) {
             $post->setDateCreation(new \DateTimeImmutable());
@@ -90,6 +106,8 @@ final class PostController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $this->handleEventImageUploads($post, $form);
+            
             $entityManager->persist($post);
             $entityManager->flush();
 
@@ -137,6 +155,8 @@ final class PostController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $this->handleEventImageUploads($post, $form);
+            
             $entityManager->flush();
 
             return $this->redirectToRoute('app_post_index', [], Response::HTTP_SEE_OTHER);
@@ -159,5 +179,54 @@ final class PostController extends AbstractController
         return $this->redirectToRoute('app_post_index', [], Response::HTTP_SEE_OTHER);
     }
 
-    
+    private function handleEventImageUploads(Post $post, FormInterface $form): void
+    {
+        // Only process uploads for Événement posts (typePost = 2)
+        if ($post->getTypePost() !== 2) {
+            return;
+        }
+
+        $uploadDir = $this->getParameter('uploads_dir') . '/events';
+        $this->ensureUploadDirectoryExists($uploadDir);
+
+        // Get the embedded eventImages form collection
+        $eventImagesForm = $form->get('eventImages');
+
+        // Process each EventImage in the collection
+        foreach ($eventImagesForm as $eventImageForm) {
+            // Get the actual EventImage entity from the form (safe mapping)
+            $eventImage = $eventImageForm->getData();
+            
+            if (!$eventImage instanceof EventImage) {
+                continue;
+            }
+
+            // Retrieve the uploaded file from the form (image_path is unmapped)
+            $uploadedFile = $eventImageForm->get('image_path')->getData();
+
+            if ($uploadedFile) {
+                // Generate unique filename and move file
+                $filename = $this->generateUniqueFilename() . '.' . $uploadedFile->guessExtension();
+                $uploadedFile->move($uploadDir, $filename);
+
+                // Set the filename directly on the EventImage entity
+                $eventImage->setImagePath($filename);
+            }
+
+            // Ensure the EventImage is associated with the Post
+            $eventImage->setPost($post);
+        }
+    }
+
+    private function generateUniqueFilename(): string
+    {
+        return bin2hex(random_bytes(12));
+    }
+
+    private function ensureUploadDirectoryExists(string $directory): void
+    {
+        if (!$this->filesystem->exists($directory)) {
+            $this->filesystem->mkdir($directory, 0755);
+        }
+    }
 }
