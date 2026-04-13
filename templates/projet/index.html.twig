@@ -1024,7 +1024,7 @@
                         cell.appendChild(more);
                     }
 
-                    if (canManageTasksCal && newTaskBaseUrl) {
+                    if (canManageTasksCal && newTaskBaseUrl && dateStr >= todayStr) {
                         const addLink = document.createElement('a');
                         addLink.className = 'cal-cell-add';
                         addLink.href = newTaskBaseUrl + '?date=' + dateStr;
