@@ -1,0 +1,489 @@
+{% extends 'base.html.twig' %}
+
+{# =============================================================================
+   Fil d'actualité — Espace Employé
+   Variables attendues (à injecter depuis le contrôleur) :
+   - posts : iterable de App\Entity\Post (active, triés récents)
+   - post_type_annonce : int (ex. 1) — valeur de type_post pour « Annonce »
+   - post_type_evenement : int (ex. 2) — valeur de type_post pour « Événement »
+   - likes_count : array<int, int> indexé par id_post
+   - comments_count : array<int, int> indexé par id_post
+   - participants_count : array<int, int> indexé par id_post (événements)
+   - places_restantes : array<int, int|null> indexé par id_post (null si N/A)
+   - comments_preview : array<int, iterable<Commentaire>> (3–5 derniers par post)
+   - user_liked_post_ids : int[] — id_post aimés par l’utilisateur courant
+   - user_participates_post_ids : int[] — id_post où l’utilisateur participe
+   - current_user_id : int|null
+   - google_maps_api_key : string|null — clé pour Static Maps / JS (optionnel)
+   - feed_route_comment : string — nom de route POST commentaire (ex. app_employe_feed_comment)
+   - feed_route_like : string — nom de route POST like (ex. app_employe_feed_like)
+   - feed_route_participate : string — nom de route POST participation (ex. app_employe_feed_participate)
+   - author_labels : array<int, string>|null — optionnel, libellé auteur par utilisateur_id
+   ============================================================================= #}
+
+{% block title %}Fil d'actualité — Espace Employé{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .feed-page {
+            max-width: 44rem;
+            margin-inline: auto;
+        }
+        .feed-hero {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .feed-hero h1 {
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin: 0;
+        }
+        .feed-hero .text-secondary {
+            font-size: 0.95rem;
+        }
+        .feed-card {
+            border: 1px solid var(--app-border, #e4e9f2);
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: var(--app-shadow-soft, 0 8px 24px rgba(15, 23, 42, 0.05));
+            margin-bottom: 1.25rem;
+            overflow: hidden;
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .feed-card:hover {
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+        }
+        .feed-card--annonce {
+            border-top: 3px solid #206bc4;
+        }
+        .feed-card--evenement {
+            border-top: 3px solid #f59f00;
+        }
+        .feed-card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 1rem 1.15rem 0;
+        }
+        .feed-author {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+        }
+        .feed-avatar {
+            width: 2.75rem;
+            height: 2.75rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .feed-avatar--annonce {
+            background: linear-gradient(135deg, #206bc4, #4d9fff);
+        }
+        .feed-avatar--evenement {
+            background: linear-gradient(135deg, #f59f00, #fab005);
+        }
+        .feed-meta-line {
+            font-size: 0.8rem;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+        .feed-body {
+            padding: 0.75rem 1.15rem 1rem;
+        }
+        .feed-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin: 0 0 0.5rem;
+            line-height: 1.35;
+        }
+        .feed-content {
+            color: #334155;
+            font-size: 0.95rem;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .feed-event-grid {
+            display: grid;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding: 0.85rem;
+            border-radius: 0.65rem;
+            background: rgba(245, 159, 0, 0.06);
+            border: 1px solid rgba(245, 159, 0, 0.2);
+        }
+        .feed-event-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+        .feed-event-row i {
+            color: #f59f00;
+            margin-top: 0.15rem;
+        }
+        .feed-map-wrap {
+            position: relative;
+            margin-top: 0.75rem;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            border: 1px solid var(--app-border, #e4e9f2);
+            background: #f1f5f9;
+        }
+        .feed-map-wrap img {
+            width: 100%;
+            height: auto;
+            display: block;
+            vertical-align: middle;
+        }
+        .feed-map-expand {
+            position: absolute;
+            bottom: 0.5rem;
+            right: 0.5rem;
+        }
+        .feed-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .feed-gallery img {
+            width: 100%;
+            aspect-ratio: 4/3;
+            object-fit: cover;
+            border-radius: 0.5rem;
+            border: 1px solid var(--app-border, #e4e9f2);
+        }
+        .feed-stats {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem 1.25rem;
+            padding: 0.65rem 1.15rem;
+            border-top: 1px solid var(--app-border, #e4e9f2);
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        .feed-stats .text-danger {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .feed-actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0;
+            border-top: 1px solid var(--app-border, #e4e9f2);
+        }
+        @media (max-width: 576px) {
+            .feed-actions {
+                grid-template-columns: 1fr;
+            }
+        }
+        .feed-actions .btn {
+            border-radius: 0;
+            border: none;
+            border-right: 1px solid var(--app-border, #e4e9f2);
+            padding: 0.65rem 0.5rem;
+            font-size: 0.875rem;
+        }
+        @media (max-width: 576px) {
+            .feed-actions .btn {
+                border-right: none;
+                border-bottom: 1px solid var(--app-border, #e4e9f2);
+            }
+        }
+        .feed-actions .btn:last-child {
+            border-right: none;
+        }
+        .feed-actions .btn.active-participate {
+            background: rgba(32, 107, 196, 0.1);
+            color: #206bc4;
+            font-weight: 600;
+        }
+        .feed-comments-toggle {
+            padding: 0.5rem 1.15rem 0;
+        }
+        .feed-comments-block {
+            padding: 0 1.15rem 1rem;
+        }
+        .feed-comment-row {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(228, 233, 242, 0.9);
+            font-size: 0.875rem;
+        }
+        .feed-comment-row:last-child {
+            border-bottom: none;
+        }
+        .feed-comment-form .input-group {
+            flex-wrap: wrap;
+        }
+        @media (min-width: 577px) {
+            .feed-comment-form .form-control {
+                min-width: 0;
+            }
+        }
+        .badge-feed-type {
+            font-weight: 600;
+            font-size: 0.75rem;
+            padding: 0.35em 0.65em;
+        }
+        .places-badge {
+            margin-left: auto;
+            font-weight: 600;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+{% set TYPE_ANNONCE = post_type_annonce|default(1) %}
+{% set TYPE_EVENEMENT = post_type_evenement|default(2) %}
+{% set gkey = google_maps_api_key|default(null) %}
+
+<div class="surface-card p-4 feed-page">
+    <div class="feed-hero">
+        <div>
+            <h1>Fil d'actualité</h1>
+            <p class="text-secondary mb-0">Restez informé des dernières annonces de l'entreprise</p>
+        </div>
+        <div class="dropdown">
+            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="ti ti-filter me-1"></i> Tout voir
+            </button>
+            <div class="dropdown-menu dropdown-menu-end">
+                <a class="dropdown-item{% if filter|default('all') == 'all' %} active{% endif %}" href="{{ path('app_employe_feed', {filter: 'all'}) }}">Toutes les publications</a>
+                <a class="dropdown-item{% if filter|default('all') == 'annonce' %} active{% endif %}" href="{{ path('app_employe_feed', {filter: 'annonce'}) }}">Annonces uniquement</a>
+                <a class="dropdown-item{% if filter|default('all') == 'evenement' %} active{% endif %}" href="{{ path('app_employe_feed', {filter: 'evenement'}) }}">Événements uniquement</a>
+            </div>
+        </div>
+    </div>
+
+    {% for post in posts %}
+        {% if post.active %}
+        {% set is_event = (post.typePost == TYPE_EVENEMENT) %}
+        {% set is_annonce = (post.typePost == TYPE_ANNONCE) %}
+        {% set pid = post.idPost %}
+        {% set like_n = likes_count is defined ? likes_count[pid]|default(0) : 0 %}
+        {% set com_n = comments_count is defined ? comments_count[pid]|default(0) : 0 %}
+        {% set part_n = participants_count is defined ? participants_count[pid]|default(0) : 0 %}
+        {% set restantes = places_restantes is defined ? places_restantes[pid]|default(null) : null %}
+        {% set preview = comments_preview is defined ? comments_preview[pid]|default([]) : [] %}
+        {% set liked = user_liked_post_ids is defined and pid in user_liked_post_ids %}
+        {% set participating = user_participates_post_ids is defined and pid in user_participates_post_ids %}
+        {% set author = author_labels is defined ? (author_labels[post.utilisateurId]|default('Utilisateur #' ~ post.utilisateurId)) : ('Utilisateur #' ~ post.utilisateurId) %}
+        {% set initials = author|slice(0, 2)|upper %}
+
+        <article class="feed-card {{ is_event ? 'feed-card--evenement' : 'feed-card--annonce' }}" data-post-id="{{ pid }}">
+            <div class="feed-card-header">
+                <div class="feed-author">
+                    <div class="feed-avatar {{ is_event ? 'feed-avatar--evenement' : 'feed-avatar--annonce' }}" aria-hidden="true">{{ initials }}</div>
+                    <div>
+                        <div class="fw-bold">{{ author }}</div>
+                        <div class="feed-meta-line">
+                            <span class="feed-relative-time" data-datetime="{{ post.dateCreation ? post.dateCreation|date('c') : '' }}">{{ post.dateCreation ? post.dateCreation|date('d/m/Y H:i') : '' }}</span>
+                            <i class="ti ti-world" title="Publication interne"></i>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    {% if is_event %}
+                        <span class="badge bg-orange-lt text-orange badge-feed-type">Événement</span>
+                    {% elseif is_annonce %}
+                        <span class="badge bg-blue-lt text-blue badge-feed-type">Annonce</span>
+                    {% else %}
+                        <span class="badge bg-secondary-lt text-secondary badge-feed-type">Type {{ post.typePost }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="feed-body">
+                <h2 class="feed-title">{{ post.titre }}</h2>
+                <div class="feed-content">{{ post.contenu }}</div>
+
+                {% if is_event %}
+                    <div class="feed-event-grid">
+                        {% if post.dateEvenement %}
+                            <div class="feed-event-row">
+                                <i class="ti ti-calendar-event"></i>
+                                <div>
+                                    <div class="text-muted small">Date début</div>
+                                    <div>{{ post.dateEvenement|date('Y-m-d') }}</div>
+                                </div>
+                            </div>
+                        {% endif %}
+                        {% if post.dateFinEvenement %}
+                            <div class="feed-event-row">
+                                <i class="ti ti-calendar-time"></i>
+                                <div>
+                                    <div class="text-muted small">Date fin</div>
+                                    <div>{{ post.dateFinEvenement|date('Y-m-d') }}</div>
+                                </div>
+                            </div>
+                        {% endif %}
+                        {% if post.lieu %}
+                            <div class="feed-event-row">
+                                <i class="ti ti-map-pin"></i>
+                                <div>
+                                    <div class="text-muted small">Lieu</div>
+                                    <div>{{ post.lieu }}</div>
+                                </div>
+                            </div>
+                        {% endif %}
+                        {% if post.capaciteMax is not null %}
+                            <div class="feed-event-row">
+                                <i class="ti ti-users"></i>
+                                <div>
+                                    <div class="text-muted small">Capacité</div>
+                                    <div>{{ post.capaciteMax }} places</div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                {% if post.lieu %}
+                    <div style="margin-top: 0.75rem;">
+                        <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://www.google.com/maps/search/?api=1&query={{ post.lieu|url_encode }}">
+                            <i class="ti ti-map-pin me-1"></i> Voir sur Google Maps
+                        </a>
+                    </div>
+                {% endif %}
+
+                    {% if post.eventImages|length > 0 %}
+                        <div class="feed-gallery">
+                            {% for img in post.eventImages %}
+                                {% set src = (img.imagePath starts with 'http') ? img.imagePath : asset(img.imagePath) %}
+                                <a href="{{ path('app_post_show', { id_post: pid }) }}" class="d-block">
+                                    <img src="{{ src }}" alt="" loading="lazy">
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+
+            <div class="feed-stats">
+                <span class="text-danger"><i class="ti ti-heart-filled"></i> {{ like_n }}</span>
+                <span><i class="ti ti-message me-1"></i>{{ com_n }} commentaire{{ com_n > 1 ? 's' : '' }}</span>
+                {% if is_event %}
+                    <span><i class="ti ti-user-check me-1"></i>{{ part_n }} participant{{ part_n > 1 ? 's' : '' }}</span>
+                    {% if restantes is not null %}
+                        <span class="badge bg-teal-lt text-teal places-badge">{{ restantes }} places restantes</span>
+                    {% endif %}
+                {% endif %}
+            </div>
+
+            <div class="feed-actions">
+                {% if feed_route_like|default(false) %}
+                    <form method="post" action="{{ path(feed_route_like, { id_post: pid }) }}" class="d-contents">
+                        <input type="hidden" name="_token" value="{{ csrf_token('feed_like_' ~ pid) }}">
+                        <button type="submit" class="btn btn-ghost-secondary w-100 h-100 {{ liked ? 'text-danger' : '' }}" aria-pressed="{{ liked ? 'true' : 'false' }}">
+                            <i class="ti ti-thumb-up me-1"></i> J'aime
+                        </button>
+                    </form>
+                {% else %}
+                    <span class="btn btn-ghost-secondary w-100 disabled text-muted" title="Définir feed_route_like dans le contrôleur">J'aime</span>
+                {% endif %}
+
+                <a class="btn btn-ghost-secondary w-100" href="#comment-form-{{ pid }}">
+                    <i class="ti ti-message-circle me-1"></i> Commenter
+                </a>
+
+                {% if is_event %}
+                    {% if feed_route_participate|default(false) %}
+                        <form method="post" action="{{ path(feed_route_participate, { id_post: pid }) }}" class="d-contents">
+                            <input type="hidden" name="_token" value="{{ csrf_token('feed_participate_' ~ pid) }}">
+                            <button type="submit" class="btn btn-ghost-secondary w-100 h-100 {{ participating ? 'active-participate' : '' }}">
+                                <i class="ti ti-circle-check me-1"></i> Je participe
+                            </button>
+                        </form>
+                    {% else %}
+                        <span class="btn btn-ghost-secondary w-100 disabled text-muted" title="Définir feed_route_participate">Je participe</span>
+                    {% endif %}
+                {% else %}
+                    <span class="btn btn-ghost-secondary w-100 disabled opacity-25"></span>
+                {% endif %}
+            </div>
+
+            {% if com_n > 0 %}
+                <div class="feed-comments-toggle">
+                    <a href="#comments-{{ pid }}" class="text-muted small text-decoration-none" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="comments-{{ pid }}">
+                        Voir les {{ com_n }} commentaire{{ com_n > 1 ? 's' : '' }}
+                    </a>
+                </div>
+                <div class="collapse feed-comments-block" id="comments-{{ pid }}">
+                    {% for c in preview %}
+                        <div class="feed-comment-row">
+                            <div class="fw-semibold small">Utilisateur #{{ c.utilisateurId }}
+                                <span class="text-muted fw-normal">— {{ c.dateCommentaire ? c.dateCommentaire|date('d/m/Y H:i') : '' }}</span>
+                            </div>
+                            <div>{{ c.contenu }}</div>
+                        </div>
+                    {% endfor %}
+                    <div class="mt-1">
+                        <a class="small" href="{{ path('app_post_show', { id_post: pid }) }}">Ouvrir la publication</a>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="px-3 pb-3 pt-1 feed-comment-form" id="comment-form-{{ pid }}">
+                {% if feed_route_comment|default(false) and current_user_id|default(null) is not null %}
+                    <form method="post" action="{{ path(feed_route_comment, { id_post: pid }) }}" class="input-group input-group-flat">
+                        <input type="hidden" name="_token" value="{{ csrf_token('feed_comment_' ~ pid) }}">
+                        <span class="input-group-text bg-white border-end-0 ps-3">
+                            <i class="ti ti-message-plus text-muted"></i>
+                        </span>
+                        <input type="text" name="contenu" class="form-control border-start-0" placeholder="Ajouter un commentaire..." required maxlength="2000" autocomplete="off">
+                        <button type="submit" class="btn btn-primary">Publier</button>
+                    </form>
+                {% endif %}
+            </div>
+        </article>
+        {% endif %}
+    {% else %}
+        <div class="empty py-5">
+            <div class="empty-icon"><i class="ti ti-news" style="font-size:3rem"></i></div>
+            <p class="empty-title">Aucune publication</p>
+            <p class="empty-subtitle text-secondary">Revenez plus tard ou modifiez les filtres.</p>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        (function () {
+            /** Dates relatives type « il y a 2 jours » (léger, sans dépendance) */
+            function formatRelative(iso) {
+                if (!iso) return '';
+                var t = new Date(iso).getTime();
+                if (isNaN(t)) return '';
+                var s = Math.floor((Date.now() - t) / 1000);
+                if (s < 60) return 'à l\'instant';
+                if (s < 3600) return 'il y a ' + Math.floor(s / 60) + ' min';
+                if (s < 86400) return 'il y a ' + Math.floor(s / 3600) + ' h';
+                if (s < 604800) return 'il y a ' + Math.floor(s / 86400) + ' j';
+                return 'il y a ' + Math.floor(s / 604800) + ' sem.';
+            }
+            document.querySelectorAll('.feed-relative-time[data-datetime]').forEach(function (el) {
+                var rel = formatRelative(el.getAttribute('data-datetime'));
+                if (rel) el.textContent = rel;
+            });
+        })();
+    </script>
+{% endblock %}

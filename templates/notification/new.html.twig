@@ -1,0 +1,29 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Créer une notification — Momentum{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Créer une notification</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="card-body">
+                    {{ include('notification/_form.html.twig', {
+                        cancel_path: path('app_notification_index'),
+                        submit_label: 'Créer'
+                    }) }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
