@@ -1,0 +1,70 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Images d'événement — Momentum{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Images d'événement</h2>
+                </div>
+                <div class="col-auto">
+                    <a class="btn btn-primary" href="{{ path('app_event_image_new') }}"><i class="ti ti-plus me-1"></i>Ajouter une image</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                            <tr>
+                                <th>Chemin</th>
+                                <th>Post</th>
+                                <th>Ordre</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for event_image in event_images %}
+                            <tr>
+                                <td class="text-truncate"><code class="text-secondary small">{{ event_image.imagePath }}</code></td>
+                                <td class="text-secondary small">{% if event_image.post %}<a href="{{ path('app_post_show', {id_post: event_image.post.idPost}) }}" class="btn btn-ghost-primary">{{ event_image.post.titre|length > 25 ? event_image.post.titre|slice(0, 25) ~ '…' : event_image.post.titre }}</a>{% else %}—{% endif %}</td>
+                                <td class="text-secondary small">{{ event_image.ordre|default('—') }}</td>
+                                <td class="text-end text-nowrap">
+                                    <div class="d-flex align-items-center justify-content-end gap-2">
+                                        <a href="{{ path('app_event_image_show', { id_image: event_image.idImage }) }}" class="btn btn-icon btn-ghost-primary" title="Voir"><i class="ti ti-eye" style="font-size: 1.25rem;"></i></a>
+                                        <a href="{{ path('app_event_image_edit', { id_image: event_image.idImage }) }}" class="btn btn-icon btn-ghost-warning" title="Modifier"><i class="ti ti-edit" style="font-size: 1.25rem;"></i></a>
+                                        <form class="d-inline" method="post" action="{{ path('app_event_image_delete', { id_image: event_image.idImage }) }}" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette image ?');">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ event_image.idImage) }}">
+                                            <button type="submit" class="btn btn-icon btn-ghost-danger" title="Supprimer"><i class="ti ti-trash" style="font-size: 1.25rem;"></i></button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4">
+                                    <div class="empty">
+                                        <div class="empty-header">404</div>
+                                        <div class="empty-title">Aucune image trouvée</div>
+                                        <div class="empty-subtitle text-secondary">Créez une nouvelle image pour commencer.</div>
+                                        <div class="empty-action">
+                                            <a href="{{ path('app_event_image_new') }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Ajouter une image</a>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

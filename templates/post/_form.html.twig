@@ -1,0 +1,174 @@
+{# Type « événement » = 2 (aligné sur FeedController / post_type_evenement) #}
+{% set post_type_evenement = 2 %}
+{% set current_type = form.vars.data is not null and form.vars.data.typePost is not null ? form.vars.data.typePost : 1 %}
+
+{{ form_start(form, { attr: { class: 'post-crud-form', novalidate: 'novalidate' } }) }}
+{% if form.vars.submitted and not form.vars.valid %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <div class="d-flex">
+            <div><i class="ti ti-alert-circle me-3"></i></div>
+            <div class="flex-grow-1">
+                <strong>Formulaire invalide</strong>
+                <div class="small mt-2">Veuillez corriger les erreurs ci-dessous :</div>
+                <ul class="small mb-0 mt-2">
+                {% for field in form %}
+                    {% for error in field.vars.errors %}
+                        <li><strong>{{ field.vars.label|default(field.vars.name) }} :</strong> {{ error.message }}</li>
+                    {% endfor %}
+                {% endfor %}
+                {% for error in form.vars.errors %}
+                    <li>{{ error.message }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <a class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></a>
+    </div>
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-12">
+        {{ form_row(form.titre, { 
+            label: 'Titre *',
+            attr: { 
+                class: 'form-control',
+                placeholder: 'Entrez le titre de la publication'
+            }
+        }) }}
+    </div>
+
+    <div class="col-12">
+        {{ form_row(form.contenu, { 
+            label: 'Contenu *',
+            attr: { 
+                class: 'form-control',
+                placeholder: 'Entrez le contenu',
+                rows: 6
+            }
+        }) }}
+    </div>
+
+    <div class="col-md-8">
+        {{ form_row(form.type_post, { 
+            label: 'Type de publication *',
+            attr: { class: 'form-select' }
+        }) }}
+    </div>
+
+    <div class="col-md-4">
+        <div class="form-group">
+            <label class="form-label">État</label>
+            <div class="form-check">
+                {{ form_widget(form.active, { 
+                    attr: { 
+                        class: 'form-check-input'
+                    }
+                }) }}
+                <label class="form-check-label" for="{{ form.active.vars.id }}">
+                    Actif
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<p class="text-secondary small my-3{{ current_type == post_type_evenement ? ' d-none' : '' }}" id="post-type-hint">
+    <i class="ti ti-info-circle me-1"></i>Sélectionnez « Événement » pour afficher les champs date, lieu et coordonnées GPS.
+</p>
+
+<div id="post-event-fields" class="post-event-fields border rounded p-3 my-4 bg-light{{ current_type != post_type_evenement ? ' d-none' : '' }}" data-event-type-value="{{ post_type_evenement }}">
+    <div class="d-flex align-items-center gap-2 mb-3 pb-3 border-bottom">
+        <i class="ti ti-calendar-event"></i>
+        <h4 class="mb-0">Détails de l'événement</h4>
+    </div>
+    <div class="row g-3">
+        <div class="col-md-6">
+            {{ form_row(form.date_evenement, { 
+                label: 'Date de début',
+                attr: { class: 'form-control' }
+            }) }}
+        </div>
+        <div class="col-md-6">
+            {{ form_row(form.date_fin_evenement, { 
+                label: 'Date de fin',
+                attr: { class: 'form-control' }
+            }) }}
+        </div>
+        <div class="col-md-6">
+            {{ form_row(form.lieu, { 
+                label: 'Lieu',
+                attr: { 
+                    class: 'form-control',
+                    placeholder: 'Entrez le lieu'
+                }
+            }) }}
+        </div>
+        <div class="col-md-6">
+            {{ form_row(form.capacite_max, { 
+                label: 'Capacité maximum',
+                attr: { 
+                    class: 'form-control',
+                    placeholder: 'Nombre de places'
+                }
+            }) }}
+        </div>
+        <div class="col-12 mt-4 pt-3 border-top">
+            <h4 class="mb-3">Images de l'événement</h4>
+            <div class="eventimages-collection">
+                {% for eventImageForm in form.eventImages %}
+                    <div class="card card-sm mb-2">
+                        <div class="card-body">
+                            <div class="row g-2">
+                                <div class="col-md-10">
+                                    {{ form_row(eventImageForm.image_path, {
+                                        label: 'Image',
+                                        attr: { class: 'form-control' }
+                                    }) }}
+                                </div>
+                                <div class="col-md-2">
+                                    {{ form_row(eventImageForm.ordre, {
+                                        label: 'Ordre',
+                                        attr: { class: 'form-control' }
+                                    }) }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ form_rest(form) }}
+
+<div class="form-footer">
+    <div class="d-flex align-items-center justify-content-end gap-2">
+        <a href="{{ cancel_path }}" class="btn btn-link">Annuler</a>
+        <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>{{ submit_label|default('Enregistrer') }}</button>
+    </div>
+</div>
+{{ form_end(form) }}
+
+<script>
+(function () {
+    var ef = document.getElementById('post-event-fields');
+    var EVENT = parseInt((ef && ef.getAttribute('data-event-type-value')) || '2', 10);
+    var select = document.querySelector('.post-crud-form select[name="post[type_post]"]');
+    var block = document.getElementById('post-event-fields');
+    var hint = document.getElementById('post-type-hint');
+    function sync() {
+        if (!select || !block) return;
+        var v = parseInt(select.value, 10);
+        var isEvent = v === EVENT;
+        block.classList.toggle('d-none', !isEvent);
+        if (hint) {
+            hint.classList.toggle('d-none', isEvent);
+        }
+    }
+    if (select) {
+        select.addEventListener('change', sync);
+        sync();
+    }
+})();
+</script>

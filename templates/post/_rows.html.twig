@@ -1,0 +1,35 @@
+{% for post in posts %}
+    <tr>
+        <td class="fw-semibold">{{ post.titre|length > 30 ? post.titre|slice(0, 30) ~ '…' : post.titre }}</td>
+        <td><span class="badge {% if post.typePost == 2 %}bg-yellow-lt text-yellow{% else %}bg-azure-lt text-azure{% endif %}">{{ post.typePost == 2 ? 'Événement' : 'Annonce' }}</span></td>
+        <td><span class="badge {% if post.active %}bg-green-lt text-green{% else %}bg-secondary-lt text-secondary{% endif %}">{{ post.active ? 'Actif' : 'Inactif' }}</span></td>
+        <td class="text-secondary small">{{ post.dateCreation ? post.dateCreation|date('d/m/Y H:i') : '—' }}</td>
+        <td class="text-end text-nowrap">
+            <div class="d-flex align-items-center justify-content-end gap-2">
+                <a class="btn btn-icon btn-ghost-primary" href="{{ path('app_post_edit', { id_post: post.idPost }) }}" title="Modifier"><i class="ti ti-edit" style="font-size: 1.25rem;"></i></a>
+                <a class="btn btn-icon btn-ghost-primary" href="{{ path('app_post_show', { id_post: post.idPost }) }}" title="Voir"><i class="ti ti-eye" style="font-size: 1.25rem;"></i></a>
+                <a class="btn btn-icon btn-ghost-primary" href="{{ path('app_commentaire_index', { id_post: post.idPost }) }}" title="Commentaires"><i class="ti ti-message-circle" style="font-size: 1.25rem;"></i></a>
+                {% if post.typePost == 2 %}
+                    <a class="btn btn-icon btn-ghost-primary" href="{{ path('app_participation_by_post', { id_post: post.idPost }) }}" title="Participations"><i class="ti ti-users" style="font-size: 1.25rem;"></i></a>
+                {% endif %}
+                <div class="dropdown">
+                    <button class="btn btn-icon btn-ghost-primary" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="ti ti-dots-vertical" style="font-size: 1.25rem;"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end">
+                        <form class="d-inline" method="post" action="{{ path('app_post_delete', { id_post: post.idPost }) }}" onsubmit="return confirm('Supprimer cette publication ?');">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ post.idPost) }}">
+                            <button type="submit" class="dropdown-item text-danger"><i class="ti ti-trash me-2"></i>Supprimer</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </td>
+    </tr>
+{% else %}
+    <tr>
+        <td colspan="5" class="text-center py-4">
+            <div class="text-secondary small">Aucune publication trouvée</div>
+        </td>
+    </tr>
+{% endfor %}

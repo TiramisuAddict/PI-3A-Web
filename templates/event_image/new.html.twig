@@ -1,0 +1,29 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Ajouter une image d'événement — Momentum{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Ajouter une image d'événement</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="card-body">
+                    {{ include('event_image/_form.html.twig', {
+                        cancel_path: path('app_event_image_index'),
+                        submit_label: 'Ajouter'
+                    }) }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

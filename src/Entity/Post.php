@@ -2,33 +2,43 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
+use App\Repository\PostRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-
-use App\Repository\PostRepository;
+use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: PostRepository::class)]
 #[ORM\Table(name: 'post')]
+#[Assert\Callback('validateEvenementFields')]
 class Post
 {
+    public function __construct()
+    {
+        $this->eventImages = new ArrayCollection();
+        $this->commentaires = new ArrayCollection();
+        $this->notifications = new ArrayCollection();
+    }
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id_post = null;
 
-    public function getId_post(): ?int
+    public function getIdPost(): ?int
     {
         return $this->id_post;
     }
 
-    public function setId_post(int $id_post): self
+    public function setIdPost(int $id_post): self
     {
         $this->id_post = $id_post;
         return $this;
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Assert\NotBlank(message: 'Le titre est obligatoire.')]
+    #[Assert\Length(min: 3, max: 255, minMessage: 'Le titre doit contenir au moins {{ limit }} caractères.')]
     private ?string $titre = null;
 
     public function getTitre(): ?string
@@ -43,6 +53,8 @@ class Post
     }
 
     #[ORM\Column(type: 'text', nullable: false)]
+    #[Assert\NotBlank(message: 'Le contenu est obligatoire.')]
+    #[Assert\Length(min: 3, minMessage: 'Le contenu doit contenir au moins {{ limit }} caractères.')]
     private ?string $contenu = null;
 
     public function getContenu(): ?string
@@ -57,45 +69,50 @@ class Post
     }
 
     #[ORM\Column(type: 'integer', nullable: false)]
+    #[Assert\NotNull(message: 'Le type de publication est obligatoire.')]
+    #[Assert\Type(type: 'integer', message: 'Le type doit être un nombre entier.')]
     private ?int $type_post = null;
 
-    public function getType_post(): ?int
+    public function getTypePost(): ?int
     {
         return $this->type_post;
     }
 
-    public function setType_post(int $type_post): self
+    public function setTypePost(int $type_post): self
     {
         $this->type_post = $type_post;
         return $this;
     }
 
-    #[ORM\Column(type: 'datetime', nullable: false)]
+    #[ORM\Column(type: 'datetime_immutable', nullable: false)]
+    #[Assert\NotNull(message: 'La date de création est obligatoire.')]
+    #[Assert\Type(\DateTimeInterface::class, message: 'La date de création doit être une date/heure valide.')]
     private ?\DateTimeInterface $date_creation = null;
 
-    public function getDate_creation(): ?\DateTimeInterface
+    public function getDateCreation(): ?\DateTimeInterface
     {
         return $this->date_creation;
     }
 
-    public function setDate_creation(\DateTimeInterface $date_creation): self
+    public function setDateCreation(\DateTimeInterface $date_creation): self
     {
         $this->date_creation = $date_creation;
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'posts')]
-    #[ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe')]
-    private ?Employe $employé = null;
+    #[ORM\Column(type: 'integer', nullable: false)]
+    #[Assert\NotNull(message: 'L’identifiant utilisateur est obligatoire.')]
+    #[Assert\Type(type: 'integer', message: 'L’identifiant utilisateur doit être un entier.')]
+    private ?int $utilisateur_id = null;
 
-    public function getEmployé(): ?Employe
+    public function getUtilisateurId(): ?int
     {
-        return $this->employé;
+        return $this->utilisateur_id;
     }
 
-    public function setEmployé(?Employe $employé): self
+    public function setUtilisateurId(int $utilisateur_id): self
     {
-        $this->employé = $employé;
+        $this->utilisateur_id = $utilisateur_id;
         return $this;
     }
 
@@ -113,35 +130,38 @@ class Post
         return $this;
     }
 
-    #[ORM\Column(type: 'date', nullable: true)]
+    #[ORM\Column(type: 'date_immutable', nullable: true)]
+    #[Assert\Type(\DateTimeInterface::class, message: 'La date de début d’événement doit être une date valide.')]
     private ?\DateTimeInterface $date_evenement = null;
 
-    public function getDate_evenement(): ?\DateTimeInterface
+    public function getDateEvenement(): ?\DateTimeInterface
     {
         return $this->date_evenement;
     }
 
-    public function setDate_evenement(?\DateTimeInterface $date_evenement): self
+    public function setDateEvenement(?\DateTimeInterface $date_evenement): self
     {
         $this->date_evenement = $date_evenement;
         return $this;
     }
 
-    #[ORM\Column(type: 'date', nullable: true)]
+    #[ORM\Column(type: 'date_immutable', nullable: true)]
+    #[Assert\Type(\DateTimeInterface::class, message: 'La date de fin d’événement doit être une date valide.')]
     private ?\DateTimeInterface $date_fin_evenement = null;
 
-    public function getDate_fin_evenement(): ?\DateTimeInterface
+    public function getDateFinEvenement(): ?\DateTimeInterface
     {
         return $this->date_fin_evenement;
     }
 
-    public function setDate_fin_evenement(?\DateTimeInterface $date_fin_evenement): self
+    public function setDateFinEvenement(?\DateTimeInterface $date_fin_evenement): self
     {
         $this->date_fin_evenement = $date_fin_evenement;
         return $this;
     }
 
     #[ORM\Column(type: 'string', nullable: true)]
+    #[Assert\Length(max: 255)]
     private ?string $lieu = null;
 
     public function getLieu(): ?string
@@ -156,20 +176,23 @@ class Post
     }
 
     #[ORM\Column(type: 'integer', nullable: true)]
+    #[Assert\Positive(message: 'La capacité maximale doit être un entier strictement positif.')]
     private ?int $capacite_max = null;
 
-    public function getCapacite_max(): ?int
+    public function getCapaciteMax(): ?int
     {
         return $this->capacite_max;
     }
 
-    public function setCapacite_max(?int $capacite_max): self
+    public function setCapaciteMax(?int $capacite_max): self
     {
         $this->capacite_max = $capacite_max;
         return $this;
     }
 
     #[ORM\Column(type: 'decimal', nullable: true)]
+    #[Assert\Type(type: 'numeric', message: 'La latitude doit être un nombre.')]
+    #[Assert\Range(notInRangeMessage: 'La latitude doit être comprise entre -90 et 90.', min: -90, max: 90)]
     private ?float $latitude = null;
 
     public function getLatitude(): ?float
@@ -184,6 +207,8 @@ class Post
     }
 
     #[ORM\Column(type: 'decimal', nullable: true)]
+    #[Assert\Type(type: 'numeric', message: 'La longitude doit être un nombre.')]
+    #[Assert\Range(notInRangeMessage: 'La longitude doit être comprise entre -180 et 180.', min: -180, max: 180)]
     private ?float $longitude = null;
 
     public function getLongitude(): ?float
@@ -225,7 +250,7 @@ class Post
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: EventImage::class, mappedBy: 'post')]
+    #[ORM\OneToMany(targetEntity: EventImage::class, mappedBy: 'post', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $eventImages;
 
     /**
@@ -250,6 +275,20 @@ class Post
     public function removeEventImage(EventImage $eventImage): self
     {
         $this->getEventImages()->removeElement($eventImage);
+        return $this;
+    }
+
+    #[ORM\OneToOne(targetEntity: LikePost::class, mappedBy: 'post')]
+    private ?LikePost $likePost = null;
+
+    public function getLikePost(): ?LikePost
+    {
+        return $this->likePost;
+    }
+
+    public function setLikePost(?LikePost $likePost): self
+    {
+        $this->likePost = $likePost;
         return $this;
     }
 
@@ -295,41 +334,76 @@ class Post
         return $this;
     }
 
-    #[ORM\ManyToMany(targetEntity: Employe::class, inversedBy: 'posts')]
-    #[ORM\JoinTable(
-        name: 'like_post',
-        joinColumns: [
-            new ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post')
-        ],
-        inverseJoinColumns: [
-            new ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe')
-        ]
-    )]
-    private Collection $employés;
-
     /**
-     * @return Collection<int, Employé>
+     * Validates event-specific fields for Événement posts only.
+     * Required fields: dateDebut, dateFin, lieu, capaciteMax
+     * Constraints:
+     *   - dateDebut must be strictly before dateFin
+     *   - dateDebut must be at least 7 days after today
+     *   - capaciteMax must be >= 15
      */
-    public function getEmployés(): Collection
+    public function validateEvenementFields(\Symfony\Component\Validator\Context\ExecutionContextInterface $context): void
     {
-        if (!$this->employés instanceof Collection) {
-            $this->employés = new ArrayCollection();
+        // Only validate event-specific fields when typePost = 2 (Événement)
+        if ($this->type_post !== 2) {
+            return;
         }
-        return $this->employés;
-    }
 
-    public function addEmployé(Employe $employé): self
-    {
-        if (!$this->getEmployés()->contains($employé)) {
-            $this->getEmployés()->add($employé);
+        // Validation 1: dateDebut (date_evenement) is required
+        if ($this->date_evenement === null) {
+            $context->buildViolation('La date de début est obligatoire pour un événement.')
+                ->atPath('date_evenement')
+                ->addViolation();
         }
-        return $this;
-    }
 
-    public function removeEmployé(Employe $employé): self
-    {
-        $this->getEmployés()->removeElement($employé);
-        return $this;
+        // Validation 2: dateFin (date_fin_evenement) is required
+        if ($this->date_fin_evenement === null) {
+            $context->buildViolation('La date de fin est obligatoire pour un événement.')
+                ->atPath('date_fin_evenement')
+                ->addViolation();
+        }
+
+        // Validation 3: lieu is required (not null or empty)
+        if ($this->lieu === null || trim($this->lieu) === '') {
+            $context->buildViolation('Le lieu est obligatoire pour un événement.')
+                ->atPath('lieu')
+                ->addViolation();
+        }
+
+        // Validation 4: capaciteMax is required
+        if ($this->capacite_max === null) {
+            $context->buildViolation('La capacité maximale est obligatoire pour un événement.')
+                ->atPath('capacite_max')
+                ->addViolation();
+        }
+
+        // Validation 5: capaciteMax must be >= 15
+        if ($this->capacite_max !== null && $this->capacite_max < 15) {
+            $context->buildViolation('La capacité maximale doit être d\'au moins 15 places pour un événement.')
+                ->atPath('capacite_max')
+                ->addViolation();
+        }
+
+        // Validation 6: dateDebut must be strictly before dateFin
+        if ($this->date_evenement !== null && $this->date_fin_evenement !== null) {
+            if ($this->date_evenement >= $this->date_fin_evenement) {
+                $context->buildViolation('La date de début doit être strictement antérieure à la date de fin.')
+                    ->atPath('date_evenement')
+                    ->addViolation();
+            }
+        }
+
+        // Validation 7: dateDebut must be at least 7 days after today
+        if ($this->date_evenement !== null) {
+            $today = new \DateTimeImmutable('today');
+            $minDate = $today->modify('+7 days');
+            
+            if ($this->date_evenement < $minDate) {
+                $context->buildViolation('La date de début doit être au moins 7 jours après la date d\'aujourd\'hui.')
+                    ->atPath('date_evenement')
+                    ->addViolation();
+            }
+        }
     }
 
 }
