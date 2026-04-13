@@ -8,5 +8,7 @@
 #   bin/console debug:router
 
 controllers:
-    resource: ../src/Controller/
+    resource:
+        path: ../src/Controller/
+        namespace: App\Controller
     type: attribute

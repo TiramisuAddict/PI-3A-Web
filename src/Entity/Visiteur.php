@@ -2,8 +2,11 @@
 
 namespace App\Entity;
 
-use App\Repository\VisiteurRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+
+use App\Repository\VisiteurRepository;
 
 #[ORM\Entity(repositoryClass: VisiteurRepository::class)]
 #[ORM\Table(name: 'visiteur')]
@@ -11,86 +14,121 @@ class Visiteur
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(name: 'id_visiteur')]
-    private ?int $id = null;
-
-    #[ORM\Column(length: 255)]
-    private string $nom = '';
-
-    #[ORM\Column(length: 255)]
-    private string $prenom = '';
-
-    #[ORM\Column(name: 'e_mail', length: 255)]
-    private string $email = '';
-
-    #[ORM\Column(name: 'mot_de_passe', length: 255)]
-    private string $motDePasse = '';
-
     #[ORM\Column(type: 'integer')]
-    private int $telephone = 0;
+    private ?int $id_visiteur = null;
 
-    public function getId(): ?int
+    public function getIdVisiteur(): ?int
     {
-        return $this->id;
+        return $this->id_visiteur;
     }
 
-    public function getNom(): string
+    public function setIdVisiteur(int $id_visiteur): self
+    {
+        $this->id_visiteur = $id_visiteur;
+        return $this;
+    }
+
+    #[ORM\Column(type: 'string', length: 30, nullable: false)]
+    private ?string $nom = null;
+
+    public function getNom(): ?string
     {
         return $this->nom;
     }
 
-    public function setNom(string $nom): static
+    public function setNom(string $nom): self
     {
         $this->nom = $nom;
-
         return $this;
     }
 
-    public function getPrenom(): string
+    #[ORM\Column(type: 'string', length: 30, nullable: false)]
+    private ?string $prenom = null;
+
+    public function getPrenom(): ?string
     {
         return $this->prenom;
     }
 
-    public function setPrenom(string $prenom): static
+    public function setPrenom(string $prenom): self
     {
         $this->prenom = $prenom;
-
         return $this;
     }
 
-    public function getEmail(): string
+    #[ORM\Column(type: 'string', length: 30, nullable: false)]
+    private ?string $e_mail = null;
+
+    public function getEMail(): ?string
     {
-        return $this->email;
+        return $this->e_mail;
     }
 
-    public function setEmail(string $email): static
+    public function setEMail(string $e_mail): self
     {
-        $this->email = $email;
-
+        $this->e_mail = $e_mail;
         return $this;
     }
 
-    public function getMotDePasse(): string
+    #[ORM\Column(type: 'string', length: 100, nullable: false)]
+    private ?string $mot_de_passe = null;
+
+    public function getMotDePasse(): ?string
     {
-        return $this->motDePasse;
+        return $this->mot_de_passe;
     }
 
-    public function setMotDePasse(string $motDePasse): static
+    public function setMotDePasse(string $mot_de_passe): self
     {
-        $this->motDePasse = $motDePasse;
-
+        $this->mot_de_passe = $mot_de_passe;
         return $this;
     }
 
-    public function getTelephone(): int
+    #[ORM\Column(type: 'integer', nullable: false)]
+    private ?int $telephone = null;
+
+    public function getTelephone(): ?int
     {
         return $this->telephone;
     }
 
-    public function setTelephone(int $telephone): static
+    public function setTelephone(int $telephone): self
     {
         $this->telephone = $telephone;
-
         return $this;
     }
+
+    #[ORM\OneToMany(targetEntity: Candidat::class, mappedBy: 'visiteur')]
+    private Collection $candidats;
+
+    public function __construct()
+    {
+        $this->candidats = new ArrayCollection();
+    }
+
+    /**
+     * @return Collection<int, Candidat>
+     */
+    public function getCandidats(): Collection
+    {
+        if (!$this->candidats instanceof Collection) {
+            $this->candidats = new ArrayCollection();
+        }
+        return $this->candidats;
+    }
+
+    public function addCandidat(Candidat $candidat): self
+    {
+        if (!$this->getCandidats()->contains($candidat)) {
+            $this->getCandidats()->add($candidat);
+        }
+        return $this;
+    }
+
+    public function removeCandidat(Candidat $candidat): self
+    {
+        $this->getCandidats()->removeElement($candidat);
+        return $this;
+    }
+
 }

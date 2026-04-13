@@ -21,7 +21,7 @@ class EvaluationFormationRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('ev')
             ->join('ev.employe', 'e')
-            ->andWhere('e.id = :employeeId')
+            ->andWhere('e.id_employe = :employeeId')
             ->setParameter('employeeId', $employeeId)
             ->orderBy('ev.dateEvaluation', 'DESC')
             ->getQuery()
@@ -35,7 +35,7 @@ class EvaluationFormationRepository extends ServiceEntityRepository
                 ->join('ev.formation', 'f')
                 ->join('ev.employe', 'e')
                 ->andWhere('f.id = :formationId')
-                ->andWhere('e.id = :employeeId')
+                ->andWhere('e.id_employe = :employeeId')
                 ->setParameter('formationId', $formationId)
                 ->setParameter('employeeId', $employeeId)
                 ->setMaxResults(1)
