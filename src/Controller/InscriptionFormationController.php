@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use App\Entity\Formation;
 use App\Entity\Employe;
 use App\Entity\EvaluationFormation;
@@ -14,6 +16,7 @@ use App\Service\FeedbackAnalysisService;
 use App\Service\ReasonAssistantService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityNotFoundException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -23,6 +26,137 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/inscription')]
 final class InscriptionFormationController extends AbstractController
 {
+    #[Route('/employe/certificat/public/{inscriptionId}/{expires}/{signature}', name: 'app_inscription_employe_certificate_public', methods: ['GET'])]
+    public function certificatePublic(int $inscriptionId, int $expires, string $signature, InscriptionFormationRepository $inscriptionRepository, EntityManagerInterface $entityManager): Response
+    {
+        if ($inscriptionId <= 0) {
+            return new Response('Certificat introuvable.', 404);
+        }
+
+        if ($expires <= time()) {
+            return new Response('Lien QR expire. Veuillez generer un nouveau QR.', 410);
+        }
+
+        $inscription = $inscriptionRepository->find($inscriptionId);
+        if (!$inscription instanceof InscriptionFormation) {
+            return new Response('Certificat introuvable.', 404);
+        }
+
+        $formation = $inscription->getFormation();
+        if (!$formation instanceof Formation) {
+            return new Response('Formation introuvable.', 404);
+        }
+
+        if ($inscription->getStatut() !== StatutInscription::ACCEPTEE->value) {
+            return new Response('Certificat indisponible.', 403);
+        }
+
+        $isFinished = $formation->getDateFin() !== null && $formation->getDateFin() < new \DateTimeImmutable();
+        if (!$isFinished) {
+            return new Response('Certificat disponible uniquement apres la fin de la formation.', 403);
+        }
+
+        $expectedSignature = $this->buildCertificateSignature(
+            $inscriptionId,
+            (int) $formation->getId(),
+            $inscription->getEmployeeId(),
+            $expires
+        );
+
+        if (!hash_equals($expectedSignature, $signature)) {
+            return new Response('Lien QR invalide.', 403);
+        }
+
+        return $this->buildCertificatePdfResponse($formation, $inscription->getEmployeeId(), $entityManager, true);
+    }
+
+    #[Route('/employe/certificat/{formationId}', name: 'app_inscription_employe_certificate', methods: ['GET'])]
+    public function certificate(Request $request, int $formationId, InscriptionFormationRepository $inscriptionRepository, FormationRepository $formationRepository, EntityManagerInterface $entityManager): Response
+    {
+        $session = $request->getSession();
+        $employeeId = (int) $session->get('employe_id', 0);
+        $employeeRole = strtolower(trim((string) $session->get('employe_role', '')));
+        $employeeLogged = $session->get('employe_logged_in') === true && in_array($employeeRole, ['employé', 'employe'], true);
+
+        if (!$employeeLogged || $employeeId <= 0) {
+            return $this->redirectToRoute('login');
+        }
+
+        if ($formationId <= 0) {
+            $this->addFlash('error', 'Formation introuvable.');
+            return $this->redirectToRoute('app_inscription_employe');
+        }
+
+        $formation = $formationRepository->find($formationId);
+        if (!$formation instanceof Formation) {
+            $this->addFlash('error', 'Formation introuvable.');
+            return $this->redirectToRoute('app_inscription_employe');
+        }
+
+        $inscription = $inscriptionRepository->findOneByFormationAndEmployee($formationId, $employeeId);
+        if ($inscription === null || $inscription->getStatut() !== StatutInscription::ACCEPTEE->value) {
+            $this->addFlash('error', 'Certificat indisponible: inscription non acceptee.');
+            return $this->redirectToRoute('app_inscription_employe', ['formation' => $formationId]);
+        }
+
+        $isFinished = $formation->getDateFin() !== null && $formation->getDateFin() < new \DateTimeImmutable();
+        if (!$isFinished) {
+            $this->addFlash('error', 'Certificat disponible uniquement apres la fin de la formation.');
+            return $this->redirectToRoute('app_inscription_employe', ['formation' => $formationId]);
+        }
+
+        return $this->buildCertificatePdfResponse($formation, $employeeId, $entityManager, false);
+    }
+
+    private function buildCertificatePdfResponse(Formation $formation, int $employeeId, EntityManagerInterface $entityManager, bool $inline): Response
+    {
+        if ($formation->getId() === null) {
+            return new Response('Formation introuvable.', 404);
+        }
+
+        $employee = $entityManager->find(Employe::class, $employeeId);
+        $employeeName = trim((string) (($employee?->getPrenom() ?? '') . ' ' . ($employee?->getNom() ?? '')));
+        if ($employeeName === '') {
+            $employeeName = 'Employe #' . $employeeId;
+        }
+
+        $issuedAt = new \DateTimeImmutable();
+        $certificateReference = sprintf('CERT-%d-%d-%s', (int) $formation->getId(), $employeeId, $issuedAt->format('YmdHis'));
+        $qrPayload = implode(' | ', [
+            'Reference: ' . $certificateReference,
+            'Employe: ' . $employeeName,
+            'Formation: ' . (string) $formation->getTitre(),
+            'Organisme: ' . (string) $formation->getOrganisme(),
+            'Date fin: ' . ($formation->getDateFin()?->format('d/m/Y') ?? '-'),
+            'Delivre le: ' . $issuedAt->format('d/m/Y'),
+        ]);
+        $qrUrl = 'https://quickchart.io/qr?size=200&text=' . rawurlencode($qrPayload);
+
+        $html = $this->renderView('inscription/certificate.html.twig', [
+            'employee_name' => $employeeName,
+            'formation' => $formation,
+            'issued_at' => $issuedAt,
+            'certificate_reference' => $certificateReference,
+            'qr_url' => $qrUrl,
+            'qr_enabled' => extension_loaded('gd'),
+        ]);
+
+        $options = new Options();
+        $options->set('isRemoteEnabled', true);
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
+
+        $filename = 'certificat-formation-' . (int) $formation->getId() . '.pdf';
+        $disposition = $inline ? 'inline' : 'attachment';
+
+        return new Response($dompdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => $disposition . '; filename="' . $filename . '"',
+        ]);
+    }
+
     #[Route('/employe/reviews/{id}', name: 'app_inscription_employe_reviews', methods: ['GET'])]
     public function getFormationReviews(int $id, FormationRepository $formationRepository, Connection $connection, FeedbackAnalysisService $feedbackAnalysisService): JsonResponse
     {
@@ -446,6 +580,29 @@ final class InscriptionFormationController extends AbstractController
             };
         });
 
+        $formationSummary = [
+            'total' => count($formations),
+            'available' => 0,
+            'full' => 0,
+            'finished' => 0,
+        ];
+        foreach ($formations as $formation) {
+            $isFinished = $formation->getDateFin() !== null && $formation->getDateFin() < new \DateTimeImmutable();
+            $isFull = ($formation->getCapacite() ?? 0) <= 0;
+
+            if ($isFinished) {
+                $formationSummary['finished']++;
+                continue;
+            }
+
+            if ($isFull) {
+                $formationSummary['full']++;
+                continue;
+            }
+
+            $formationSummary['available']++;
+        }
+
         $formationReviews = [];
         $formationReviewSummary = [
             'positive' => 0,
@@ -475,22 +632,52 @@ final class InscriptionFormationController extends AbstractController
 
         $inscriptionByFormation = [];
         $evaluationByFormation = [];
+        $certificateQrPathByFormation = [];
         if ($employeeLogged) {
             $myInscriptions = $inscriptionRepository->findBy(['employeeId' => $employeeId]);
             foreach ($myInscriptions as $inscription) {
-                $formation = $inscription->getFormation();
-                if ($formation !== null && $formation->getId() !== null) {
-                    $inscriptionByFormation[(int) $formation->getId()] = [
-                        'id' => $inscription->getId(),
-                        'statut' => $inscription->getStatut(),
-                        'raison' => $inscription->getRaison(),
-                    ];
+                try {
+                    $formation = $inscription->getFormation();
+                } catch (EntityNotFoundException $exception) {
+                    // The related formation was removed; skip this orphan inscription safely.
+                    continue;
+                }
+
+                try {
+                    if ($formation !== null && $formation->getId() !== null) {
+                        $formationId = (int) $formation->getId();
+                        $inscriptionId = (int) ($inscription->getId() ?? 0);
+
+                        $inscriptionByFormation[$formationId] = [
+                            'id' => $inscription->getId(),
+                            'statut' => $inscription->getStatut(),
+                            'raison' => $inscription->getRaison(),
+                        ];
+
+                        $isFinished = $formation->getDateFin() !== null && $formation->getDateFin() < new \DateTimeImmutable();
+                        if ($inscriptionId > 0 && $inscription->getStatut() === StatutInscription::ACCEPTEE->value && $isFinished) {
+                            $expires = (new \DateTimeImmutable('+30 days'))->getTimestamp();
+                            $signature = $this->buildCertificateSignature($inscriptionId, $formationId, $inscription->getEmployeeId(), $expires);
+                            $certificateQrPathByFormation[$formationId] = $this->generateUrl('app_inscription_employe_certificate_public', [
+                                'inscriptionId' => $inscriptionId,
+                                'expires' => $expires,
+                                'signature' => $signature,
+                            ]);
+                        }
+                    }
+                } catch (EntityNotFoundException $exception) {
+                    continue;
                 }
             }
 
             $myEvaluations = $evaluationFormationRepository->findByEmployeId($employeeId);
             foreach ($myEvaluations as $evaluation) {
-                $formation = $evaluation->getFormation();
+                try {
+                    $formation = $evaluation->getFormation();
+                } catch (EntityNotFoundException $exception) {
+                    continue;
+                }
+
                 if ($formation !== null && $formation->getId() !== null) {
                     $evaluationByFormation[(int) $formation->getId()] = [
                         'id' => $evaluation->getId(),
@@ -506,12 +693,18 @@ final class InscriptionFormationController extends AbstractController
             $alreadyInscrit = $inscriptionRepository->findOneByFormationAndEmployee((int) $selectedFormation->getId(), $employeeId) !== null;
         }
 
+        $qrPublicBaseUrl = trim((string) ($_ENV['QR_PUBLIC_BASE_URL'] ?? $_SERVER['QR_PUBLIC_BASE_URL'] ?? getenv('QR_PUBLIC_BASE_URL') ?: ''));
+        if ($qrPublicBaseUrl !== '') {
+            $qrPublicBaseUrl = rtrim($qrPublicBaseUrl, '/');
+        }
+
         return $this->render('inscription/employe.html.twig', [
             'formations' => $formations,
             'employee_logged' => $employeeLogged,
             'employee_id' => $employeeId,
             'email' => $session->get('employe_email') ?? '',
             'role' => $session->get('employe_role') ?? '',
+            'formation_summary' => $formationSummary,
             'formation_review_summary' => $formationReviewSummary,
             'selected_formation' => $selectedFormation,
             'already_inscrit' => $alreadyInscrit,
@@ -526,7 +719,17 @@ final class InscriptionFormationController extends AbstractController
             'analysis_result' => $analysisResult,
             'typed_reason' => $typedReason,
             'assistant_notice' => $assistantNotice,
+            'qr_public_base_url' => $qrPublicBaseUrl,
+            'certificate_qr_path_by_formation' => $certificateQrPathByFormation,
         ]);
+    }
+
+    private function buildCertificateSignature(int $inscriptionId, int $formationId, int $employeeId, int $expires): string
+    {
+        $secret = (string) ($_ENV['APP_SECRET'] ?? $_SERVER['APP_SECRET'] ?? getenv('APP_SECRET') ?: 'change-me-app-secret');
+        $payload = $inscriptionId . '|' . $formationId . '|' . $employeeId . '|' . $expires;
+
+        return hash_hmac('sha256', $payload, $secret);
     }
 
     private function handleReasonAction(Request $request, FormationRepository $formationRepository, ReasonAssistantService $reasonAssistantService, string $type): JsonResponse
@@ -586,10 +789,13 @@ final class InscriptionFormationController extends AbstractController
 
         $analysisResult = $reasonAssistantService->generateReason($reason, (string) $formation->getTitre());
         $text = $analysisResult->generatedText !== '' ? $analysisResult->generatedText : $reason;
+        $message = $analysisResult->generatedText !== ''
+            ? 'Hugging Face a genere un paragraphe complet.'
+            : 'Hugging Face est indisponible ou le token est invalide. Texte original conserve.';
 
         return $this->json([
             'ok' => true,
-            'message' => 'Hugging Face a genere un paragraphe complet.',
+            'message' => $message,
             'text' => $text,
             'analysis' => [
                 'language' => $analysisResult->language,
