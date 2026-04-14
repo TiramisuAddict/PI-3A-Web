@@ -95,6 +95,24 @@ final class InscriptionFormationController extends AbstractController
             return $this->redirectToRoute('app_formation_rh');
         }
 
+        if ($inscription->getStatut() === StatutInscription::REFUSEE->value) {
+            $formation = $inscription->getFormation();
+            if ($formation === null) {
+                $this->addFlash('error', 'Formation introuvable.');
+
+                return $this->redirectToRoute('app_formation_rh');
+            }
+
+            $remainingCapacity = (int) ($formation->getCapacite() ?? 0);
+            if ($remainingCapacity <= 0) {
+                $this->addFlash('error', 'Formation complete. Aucune place disponible.');
+
+                return $this->redirectToRoute('app_formation_rh');
+            }
+
+            $formation->setCapacite($remainingCapacity - 1);
+        }
+
         $inscription->setStatut(StatutInscription::ACCEPTEE);
         $entityManager->flush();
         $this->addFlash('success', 'Inscription acceptee.');
@@ -114,6 +132,13 @@ final class InscriptionFormationController extends AbstractController
             $this->addFlash('error', 'Inscription introuvable.');
 
             return $this->redirectToRoute('app_formation_rh');
+        }
+
+        if ($inscription->getStatut() === StatutInscription::EN_ATTENTE->value) {
+            $formation = $inscription->getFormation();
+            if ($formation !== null) {
+                $formation->setCapacite((int) ($formation->getCapacite() ?? 0) + 1);
+            }
         }
 
         $inscription->setStatut(StatutInscription::REFUSEE);
@@ -187,6 +212,13 @@ final class InscriptionFormationController extends AbstractController
                     return $this->redirectToRoute('app_inscription_employe');
                 }
 
+                $remainingCapacity = (int) ($formation->getCapacite() ?? 0);
+                if ($remainingCapacity <= 0) {
+                    $this->addFlash('error', 'Cette formation est complete.');
+
+                    return $this->redirectToRoute('app_inscription_employe', ['formation' => $formationId]);
+                }
+
                 $existing = $inscriptionRepository->findOneByFormationAndEmployee((int) $formation->getId(), $employeeId);
                 if ($existing !== null) {
                     $this->addFlash('error', 'Vous etes deja inscrit a cette formation.');
@@ -208,6 +240,7 @@ final class InscriptionFormationController extends AbstractController
                 $inscription->setEmployeeId($employeeId);
                 $inscription->setStatut(StatutInscription::EN_ATTENTE);
                 $inscription->setRaison($reasonToStore !== '' ? $reasonToStore : null);
+                $formation->setCapacite($remainingCapacity - 1);
 
                 $entityManager->persist($inscription);
                 $entityManager->flush();
@@ -238,6 +271,11 @@ final class InscriptionFormationController extends AbstractController
                     $this->addFlash('error', 'Seule une inscription en attente peut etre annulee.');
 
                     return $this->redirectToRoute('app_inscription_employe');
+                }
+
+                $formation = $inscription->getFormation();
+                if ($formation !== null) {
+                    $formation->setCapacite((int) ($formation->getCapacite() ?? 0) + 1);
                 }
 
                 $entityManager->remove($inscription);
