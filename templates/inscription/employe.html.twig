@@ -4,6 +4,7 @@
 
 {% block stylesheets %}
     {{ parent() }}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
 {% endblock %}
 
 {% block body %}
@@ -142,7 +143,7 @@
                             {% set isFull = remainingPlaces <= 0 %}
                             {% set isFinished = formation.dateFin and formation.dateFin|date('U') < 'now'|date('U') %}
                             {% set formationQuery = app.request.query.all|merge({'formation': formation.id}) %}
-                            <div class="col-lg-4 col-md-6 formation-item" data-title="{{ formation.titre }}" data-organisme="{{ formation.organisme }}" data-lieu="{{ formation.lieu }}" data-date-debut="{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}" data-date-fin="{{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}" data-rating="{{ reviews.average_note|default(0) }}" data-reviews="{{ reviews.reviews_count|default(0) }}" data-formation-id="{{ formation.id }}" data-enrolled="{{ state ? 1 : 0 }}">
+                            <div class="col-lg-4 col-md-6 formation-item" data-title="{{ formation.titre }}" data-organisme="{{ formation.organisme }}" data-lieu="{{ formation.lieu }}" data-date-debut="{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}" data-date-fin="{{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}" data-rating="{{ reviews.average_note|default(0) }}" data-reviews="{{ reviews.reviews_count|default(0) }}" data-formation-id="{{ formation.id }}" data-enrolled="{{ state ? 1 : 0 }}" data-status="{{ state ? state.statut : '' }}">
                                 <div class="border rounded p-3 h-100 formation-card-clickable {{ selected_formation and selected_formation.id == formation.id ? 'border-primary' : '' }}" data-select-url="{{ path('app_inscription_employe', formationQuery) }}" role="link" tabindex="0" style="cursor: pointer;">
                                     <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
                                         <div class="d-flex flex-column gap-2">
@@ -179,7 +180,7 @@
                                             <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe_certificate', {'formationId': formation.id}) }}">
                                                 <i class="ti ti-file-download me-1"></i>Certificat PDF
                                             </a>
-                                            <button type="button" class="btn btn-sm btn-outline-primary open-certificate-qr" data-qr-url="https://quickchart.io/qr?size=260&text={{ certUrl|url_encode }}">
+                                            <button type="button" class="btn btn-sm btn-outline-primary open-certificate-qr" data-qr-url="{{ qr_code_data_uri(certUrl) }}">
                                                 <i class="ti ti-qrcode me-1"></i>QR
                                             </button>
                                         {% elseif not state and not isFull and not isFinished %}
@@ -222,7 +223,7 @@
                                     <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe_certificate', {'formationId': selected_formation.id}) }}">
                                         <i class="ti ti-file-download me-1"></i>Télécharger certificat
                                     </a>
-                                    <button type="button" class="btn btn-sm btn-outline-primary open-certificate-qr" data-qr-url="https://quickchart.io/qr?size=300&text={{ selectedCertUrl|url_encode }}">
+                                    <button type="button" class="btn btn-sm btn-outline-primary open-certificate-qr" data-qr-url="{{ qr_code_data_uri(selectedCertUrl) }}">
                                         <i class="ti ti-qrcode me-1"></i>Voir QR
                                     </button>
                                     </div>
@@ -311,6 +312,23 @@
     </div>
 </div>
 
+<div class="modal fade" id="formationCalendarModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-0">Calendrier des formations</h5>
+                    <small class="text-secondary">Vos inscriptions (acceptee, en attente, refusee)</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="calendar-holder" style="min-height: 620px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="certificateQrModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-sm modal-dialog-centered">
         <div class="modal-content">
@@ -326,11 +344,13 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <script>
 (function () {
     const filterForm = document.getElementById('formation-filter-form');
     if (!filterForm) return;
 
+    const formationGrid = document.querySelector('.formation-grid');
     const cards = Array.from(document.querySelectorAll('.formation-item'));
     const searchInput = filterForm.querySelector('input[name="q"]');
     const sortSelect = filterForm.querySelector('select[name="sort"]');
@@ -338,135 +358,101 @@
     const minReviewsInput = filterForm.querySelector('input[name="min_reviews"]');
     const calendarButton = document.getElementById('open-calendar-btn');
 
-    const calendarModal = document.createElement('div');
-    calendarModal.className = 'modal fade';
-    calendarModal.id = 'formationCalendarModal';
-    calendarModal.tabIndex = -1;
-    calendarModal.setAttribute('aria-hidden', 'true');
-    calendarModal.innerHTML = `
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <div>
-                        <h5 class="modal-title mb-0">Calendrier des formations</h5>
-                        <small class="text-secondary" id="calendar-month-label"></small>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" id="calendar-prev-month"><i class="ti ti-chevron-left"></i></button>
-                        <div class="fw-bold" id="calendar-month-title"></div>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" id="calendar-next-month"><i class="ti ti-chevron-right"></i></button>
-                    </div>
-                    <div class="d-grid text-center small fw-bold text-secondary mb-2" style="grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .25rem;">
-                        <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
-                    </div>
-                    <div id="calendar-grid" class="d-grid" style="grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .25rem;"></div>
-                    <div class="mt-3 d-flex flex-wrap gap-2 align-items-center small">
-                        <span class="badge rounded-pill bg-primary-lt text-primary">Debut formation</span>
-                        <span class="badge rounded-pill bg-success-lt text-success">Formation en cours</span>
-                        <span class="badge rounded-pill bg-secondary-lt text-secondary">Jour sans formation</span>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    document.body.appendChild(calendarModal);
+    const calendarModal = document.getElementById('formationCalendarModal');
+    const calendarHolder = document.getElementById('calendar-holder');
+    let fullCalendar = null;
 
-    const calendarEvents = cards
-        .filter((card) => card.dataset.enrolled === '1')
-        .map((card) => ({
-            title: card.dataset.title || '',
-            start: card.dataset.dateDebut || '',
-            end: card.dataset.dateFin || '',
-        }))
-        .filter((event) => event.start !== '');
+    const addOneDay = (dateString) => {
+        if (!dateString) return null;
+        const date = new Date(dateString + 'T00:00:00');
+        if (Number.isNaN(date.getTime())) return null;
+        date.setDate(date.getDate() + 1);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+    };
 
-    const monthLabel = document.getElementById('calendar-month-label');
-    const monthTitle = document.getElementById('calendar-month-title');
-    const calendarGrid = document.getElementById('calendar-grid');
-    const calDate = new Date();
-
-    const formatMonth = (date) => date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-    const formatDay = (date) => String(date.getDate()).padStart(2, '0');
-    const toDateKey = (date) => date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
-
-    const renderCalendar = () => {
-        if (!calendarGrid || !monthTitle || !monthLabel) return;
-        const year = calDate.getFullYear();
-        const month = calDate.getMonth();
-        const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
-        const startOffset = (firstDay.getDay() + 6) % 7;
-        const todayKey = toDateKey(new Date());
-        const eventMap = new Map();
-
-        calendarEvents.forEach((event) => {
-            const start = new Date(event.start + 'T00:00:00');
-            const end = event.end ? new Date(event.end + 'T00:00:00') : new Date(event.start + 'T00:00:00');
-            const cursor = new Date(start);
-            while (cursor <= end) {
-                const key = toDateKey(cursor);
-                if (!eventMap.has(key)) eventMap.set(key, []);
-                eventMap.get(key).push(event.title);
-                cursor.setDate(cursor.getDate() + 1);
-            }
-        });
-
-        monthTitle.textContent = formatMonth(calDate);
-        monthLabel.textContent = 'Les formations sont repérées sur leurs périodes';
-        calendarGrid.innerHTML = '';
-
-        for (let i = 0; i < startOffset; i++) {
-            const emptyCell = document.createElement('div');
-            emptyCell.innerHTML = '<div class="border rounded p-2 bg-light" style="min-height:96px;"></div>';
-            calendarGrid.appendChild(emptyCell);
-        }
-
-        for (let day = 1; day <= lastDay.getDate(); day++) {
-            const current = new Date(year, month, day);
-            const key = toDateKey(current);
-            const eventTitles = eventMap.get(key) || [];
-            const isToday = key === todayKey;
-            const isStart = calendarEvents.some((event) => event.start === key);
-            const isBusy = eventTitles.length > 0;
-            const classes = ['border', 'rounded', 'p-2', 'h-100'];
-
-            if (isStart) {
-                classes.push('bg-primary-lt', 'border-primary');
-            } else if (isBusy) {
-                classes.push('bg-success-lt', 'border-success');
-            } else {
-                classes.push('bg-white');
-            }
-
-            if (isToday) classes.push('shadow-sm');
-
-            const cell = document.createElement('div');
-            cell.innerHTML = `
-                <div class="${classes.join(' ')}" style="min-height:96px; overflow: hidden;">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div class="fw-bold">${day}</div>
-                        ${isStart ? '<span class="badge bg-primary">Debut</span>' : (isBusy ? '<span class="badge bg-success">En cours</span>' : '')}
-                    </div>
-                    <div class="small text-secondary" style="line-height:1.15; max-height: 2.3em; overflow: hidden;">${eventTitles.length > 0 ? eventTitles.slice(0, 1).join('<br>') : 'Aucune formation'}</div>
-                </div>`;
-            calendarGrid.appendChild(cell);
+    const resolveEventColor = (status) => {
+        switch ((status || '').toUpperCase()) {
+            case 'ACCEPTEE':
+                return '#198754';
+            case 'EN_ATTENTE':
+                return '#f59f00';
+            case 'REFUSEE':
+                return '#dc3545';
+            default:
+                return '#0d6efd';
         }
     };
 
-    if (calendarButton) {
+    const localEnrolledEvents = cards
+        .filter((card) => card.dataset.enrolled === '1' && (card.dataset.dateDebut || '') !== '')
+        .map((card) => {
+            const status = card.dataset.status || '';
+            const color = resolveEventColor(status);
+            return {
+                title: card.dataset.title || 'Formation',
+                start: card.dataset.dateDebut,
+                end: addOneDay(card.dataset.dateFin || card.dataset.dateDebut || ''),
+                allDay: true,
+                backgroundColor: color,
+                borderColor: color,
+                textColor: '#ffffff',
+                extendedProps: {
+                    statut: status,
+                    organisme: card.dataset.organisme || '',
+                    lieu: card.dataset.lieu || '',
+                },
+            };
+        });
+
+    const initCalendar = () => {
+        if (!calendarHolder || fullCalendar || typeof FullCalendar === 'undefined') return;
+
+        fullCalendar = new FullCalendar.Calendar(calendarHolder, {
+            initialView: 'dayGridMonth',
+            locale: 'fr',
+            height: 580,
+            firstDay: 1,
+            headerToolbar: {
+                start: 'prev,next today',
+                center: 'title',
+                end: 'dayGridMonth,timeGridWeek,listWeek',
+            },
+            events: localEnrolledEvents,
+            eventDidMount: function (info) {
+                const props = info.event.extendedProps || {};
+                const parts = [];
+                if (props.statut) parts.push('Statut: ' + props.statut);
+                if (props.organisme) parts.push('Organisme: ' + props.organisme);
+                if (props.lieu) parts.push('Lieu: ' + props.lieu);
+                if (parts.length > 0) {
+                    info.el.setAttribute('title', parts.join(' | '));
+                }
+            },
+        });
+
+        fullCalendar.render();
+    };
+
+    if (calendarButton && calendarModal) {
+        calendarModal.addEventListener('shown.bs.modal', () => {
+            initCalendar();
+            if (!fullCalendar) return;
+
+            requestAnimationFrame(() => {
+                fullCalendar.updateSize();
+                fullCalendar.render();
+            });
+        });
+
         calendarButton.addEventListener('click', () => {
-            renderCalendar();
+            initCalendar();
             const modal = bootstrap.Modal.getOrCreateInstance(calendarModal);
             modal.show();
         });
     }
-
-    const prevMonth = calendarModal.querySelector('#calendar-prev-month');
-    const nextMonth = calendarModal.querySelector('#calendar-next-month');
-    if (prevMonth) prevMonth.addEventListener('click', () => { calDate.setMonth(calDate.getMonth() - 1); renderCalendar(); });
-    if (nextMonth) nextMonth.addEventListener('click', () => { calDate.setMonth(calDate.getMonth() + 1); renderCalendar(); });
 
     const certificateQrModalEl = document.getElementById('certificateQrModal');
     const certificateQrImage = document.getElementById('certificate-qr-image');
@@ -496,6 +482,44 @@
             const matchesMinRating = minRating <= 0 || (reviews > 0 && rating >= minRating);
             card.classList.toggle('d-none', !(matchesQuery && matchesMinReviews && matchesMinRating));
         });
+
+        const parseDate = (value) => {
+            if (!value) return 0;
+            const timestamp = Date.parse(value + 'T00:00:00');
+            return Number.isNaN(timestamp) ? 0 : timestamp;
+        };
+
+        const sortedCards = [...cards].sort((left, right) => {
+            const leftRating = parseFloat(left.dataset.rating || '0') || 0;
+            const rightRating = parseFloat(right.dataset.rating || '0') || 0;
+            const leftReviews = parseInt(left.dataset.reviews || '0', 10) || 0;
+            const rightReviews = parseInt(right.dataset.reviews || '0', 10) || 0;
+            const leftTitle = (left.dataset.title || '').toLowerCase();
+            const rightTitle = (right.dataset.title || '').toLowerCase();
+            const leftDate = parseDate(left.dataset.dateDebut || '');
+            const rightDate = parseDate(right.dataset.dateDebut || '');
+
+            switch (sort) {
+                case 'rating_desc':
+                    return (rightRating - leftRating)
+                        || (rightReviews - leftReviews)
+                        || leftTitle.localeCompare(rightTitle, 'fr');
+                case 'reviews_desc':
+                    return (rightReviews - leftReviews)
+                        || (rightRating - leftRating)
+                        || leftTitle.localeCompare(rightTitle, 'fr');
+                case 'title_asc':
+                    return leftTitle.localeCompare(rightTitle, 'fr');
+                case 'date_desc':
+                default:
+                    return (rightDate - leftDate)
+                        || leftTitle.localeCompare(rightTitle, 'fr');
+            }
+        });
+
+        if (formationGrid) {
+            sortedCards.forEach((card) => formationGrid.appendChild(card));
+        }
     };
 
     [searchInput, sortSelect, minRatingSelect, minReviewsInput].forEach((el) => {
@@ -504,6 +528,8 @@
             el.addEventListener('change', applyClientFilters);
         }
     });
+
+    applyClientFilters();
 
     document.querySelectorAll('.formation-card-clickable').forEach((card) => {
         card.addEventListener('click', (event) => {

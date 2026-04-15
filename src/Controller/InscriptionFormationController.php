@@ -2,13 +2,12 @@
 
 namespace App\Controller;
 
-use Dompdf\Dompdf;
-use Dompdf\Options;
 use App\Entity\Formation;
 use App\Entity\Employe;
 use App\Entity\EvaluationFormation;
 use App\Entity\InscriptionFormation;
 use App\Enum\StatutInscription;
+use Nucleos\DompdfBundle\Factory\DompdfFactoryInterface;
 use App\Repository\EvaluationFormationRepository;
 use App\Repository\FormationRepository;
 use App\Repository\InscriptionFormationRepository;
@@ -22,10 +21,16 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 #[Route('/inscription')]
 final class InscriptionFormationController extends AbstractController
 {
+    public function __construct(
+        private readonly DompdfFactoryInterface $dompdfFactory,
+    ) {
+    }
+
     #[Route('/employe/certificat/public/{inscriptionId}/{expires}/{signature}', name: 'app_inscription_employe_certificate_public', methods: ['GET'])]
     public function certificatePublic(int $inscriptionId, int $expires, string $signature, InscriptionFormationRepository $inscriptionRepository, EntityManagerInterface $entityManager): Response
     {
@@ -67,7 +72,13 @@ final class InscriptionFormationController extends AbstractController
             return new Response('Lien QR invalide.', 403);
         }
 
-        return $this->buildCertificatePdfResponse($formation, $inscription->getEmployeeId(), $entityManager, true);
+        $publicQrUrl = $this->buildPublicCertificateUrl('app_inscription_employe_certificate_public', [
+            'inscriptionId' => $inscriptionId,
+            'expires' => $expires,
+            'signature' => $signature,
+        ]);
+
+        return $this->buildCertificatePdfResponse($formation, $inscription->getEmployeeId(), $entityManager, true, $publicQrUrl);
     }
 
     #[Route('/employe/certificat/{formationId}', name: 'app_inscription_employe_certificate', methods: ['GET'])]
@@ -105,10 +116,18 @@ final class InscriptionFormationController extends AbstractController
             return $this->redirectToRoute('app_inscription_employe', ['formation' => $formationId]);
         }
 
-        return $this->buildCertificatePdfResponse($formation, $employeeId, $entityManager, false);
+        $publicExpires = (new \DateTimeImmutable('+30 days'))->getTimestamp();
+        $publicSignature = $this->buildCertificateSignature((int) $inscription->getId(), $formationId, $employeeId, $publicExpires);
+        $publicQrUrl = $this->buildPublicCertificateUrl('app_inscription_employe_certificate_public', [
+            'inscriptionId' => (int) $inscription->getId(),
+            'expires' => $publicExpires,
+            'signature' => $publicSignature,
+        ]);
+
+        return $this->buildCertificatePdfResponse($formation, $employeeId, $entityManager, false, $publicQrUrl);
     }
 
-    private function buildCertificatePdfResponse(Formation $formation, int $employeeId, EntityManagerInterface $entityManager, bool $inline): Response
+    private function buildCertificatePdfResponse(Formation $formation, int $employeeId, EntityManagerInterface $entityManager, bool $inline, ?string $qrUrl = null): Response
     {
         if ($formation->getId() === null) {
             return new Response('Formation introuvable.', 404);
@@ -130,20 +149,19 @@ final class InscriptionFormationController extends AbstractController
             'Date fin: ' . ($formation->getDateFin()?->format('d/m/Y') ?? '-'),
             'Delivre le: ' . $issuedAt->format('d/m/Y'),
         ]);
-        $qrUrl = 'https://quickchart.io/qr?size=200&text=' . rawurlencode($qrPayload);
+        $qrTarget = $qrUrl ?? $qrPayload;
 
         $html = $this->renderView('inscription/certificate.html.twig', [
             'employee_name' => $employeeName,
             'formation' => $formation,
             'issued_at' => $issuedAt,
             'certificate_reference' => $certificateReference,
-            'qr_url' => $qrUrl,
-            'qr_enabled' => extension_loaded('gd'),
+            'qr_target' => $qrTarget,
         ]);
 
-        $options = new Options();
-        $options->set('isRemoteEnabled', true);
-        $dompdf = new Dompdf($options);
+        $dompdf = $this->dompdfFactory->create([
+            'isRemoteEnabled' => true,
+        ]);
         $dompdf->loadHtml($html);
         $dompdf->setPaper('A4', 'landscape');
         $dompdf->render();
@@ -155,6 +173,16 @@ final class InscriptionFormationController extends AbstractController
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => $disposition . '; filename="' . $filename . '"',
         ]);
+    }
+
+    private function buildPublicCertificateUrl(string $route, array $parameters): string
+    {
+        $publicBaseUrl = trim((string) ($_ENV['QR_PUBLIC_BASE_URL'] ?? $_SERVER['QR_PUBLIC_BASE_URL'] ?? getenv('QR_PUBLIC_BASE_URL') ?: ''));
+        if ($publicBaseUrl !== '') {
+            return rtrim($publicBaseUrl, '/') . $this->generateUrl($route, $parameters, UrlGeneratorInterface::ABSOLUTE_PATH);
+        }
+
+        return $this->generateUrl($route, $parameters, UrlGeneratorInterface::ABSOLUTE_URL);
     }
 
     #[Route('/employe/reviews/{id}', name: 'app_inscription_employe_reviews', methods: ['GET'])]

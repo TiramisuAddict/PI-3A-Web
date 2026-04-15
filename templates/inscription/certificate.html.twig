@@ -100,5 +100,12 @@
             Responsable formation
         </div>
     </div>
+
+    {% if qr_target is defined and qr_target is not empty %}
+        <div style="position:absolute; right:28px; bottom:28px; text-align:center;">
+            <img src="{{ qr_code_data_uri(qr_target) }}" alt="QR certificat" style="width:120px; height:120px;">
+            <div style="font-size:11px; color:#475569; margin-top:6px;">Scannez pour ouvrir le certificat</div>
+        </div>
+    {% endif %}
 </body>
 </html>
