@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Demande;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 class DemandeRepository extends ServiceEntityRepository
@@ -93,7 +94,7 @@ class DemandeRepository extends ServiceEntityRepository
         return $grouped;
     }
 
-    private function createFilteredQueryBuilder(array $filters = [], ?int $employeId = null)
+    public function createFilteredQueryBuilder(array $filters = [], ?int $employeId = null): QueryBuilder
     {
         $qb = $this->createQueryBuilder('d');
 

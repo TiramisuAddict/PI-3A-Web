@@ -10,6 +10,7 @@
         "doctrine/doctrine-bundle": "^2.18",
         "doctrine/doctrine-migrations-bundle": "^3.7",
         "doctrine/orm": "^3.6",
+        "knplabs/knp-paginator-bundle": "^6.10",
         "phpdocumentor/reflection-docblock": "^5.2",
         "phpstan/phpdoc-parser": "^2.3",
         "symfony/asset": "6.4.*",
@@ -103,15 +104,5 @@
             "allow-contrib": false,
             "require": "6.4.*"
         }
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^9.5",
-        "symfony/browser-kit": "6.4.*",
-        "symfony/css-selector": "6.4.*",
-        "symfony/debug-bundle": "6.4.*",
-        "symfony/maker-bundle": "^1.0",
-        "symfony/phpunit-bridge": "^8.0",
-        "symfony/stopwatch": "6.4.*",
-        "symfony/web-profiler-bundle": "6.4.*"
     }
 }

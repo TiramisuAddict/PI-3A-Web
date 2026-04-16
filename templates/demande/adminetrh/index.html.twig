@@ -304,28 +304,41 @@
 
             <div class="card mb-3">
                 <div class="card-body filter-card">
-                    <div class="row align-items-center g-2">
+                    <form method="get" action="{{ path('demande_index') }}" class="row align-items-center g-2" id="demande-filter-form">
                         <div class="col-12 col-md-6">
-                            <input type="text" id="searchInput" class="form-control"
+                            <input type="text" name="search" id="demande-search-input" class="form-control"
                                    placeholder="Rechercher par titre, categorie, type ou statut"
-                                   autocomplete="off">
+                                   autocomplete="off"
+                                   value="{{ filters.search|default('') }}">
+                            <input type="hidden" name="status" value="{{ filters.status|default('') }}">
+                            <input type="hidden" name="priorite" value="{{ filters.priorite|default('') }}">
+                            <input type="hidden" name="categorie" value="{{ filters.categorie|default('') }}">
+                            <input type="hidden" name="page" value="1">
                         </div>
                         <div class="col-12 col-md-6">
                             <div class="d-flex flex-wrap gap-2 justify-content-md-end">
-                                <button type="button" class="quick-filter-btn active" data-filter="all">
-                                    <i class="ti ti-list"></i>Tous
+                                <button type="button" class="btn btn-primary btn-sm" id="demande-search-button">
+                                    <i class="ti ti-search me-1"></i>Rechercher
                                 </button>
-                                <button type="button" class="quick-filter-btn" data-filter="HAUTE">
-                                    <i class="ti ti-alert-circle"></i>Haute
-                                </button>
-                                <button type="button" class="quick-filter-btn" data-filter="Nouvelle">
-                                    <i class="ti ti-sparkles"></i>Nouvelles
-                                </button>
-                                <button type="button" class="quick-filter-btn" data-filter="En cours">
-                                    <i class="ti ti-progress"></i>En cours
-                                </button>
+                                <a href="{{ path('demande_index') }}" class="btn btn-outline-secondary btn-sm">
+                                    <i class="ti ti-refresh me-1"></i>Reinitialiser
+                                </a>
                             </div>
                         </div>
+                    </form>
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        <a href="{{ path('demande_index', {'search': filters.search|default(''), 'categorie': filters.categorie|default(''), 'page': 1}) }}" class="quick-filter-btn {{ (filters.priorite|default('') == '' and filters.status|default('') == '') ? 'active' : '' }}">
+                            <i class="ti ti-list"></i>Tous
+                        </a>
+                        <a href="{{ path('demande_index', {'search': filters.search|default(''), 'categorie': filters.categorie|default(''), 'priorite': 'HAUTE', 'status': '', 'page': 1}) }}" class="quick-filter-btn {{ filters.priorite|default('') == 'HAUTE' ? 'active' : '' }}">
+                            <i class="ti ti-alert-circle"></i>Haute
+                        </a>
+                        <a href="{{ path('demande_index', {'search': filters.search|default(''), 'categorie': filters.categorie|default(''), 'status': 'Nouvelle', 'priorite': '', 'page': 1}) }}" class="quick-filter-btn {{ filters.status|default('') == 'Nouvelle' ? 'active' : '' }}">
+                            <i class="ti ti-sparkles"></i>Nouvelles
+                        </a>
+                        <a href="{{ path('demande_index', {'search': filters.search|default(''), 'categorie': filters.categorie|default(''), 'status': 'En cours', 'priorite': '', 'page': 1}) }}" class="quick-filter-btn {{ filters.status|default('') == 'En cours' ? 'active' : '' }}">
+                            <i class="ti ti-progress"></i>En cours
+                        </a>
                     </div>
                 </div>
             </div>
@@ -517,15 +530,11 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
-
-            <div class="empty-state" id="noResults" style="display: none;">
-                <i class="ti ti-search-off"></i>
-                <h3>Aucun resultat</h3>
-                <p class="text-muted">Aucune demande ne correspond a votre recherche.</p>
-                <button type="button" class="btn btn-outline-primary btn-sm mt-3" onclick="clearSearch()">
-                    <i class="ti ti-refresh me-1"></i>Reinitialiser
-                </button>
+                {% if demandes.getTotalItemCount > 0 %}
+                    <div class="card-footer d-flex justify-content-center">
+                        {{ knp_pagination_render(demandes) }}
+                    </div>
+                {% endif %}
             </div>
 
         </div>
@@ -591,32 +600,79 @@
 <script>
 (function () {
     "use strict";
+    function navigateWithStatus(status) {
+        var url = new URL(window.location.href);
+        if (status) {
+            url.searchParams.set("status", status);
+        } else {
+            url.searchParams.delete("status");
+        }
 
-    var searchInput;
-    var noResults;
-    var currentFilter = "all";
+        url.searchParams.delete("priorite");
+        url.searchParams.set("page", "1");
+        window.location.assign(url.toString());
+    }
 
     document.addEventListener("DOMContentLoaded", function () {
-        searchInput = document.getElementById("searchInput");
-        noResults   = document.getElementById("noResults");
+        var filterForm = document.getElementById("demande-filter-form");
+        var searchInput = document.getElementById("demande-search-input");
+        var searchButton = document.getElementById("demande-search-button");
+        var rows = document.querySelectorAll(".demande-row");
 
-        if (searchInput) {
-            searchInput.addEventListener("input", debounce(performSearch, 300));
-            searchInput.addEventListener("keyup", function (e) {
-                if (e.key === "Escape") clearSearch();
+        function normalizeValue(value) {
+            return (value || "")
+                .toString()
+                .trim()
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+        }
+
+        function performSearch() {
+            var term = normalizeValue(searchInput ? searchInput.value : "");
+
+            rows.forEach(function (row) {
+                var titre = normalizeValue(row.getAttribute("data-titre"));
+                var categorie = normalizeValue(row.getAttribute("data-categorie"));
+                var type = normalizeValue(row.getAttribute("data-type"));
+                var priorite = normalizeValue(row.getAttribute("data-priorite"));
+                var status = normalizeValue(row.getAttribute("data-status"));
+
+                var visible =
+                    term === "" ||
+                    titre.indexOf(term) !== -1 ||
+                    categorie.indexOf(term) !== -1 ||
+                    type.indexOf(term) !== -1 ||
+                    priorite.indexOf(term) !== -1 ||
+                    status.indexOf(term) !== -1;
+
+                row.style.display = visible ? "" : "none";
             });
         }
 
-        document.querySelectorAll(".quick-filter-btn").forEach(function (btn) {
-            btn.addEventListener("click", function () {
-                document.querySelectorAll(".quick-filter-btn").forEach(function (b) {
-                    b.classList.remove("active");
-                });
-                this.classList.add("active");
-                currentFilter = this.getAttribute("data-filter");
+        if (filterForm && searchInput) {
+            filterForm.addEventListener("submit", function (event) {
+                event.preventDefault();
                 performSearch();
             });
-        });
+
+            searchInput.addEventListener("input", function () {
+                performSearch();
+            });
+
+            searchInput.addEventListener("keyup", function (event) {
+                if (event.key === "Escape") {
+                    searchInput.value = "";
+                    performSearch();
+                }
+            });
+        }
+
+        if (searchButton) {
+            searchButton.addEventListener("click", function () {
+                performSearch();
+            });
+        }
 
         if (window.DemandeSyncManager) {
             window.DemandeSyncManager.onStatusUpdate(function (data) {
@@ -625,137 +681,9 @@
                 }
             });
         }
-        performSearch();
     });
 
-    function performSearch() {
-        var term    = searchInput ? searchInput.value.toLowerCase().trim() : "";
-        var rows    = document.querySelectorAll(".demande-row");
-        var visible = 0;
-
-        var counts = {
-            total      : 0,
-            "Nouvelle" : 0,
-            "En cours" : 0,
-            "Resolue"  : 0
-        };
-
-        rows.forEach(function (row) {
-            var titre     = row.getAttribute("data-titre")     || "";
-            var categorie = row.getAttribute("data-categorie") || "";
-            var type      = row.getAttribute("data-type")      || "";
-            var priorite  = row.getAttribute("data-priorite")  || "";
-            var status    = row.getAttribute("data-status")    || "";
-            var normalizedPriorite = normalizeValue(priorite);
-            var normalizedStatus   = normalizeValue(status);
-            var normalizedFilter   = normalizeValue(currentFilter);
-
-            var matchSearch =
-                term === "" ||
-                titre.indexOf(term)                  !== -1 ||
-                categorie.indexOf(term)              !== -1 ||
-                type.indexOf(term)                   !== -1 ||
-                normalizedPriorite.indexOf(term)     !== -1 ||
-                normalizedStatus.indexOf(term)       !== -1;
-
-            var matchFilter =
-                currentFilter === "all" ||
-                normalizedPriorite === normalizedFilter ||
-                normalizedStatus   === normalizedFilter;
-
-            if (matchSearch && matchFilter) {
-                row.classList.remove("hidden");
-                visible++;
-                counts.total++;
-                var trackedStatus = toTrackedStatus(status);
-                if (trackedStatus && counts[trackedStatus] !== undefined) {
-                    counts[trackedStatus]++;
-                }
-            } else {
-                row.classList.add("hidden");
-            }
-        });
-
-        animateStat("total",     counts["total"]);
-        animateStat("Nouvelle",  counts["Nouvelle"]);
-        animateStat("En cours",  counts["En cours"]);
-        animateStat("Resolue",   counts["Resolue"]);
-
-        var table = document.querySelector(".table-responsive");
-        if (visible === 0 && rows.length > 0) {
-            if (noResults) noResults.style.display = "block";
-            if (table)     table.style.display     = "none";
-        } else {
-            if (noResults) noResults.style.display = "none";
-            if (table)     table.style.display     = "block";
-        }
-    }
-
-    function animateStat(key, value) {
-        var el = document.querySelector('[data-stat-value="' + key + '"]');
-        if (!el) return;
-        var current = parseInt(el.textContent) || 0;
-        if (current === value) return;
-        el.style.transition = "opacity 0.15s ease";
-        el.style.opacity    = "0.3";
-        setTimeout(function () {
-            el.textContent   = value;
-            el.style.opacity = "1";
-        }, 150);
-    }
-
-    function clearSearch() {
-        if (searchInput) searchInput.value = "";
-        currentFilter = "all";
-        document.querySelectorAll(".quick-filter-btn").forEach(function (b) {
-            b.classList.remove("active");
-        });
-        var allBtn = document.querySelector('.quick-filter-btn[data-filter="all"]');
-        if (allBtn) allBtn.classList.add("active");
-        performSearch();
-    }
-
-    function filterByStatus(status) {
-        if (searchInput) searchInput.value = "";
-        currentFilter = status || "all";
-        document.querySelectorAll(".quick-filter-btn").forEach(function (b) {
-            b.classList.remove("active");
-            if (normalizeValue(b.getAttribute("data-filter") || "") === normalizeValue(currentFilter)) {
-                b.classList.add("active");
-            }
-        });
-        performSearch();
-    }
-
-    function normalizeValue(value) {
-        return (value || "")
-            .toString()
-            .trim()
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "");
-    }
-
-    function toTrackedStatus(status) {
-        var normalized = normalizeValue(status);
-        if (normalized === "nouvelle") return "Nouvelle";
-        if (normalized === "en cours") return "En cours";
-        if (normalized === "resolue") return "Resolue";
-        return null;
-    }
-
-    function debounce(func, wait) {
-        var timeout;
-        return function () {
-            var ctx  = this;
-            var args = arguments;
-            clearTimeout(timeout);
-            timeout = setTimeout(function () { func.apply(ctx, args); }, wait);
-        };
-    }
-
-    window.filterByStatus = filterByStatus;
-    window.clearSearch    = clearSearch;
+    window.filterByStatus = navigateWithStatus;
 
 }());
 </script>

@@ -10,6 +10,7 @@ use App\Form\DemandeType;
 use App\Repository\DemandeRepository;
 use App\Services\DemandeFormHelper;
 use Doctrine\ORM\EntityManagerInterface;
+use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -34,7 +35,7 @@ class DemandeController extends AbstractController
     }
 
     #[Route('/demande', name: 'demande_index', methods: ['GET'])]
-    public function index(Request $request, SessionInterface $session): Response
+    public function index(Request $request, SessionInterface $session, PaginatorInterface $paginator): Response
     {
         if (!$this->isEmployeLoggedIn($session)) {
             return $this->redirectToRoute('login');
@@ -51,9 +52,12 @@ class DemandeController extends AbstractController
 
         $activeFilters = array_filter($filters, static fn ($value) => null !== $value && '' !== $value);
 
-        $demandes = method_exists($this->demandeRepository, 'findWithFilters')
-            ? $this->demandeRepository->findWithFilters($activeFilters, $scopedEmployeId)
-            : $this->demandeRepository->findAll();
+        $page = $request->query->getInt('page', 1);
+        $queryBuilder = $this->demandeRepository
+            ->createFilteredQueryBuilder($activeFilters, $scopedEmployeId)
+            ->orderBy('d.date_creation', 'DESC');
+
+        $demandes = $paginator->paginate($queryBuilder, $page, 10);
 
         $stats = [
             'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll($scopedEmployeId, $activeFilters) : count($demandes),
