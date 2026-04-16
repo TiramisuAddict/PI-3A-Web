@@ -86,16 +86,16 @@ class Post
 
     #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'posts')]
     #[ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe')]
-    private ?Employe $employé = null;
+    private ?Employe $employe = null;
 
-    public function getEmployé(): ?Employe
+    public function getEmploye(): ?Employe
     {
-        return $this->employé;
+        return $this->employe;
     }
 
-    public function setEmployé(?Employe $employé): self
+    public function setEmploye(?Employe $employe): self
     {
-        $this->employé = $employé;
+        $this->employe = $employe;
         return $this;
     }
 
@@ -305,30 +305,30 @@ class Post
             new ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe')
         ]
     )]
-    private Collection $employés;
+    private Collection $employes;
 
     /**
-     * @return Collection<int, Employé>
+     * @return Collection<int, Employe>
      */
-    public function getEmployés(): Collection
+    public function getEmployes(): Collection
     {
-        if (!$this->employés instanceof Collection) {
-            $this->employés = new ArrayCollection();
+        if (!$this->employes instanceof Collection) {
+            $this->employes = new ArrayCollection();
         }
-        return $this->employés;
+        return $this->employes;
     }
 
-    public function addEmployé(Employe $employé): self
+    public function addEmploye(Employe $employe): self
     {
-        if (!$this->getEmployés()->contains($employé)) {
-            $this->getEmployés()->add($employé);
+        if (!$this->getEmployes()->contains($employe)) {
+            $this->getEmployes()->add($employe);
         }
         return $this;
     }
 
-    public function removeEmployé(Employe $employé): self
+    public function removeEmploye(Employe $employe): self
     {
-        $this->getEmployés()->removeElement($employé);
+        $this->getEmployes()->removeElement($employe);
         return $this;
     }
 

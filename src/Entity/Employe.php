@@ -140,7 +140,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Entreprise::class, inversedBy: 'employés')]
+    #[ORM\ManyToOne(targetEntity: Entreprise::class, inversedBy: 'employes')]
     #[ORM\JoinColumn(name: 'id_entreprise', referencedColumnName: 'id_entreprise')]
     private ?Entreprise $entreprise = null;
 
@@ -155,19 +155,25 @@ class Employe
         return $this;
     }
 
-    #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $cv_data = null;
+    #[ORM\Column(type: 'blob', columnDefinition: 'MEDIUMBLOB DEFAULT NULL', nullable: true)]
+    private  mixed $cv_data = null;
 
-    public function getCv_data(): ?string
+    public function getCvData(): ?string
     {
-        return $this->cv_data;
+        if (is_resource($this->cv_data)) {
+            $data = stream_get_contents($this->cv_data);
+            return $data === false ? null : $data;
+        }
+
+        return is_string($this->cv_data) ? $this->cv_data : null;
     }
 
-    public function setCv_data(?string $cv_data): self
+    public function setCvData(?string $cv_data): self
     {
         $this->cv_data = $cv_data;
         return $this;
     }
+
 
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $cv_nom = null;
@@ -183,7 +189,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Commentaire::class, mappedBy: 'employé')]
+    #[ORM\OneToMany(targetEntity: Commentaire::class, mappedBy: 'employe')]
     private Collection $commentaires;
 
     /**
@@ -211,7 +217,21 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Compte::class, mappedBy: 'employé')]
+    #[ORM\OneToOne(targetEntity: CompetenceEmploye::class, mappedBy: 'employe')]
+    private ?CompetenceEmploye $competenceEmploye = null;
+
+    public function getCompetenceEmploye(): ?CompetenceEmploye
+    {
+        return $this->competenceEmploye;
+    }
+
+    public function setCompetenceEmploye(?CompetenceEmploye $competenceEmploye): self
+    {
+        $this->competenceEmploye = $competenceEmploye;
+        return $this;
+    }
+
+    #[ORM\OneToMany(targetEntity: Compte::class, mappedBy: 'employe')]
     private Collection $comptes;
 
     /**
@@ -239,8 +259,7 @@ class Employe
         return $this;
     }
 
-
-    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employé')]
+    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employe')]
     private Collection $demandes;
 
     /**
@@ -268,7 +287,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Notification::class, mappedBy: 'employé')]
+    #[ORM\OneToMany(targetEntity: Notification::class, mappedBy: 'employe')]
     private Collection $notifications;
 
     /**
@@ -296,7 +315,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToOne(targetEntity: Participation::class, mappedBy: 'employé')]
+    #[ORM\OneToOne(targetEntity: Participation::class, mappedBy: 'employe')]
     private ?Participation $participation = null;
 
     public function getParticipation(): ?Participation
@@ -310,7 +329,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Post::class, mappedBy: 'employé')]
+    #[ORM\OneToMany(targetEntity: Post::class, mappedBy: 'employe')]
     private Collection $posts;
 
     /**
@@ -338,7 +357,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Projet::class, mappedBy: 'employé')]
+    #[ORM\OneToMany(targetEntity: Projet::class, mappedBy: 'employe')]
     private Collection $projets;
 
     /**
@@ -366,7 +385,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Tache::class, mappedBy: 'employé')]
+    #[ORM\OneToMany(targetEntity: Tache::class, mappedBy: 'employe')]
     private Collection $taches;
 
     /**
@@ -394,7 +413,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\ManyToMany(targetEntity: Projet::class, inversedBy: 'employés')]
+    #[ORM\ManyToMany(targetEntity: Projet::class, inversedBy: 'employes')]
     #[ORM\JoinTable(
         name: 'equipe_projet',
         joinColumns: [
@@ -411,8 +430,8 @@ class Employe
      */
     public function getProjets1(): Collection
     {
-        if (!$this->projets instanceof Collection) {
-            $this->projets = new ArrayCollection();
+        if (!$this->projets1 instanceof Collection) {
+            $this->projets1 = new ArrayCollection();
         }
         return $this->projets;
     }
@@ -431,7 +450,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\ManyToMany(targetEntity: Post::class, inversedBy: 'employés')]
+    #[ORM\ManyToMany(targetEntity: Post::class, inversedBy: 'employes')]
     #[ORM\JoinTable(
         name: 'like_post',
         joinColumns: [
@@ -448,10 +467,10 @@ class Employe
      */
     public function getPosts1(): Collection
     {
-        if (!$this->posts instanceof Collection) {
-            $this->posts = new ArrayCollection();
+        if (!$this->posts1 instanceof Collection) {
+            $this->posts1 = new ArrayCollection();
         }
-        return $this->posts;
+        return $this->posts1;
     }
 
     public function addPost1(Post $post): self
@@ -467,4 +486,5 @@ class Employe
         $this->getPosts1()->removeElement($post);
         return $this;
     }
+
 }

@@ -41,24 +41,50 @@ class EmployeRepository extends ServiceEntityRepository
     //            ->getOneOrNullResult()
     //        ;
     //    }
+    private function createFilteredQueryBuilder($entreprise, ?string $search, ?string $role)
+    {
+        $qb = $this->createQueryBuilder('e')
+            ->andWhere('e.entreprise = :entreprise')
+            ->setParameter('entreprise', $entreprise);
+
+        if ($search) {
+            $qb->andWhere('LOWER(e.nom) LIKE :search OR LOWER(e.prenom) LIKE :search')
+                ->setParameter('search', '%' . strtolower($search) . '%');
+        }
+
+        if ($role) {
+            $qb->andWhere('LOWER(e.role) = :role')
+                ->setParameter('role', strtolower($role));
+        }
+
+        return $qb;
+    }
+
     public function findByEntrepriseAndFilters($entreprise, ?string $search, ?string $role): array
-{
-    $qb = $this->createQueryBuilder('e')
-               ->andWhere('e.entreprise = :entreprise')
-               ->setParameter('entreprise', $entreprise);
-
-    if ($search) {
-        $qb->andWhere('LOWER(e.nom) LIKE :search OR LOWER(e.prenom) LIKE :search')
-           ->setParameter('search', '%'.strtolower($search).'%');
+    {
+        return $this->createFilteredQueryBuilder($entreprise, $search, $role)
+            ->orderBy('e.id_employe', 'ASC')
+            ->getQuery()
+            ->getResult();
     }
 
-    if ($role) {
-        $qb->andWhere('LOWER(e.role) = :role')
-           ->setParameter('role', strtolower($role));
+    public function findByEntrepriseAndFiltersPaginated($entreprise, ?string $search, ?string $role, int $page, int $perPage): array
+    {
+        $offset = max(0, ($page - 1) * $perPage);
+
+        return $this->createFilteredQueryBuilder($entreprise, $search, $role)
+            ->orderBy('e.id_employe', 'ASC')
+            ->setFirstResult($offset)
+            ->setMaxResults($perPage)
+            ->getQuery()
+            ->getResult();
     }
 
-    return $qb->orderBy('e.nom', 'ASC')
-              ->getQuery()
-              ->getResult();
-}
+    public function countByEntrepriseAndFilters($entreprise, ?string $search, ?string $role): int
+    {
+        return (int) $this->createFilteredQueryBuilder($entreprise, $search, $role)
+            ->select('COUNT(e.id_employe)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }
