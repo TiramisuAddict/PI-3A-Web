@@ -6,6 +6,10 @@
 {{ parent() }}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
+    html, body {
+        overflow: hidden !important;
+        height: 100% !important;
+    }
     .stats-row {
         display: flex;
         gap: 12px;
@@ -16,58 +20,11 @@
         flex: 1;
         min-width: 140px;
         border: 1px solid rgba(15, 23, 42, 0.08);
-        border-radius: 8px;
-        background: #fff;
-        transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
-        cursor: pointer;
-        padding: 12px 16px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    .stat-card:hover {
-        border-color: rgba(31, 111, 235, 0.35);
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
-        transform: translateY(-2px);
-    }
-    .stat-icon {
-        width: 42px;
-        height: 42px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-            color: #fff !important;
-        flex-shrink: 0;
-    }
-    .stat-content {
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-    }
-    .stat-value {
-        font-size: 1.5rem;
-        font-weight: 700;
-        line-height: 1;
-    }
-    .stat-label {
-        font-size: 0.75rem;
-        color: #64748b;
-        margin-top: 4px;
-        font-weight: 500;
-        white-space: nowrap;
-    }
-    .demande-row.hidden {
-        display: none;
-    }
-    .stat-card {
-        flex: 1;
-        min-width: 140px;
-        border: 1px solid rgba(15, 23, 42, 0.08);
         border-radius: 10px;
         background: #fff;
         transition: border-color .2s ease, box-shadow .2s ease;
         cursor: pointer;
+        padding: 16px 20px;
         display: flex;
         align-items: center;
         gap: 12px;
@@ -87,6 +44,25 @@
         justify-content: center;
         font-size: 1.25rem;
         background: #f5f7fb;
+        color: #fff !important;
+        flex-shrink: 0;
+    }
+    .stat-content {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-top: 4px;
+        font-weight: 500;
+        white-space: nowrap;
     }
     .badge {
         padding: 4px 8px;
@@ -95,6 +71,11 @@
         border-radius: 4px;
         display: inline-block;
         color: #fff !important;
+    }
+    .titre-link {
+        color: #1f2937;
+        font-weight: 600;
+        text-decoration: none;
     }
     .titre-link:hover {
         color: var(--tblr-primary);
@@ -129,6 +110,7 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
+        text-decoration: none;
     }
     .quick-filter-btn:hover {
         border-color: var(--tblr-primary);
@@ -212,15 +194,88 @@
         color: #64748b;
         margin-bottom: 20px;
     }
-    .filter-card {
-        padding: 12px 16px;
+    .page-wrapper {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 56px);
+        overflow: hidden;
+    }
+    .page-body {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    .page-body > .container-xl {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .card.table-card {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-height: 0;
+    }
+    .card.table-card .table-responsive {
+        flex: 1;
+        overflow: hidden;
+    }
+    .card.table-card .table-responsive table {
+        margin-bottom: 0;
+    }
+    .card.table-card .card-footer {
+        flex-shrink: 0;
+    }
+    .search-filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .search-filter-bar .search-input-wrap {
+        flex: 1;
+        min-width: 200px;
+        position: relative;
+    }
+    .search-filter-bar .search-input-wrap input {
+        padding-left: 36px;
+    }
+    .search-filter-bar .search-input-wrap .search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        pointer-events: none;
+    }
+    .search-filter-bar .search-input-wrap .clear-btn {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 2px;
+        display: none;
+        line-height: 1;
+    }
+    .search-filter-bar .search-input-wrap .clear-btn.visible {
+        display: block;
+    }
+    .search-filter-bar .search-input-wrap .clear-btn:hover {
+        color: #dc3545;
     }
 </style>
 {% endblock %}
 
 {% block body %}
 {{ include('components/navbar.html.twig') }}
-<div class="d-flex" style="min-height:calc(100vh - 56px);">
+<div class="d-flex" style="height:calc(100vh - 56px);overflow:hidden;">
 {{ include('components/sidebar.html.twig', {'active_page': 'demandes', 'sidebar_role': role}) }}
 <div class="page-wrapper">
     <div class="container-xl">
@@ -265,36 +320,28 @@
 
             <div class="stats-row">
                 <div class="stat-card" onclick="filterByStatus('')" data-stat-card="total">
-                    <div class="stat-icon bg-primary-lt text-primary">
-                        <i class="ti ti-files"></i>
-                    </div>
+                    <div class="stat-icon bg-primary-lt text-primary"><i class="ti ti-files"></i></div>
                     <div class="stat-content">
                         <div class="stat-value text-primary" data-stat-value="total">{{ stats.total }}</div>
                         <div class="stat-label">Total</div>
                     </div>
                 </div>
                 <div class="stat-card" onclick="filterByStatus('Nouvelle')" data-stat-card="Nouvelle">
-                    <div class="stat-icon bg-blue-lt text-blue">
-                        <i class="ti ti-clock"></i>
-                    </div>
+                    <div class="stat-icon bg-blue-lt text-blue"><i class="ti ti-clock"></i></div>
                     <div class="stat-content">
                         <div class="stat-value text-blue" data-stat-value="Nouvelle">{{ stats.byStatus['Nouvelle'] | default(0) }}</div>
                         <div class="stat-label">Nouvelles</div>
                     </div>
                 </div>
                 <div class="stat-card" onclick="filterByStatus('En cours')" data-stat-card="En cours">
-                    <div class="stat-icon bg-yellow-lt text-yellow">
-                        <i class="ti ti-loader"></i>
-                    </div>
+                    <div class="stat-icon bg-yellow-lt text-yellow"><i class="ti ti-loader"></i></div>
                     <div class="stat-content">
                         <div class="stat-value text-yellow" data-stat-value="En cours">{{ stats.byStatus['En cours'] | default(0) }}</div>
                         <div class="stat-label">En cours</div>
                     </div>
                 </div>
                 <div class="stat-card" onclick="filterByStatus('Resolue')" data-stat-card="Resolue">
-                    <div class="stat-icon bg-green-lt text-green">
-                        <i class="ti ti-check"></i>
-                    </div>
+                    <div class="stat-icon bg-green-lt text-green"><i class="ti ti-check"></i></div>
                     <div class="stat-content">
                         <div class="stat-value text-green" data-stat-value="Resolue">{{ stats.byStatus['Resolue'] | default(0) }}</div>
                         <div class="stat-label">Resolues</div>
@@ -303,49 +350,41 @@
             </div>
 
             <div class="card mb-3">
-                <div class="card-body filter-card">
-                    <form method="get" action="{{ path('demande_index') }}" class="row align-items-center g-2" id="demande-filter-form">
-                        <div class="col-12 col-md-6">
-                            <input type="text" name="search" id="demande-search-input" class="form-control"
-                                   placeholder="Rechercher par titre, categorie, type ou statut"
+                <div class="card-body py-2 px-3">
+                    <div class="search-filter-bar">
+                        <div class="search-input-wrap">
+                            <i class="ti ti-search search-icon"></i>
+                            <input type="text" id="demande-search-input" class="form-control"
+                                   placeholder="Rechercher par titre, categorie, type ou statut..."
                                    autocomplete="off"
                                    value="{{ filters.search|default('') }}">
-                            <input type="hidden" name="status" value="{{ filters.status|default('') }}">
-                            <input type="hidden" name="priorite" value="{{ filters.priorite|default('') }}">
-                            <input type="hidden" name="categorie" value="{{ filters.categorie|default('') }}">
-                            <input type="hidden" name="page" value="1">
+                            <button type="button" class="clear-btn {{ filters.search|default('') != '' ? 'visible' : '' }}" id="search-clear-btn" title="Effacer">
+                                <i class="ti ti-x"></i>
+                            </button>
                         </div>
-                        <div class="col-12 col-md-6">
-                            <div class="d-flex flex-wrap gap-2 justify-content-md-end">
-                                <button type="button" class="btn btn-primary btn-sm" id="demande-search-button">
-                                    <i class="ti ti-search me-1"></i>Rechercher
-                                </button>
-                                <a href="{{ path('demande_index') }}" class="btn btn-outline-secondary btn-sm">
-                                    <i class="ti ti-refresh me-1"></i>Reinitialiser
-                                </a>
-                            </div>
-                        </div>
-                    </form>
-                    <div class="d-flex flex-wrap gap-2 mt-3">
-                        <a href="{{ path('demande_index', {'search': filters.search|default(''), 'categorie': filters.categorie|default(''), 'page': 1}) }}" class="quick-filter-btn {{ (filters.priorite|default('') == '' and filters.status|default('') == '') ? 'active' : '' }}">
+                        <a href="{{ path('demande_index', {'categorie': filters.categorie|default(''), 'limit': limit|default(10), 'page': 1}) }}"
+                           class="quick-filter-btn {{ (filters.priorite|default('') == '' and filters.status|default('') == '' and filters.search|default('') == '') ? 'active' : '' }}">
                             <i class="ti ti-list"></i>Tous
                         </a>
-                        <a href="{{ path('demande_index', {'search': filters.search|default(''), 'categorie': filters.categorie|default(''), 'priorite': 'HAUTE', 'status': '', 'page': 1}) }}" class="quick-filter-btn {{ filters.priorite|default('') == 'HAUTE' ? 'active' : '' }}">
+                        <a href="{{ path('demande_index', {'categorie': filters.categorie|default(''), 'priorite': 'HAUTE', 'limit': limit|default(10), 'page': 1}) }}"
+                           class="quick-filter-btn {{ filters.priorite|default('') == 'HAUTE' ? 'active' : '' }}">
                             <i class="ti ti-alert-circle"></i>Haute
                         </a>
-                        <a href="{{ path('demande_index', {'search': filters.search|default(''), 'categorie': filters.categorie|default(''), 'status': 'Nouvelle', 'priorite': '', 'page': 1}) }}" class="quick-filter-btn {{ filters.status|default('') == 'Nouvelle' ? 'active' : '' }}">
+                        <a href="{{ path('demande_index', {'categorie': filters.categorie|default(''), 'status': 'Nouvelle', 'limit': limit|default(10), 'page': 1}) }}"
+                           class="quick-filter-btn {{ filters.status|default('') == 'Nouvelle' ? 'active' : '' }}">
                             <i class="ti ti-sparkles"></i>Nouvelles
                         </a>
-                        <a href="{{ path('demande_index', {'search': filters.search|default(''), 'categorie': filters.categorie|default(''), 'status': 'En cours', 'priorite': '', 'page': 1}) }}" class="quick-filter-btn {{ filters.status|default('') == 'En cours' ? 'active' : '' }}">
+                        <a href="{{ path('demande_index', {'categorie': filters.categorie|default(''), 'status': 'En cours', 'limit': limit|default(10), 'page': 1}) }}"
+                           class="quick-filter-btn {{ filters.status|default('') == 'En cours' ? 'active' : '' }}">
                             <i class="ti ti-progress"></i>En cours
                         </a>
                     </div>
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card table-card">
                 <div class="table-responsive">
-                    <table class="table table-vcenter table-hover card-table">
+                    <table class="table table-vcenter table-hover card-table" id="demande-table">
                         <thead>
                             <tr>
                                 <th style="width: 28%">Titre</th>
@@ -357,7 +396,7 @@
                                 <th class="text-end" style="width: 130px;">Actions</th>
                             </tr>
                         </thead>
-                                                <tbody>
+                        <tbody>
                             {% for demande in demandes %}
                                 <tr class="demande-row"
                                     data-titre="{{ demande.titre|lower }}"
@@ -411,111 +450,30 @@
                                     </td>
                                     <td class="text-end">
                                         <div class="action-buttons">
-
-                                            {# View #}
                                             <a href="{{ path('demande_show', {id: demande.idDemande}) }}"
-                                            class="action-btn action-btn-view" title="Afficher">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
-                                                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                                    <circle cx="12" cy="12" r="3"></circle>
-                                                </svg>
+                                               class="action-btn action-btn-view" title="Afficher">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                             </a>
-
-                                            {# Edit #}
                                             {% if demande.status != 'Annulee' %}
                                                 <a href="{{ path('demande_edit', {id: demande.idDemande}) }}"
-                                                class="action-btn action-btn-edit" title="Modifier">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
-                                                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                                    </svg>
+                                                   class="action-btn action-btn-edit" title="Modifier">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                                 </a>
                                             {% else %}
-                                                <span class="action-btn action-btn-edit"
-                                                    style="opacity:0.35;cursor:not-allowed;"
-                                                    title="Modification impossible">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
-                                                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                                    </svg>
+                                                <span class="action-btn action-btn-edit" style="opacity:0.35;cursor:not-allowed;" title="Modification impossible">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                                 </span>
                                             {% endif %}
-
-                                            {# Delete #}
                                             <button type="button"
                                                     class="action-btn action-btn-delete"
                                                     title="Supprimer"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#deleteDemandeModal-{{ demande.idDemande }}">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
-                                                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-                                                    <path d="M10 11v6"></path>
-                                                    <path d="M14 11v6"></path>
-                                                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-                                                </svg>
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
                                             </button>
-
                                         </div>
                                     </td>
                                 </tr>
-                                <div class="modal" id="deleteDemandeModal-{{ demande.idDemande }}" tabindex="-1">
-                                <div class="modal-dialog modal-sm" role="document">
-                                    <div class="modal-content">
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-                                    <div class="modal-status bg-danger"></div>
-                                    <div class="modal-body text-center py-4">
-                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                            class="icon mb-2 text-danger icon-lg"
-                                            width="24" height="24" viewBox="0 0 24 24"
-                                            stroke-width="2" stroke="currentColor" fill="none"
-                                            stroke-linecap="round" stroke-linejoin="round">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-                                        <path d="M10 11v6"></path>
-                                        <path d="M14 11v6"></path>
-                                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-                                        </svg>
-                                        <h3>Supprimer la demande ?</h3>
-                                        <div class="text-secondary">
-                                        Vous allez supprimer :<br>
-                                        <strong class="text-dark">{{ demande.titre }}</strong><br><br>
-                                        Cette action est <strong>irreversible</strong>.
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <div class="w-100">
-                                        <div class="row">
-                                            <div class="col">
-                                            <button type="button" class="btn w-100" data-bs-dismiss="modal">
-                                                Annuler
-                                            </button>
-                                            </div>
-                                            <div class="col">
-                                            <form method="post"
-                                                    action="{{ path('demande_delete', {id: demande.idDemande}) }}"
-                                                    style="margin:0;">
-                                                <button type="submit" class="btn btn-danger w-100">
-                                                <i class="ti ti-trash me-1"></i>Supprimer
-                                                </button>
-                                            </form>
-                                            </div>
-                                        </div>
-                                        </div>
-                                    </div>
-                                    </div>
-                                </div>
-                                </div>
-
                             {% else %}
                                 <tr>
                                     <td colspan="7">
@@ -536,62 +494,57 @@
                     </div>
                 {% endif %}
             </div>
-
         </div>
     </div>
 </div>
+</div>
+
+{# Delete modals #}
+<div id="delete-modals-container">
+{% for demande in demandes %}
+<div class="modal" id="deleteDemandeModal-{{ demande.idDemande }}" tabindex="-1">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-body text-center py-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon mb-2 text-danger icon-lg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                    <path d="M10 11v6"></path><path d="M14 11v6"></path>
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                </svg>
+                <h3>Supprimer la demande ?</h3>
+                <div class="text-secondary">
+                    Vous allez supprimer :<br>
+                    <strong class="text-dark">{{ demande.titre }}</strong><br><br>
+                    Cette action est <strong>irreversible</strong>.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn w-100" data-bs-dismiss="modal">Annuler</button>
+                        </div>
+                        <div class="col">
+                            <form method="post" action="{{ path('demande_delete', {id: demande.idDemande}) }}" style="margin:0;">
+                                <button type="submit" class="btn btn-danger w-100">
+                                    <i class="ti ti-trash me-1"></i>Supprimer
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 </div>
 
 {{ include('demande/_logout_modal.html.twig') }}
-
-{# ── Delete modal — same style as logout / cancel modals ── #}
-<div class="modal" id="deleteDemandeModal" tabindex="-1">
-  <div class="modal-dialog modal-sm" role="document">
-    <div class="modal-content">
-      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-      <div class="modal-status bg-danger"></div>
-      <div class="modal-body text-center py-4">
-        <svg xmlns="http://www.w3.org/2000/svg"
-             class="icon mb-2 text-danger icon-lg"
-             width="24" height="24" viewBox="0 0 24 24"
-             stroke-width="2" stroke="currentColor" fill="none"
-             stroke-linecap="round" stroke-linejoin="round">
-          <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-          <path d="M10 11v6"></path>
-          <path d="M14 11v6"></path>
-          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-        </svg>
-        <h3>Supprimer la demande ?</h3>
-        <div class="text-secondary">
-          Vous allez supprimer :<br>
-          <strong id="deleteDemandeTitre" class="text-dark"></strong><br><br>
-          Cette action est <strong>irreversible</strong>.
-        </div>
-      </div>
-      <div class="modal-footer">
-        <div class="w-100">
-          <div class="row">
-            <div class="col">
-              <button type="button" class="btn w-100" data-bs-dismiss="modal">
-                Annuler
-              </button>
-            </div>
-            <div class="col">
-              <form id="deleteDemandeForm" method="post" action="" style="margin:0;">
-                <button type="submit" class="btn btn-danger w-100">
-                  <i class="ti ti-trash me-1"></i>Supprimer
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
 {% endblock %}
 
 {% block javascripts %}
@@ -600,79 +553,271 @@
 <script>
 (function () {
     "use strict";
-    function navigateWithStatus(status) {
+
+    var ROW_HEIGHT = 49;
+    var currentLimit = {{ limit|default(10) }};
+    var resizeTimer = null;
+    var searchTimer = null;
+    var currentStatusFilter = "";
+    var searchInput = null;
+    var currentSearchTerm = "";
+    var fetchSequence = 0;
+
+    function calculateOptimalLimit() {
+        var tableCard = document.querySelector('.card.table-card');
+        if (!tableCard) return currentLimit;
+        var cardRect = tableCard.getBoundingClientRect();
+        var thead = tableCard.querySelector('thead');
+        var footer = tableCard.querySelector('.card-footer');
+        var theadHeight = thead ? thead.offsetHeight : 42;
+        var footerHeight = footer ? footer.offsetHeight : 52;
+        var viewportBottom = window.innerHeight;
+        var availableHeight = viewportBottom - cardRect.top - theadHeight - footerHeight - 4;
+        if (availableHeight < ROW_HEIGHT) availableHeight = ROW_HEIGHT;
+        var rows = Math.floor(availableHeight / ROW_HEIGHT);
+        if (rows < 1) rows = 1;
+        if (rows > 100) rows = 100;
+        return rows;
+    }
+
+    function buildUrl(overrides) {
         var url = new URL(window.location.href);
-        if (status) {
-            url.searchParams.set("status", status);
-        } else {
-            url.searchParams.delete("status");
+        if (overrides) {
+            for (var key in overrides) {
+                if (overrides[key] === null || overrides[key] === '') {
+                    url.searchParams.delete(key);
+                } else {
+                    url.searchParams.set(key, overrides[key]);
+                }
+            }
+        }
+        return url.toString();
+    }
+
+    function getUpdatedUrl(newLimit) {
+        var url = new URL(window.location.href);
+        var oldLimit = parseInt(url.searchParams.get('limit')) || 10;
+        var oldPage = parseInt(url.searchParams.get('page')) || 1;
+        var firstItemIndex = (oldPage - 1) * oldLimit;
+        var newPage = Math.floor(firstItemIndex / newLimit) + 1;
+        if (newPage < 1) newPage = 1;
+        url.searchParams.set('limit', newLimit.toString());
+        url.searchParams.set('page', newPage.toString());
+        return url.toString();
+    }
+
+    function applyDynamicLimit() {
+        var optimalLimit = calculateOptimalLimit();
+        if (optimalLimit !== currentLimit) {
+            currentLimit = optimalLimit;
+            window.location.assign(getUpdatedUrl(optimalLimit));
+        }
+    }
+
+    function updateQuickFilterLinks(limit) {
+        document.querySelectorAll('.quick-filter-btn').forEach(function (link) {
+            try {
+                var href = new URL(link.href);
+                href.searchParams.set('limit', limit.toString());
+                link.href = href.toString();
+            } catch (e) {}
+        });
+    }
+
+    function updateStatCardValues(responseDoc) {
+        ["total", "Nouvelle", "En cours", "Resolue"].forEach(function (key) {
+            var source = responseDoc.querySelector('[data-stat-value="' + key + '"]');
+            var target = document.querySelector('[data-stat-value="' + key + '"]');
+            if (source && target) {
+                target.textContent = source.textContent;
+            }
+        });
+    }
+
+    function syncTableFromResponse(responseDoc) {
+        var currentBody = document.querySelector('#demande-table tbody');
+        var nextBody = responseDoc.querySelector('#demande-table tbody');
+        if (currentBody && nextBody) {
+            currentBody.innerHTML = nextBody.innerHTML;
+        }
+    }
+
+    function syncPaginationFromResponse(responseDoc) {
+        var tableCard = document.querySelector('.card.table-card');
+        if (!tableCard) return;
+
+        var currentFooter = tableCard.querySelector('.card-footer');
+        var nextFooter = responseDoc.querySelector('.card.table-card .card-footer');
+
+        if (nextFooter) {
+            if (!currentFooter) {
+                currentFooter = nextFooter.cloneNode(true);
+                tableCard.appendChild(currentFooter);
+            } else {
+                currentFooter.innerHTML = nextFooter.innerHTML;
+            }
+        } else if (currentFooter) {
+            currentFooter.remove();
         }
 
-        url.searchParams.delete("priorite");
-        url.searchParams.set("page", "1");
-        window.location.assign(url.toString());
+        bindPaginationLinks();
+    }
+
+    function syncDeleteModalsFromResponse(responseDoc) {
+        var currentModals = document.getElementById('delete-modals-container');
+        var nextModals = responseDoc.getElementById('delete-modals-container');
+        if (currentModals && nextModals) {
+            currentModals.innerHTML = nextModals.innerHTML;
+        }
+    }
+
+    function buildRequestUrl(page) {
+        var url = new URL(window.location.href);
+        url.searchParams.set('limit', currentLimit.toString());
+        url.searchParams.set('page', String(page || 1));
+
+        if (currentSearchTerm) {
+            url.searchParams.set('search', currentSearchTerm);
+        } else {
+            url.searchParams.delete('search');
+        }
+
+        if (currentStatusFilter) {
+            url.searchParams.set('status', currentStatusFilter);
+            url.searchParams.delete('priorite');
+        }
+
+        if (!currentStatusFilter) {
+            url.searchParams.delete('status');
+        }
+
+        return url;
+    }
+
+    function fetchAndRender(page) {
+        var sequence = ++fetchSequence;
+        var requestUrl = buildRequestUrl(page);
+        window.history.replaceState({}, '', requestUrl.toString());
+
+        fetch(requestUrl.toString(), {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(function (response) {
+                return response.text();
+            })
+            .then(function (html) {
+                if (sequence !== fetchSequence) return;
+                var responseDoc = new DOMParser().parseFromString(html, 'text/html');
+                updateStatCardValues(responseDoc);
+                syncTableFromResponse(responseDoc);
+                syncPaginationFromResponse(responseDoc);
+                syncDeleteModalsFromResponse(responseDoc);
+            })
+            .catch(function () {
+                window.location.assign(requestUrl.toString());
+            });
+    }
+
+    function debounce(func, wait) {
+        return function () {
+            var args = arguments;
+            if (searchTimer) clearTimeout(searchTimer);
+            searchTimer = setTimeout(function () {
+                func.apply(null, args);
+            }, wait);
+        };
+    }
+
+    function bindPaginationLinks() {
+        document.querySelectorAll('.card.table-card .card-footer a').forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                event.preventDefault();
+                try {
+                    var href = new URL(link.href);
+                    var nextPage = parseInt(href.searchParams.get('page')) || 1;
+                    currentSearchTerm = href.searchParams.get('search') || currentSearchTerm;
+                    currentStatusFilter = href.searchParams.get('status') || currentStatusFilter;
+                    if (searchInput) {
+                        searchInput.value = currentSearchTerm;
+                    }
+                    fetchAndRender(nextPage);
+                } catch (e) {
+                    window.location.assign(link.href);
+                }
+            });
+        });
+    }
+
+    function filterByStatus(status) {
+        currentStatusFilter = status || "";
+        fetchAndRender(1);
+    }
+
+    function clearSearch() {
+        if (!searchInput) return;
+        searchInput.value = "";
+        currentSearchTerm = "";
+        fetchAndRender(1);
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-        var filterForm = document.getElementById("demande-filter-form");
-        var searchInput = document.getElementById("demande-search-input");
-        var searchButton = document.getElementById("demande-search-button");
-        var rows = document.querySelectorAll(".demande-row");
+        var optimalLimit = calculateOptimalLimit();
+        var urlLimit = parseInt(new URLSearchParams(window.location.search).get('limit')) || 0;
+        var queryParams = new URLSearchParams(window.location.search);
 
-        function normalizeValue(value) {
-            return (value || "")
-                .toString()
-                .trim()
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "");
+        currentSearchTerm = queryParams.get('search') || "";
+        currentStatusFilter = queryParams.get('status') || "";
+
+        updateQuickFilterLinks(optimalLimit);
+
+        if (urlLimit === 0 || Math.abs(urlLimit - optimalLimit) >= 1) {
+            window.location.assign(getUpdatedUrl(optimalLimit));
+            return;
         }
 
-        function performSearch() {
-            var term = normalizeValue(searchInput ? searchInput.value : "");
+        currentLimit = optimalLimit;
 
-            rows.forEach(function (row) {
-                var titre = normalizeValue(row.getAttribute("data-titre"));
-                var categorie = normalizeValue(row.getAttribute("data-categorie"));
-                var type = normalizeValue(row.getAttribute("data-type"));
-                var priorite = normalizeValue(row.getAttribute("data-priorite"));
-                var status = normalizeValue(row.getAttribute("data-status"));
+        searchInput = document.getElementById("demande-search-input");
+        var clearBtn = document.getElementById("search-clear-btn");
 
-                var visible =
-                    term === "" ||
-                    titre.indexOf(term) !== -1 ||
-                    categorie.indexOf(term) !== -1 ||
-                    type.indexOf(term) !== -1 ||
-                    priorite.indexOf(term) !== -1 ||
-                    status.indexOf(term) !== -1;
-
-                row.style.display = visible ? "" : "none";
-            });
-        }
-
-        if (filterForm && searchInput) {
-            filterForm.addEventListener("submit", function (event) {
-                event.preventDefault();
-                performSearch();
-            });
-
-            searchInput.addEventListener("input", function () {
-                performSearch();
-            });
+        if (searchInput) {
+            searchInput.addEventListener("input", debounce(function () {
+                currentSearchTerm = searchInput.value.trim();
+                if (clearBtn) {
+                    clearBtn.classList.toggle('visible', searchInput.value.trim().length > 0);
+                }
+                fetchAndRender(1);
+            }, 150));
 
             searchInput.addEventListener("keyup", function (event) {
                 if (event.key === "Escape") {
-                    searchInput.value = "";
-                    performSearch();
+                    if (clearBtn) clearBtn.classList.remove('visible');
+                    clearSearch();
                 }
+            });
+
+            searchInput.focus();
+            var len = searchInput.value.length;
+            searchInput.setSelectionRange(len, len);
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener("click", function () {
+                clearBtn.classList.remove('visible');
+                clearSearch();
             });
         }
 
-        if (searchButton) {
-            searchButton.addEventListener("click", function () {
-                performSearch();
-            });
-        }
+        bindPaginationLinks();
+
+        window.addEventListener('resize', function () {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function () {
+                applyDynamicLimit();
+            }, 300);
+        });
 
         if (window.DemandeSyncManager) {
             window.DemandeSyncManager.onStatusUpdate(function (data) {
@@ -681,10 +826,10 @@
                 }
             });
         }
+
     });
 
-    window.filterByStatus = navigateWithStatus;
-
+    window.filterByStatus = filterByStatus;
 }());
 </script>
 {% endblock %}

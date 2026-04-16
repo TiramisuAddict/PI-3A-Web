@@ -43,38 +43,52 @@ class DemandeController extends AbstractController
 
         $filters = [
             'categorie' => $request->query->get('categorie'),
-            'status' => $request->query->get('status'),
-            'priorite' => $request->query->get('priorite'),
-            'search' => $request->query->get('search'),
+            'status'    => $request->query->get('status'),
+            'priorite'  => $request->query->get('priorite'),
+            'search'    => $request->query->get('search'),
         ];
-        $isManager = $this->canManageDemandes($session);
+
+        $isManager       = $this->canManageDemandes($session);
         $scopedEmployeId = $isManager ? null : $this->getLoggedInEmployeId($session);
 
-        $activeFilters = array_filter($filters, static fn ($value) => null !== $value && '' !== $value);
+        $activeFilters = array_filter(
+            $filters,
+            static fn($value) => null !== $value && '' !== $value
+        );
 
-        $page = $request->query->getInt('page', 1);
+        $page  = $request->query->getInt('page', 1);
+        $limit = $request->query->getInt('limit', 10);
+        if ($limit < 1)   $limit = 1;
+        if ($limit > 100) $limit = 100;
+
         $queryBuilder = $this->demandeRepository
             ->createFilteredQueryBuilder($activeFilters, $scopedEmployeId)
             ->orderBy('d.date_creation', 'DESC');
 
-        $demandes = $paginator->paginate($queryBuilder, $page, 10);
+        $demandes = $paginator->paginate($queryBuilder, $page, $limit);
 
         $stats = [
-            'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll($scopedEmployeId, $activeFilters) : count($demandes),
-            'byStatus' => method_exists($this->demandeRepository, 'countGroupByStatus') ? $this->demandeRepository->countGroupByStatus($scopedEmployeId, $activeFilters) : [],
-            'byPriorite' => method_exists($this->demandeRepository, 'countGroupByPriorite') ? $this->demandeRepository->countGroupByPriorite($scopedEmployeId, $activeFilters) : [],
+            'total'      => $this->demandeRepository->countAll($scopedEmployeId, $activeFilters),
+            'byStatus'   => $this->demandeRepository->countGroupByStatus($scopedEmployeId, $activeFilters),
+            'byPriorite' => $this->demandeRepository->countGroupByPriorite($scopedEmployeId, $activeFilters),
         ];
 
-        return $this->render($isManager ? 'demande/adminetrh/index.html.twig' : 'demande/employe/employe_index.html.twig', [
-            'demandes' => $demandes,
-            'categories' => $this->formHelper->getCategories(),
-            'statuses' => $this->formHelper->getStatuses(),
-            'priorites' => $this->formHelper->getPriorites(),
-            'filters' => $filters,
-            'stats' => $stats,
-            'email' => $session->get('employe_email') ?? '',
-            'role' => $session->get('employe_role') ?? '',
-        ]);
+        return $this->render(
+            $isManager
+                ? 'demande/adminetrh/index.html.twig'
+                : 'demande/employe/employe_index.html.twig',
+            [
+                'demandes'   => $demandes,
+                'categories' => $this->formHelper->getCategories(),
+                'statuses'   => $this->formHelper->getStatuses(),
+                'priorites'  => $this->formHelper->getPriorites(),
+                'filters'    => $filters,
+                'stats'      => $stats,
+                'limit'      => $limit,
+                'email'      => $session->get('employe_email') ?? '',
+                'role'       => $session->get('employe_role') ?? '',
+            ]
+        );
     }
 
     #[Route('/demande/nouvelle', name: 'demande_new', methods: ['GET', 'POST'])]
@@ -86,7 +100,6 @@ class DemandeController extends AbstractController
 
         if ($this->canManageDemandes($session)) {
             $this->addFlash('warning', 'Les comptes RH et administrateur entreprise ne peuvent pas creer de demande.');
-
             return $this->redirectToRoute('demande_index');
         }
 
@@ -101,18 +114,18 @@ class DemandeController extends AbstractController
         $demande->setEmploye($employe);
 
         $form = $this->createForm(DemandeType::class, $demande, [
-            'is_edit' => false,
+            'is_edit'         => false,
             'include_employe' => true,
             'employe_choices' => [$employe],
         ]);
         $form->handleRequest($request);
 
-        $detailErrors = [];
+        $detailErrors     = [];
         $submittedDetails = [];
-        $submittedType = null;
+        $submittedType    = null;
 
         if ($form->isSubmitted()) {
-            $formData = $request->request->all();
+            $formData      = $request->request->all();
             $submittedType = $formData['demande']['typeDemande'] ?? null;
             $submittedDetails = $formData['details'] ?? [];
 
@@ -148,13 +161,13 @@ class DemandeController extends AbstractController
         }
 
         return $this->render('demande/employe/new.html.twig', [
-            'form' => $form->createView(),
-            'categories' => $this->formHelper->getCategoryTypes(),
-            'detailErrors' => $detailErrors,
+            'form'             => $form->createView(),
+            'categories'       => $this->formHelper->getCategoryTypes(),
+            'detailErrors'     => $detailErrors,
             'submittedDetails' => $submittedDetails,
-            'submittedType' => $submittedType,
-            'email' => $session->get('employe_email') ?? '',
-            'role' => $session->get('employe_role') ?? '',
+            'submittedType'    => $submittedType,
+            'email'            => $session->get('employe_email') ?? '',
+            'role'             => $session->get('employe_role') ?? '',
         ]);
     }
 
@@ -168,18 +181,23 @@ class DemandeController extends AbstractController
         $scopedEmployeId = $this->canManageDemandes($session) ? null : $this->getLoggedInEmployeId($session);
 
         $stats = [
-            'total' => method_exists($this->demandeRepository, 'countAll') ? $this->demandeRepository->countAll($scopedEmployeId) : 0,
-            'byStatus' => method_exists($this->demandeRepository, 'countGroupByStatus') ? $this->demandeRepository->countGroupByStatus($scopedEmployeId) : [],
-            'byPriorite' => method_exists($this->demandeRepository, 'countGroupByPriorite') ? $this->demandeRepository->countGroupByPriorite($scopedEmployeId) : [],
-            'byType' => method_exists($this->demandeRepository, 'countGroupByType') ? $this->demandeRepository->countGroupByType($scopedEmployeId) : [],
-            'byCategorie' => method_exists($this->demandeRepository, 'countGroupByCategorie') ? $this->demandeRepository->countGroupByCategorie($scopedEmployeId) : [],
+            'total'      => $this->demandeRepository->countAll($scopedEmployeId),
+            'byStatus'   => $this->demandeRepository->countGroupByStatus($scopedEmployeId),
+            'byPriorite' => $this->demandeRepository->countGroupByPriorite($scopedEmployeId),
+            'byType'     => $this->demandeRepository->countGroupByType($scopedEmployeId),
+            'byCategorie'=> $this->demandeRepository->countGroupByCategorie($scopedEmployeId),
         ];
 
-        return $this->render($this->canManageDemandes($session) ? 'demande/adminetrh/statistics.html.twig' : 'demande/employe/statistics.html.twig', [
-            'stats' => $stats,
-            'email' => $session->get('employe_email') ?? '',
-            'role' => $session->get('employe_role') ?? '',
-        ]);
+        return $this->render(
+            $this->canManageDemandes($session)
+                ? 'demande/adminetrh/statistics.html.twig'
+                : 'demande/employe/statistics.html.twig',
+            [
+                'stats' => $stats,
+                'email' => $session->get('employe_email') ?? '',
+                'role'  => $session->get('employe_role') ?? '',
+            ]
+        );
     }
 
     #[Route('/demande/api/fields/{type}', name: 'demande_controller_api_fields', methods: ['GET'])]
@@ -248,7 +266,7 @@ class DemandeController extends AbstractController
                 'success'   => true,
                 'message'   => 'Statut mis a jour',
                 'newStatus' => $newStatus,
-                'stats'     => $stats
+                'stats'     => $stats,
             ]);
 
         } catch (\Exception $e) {
@@ -346,8 +364,8 @@ class DemandeController extends AbstractController
             throw $this->createAccessDeniedException('Vous ne pouvez pas consulter cette demande.');
         }
 
-        $detailsData = [];
-        $fieldLabels = [];
+        $detailsData    = [];
+        $fieldLabels    = [];
         $demandeDetails = $demande->getDemandeDetails();
 
         if ($demandeDetails->count() > 0) {
@@ -359,14 +377,19 @@ class DemandeController extends AbstractController
             }
         }
 
-        return $this->render($this->canManageDemandes($session) ? 'demande/adminetrh/show.html.twig' : 'demande/employe/employe_show.html.twig', [
-            'demande' => $demande,
-            'detailsData' => $detailsData,
-            'fieldLabels' => $fieldLabels,
-            'statuses' => $this->formHelper->getStatuses(),
-            'email' => $session->get('employe_email') ?? '',
-            'role' => $session->get('employe_role') ?? '',
-        ]);
+        return $this->render(
+            $this->canManageDemandes($session)
+                ? 'demande/adminetrh/show.html.twig'
+                : 'demande/employe/employe_show.html.twig',
+            [
+                'demande'     => $demande,
+                'detailsData' => $detailsData,
+                'fieldLabels' => $fieldLabels,
+                'statuses'    => $this->formHelper->getStatuses(),
+                'email'       => $session->get('employe_email') ?? '',
+                'role'        => $session->get('employe_role') ?? '',
+            ]
+        );
     }
 
     #[Route('/demande/action/status-form/{id}', name: 'demande_update_status_form', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -448,25 +471,25 @@ class DemandeController extends AbstractController
                 : $this->formHelper->getStatuses());
 
         $existingDetails = [];
-        $demandeDetails = $demande->getDemandeDetails();
+        $demandeDetails  = $demande->getDemandeDetails();
         if ($demandeDetails->count() > 0) {
-            $firstDetail = $demandeDetails->first();
+            $firstDetail     = $demandeDetails->first();
             $existingDetails = json_decode($firstDetail->getDetails(), true) ?? [];
         }
 
         $form = $this->createForm(DemandeType::class, $demande, [
-            'is_edit' => true,
+            'is_edit'        => true,
             'status_choices' => $statusChoices,
         ]);
         $form->handleRequest($request);
 
-        $detailErrors = [];
+        $detailErrors     = [];
         $submittedDetails = $existingDetails;
-        $submittedType = $demande->getTypeDemande();
+        $submittedType    = $demande->getTypeDemande();
 
         if ($form->isSubmitted()) {
-            $formData = $request->request->all();
-            $submittedType = $formData['demande']['typeDemande'] ?? null;
+            $formData         = $request->request->all();
+            $submittedType    = $formData['demande']['typeDemande'] ?? null;
             $submittedDetails = $formData['details'] ?? [];
 
             if ($submittedType) {
@@ -474,8 +497,8 @@ class DemandeController extends AbstractController
             }
 
             if ($form->isValid() && empty($detailErrors)) {
-                $oldStatus = $this->em->getUnitOfWork()->getOriginalEntityData($demande)['status'] ?? $demande->getStatus();
-                $newStatus = $demande->getStatus();
+                $oldStatus   = $this->em->getUnitOfWork()->getOriginalEntityData($demande)['status'] ?? $demande->getStatus();
+                $newStatus   = $demande->getStatus();
                 $commentaire = $form->get('commentaire')->getData();
 
                 if (!$this->canTransitionStatus($oldStatus, $newStatus)) {
@@ -502,7 +525,6 @@ class DemandeController extends AbstractController
                         $detail->setDemande($demande);
                         $this->em->persist($detail);
                     }
-
                     $detail->setDetails(json_encode($submittedDetails));
                 }
 
@@ -514,17 +536,19 @@ class DemandeController extends AbstractController
         }
 
         return $this->render('demande/adminetrh/edit.html.twig', [
-            'demande' => $demande,
-            'form' => $form->createView(),
-            'categories' => $this->formHelper->getCategoryTypes(),
-            'statuses' => $this->formHelper->getStatuses(),
-            'existingDetails' => $submittedDetails,
-            'detailErrors' => $detailErrors,
-            'submittedType' => $submittedType,
-            'email' => $session->get('employe_email') ?? '',
-            'role' => $session->get('employe_role') ?? '',
+            'demande'          => $demande,
+            'form'             => $form->createView(),
+            'categories'       => $this->formHelper->getCategoryTypes(),
+            'statuses'         => $this->formHelper->getStatuses(),
+            'existingDetails'  => $submittedDetails,
+            'detailErrors'     => $detailErrors,
+            'submittedType'    => $submittedType,
+            'email'            => $session->get('employe_email') ?? '',
+            'role'             => $session->get('employe_role') ?? '',
         ]);
     }
+
+    // ─── Private helpers ────────────────────────────────────────────────────
 
     private function isEmployeLoggedIn(SessionInterface $session): bool
     {
@@ -542,15 +566,12 @@ class DemandeController extends AbstractController
         if (null === $currentStatus || null === $newStatus) {
             return false;
         }
-
         if ($currentStatus === 'Annulee' || $currentStatus === 'Resolue') {
             return $newStatus === $currentStatus;
         }
-
         if ($currentStatus === 'Rejetee') {
             return in_array($newStatus, ['Rejetee', 'Reconsideration'], true);
         }
-
         return true;
     }
 
@@ -559,22 +580,18 @@ class DemandeController extends AbstractController
         if ($currentStatus === 'Annulee') {
             return 'Cette demande est annulee. Son statut ne peut pas etre modifie.';
         }
-
         if ($currentStatus === 'Resolue') {
             return 'Cette demande est deja resolue. Le statut ne peut plus etre modifie.';
         }
-
         if ($currentStatus === 'Rejetee') {
             return 'Cette demande est rejetee. Utilisez le bouton Reconsideration dans la page de details pour rouvrir les changements de statut.';
         }
-
         return 'Le statut ne peut pas etre modifie dans cet etat.';
     }
 
     private function getLoggedInEmployeId(SessionInterface $session): ?int
     {
         $employeId = $session->get('employe_id');
-
         return is_numeric($employeId) ? (int) $employeId : null;
     }
 
@@ -583,10 +600,8 @@ class DemandeController extends AbstractController
         if ($this->canManageDemandes($session)) {
             return true;
         }
-
-        $demandeEmployeId = $demande->getEmploye()?->getId_employe();
+        $demandeEmployeId  = $demande->getEmploye()?->getId_employe();
         $loggedInEmployeId = $this->getLoggedInEmployeId($session);
-
         return null !== $demandeEmployeId
             && null !== $loggedInEmployeId
             && $demandeEmployeId === $loggedInEmployeId;
@@ -594,10 +609,7 @@ class DemandeController extends AbstractController
 
     private function jsonAccessDenied(string $message, int $status = 403): JsonResponse
     {
-        return new JsonResponse([
-            'success' => false,
-            'message' => $message,
-        ], $status);
+        return new JsonResponse(['success' => false, 'message' => $message], $status);
     }
 
     private function getActorLabel(SessionInterface $session): string
@@ -605,18 +617,12 @@ class DemandeController extends AbstractController
         if (true === $session->get('admin_logged_in')) {
             return 'Administrateur systeme';
         }
-
-        $role = trim((string) $session->get('employe_role'));
+        $role  = trim((string) $session->get('employe_role'));
         $email = trim((string) $session->get('employe_email'));
-
         if ('' !== $role && '' !== $email) {
             return $role . ' - ' . $email;
         }
-
-        if ('' !== $email) {
-            return $email;
-        }
-
+        if ('' !== $email) return $email;
         return '' !== $role ? $role : 'Systeme';
     }
 
@@ -624,21 +630,20 @@ class DemandeController extends AbstractController
     {
         $errors = [];
         $fields = $this->formHelper->getFieldsForType($typeDemande);
-        $today = new \DateTime();
+        $today  = new \DateTime();
         $today->setTime(0, 0, 0);
 
         foreach ($fields as $field) {
-            $key = $field['key'];
-            $label = $field['label'];
+            $key      = $field['key'];
+            $label    = $field['label'];
             $required = $field['required'] ?? false;
-            $type = $field['type'] ?? 'text';
-            $value = $details[$key] ?? null;
+            $type     = $field['type'] ?? 'text';
+            $value    = $details[$key] ?? null;
 
             if ($required && ($value === null || trim((string) $value) === '')) {
                 $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" est obligatoire.', 'type' => 'blank'];
                 continue;
             }
-
             if ($value === null || trim((string) $value) === '') {
                 continue;
             }
@@ -650,7 +655,7 @@ class DemandeController extends AbstractController
                     $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" ne peut pas etre negatif.', 'type' => 'format'];
                 } elseif (
                     str_contains(strtolower($key), 'montant') ||
-                    str_contains(strtolower($key), 'nombre') ||
+                    str_contains(strtolower($key), 'nombre')  ||
                     str_contains(strtolower($key), 'quantite') ||
                     str_contains(strtolower($key), 'cout')
                 ) {
@@ -664,16 +669,16 @@ class DemandeController extends AbstractController
                 try {
                     $date = new \DateTime($value);
                     $date->setTime(0, 0, 0);
-                    $lowerKey = strtolower($key);
+                    $lowerKey   = strtolower($key);
                     $lowerLabel = strtolower($label);
 
                     $mustBeFuture =
-                        str_contains($lowerKey, 'datedebut') ||
+                        str_contains($lowerKey, 'datedebut')    ||
                         str_contains($lowerKey, 'datesouhaitee') ||
-                        str_contains($lowerKey, 'datepassage') ||
+                        str_contains($lowerKey, 'datepassage')   ||
                         str_contains($lowerKey, 'dateheuressup') ||
-                        str_contains($lowerLabel, 'date de debut') ||
-                        str_contains($lowerLabel, 'date souhaitee') ||
+                        str_contains($lowerLabel, 'date de debut')    ||
+                        str_contains($lowerLabel, 'date souhaitee')   ||
                         str_contains($lowerLabel, 'date de depart');
 
                     if ($mustBeFuture && $date < $today) {

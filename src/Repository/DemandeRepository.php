@@ -9,6 +9,8 @@ use Doctrine\Persistence\ManagerRegistry;
 
 class DemandeRepository extends ServiceEntityRepository
 {
+    private const RESOLVED_STATUS_VARIANTS = ['Resolue', 'Résolue', 'Resolu', 'Résolu'];
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Demande::class);
@@ -32,18 +34,18 @@ class DemandeRepository extends ServiceEntityRepository
 
     public function countGroupByStatus(?int $employeId = null, array $filters = []): array
     {
-        $qb = $this->createFilteredQueryBuilder($filters, $employeId)
+        $results = $this->createFilteredQueryBuilder($filters, $employeId)
             ->select('d.status AS status, COUNT(d.id_demande) as cnt')
-            ->groupBy('d.status');
-        
-        $results = $qb->getQuery()->getResult();
+            ->groupBy('d.status')
+            ->getQuery()
+            ->getResult();
 
         $grouped = [];
         foreach ($results as $result) {
-            $status = $result['status'] ?? null;
-            $count = (int) ($result['cnt'] ?? 0);
+            $status = $this->normalizeStatusKey($result['status'] ?? null);
+            $count  = (int) ($result['cnt'] ?? 0);
             if ($status !== null) {
-                $grouped[$status] = $count;
+                $grouped[$status] = ($grouped[$status] ?? 0) + $count;
             }
         }
         return $grouped;
@@ -109,8 +111,13 @@ class DemandeRepository extends ServiceEntityRepository
         }
 
         if (!empty($filters['status'])) {
-            $qb->andWhere('d.status = :status')
-               ->setParameter('status', $filters['status']);
+            if ($this->isResolvedStatus($filters['status'])) {
+                $qb->andWhere('d.status IN (:statusVariants)')
+                   ->setParameter('statusVariants', self::RESOLVED_STATUS_VARIANTS);
+            } else {
+                $qb->andWhere('d.status = :status')
+                   ->setParameter('status', $filters['status']);
+            }
         }
 
         if (!empty($filters['priorite'])) {
@@ -119,10 +126,29 @@ class DemandeRepository extends ServiceEntityRepository
         }
 
         if (!empty($filters['search'])) {
-            $qb->andWhere('d.titre LIKE :search OR d.description LIKE :search OR d.type_demande LIKE :search OR d.categorie LIKE :search OR d.status LIKE :search')
-               ->setParameter('search', '%' . $filters['search'] . '%');
+            $qb->andWhere(
+                'd.titre LIKE :search OR d.description LIKE :search OR d.type_demande LIKE :search OR d.categorie LIKE :search OR d.status LIKE :search'
+            )->setParameter('search', '%' . $filters['search'] . '%');
         }
 
         return $qb;
+    }
+
+    private function isResolvedStatus(string $status): bool
+    {
+        return in_array($status, self::RESOLVED_STATUS_VARIANTS, true);
+    }
+
+    private function normalizeStatusKey(?string $status): ?string
+    {
+        if (null === $status) {
+            return null;
+        }
+
+        if ($this->isResolvedStatus($status)) {
+            return 'Resolue';
+        }
+
+        return $status;
     }
 }
