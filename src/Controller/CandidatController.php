@@ -259,9 +259,7 @@ final class CandidatController extends AbstractController
         $matchingService = new \App\Services\Offre\ContextMatchingService();
         
         $numberOfWantedCandidats = $request->query->getInt('numberOfWantedCandidats', 10000);
-        if ($numberOfWantedCandidats <= 0) {
-            $numberOfWantedCandidats = 10000;
-        }
+        if ($numberOfWantedCandidats <= 0) { $numberOfWantedCandidats = 10000; }
         $i = 0;
 
         $offre = $doctrine->getRepository(Offre::class)->find($offreId);

@@ -107,40 +107,38 @@
 
 		<div class="card panel-card mb-3">
 			<div class="card-body">
-				<form method="get" action="{{ path('app_candidat_dashboard') }}" id="offreSelectionForm" class="row g-3 align-items-end">
+				<div class="row g-3 align-items-end">
 					<div class="col-12 col-lg-8">
-						<label for="offreId" class="form-label mb-1">Selectionner une offre pour voir les candidats</label>
-						<select id="offreId" name="offreId" class="form-select">
-							{% if offres is empty %}
-								<option value="">Aucune offre disponible</option>
-							{% else %}
-								{% for offre in offres %}
-									<option value="{{ offre.id }}" {{ selectedOffreId == offre.id ? 'selected' : '' }}>
-										{{ offre.titrePoste }}
-									</option>
-								{% endfor %}
-							{% endif %}
-						</select>
+						<form method="get" action="{{ path('app_candidat_dashboard') }}" id="offreSelectionForm">
+							<label for="offreId" class="form-label mb-1">Selectionner une offre pour voir les candidats</label>
+							<select id="offreId" name="offreId" class="form-select">
+								{% if offres is empty %}
+									<option value="">Aucune offre disponible</option>
+								{% else %}
+									{% for offre in offres %}
+										<option value="{{ offre.id }}" {{ selectedOffreId == offre.id ? 'selected' : '' }}>
+											{{ offre.titrePoste }}
+										</option>
+									{% endfor %}
+								{% endif %}
+							</select>
+						</form>
 					</div>
-				</form>
-
-				<form method="get"
-					action="{{ path('app_candidature_matching', { offreId: selectedOffreId }) }}"
-					class="row g-3 align-items-end mt-1">
-					<div class="col-12 col-lg-8"></div>
-					<div class="col-12 col-lg-4 d-grid d-lg-flex justify-content-lg-end gap-2">
-						<input
-							type="number"
-							min="1"
-							class="form-control"
-							name="numberOfWantedCandidats"
-							placeholder="N° candidats souhaités"
-						>
-						<button type="submit" class="btn btn-primary">
-							Lancer l'IA Matching
-						</button>
+					<div class="col-12 col-lg-4">
+						<form method="get" action="{{ path('app_candidature_matching', { offreId: selectedOffreId }) }}" class="d-flex align-items-end gap-2">
+							<input
+								type="number"
+								min="1"
+								class="form-control"
+								name="numberOfWantedCandidats"
+								placeholder="N° candidats souhaités"
+							>
+							<button type="submit" class="btn btn-primary text-nowrap">
+								Lancer l'IA Matching
+							</button>
+						</form>
 					</div>
-				</form>
+				</div>
 			</div>
 		</div>
 
