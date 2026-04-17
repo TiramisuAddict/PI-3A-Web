@@ -10,6 +10,9 @@ use App\Repository\PostRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
+
 
 #[Route('/admin')]
 final class DashboardController extends AbstractController
@@ -26,7 +29,7 @@ final class DashboardController extends AbstractController
         CommentaireRepository $commentaireRepository,
         LikePostRepository $likePostRepository,
         ParticipationRepository $participationRepository,
-        NotificationRepository $notificationRepository,
+        NotificationRepository $notificationRepository,SessionInterface $session
     ): Response {
         $engagement = $postRepository->findTopEngagementForChart(12);
         $participationByDay = $participationRepository->countByDayForEventPosts(45);
@@ -48,6 +51,8 @@ final class DashboardController extends AbstractController
             'chartEngagementValues' => array_column($engagement, 'engagement'),
             'chartParticipationLabels' => array_column($participationByDay, 'day'),
             'chartParticipationValues' => array_column($participationByDay, 'count'),
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
         ]);
     }
 }
