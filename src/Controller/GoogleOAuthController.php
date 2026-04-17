@@ -23,7 +23,7 @@ final class GoogleOAuthController extends AbstractController
                 'profile',
                 'https://www.googleapis.com/auth/calendar',
                 'https://www.googleapis.com/auth/calendar.events',
-            ]);
+            ], []);
     }
 
     #[Route('/google/check', name: 'app_google_oauth_check', methods: ['GET'])]
@@ -35,7 +35,10 @@ final class GoogleOAuthController extends AbstractController
             $googleUser = $client->fetchUserFromToken($accessToken);
 
             $session->set('google_linked', true);
-            $session->set('google_email', $googleUser->getEmail());
+            
+            $googleData = $googleUser->toArray();
+            $session->set('google_email', (string) ($googleData['email'] ?? ''));
+
             $session->set('google_access_token', $accessToken->getToken());
             $session->set('google_refresh_token', $accessToken->getRefreshToken());
             $session->set('google_expires_at', $accessToken->getExpires());
