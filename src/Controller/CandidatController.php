@@ -251,6 +251,11 @@ final class CandidatController extends AbstractController
             'id' => $id,
         ]);
     }
+    #[Route('/candidats/matching/cid={id}&oid={offreId}', name: 'app_candidature_matching', methods: ['POST'])]
+    public function contextMatching(ManagerRegistry $doctrine, int $id, int $offreId): Response {
+        $candidat = $doctrine->getManager()->getRepository(Candidat::class)->find($id);
+        $offre = $doctrine->getManager()->getRepository(Offre::class)->find($offreId);
 
-    #
+        
+    }
 }

@@ -122,9 +122,14 @@
 							{% endif %}
 						</select>
 					</div>
-
+					 {# Matching btn #}
 					<div class="col-12 col-lg-4 d-grid d-lg-flex justify-content-lg-end">
-						<button type="button" class="btn btn-primary" disabled>Lancer l'IA Matching</button>
+						<a href="{{ path('app_candidature_matching',{ id: selectedCandidat.id, offreId: selectedOffreId } ) }}" 
+							class="btn btn-primary" 
+							target="_blank" 
+							rel="noopener">
+								Lancer l'IA Matching
+						</a>
 					</div>
 				</form>
 			</div>
