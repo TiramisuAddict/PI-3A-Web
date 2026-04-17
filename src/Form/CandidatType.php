@@ -24,7 +24,7 @@ class CandidatType extends AbstractType
                 'choices' => [
                     'En attente' => 'En attente',
                     'Acceptée' => 'Acceptée',
-                    'Refusée' => 'Refusée',
+                    'Refusée' => 'Refusé',
                     'Entretien' => 'Entretien',
                     'Présélectionné' => 'Présélectionné',
                 ],

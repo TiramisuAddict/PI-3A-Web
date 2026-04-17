@@ -254,9 +254,15 @@ final class CandidatController extends AbstractController
     }
 
     #[Route('/candidats/matching/oid={offreId}', name: 'app_candidature_matching', methods: ['GET'])]
-    public function contextMatching(ManagerRegistry $doctrine, int $offreId): Response {
+    public function contextMatching(ManagerRegistry $doctrine, int $offreId, Request $request): Response {
         $entityManager = $doctrine->getManager();
         $matchingService = new \App\Services\Offre\ContextMatchingService();
+        
+        $numberOfWantedCandidats = $request->query->getInt('numberOfWantedCandidats', 10000);
+        if ($numberOfWantedCandidats <= 0) {
+            $numberOfWantedCandidats = 10000;
+        }
+        $i = 0;
 
         $offre = $doctrine->getRepository(Offre::class)->find($offreId);
 
@@ -270,11 +276,19 @@ final class CandidatController extends AbstractController
             
             $matchingResult = $matchingService->match($processedOffreDescription, $textFromPdf);
             $candidat->setScore($matchingResult);
+            
+            if ($matchingResult >= 0.4 && $i < $numberOfWantedCandidats) {
+                $candidat->setEtat("Présélectionné");
+                $i++;
+            } else {
+                $candidat->setEtat("Refusé");
+            }
         
             $entityManager->persist($candidat);
-            $entityManager->flush($candidat);
         }
+        $entityManager->flush();
         
-        return $this->redirectToRoute('app_candidat_dashboard');
+        $this->addFlash('success', $i . ' candidat(s) présélectionné(s).');
+        return $this->redirectToRoute('app_candidat_dashboard', ['offreId' => $offreId]);
     }
 }

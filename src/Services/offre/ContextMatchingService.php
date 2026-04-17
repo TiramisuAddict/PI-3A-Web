@@ -35,7 +35,7 @@
             return $text;
         }
 
-        public function match($offreText, $resumeText): string {
+        public function match(string $offreText, string $resumeText): float {
             try {
                 $jsonBody = json_encode([
                     'inputs' => [
@@ -57,13 +57,23 @@
 
                 $response = curl_exec($ch);
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlError = curl_error($ch);
                 curl_close($ch);
 
-                if ($httpCode === 200) {
-                    return json_decode($response, true)[0]['score'] ?? 3.0;
-                } else {
+                if ($response === false || $curlError || $httpCode !== 200) {
                     return 0.0;
                 }
+
+                $decoded = json_decode($response, true);
+                if (!is_array($decoded)) {
+                    return 0.0;
+                }
+
+                if (isset($decoded[0]) && is_numeric($decoded[0])) {
+                    return abs((float) $decoded[0]);
+                }
+
+                return 0.0;
             } catch (\Exception $e) {
                 return 0.0;
             }

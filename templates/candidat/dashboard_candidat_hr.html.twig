@@ -1,4 +1,4 @@
-﻿{% extends 'base.html.twig' %}
+{% extends 'base.html.twig' %}
 
 {% block title %}Candidatures | Dashboard RH{% endblock %}
 
@@ -122,14 +122,23 @@
 							{% endif %}
 						</select>
 					</div>
-					 {# Matching btn #}
-					<div class="col-12 col-lg-4 d-grid d-lg-flex justify-content-lg-end">
-						<a href="{{ path('app_candidature_matching',{offreId: selectedOffreId } ) }}" 
-							class="btn btn-primary" 
-							target="_blank" 
-							rel="noopener">
-								Lancer l'IA Matching
-						</a>
+				</form>
+
+				<form method="get"
+					action="{{ path('app_candidature_matching', { offreId: selectedOffreId }) }}"
+					class="row g-3 align-items-end mt-1">
+					<div class="col-12 col-lg-8"></div>
+					<div class="col-12 col-lg-4 d-grid d-lg-flex justify-content-lg-end gap-2">
+						<input
+							type="number"
+							min="1"
+							class="form-control"
+							name="numberOfWantedCandidats"
+							placeholder="N° candidats souhaités"
+						>
+						<button type="submit" class="btn btn-primary">
+							Lancer l'IA Matching
+						</button>
 					</div>
 				</form>
 			</div>
@@ -169,9 +178,9 @@
 											<td>{{ candidat.visiteur.eMail }}</td>
 											<td>{{ candidat.score is not null ? candidat.score|number_format(2, '.', '') : '-' }}</td>
 											<td>
-												{% if candidat.etat == 'RefusÃ©e' or candidat.etat == 'RefusÃ©' %}
+												{% if candidat.etat == 'Refusé' %}
 													<span class="badge bg-red-lt text-red">{{ candidat.etat }}</span>
-												{% elseif candidat.etat == 'AcceptÃ©e' or candidat.etat == 'AcceptÃ©' %}
+												{% elseif candidat.etat == 'Acceptée'%}
 													<span class="badge bg-green-lt text-green">{{ candidat.etat }}</span>
 												{% else %}
 													<span class="badge bg-blue-lt text-blue">{{ candidat.etat }}</span>
