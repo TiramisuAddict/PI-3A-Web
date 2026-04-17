@@ -16,6 +16,11 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
+use Knp\Component\Pager\PaginatorInterface;
+use Symfony\UX\Chartjs\Builder\ChartBuilderInterface;
+use Symfony\UX\Chartjs\Model\Chart;
+use App\Service\GeminiService;
+use App\Service\TaskNotificationService;
 
 
 #[Route('/projet')]
@@ -105,33 +110,72 @@ final class ProjetController extends AbstractController
     }
 
     #[Route(name: 'app_projet_index', methods: ['GET'])]
-    public function index(Request $request, ProjetRepository $projetRepository, EmployeRepository $employeRepository, SessionInterface $session): Response
+    public function index(Request $request, ProjetRepository $projetRepository, EmployeRepository $employeRepository, SessionInterface $session, PaginatorInterface $paginator): Response
     {
         $rbac = $this->buildRbacContext($session, $employeRepository);
 
         $filters = [
-            'search' => trim((string) $request->query->get('search', '')),
-            'statut' => trim((string) $request->query->get('statut', '')),
-            'priorite' => trim((string) $request->query->get('priorite', '')),
+            'search'      => trim((string) $request->query->get('search', '')),
+            'statut'      => trim((string) $request->query->get('statut', '')),
+            'priorite'    => trim((string) $request->query->get('priorite', '')),
             'chef_projet' => trim((string) $request->query->get('chef_projet', (string) $request->query->get('responsable', ''))),
         ];
 
+        $vue          = $request->query->get('vue', 'kanban');
         $chefProjetId = ctype_digit($filters['chef_projet']) ? (int) $filters['chef_projet'] : null;
+        $employeId    = (!$rbac['canManageProjects'] && $rbac['currentEmploye'] !== null)
+            ? $rbac['currentEmploye']->getId_employe()
+            : null;
 
+        // ── Vue liste : grille paginée de tous les projets ─────
+        if ($vue === 'liste') {
+            $qb = $projetRepository->findByFiltersQb(
+                $filters['search']   !== '' ? $filters['search']   : null,
+                $filters['statut']   !== '' ? $filters['statut']   : null,
+                $filters['priorite'] !== '' ? $filters['priorite'] : null,
+                $chefProjetId,
+                $employeId,
+            );
+
+            $pagination = $paginator->paginate(
+                $qb,
+                $request->query->getInt('page', 1),
+                6
+            );
+
+            $sidebarProjets = $this->filterProjetsForEmploye(
+                $projetRepository->findByFilters(null, null, null, null),
+                $rbac['currentEmploye'],
+                $rbac['canManageProjects']
+            );
+
+            return $this->render('projet/index.html.twig', array_merge($rbac, [
+                'projets'                 => [],
+                'selectedProjet'          => null,
+                'pagination'              => $pagination,
+                'vue'                     => 'liste',
+                'sidebarProjets'          => $sidebarProjets,
+                'sidebarSelectedProjetId' => null,
+                'filters'                 => $filters,
+                'hasActiveFilters'        => $filters['search'] !== '' || $filters['statut'] !== '' || $filters['priorite'] !== '' || $filters['chef_projet'] !== '',
+                'chefProjets'             => $this->buildChefProjetsForFilter($employeRepository),
+            ]));
+        }
+
+        // ── Vue kanban (comportement existant) ─────────────────
         $projets = $projetRepository->findByFilters(
-            $filters['search'] !== '' ? $filters['search'] : null,
-            $filters['statut'] !== '' ? $filters['statut'] : null,
+            $filters['search']   !== '' ? $filters['search']   : null,
+            $filters['statut']   !== '' ? $filters['statut']   : null,
             $filters['priorite'] !== '' ? $filters['priorite'] : null,
             $chefProjetId,
             null,
             null,
         );
 
-        // Filter projects for regular employees
         $projets = $this->filterProjetsForEmploye($projets, $rbac['currentEmploye'], $rbac['canManageProjects']);
 
         $selectedProjetId = ctype_digit((string) $request->query->get('projet', '')) ? (int) $request->query->get('projet') : null;
-        $selectedProjet = null;
+        $selectedProjet   = null;
 
         if ($selectedProjetId !== null) {
             foreach ($projets as $projet) {
@@ -147,13 +191,15 @@ final class ProjetController extends AbstractController
         }
 
         return $this->render('projet/index.html.twig', array_merge($rbac, [
-            'projets' => $projets,
-            'selectedProjet' => $selectedProjet,
-            'sidebarProjets' => $projets,
+            'projets'                 => $projets,
+            'selectedProjet'          => $selectedProjet,
+            'pagination'              => null,
+            'vue'                     => 'kanban',
+            'sidebarProjets'          => $projets,
             'sidebarSelectedProjetId' => $selectedProjet?->getIdProjet(),
-            'filters' => $filters,
-            'hasActiveFilters' => $filters['search'] !== '' || $filters['statut'] !== '' || $filters['priorite'] !== '' || $filters['chef_projet'] !== '',
-            'chefProjets' => $this->buildChefProjetsForFilter($employeRepository),
+            'filters'                 => $filters,
+            'hasActiveFilters'        => $filters['search'] !== '' || $filters['statut'] !== '' || $filters['priorite'] !== '' || $filters['chef_projet'] !== '',
+            'chefProjets'             => $this->buildChefProjetsForFilter($employeRepository),
         ]));
     }
 
@@ -261,7 +307,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/new', name: 'app_tache_new', methods: ['GET', 'POST'])]
-    public function newTask(Request $request, Projet $projet, ProjetRepository $projetRepository, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): Response
+    public function newTask(Request $request, Projet $projet, ProjetRepository $projetRepository, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository, TaskNotificationService $notificationService): Response
     {
         $rbac = $this->buildRbacContext($session, $employeRepository);
 
@@ -306,6 +352,9 @@ final class ProjetController extends AbstractController
             $this->synchronizeTaskProgressionAndStatus($tache);
             $entityManager->persist($tache);
             $entityManager->flush();
+
+            // Notifier l'employe assigne par email
+            $notificationService->notifyNewTask($tache);
 
             return $this->redirectToRoute('app_projet_index', ['projet' => $projet->getIdProjet()], Response::HTTP_SEE_OTHER);
         }
@@ -596,6 +645,158 @@ final class ProjetController extends AbstractController
         if ($status !== Tache::STATUT_A_FAIRE) {
             $tache->setStatutTache(Tache::STATUT_A_FAIRE);
         }
+    }
+
+    #[Route('/{id_projet}/workload', name: 'app_projet_workload', methods: ['GET'])]
+    public function workloadAnalysis(Projet $projet, SessionInterface $session, EmployeRepository $employeRepository): JsonResponse
+    {
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+
+        if (!$rbac['canManageTasks']) {
+            return $this->json(['ok' => false, 'message' => 'Acces refuse.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $today = new \DateTime('today');
+        $results = [];
+
+        foreach ($projet->getMembresEquipe() as $employe) {
+            $score = 0.0;
+            $urgentCount = 0;
+            $activeTasks = 0;
+
+            foreach ($employe->getTaches() as $tache) {
+                // Only tasks belonging to this project
+                if ($tache->getProjet()?->getId_projet() !== $projet->getId_projet()) {
+                    continue;
+                }
+
+                // Skip completed tasks — not consuming active effort
+                if ($tache->getStatutTache() === Tache::STATUT_TERMINEE) {
+                    continue;
+                }
+
+                ++$activeTasks;
+
+                // Priority score
+                $score += match ($tache->getPriorite()) {
+                    Tache::PRIORITE_HAUTE   => 3.0,
+                    Tache::PRIORITE_MOYENNE => 2.0,
+                    Tache::PRIORITE_BASSE   => 1.0,
+                    default                 => 0.0,
+                };
+
+                // Due date urgency bonus
+                $dateLimite = $tache->getDateLimite();
+                if ($dateLimite !== null) {
+                    $diff = $today->diff($dateLimite);
+                    $daysLeft = (int) $diff->days;
+                    $isOverdue = $diff->invert === 1;
+
+                    if ($isOverdue || $daysLeft <= 3) {
+                        $score += 2.0;
+                        ++$urgentCount;
+                    } elseif ($daysLeft <= 7) {
+                        $score += 1.0;
+                    }
+                }
+
+                // Blocked tasks are not consuming active effort — small deduction
+                if ($tache->getStatutTache() === Tache::STATUT_BLOQUEE) {
+                    $score -= 0.5;
+                }
+            }
+
+            // Availability thresholds
+            if ($score >= 15 || $urgentCount >= 3) {
+                $status = 'surcharge';
+                $statusLabel = 'Surchargé';
+                $dot = '🔴';
+            } elseif ($score >= 8 || $urgentCount >= 1) {
+                $status = 'occupe';
+                $statusLabel = 'Occupé';
+                $dot = '🟡';
+            } else {
+                $status = 'disponible';
+                $statusLabel = 'Disponible';
+                $dot = '🟢';
+            }
+
+            $results[] = [
+                'id'          => $employe->getId_employe(),
+                'nom'         => $employe->getNom(),
+                'prenom'      => $employe->getPrenom(),
+                'score'       => round($score, 1),
+                'activeTasks' => $activeTasks,
+                'urgentTasks' => $urgentCount,
+                'status'      => $status,
+                'statusLabel' => $dot . ' ' . $statusLabel,
+            ];
+        }
+
+        // Sort ascending: lowest score = most available
+        usort($results, static fn (array $a, array $b): int => $a['score'] <=> $b['score']);
+
+        // Build the top suggestion with a human-readable reason
+        $suggestion = null;
+        if (!empty($results)) {
+            $top = $results[0];
+            if ($top['activeTasks'] === 0) {
+                $reason = 'Aucune tâche active — complètement disponible.';
+            } elseif ($top['status'] === 'disponible') {
+                $reason = sprintf(
+                    'Score de charge %.1f sur %d tâche(s) active(s) — le plus disponible de l\'équipe.',
+                    $top['score'],
+                    $top['activeTasks']
+                );
+            } else {
+                $reason = sprintf(
+                    'Score de charge %.1f — le moins chargé de l\'équipe malgré %d tâche(s) active(s).',
+                    $top['score'],
+                    $top['activeTasks']
+                );
+            }
+            $suggestion = array_merge($top, ['reason' => $reason]);
+        }
+
+        return $this->json([
+            'ok'         => true,
+            'team'       => $results,
+            'suggestion' => $suggestion,
+        ]);
+    }
+
+    #[Route('/tache/generate-description', name: 'app_tache_generate_description', methods: ['POST'])]
+    public function generateTaskDescription(Request $request, SessionInterface $session, EmployeRepository $employeRepository, GeminiService $geminiService): JsonResponse
+    {
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+        if (!$rbac['canManageTasks']) {
+            return $this->json(['ok' => false, 'message' => 'Acces refuse.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            return $this->json(['ok' => false, 'message' => 'Corps de requete invalide.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $taskTitle   = trim((string) ($payload['taskTitle'] ?? ''));
+        $projectName = trim((string) ($payload['projectName'] ?? ''));
+
+        if ($taskTitle === '' || $projectName === '') {
+            return $this->json(['ok' => false, 'message' => 'taskTitle et projectName sont obligatoires.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Basic length guard — prevent prompt injection via oversized inputs
+        if (mb_strlen($taskTitle) > 200 || mb_strlen($projectName) > 200) {
+            return $this->json(['ok' => false, 'message' => 'Titre ou nom de projet trop long.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        try {
+            $description = $geminiService->generateTaskDescription($taskTitle, $projectName);
+        } catch (\RuntimeException $e) {
+            return $this->json(['ok' => false, 'message' => $e->getMessage()], Response::HTTP_BAD_GATEWAY);
+        }
+
+        return $this->json(['ok' => true, 'description' => $description]);
     }
 
     private function isChefProjetRole(?string $role): bool
