@@ -60,12 +60,12 @@
                 curl_close($ch);
 
                 if ($httpCode === 200) {
-                    return $response;
+                    return json_decode($response, true)[0]['score'] ?? 3.0;
                 } else {
-                    return '[0.0]';
+                    return 0.0;
                 }
             } catch (\Exception $e) {
-                return '[0.0]';
+                return 0.0;
             }
         }
 

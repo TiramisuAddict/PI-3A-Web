@@ -253,21 +253,28 @@ final class CandidatController extends AbstractController
         ]);
     }
 
-    #[Route('/candidats/matching/cid={id}&oid={offreId}', name: 'app_candidature_matching', methods: ['GET'])]
-    public function contextMatching(ManagerRegistry $doctrine, int $id, int $offreId): Response {
-        $candidat = $doctrine->getManager()->getRepository(Candidat::class)->find($id);
-        $offre = $doctrine->getManager()->getRepository(Offre::class)->find($offreId);
-
+    #[Route('/candidats/matching/oid={offreId}', name: 'app_candidature_matching', methods: ['GET'])]
+    public function contextMatching(ManagerRegistry $doctrine, int $offreId): Response {
+        $entityManager = $doctrine->getManager();
         $matchingService = new \App\Services\Offre\ContextMatchingService();
 
-        $pdfcontent = $candidat->getCvData();
-        $textFromPdf = $matchingService->extractTextFromPDF($pdfcontent);
+        $offre = $doctrine->getRepository(Offre::class)->find($offreId);
 
         $offreDescription = $offre->getDescription();
         $processedOffreDescription = $matchingService->preprocessRichText($offreDescription);
 
-        $matchingResult = $matchingService->match($processedOffreDescription, $textFromPdf);
+        $offreCandidats = $offre->getCandidats();
+        foreach ($offreCandidats as $candidat){
+            $pdfcontent = $candidat->getCvData();
+            $textFromPdf = $matchingService->extractTextFromPDF($pdfcontent);
+            
+            $matchingResult = $matchingService->match($processedOffreDescription, $textFromPdf);
+            $candidat->setScore($matchingResult);
         
-        return new Response($matchingResult);
+            $entityManager->persist($candidat);
+            $entityManager->flush($candidat);
+        }
+        
+        return $this->redirectToRoute('app_candidat_dashboard');
     }
 }
