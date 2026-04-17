@@ -256,7 +256,7 @@ final class CandidatController extends AbstractController
     #[Route('/candidats/matching/oid={offreId}', name: 'app_candidature_matching', methods: ['GET'])]
     public function contextMatching(ManagerRegistry $doctrine, int $offreId, Request $request): Response {
         $entityManager = $doctrine->getManager();
-        $matchingService = new \App\Services\Offre\ContextMatchingService();
+        $matchingService = new \App\Services\ContextMatchingService();
         
         $numberOfWantedCandidats = $request->query->getInt('numberOfWantedCandidats', 10000);
         if ($numberOfWantedCandidats <= 0) { $numberOfWantedCandidats = 10000; }

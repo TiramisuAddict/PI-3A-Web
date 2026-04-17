@@ -1,5 +1,5 @@
 <?php 
-    namespace App\Services\Offre;
+    namespace App\Services;
     
     class ContextMatchingService {
 
