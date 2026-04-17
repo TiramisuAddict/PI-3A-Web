@@ -17,6 +17,7 @@ use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use App\Form\EventImageType;
 
+
 /**
  * Formulaire CRUD Post : ne mappe pas les associations inverses (like, participation).
  */

@@ -3,6 +3,10 @@
 {% block title %}Tableau de bord admin{% endblock %}
 
 {% block body %}
+{{ include('components/navbar.html.twig') }}
+  <div class="d-flex overflow-hidden" style="height:calc(100vh - 56px);">
+    {{ include('components/sidebar.html.twig', {'active_page': 'accueil','sidebar_role': role}) }}
+<div class="flex-fill overflow-y-auto p-4" style="background:#F6F7FF; min-width:0;">
 <div class="page-wrapper">
     <div class="container-xl">
         <div class="page-header d-print-none">
@@ -159,6 +163,7 @@
 
         </div>
     </div>
+</div>
 </div>
 {% endblock %}
 
