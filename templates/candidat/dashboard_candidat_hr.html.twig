@@ -108,9 +108,10 @@
 		<div class="card panel-card mb-3">
 			<div class="card-body">
 				<div class="row g-3 align-items-end">
-					<div class="col-12 col-lg-8">
+
+					<div class="col-12 col-lg-5">
 						<form method="get" action="{{ path('app_candidat_dashboard') }}" id="offreSelectionForm">
-							<label for="offreId" class="form-label mb-1">Selectionner une offre pour voir les candidats</label>
+							<label for="offreId" class="form-label mb-1 fw-semibold">Sélectionner une offre</label>
 							<select id="offreId" name="offreId" class="form-select">
 								{% if offres is empty %}
 									<option value="">Aucune offre disponible</option>
@@ -124,21 +125,33 @@
 							</select>
 						</form>
 					</div>
-					<div class="col-12 col-lg-4">
-						<form method="get" action="{{ path('app_candidature_matching', { offreId: selectedOffreId }) }}" class="d-flex align-items-end gap-2">
-							<input
-								type="number"
-								min="1"
-								class="form-control"
-								name="numberOfWantedCandidats"
-								placeholder="N° candidats souhaités"
-							>
-							<button type="submit" class="btn btn-primary text-nowrap">
-								Lancer l'IA Matching
-							</button>
+
+					<div class="col-12 col-lg-7">
+						<form method="get" action="{{ path('app_candidature_matching', { offreId: selectedOffreId }) }}" class="row g-2 align-items-end">
+							<div class="col-12 col-sm-4">
+								<label for="numCandidats" class="form-label mb-1 fw-semibold text-truncate d-block">Nb. candidats souhaités</label>
+								<input
+									type="number"
+									id="numCandidats"
+									min="1"
+									class="form-control"
+									name="numberOfWantedCandidats"
+									placeholder="Ex: 10"
+								>
+							</div>
+
+							<div class="col-12 col-sm-8 d-flex gap-2">
+								<button type="submit" class="btn btn-primary text-nowrap flex-grow-1">
+									<i class="bi bi-cpu me-1"></i> Lancer l'IA Matching
+								</button>
+								<button type="button" class="btn btn-outline-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#createMeetingModal">
+									Créer une réunion
+								</button>
+							</div>
 						</form>
 					</div>
 				</div>
+
 			</div>
 		</div>
 
@@ -239,6 +252,36 @@
 				</div>
 			</div>
 		</div>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="createMeetingModal" tabindex="-1" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title">Créer une réunion</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				<form id="createMeetingForm" method="post" action="{{ path('app_candidature_create_meeting') }}">
+					<input type="hidden" name="_token" value="{{ csrf_token('create_meeting') }}">
+					<input type="hidden" name="offreId" value="{{ selectedOffreId }}">
+					<input type="hidden" name="candidatId" value="{{ selectedCandidatId }}">
+					<div class="mb-3">
+						<label for="meetingDate" class="form-label">Date</label>
+						<input type="date" id="meetingDate" name="meetingDate" class="form-control" required>
+					</div>
+					<div class="mb-3">
+						<label for="meetingTime" class="form-label">Heure</label>
+						<input type="time" id="meetingTime" name="meetingTime" class="form-control" required>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Annuler</button>
+				<button type="submit" form="createMeetingForm" class="btn btn-primary ms-auto">Sauvegarder</button>
+			</div>
 		</div>
 	</div>
 </div>
