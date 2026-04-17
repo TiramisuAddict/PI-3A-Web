@@ -8,6 +8,7 @@ use App\Entity\Employe;
 use App\Entity\HistoriqueDemande;
 use App\Form\DemandeType;
 use App\Repository\DemandeRepository;
+use App\Services\DemandeMailer;
 use App\Services\DemandeFormHelper;
 use Doctrine\ORM\EntityManagerInterface;
 use Knp\Component\Pager\PaginatorInterface;
@@ -23,15 +24,18 @@ class DemandeController extends AbstractController
     private DemandeFormHelper $formHelper;
     private EntityManagerInterface $em;
     private DemandeRepository $demandeRepository;
+    private DemandeMailer $demandeMailer;
 
     public function __construct(
         DemandeFormHelper $formHelper,
         EntityManagerInterface $em,
-        DemandeRepository $demandeRepository
+        DemandeRepository $demandeRepository,
+        DemandeMailer $demandeMailer
     ) {
         $this->formHelper = $formHelper;
         $this->em = $em;
         $this->demandeRepository = $demandeRepository;
+        $this->demandeMailer = $demandeMailer;
     }
 
     #[Route('/demande', name: 'demande_index', methods: ['GET'])]
@@ -155,6 +159,8 @@ class DemandeController extends AbstractController
                 $this->em->persist($historique);
                 $this->em->flush();
 
+                $this->demandeMailer->notifyManagersDemandeCreated($demande);
+
                 $this->addFlash('success', 'Demande creee avec succes.');
                 return $this->redirectToRoute('demande_show', ['id' => $demande->getIdDemande()]);
             }
@@ -243,17 +249,22 @@ class DemandeController extends AbstractController
 
             $oldStatus = $demande->getStatus();
             $demande->setStatus($newStatus);
+            $actorLabel = $this->getActorLabel($session);
 
             $historique = new HistoriqueDemande();
             $historique->setDemande($demande);
             $historique->setAncienStatut($oldStatus);
             $historique->setNouveauStatut($newStatus);
-            $historique->setActeur($this->getActorLabel($session));
+            $historique->setActeur($actorLabel);
             $historique->setCommentaire($commentaire);
             $historique->setDateAction(new \DateTime());
 
             $this->em->persist($historique);
             $this->em->flush();
+
+            if ($oldStatus !== $newStatus) {
+                $this->demandeMailer->notifyEmployeStatusChanged($demande, $oldStatus, $newStatus, $actorLabel, $commentaire);
+            }
 
             $stats = [
                 'total'    => $this->demandeRepository->countAll(null),
@@ -316,6 +327,8 @@ class DemandeController extends AbstractController
 
         $this->em->persist($historique);
         $this->em->flush();
+
+        $this->demandeMailer->notifyManagersDemandeCanceled($demande);
 
         $this->addFlash('success', 'Demande annulee avec succes.');
         return $this->redirectToRoute('demande_show', ['id' => $id]);
@@ -427,17 +440,22 @@ class DemandeController extends AbstractController
 
         $oldStatus = $demande->getStatus();
         $demande->setStatus($newStatus);
+        $actorLabel = $this->getActorLabel($session);
 
         $historique = new HistoriqueDemande();
         $historique->setDemande($demande);
         $historique->setAncienStatut($oldStatus);
         $historique->setNouveauStatut($newStatus);
-        $historique->setActeur($this->getActorLabel($session));
+        $historique->setActeur($actorLabel);
         $historique->setCommentaire($commentaire !== '' ? $commentaire : 'Statut mis a jour');
         $historique->setDateAction(new \DateTime());
 
         $this->em->persist($historique);
         $this->em->flush();
+
+        if ($oldStatus !== $newStatus) {
+            $this->demandeMailer->notifyEmployeStatusChanged($demande, $oldStatus, $newStatus, $actorLabel, $commentaire);
+        }
 
         $this->addFlash('success', 'Statut mis a jour : ' . $newStatus . '.');
         return $this->redirectToRoute('demande_show', ['id' => $id]);
@@ -500,18 +518,20 @@ class DemandeController extends AbstractController
                 $oldStatus   = $this->em->getUnitOfWork()->getOriginalEntityData($demande)['status'] ?? $demande->getStatus();
                 $newStatus   = $demande->getStatus();
                 $commentaire = $form->get('commentaire')->getData();
+                $actorLabel  = $this->getActorLabel($session);
+                $statusChanged = $oldStatus !== $newStatus;
 
                 if (!$this->canTransitionStatus($oldStatus, $newStatus)) {
                     $this->addFlash('danger', $this->getStatusTransitionBlockedMessage($oldStatus));
                     return $this->redirectToRoute('demande_show', ['id' => $demande->getIdDemande()]);
                 }
 
-                if ($oldStatus !== $newStatus) {
+                if ($statusChanged) {
                     $historique = new HistoriqueDemande();
                     $historique->setDemande($demande);
                     $historique->setAncienStatut($oldStatus);
                     $historique->setNouveauStatut($newStatus);
-                    $historique->setActeur($this->getActorLabel($session));
+                    $historique->setActeur($actorLabel);
                     $historique->setCommentaire($commentaire ?? 'Statut modifie');
                     $historique->setDateAction(new \DateTime());
                     $this->em->persist($historique);
@@ -529,6 +549,10 @@ class DemandeController extends AbstractController
                 }
 
                 $this->em->flush();
+
+                if ($statusChanged) {
+                    $this->demandeMailer->notifyEmployeStatusChanged($demande, $oldStatus, $newStatus, $actorLabel, (string) $commentaire);
+                }
 
                 $this->addFlash('success', 'Demande mise a jour avec succes.');
                 return $this->redirectToRoute('demande_show', ['id' => $demande->getIdDemande()]);

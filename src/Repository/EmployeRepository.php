@@ -11,6 +11,8 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class EmployeRepository extends ServiceEntityRepository
 {
+    private const DEMANDE_MANAGER_ROLES = ['RH', 'administrateur entreprise'];
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Employe
@@ -61,4 +63,24 @@ class EmployeRepository extends ServiceEntityRepository
               ->getQuery()
               ->getResult();
 }
+
+    public function findDemandeManagerEmailsByEntrepriseId(int $entrepriseId): array
+    {
+        $rows = $this->createQueryBuilder('e')
+            ->select('DISTINCT e.e_mail AS email')
+            ->leftJoin('e.entreprise', 'en')
+            ->andWhere('en.id_entreprise = :entrepriseId')
+            ->andWhere('e.role IN (:roles)')
+            ->andWhere('e.e_mail IS NOT NULL')
+            ->andWhere("TRIM(e.e_mail) <> ''")
+            ->setParameter('entrepriseId', $entrepriseId)
+            ->setParameter('roles', self::DEMANDE_MANAGER_ROLES)
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_values(array_filter(array_map(
+            static fn(array $row): string => trim((string) ($row['email'] ?? '')),
+            $rows
+        )));
+    }
 }
