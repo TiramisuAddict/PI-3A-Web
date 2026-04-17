@@ -3,6 +3,8 @@
 namespace App\Controller;
 
 use App\Entity\Candidat;
+use App\Entity\Offre;
+
 use App\Form\PostulerType;
 use App\Repository\CandidatRepository;
 use App\Repository\OffreRepository;
@@ -14,7 +16,6 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
-
 
 use App\Form\CandidatType;
 
@@ -251,11 +252,22 @@ final class CandidatController extends AbstractController
             'id' => $id,
         ]);
     }
-    #[Route('/candidats/matching/cid={id}&oid={offreId}', name: 'app_candidature_matching', methods: ['POST'])]
+
+    #[Route('/candidats/matching/cid={id}&oid={offreId}', name: 'app_candidature_matching', methods: ['GET'])]
     public function contextMatching(ManagerRegistry $doctrine, int $id, int $offreId): Response {
         $candidat = $doctrine->getManager()->getRepository(Candidat::class)->find($id);
         $offre = $doctrine->getManager()->getRepository(Offre::class)->find($offreId);
 
+        $matchingService = new \App\Services\Offre\ContextMatchingService();
+
+        $pdfcontent = $candidat->getCvData();
+        $textFromPdf = $matchingService->extractTextFromPDF($pdfcontent);
+
+        $offreDescription = $offre->getDescription();
+        $processedOffreDescription = $matchingService->preprocessRichText($offreDescription);
+
+        $matchingResult = $matchingService->match($processedOffreDescription, $textFromPdf);
         
+        return new Response($matchingResult);
     }
 }
