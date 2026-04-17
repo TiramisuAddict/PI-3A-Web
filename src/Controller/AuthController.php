@@ -2,14 +2,16 @@
 
 namespace App\Controller;
 
+use App\Form\TwoFactorCodeType;
+use App\Services\TwilioVerifyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
+use Symfony\Component\Routing\Attribute\Route;
 use App\Form\LoginType;
 use App\Repository\EmployeRepository;
 use App\Repository\AdministrateurSystemeRepository;
-use Symfony\Component\HttpFoundation\Session\SessionInterface;
 
 final class AuthController extends AbstractController
 {
@@ -17,19 +19,45 @@ final class AuthController extends AbstractController
     {
         return match($role) {
             'administrateur entreprise' => $this->redirectToRoute('RH_Home'),
-            'RH'=> $this->redirectToRoute('RH_Home'),
+            'RH' => $this->redirectToRoute('RH_Home'),
             default => $this->redirectToRoute('employe_Home'),
         };
     }
 
+    private function clearTwoFactorSession(SessionInterface $session): void
+    {
+        foreach ([
+            'two_factor_pending',
+            'two_factor_user_type',
+            'two_factor_user_id',
+            'two_factor_email',
+            'two_factor_role',
+            'two_factor_channel',
+            'two_factor_destination',
+            'two_factor_resend_available_at',
+        ] as $key) {
+            $session->remove($key);
+        }
+    }
+
     #[Route('/login', name: 'login', methods: ['GET', 'POST'])]
-    public function login(Request $request,AdministrateurSystemeRepository $adminRepo,EmployeRepository $employeRepo,SessionInterface $session): Response {
+    public function login(Request $request, AdministrateurSystemeRepository $adminRepo, EmployeRepository $employeRepo, SessionInterface $session, TwilioVerifyService $twilioVerifyService): Response
+    {
+        $cancelTwoFactor = $request->query->getBoolean('cancel_2fa');
+        if ($cancelTwoFactor) {
+            $this->clearTwoFactorSession($session);
+        }
+
         if ($session->get('admin_logged_in') === true) {
             return $this->redirectToRoute('admin_dashboard');
         }
 
         if ($session->get('employe_logged_in') === true) {
             return $this->redirectByRole($session->get('employe_role'));
+        }
+
+        if ($session->get('two_factor_pending') === true && !$cancelTwoFactor) {
+            return $this->redirectToRoute('two_factor_verify');
         }
 
         $form = $this->createForm(LoginType::class);
@@ -43,9 +71,20 @@ final class AuthController extends AbstractController
             // Vérification admin système
             $admin = $adminRepo->findOneBy(['e_mail' => $email]);
             if ($admin && $admin->getMot_de_passe() === $password) {
-                $session->set('admin_logged_in', true);
-                $session->set('admin_email', $admin->getE_mail());
-                return $this->redirectToRoute('admin_dashboard');
+                $destination = $admin->getTelephone();
+                if ($destination === '') {
+                    $this->addFlash('error', 'Numéro de téléphone invalide.');
+                    return $this->render('auth/login.html.twig', ['form' => $form]);
+                }
+
+                $twilioVerifyService->sendCode($destination, 'sms');
+                $this->clearTwoFactorSession($session);
+                foreach ($twilioVerifyService->buildTwoFactorSessionData('admin', (int) $admin->getId(), (string) $admin->getE_mail(), $destination) as $key => $value) {
+                    $session->set($key, $value);
+                }
+
+                $this->addFlash('success', 'Code OTP envoyé par SMS.');
+                return $this->redirectToRoute('two_factor_verify');
             }
 
             $employe = $employeRepo->findOneBy(['e_mail' => $email]);
@@ -59,12 +98,20 @@ final class AuthController extends AbstractController
                 }
 
                 if ($compte) {
-                    $session->set('employe_logged_in', true);
-                    $session->set('employe_id', $employe->getId_employe());
-                    $session->set('employe_email', $employe->getEmail());
-                    $session->set('employe_role', $employe->getRole());
-                    $session->set('employe_id_entreprise', $employe->getEntreprise()->getId_entreprise());
-                    return $this->redirectByRole($employe->getRole());
+                    $destination =$employe->getTelephone();
+                    if ($destination === '') {
+                        $this->addFlash('error', 'Numéro de téléphone invalide.');
+                        return $this->render('auth/login.html.twig', ['form' => $form]);
+                    }
+
+                    $twilioVerifyService->sendCode($destination, 'sms');
+                    $this->clearTwoFactorSession($session);
+                    foreach ($twilioVerifyService->buildTwoFactorSessionData('employe', (int) $employe->getId_employe(), (string) $employe->getEmail(), $destination, (string) $employe->getRole()) as $key => $value) {
+                        $session->set($key, $value);
+                    }
+
+                    $this->addFlash('success', 'Nous vous avons envoyé un code par SMS.');
+                    return $this->redirectToRoute('two_factor_verify');
                 }
             }
 
@@ -72,6 +119,94 @@ final class AuthController extends AbstractController
         }
 
         return $this->render('auth/login.html.twig', ['form' => $form]);
+    }
+
+    #[Route('/two-factor', name: 'two_factor_verify', methods: ['GET', 'POST'])]
+    public function twoFactor(Request $request, SessionInterface $session, EmployeRepository $employeRepo, AdministrateurSystemeRepository $adminRepo, TwilioVerifyService $twilioVerifyService): Response
+    {
+        if ($session->get('two_factor_pending') !== true) {
+            return $this->redirectToRoute('login');
+        }
+
+        $loginForm = $this->createForm(LoginType::class);
+        $form = $this->createForm(TwoFactorCodeType::class);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $code = $form->get('code')->getData();
+            $destination = $session->get('two_factor_destination', '');
+            $channel = $session->get('two_factor_channel', 'sms');
+
+            if (!$twilioVerifyService->verifyCode($destination, $code, $channel)) {
+                $this->addFlash('error', 'Code OTP invalide ou expiré.');
+            } else {
+                $userType = $session->get('two_factor_user_type');
+                $role = $session->get('two_factor_role');
+
+                if ($userType === 'admin') {
+                    $admin = $adminRepo->find($session->get('two_factor_user_id'));
+                    if (!$admin) {
+                        return $this->redirectToRoute('login', ['cancel_2fa' => 1]);
+                    }
+
+                    $this->clearTwoFactorSession($session);
+                    $session->set('admin_logged_in', true);
+                    $session->set('admin_email', $admin->getE_mail());
+
+                    return $this->redirectToRoute('admin_dashboard');
+                }
+
+                $employe = $employeRepo->find($session->get('two_factor_user_id'));
+                if (!$employe) {
+                    return $this->redirectToRoute('login', ['cancel_2fa' => 1]);
+                }
+
+                $this->clearTwoFactorSession($session);
+                $session->set('employe_logged_in', true);
+                $session->set('employe_id', $employe->getId_employe());
+                $session->set('employe_email', $employe->getEmail());
+                $session->set('employe_role', $employe->getRole());
+                $session->set('employe_id_entreprise', $employe->getEntreprise()->getId_entreprise());
+
+                return $this->redirectByRole($role);
+            }
+        }
+
+        return $this->render('auth/login.html.twig', [
+            'form' => $loginForm->createView(),
+            'two_factor_form' => $form->createView(),
+            'two_factor_destination' => (string) $session->get('two_factor_destination', ''),
+            'two_factor_resend_remaining_seconds' => $twilioVerifyService->getResendRemainingSeconds((int) $session->get('two_factor_resend_available_at', 0)),
+        ]);
+    }
+
+    #[Route('/two-factor/resend', name: 'two_factor_resend', methods: ['POST'])]
+    public function resendTwoFactorCode(Request $request, SessionInterface $session, TwilioVerifyService $twilioVerifyService): Response
+    {
+        if ($session->get('two_factor_pending') !== true) {
+            return $this->redirectToRoute('login');
+        }
+
+        if (!$this->isCsrfTokenValid('two_factor_resend', $request->request->get('_token'))) {
+            return $this->redirectToRoute('two_factor_verify');
+        }
+
+        $availableAt =  $session->get('two_factor_resend_available_at', 0);
+        if (!$twilioVerifyService->canResend($availableAt)) {
+            $this->addFlash('error', sprintf('Veuillez patienter %d seconde(s) avant de renvoyer un code.', $twilioVerifyService->getResendRemainingSeconds($availableAt)));
+            return $this->redirectToRoute('two_factor_verify');
+        }
+
+        $destination = $session->get('two_factor_destination', '');
+        if ($destination === '') {
+            return $this->redirectToRoute('login', ['cancel_2fa' => 1]);
+        }
+
+        $twilioVerifyService->sendCode($destination,$session->get('two_factor_channel', 'sms'));
+        $session->set('two_factor_resend_available_at', $twilioVerifyService->nextResendAvailableAt());
+        $this->addFlash('success', 'Nouveau code OTP envoye par SMS.');
+
+        return $this->redirectToRoute('two_factor_verify');
     }
 
     #[Route('/logout', name: 'logout')]

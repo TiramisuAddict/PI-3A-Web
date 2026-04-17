@@ -8,13 +8,15 @@ use App\Entity\Entreprise;
 use App\Repository\EmployeRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class EmployeCsvImportService
 {
     /**
      * @return array{imported:int, errors:string[], fatalError:?string}
      */
-    public function import(UploadedFile $file,Entreprise $entreprise,EmployeRepository $employeRepository,EntityManagerInterface $entityManager,PasswordGenerator $passwordGenerator): array
+    public function import(UploadedFile $file,Entreprise $entreprise,EmployeRepository $employeRepository,EntityManagerInterface $entityManager,PasswordGenerator $passwordGenerator,MailerInterface $mailer,MailerService $mailerService,UserPasswordHasherInterface $passwordHasher): array
     {
         $extension = strtolower((string) $file->getClientOriginalExtension());
         if ($extension !== 'csv') {
@@ -48,6 +50,7 @@ class EmployeCsvImportService
         $imported = 0;
         $lineNumber = 0;
         $errors = [];
+        $pendingEmails = [];
 
         while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
             $lineNumber++;
@@ -115,12 +118,20 @@ class EmployeCsvImportService
                 ->setDateEmbauche($dateEmbauche)
                 ->setEntreprise($entreprise);
 
+            $plainPassword = $passwordGenerator->generatePlain();
             $compte = new Compte();
-            $compte->setMot_de_passe($passwordGenerator->generate());
+            $compte->setMot_de_passe($passwordHasher->hashPassword($compte, $plainPassword));
             $compte->setEmployé($employe);
 
             $entityManager->persist($employe);
             $entityManager->persist($compte);
+
+            $pendingEmails[] = [
+                'email' => $email,
+                'prenom' => $prenom,
+                'nom' => $nom,
+                'password' => $plainPassword,
+            ];
 
             $existingEmails[$normalizedEmail] = true;
             $imported++;
@@ -130,6 +141,20 @@ class EmployeCsvImportService
 
         if ($imported > 0) {
             $entityManager->flush();
+
+            foreach ($pendingEmails as $pendingEmail) {
+                try {
+                    $mailerService->sendTemporaryPassword(
+                        $mailer,
+                        (string) $pendingEmail['email'],
+                        (string) $pendingEmail['prenom'],
+                        (string) $pendingEmail['nom'],
+                        (string) $pendingEmail['password']
+                    );
+                } catch (\Throwable $exception) {
+                    $errors[] = sprintf('Envoi e-mail échoué pour %s.', (string) $pendingEmail['email']);
+                }
+            }
         }
 
         return [

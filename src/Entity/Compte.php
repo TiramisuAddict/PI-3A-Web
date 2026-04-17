@@ -5,12 +5,13 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 
 use App\Repository\CompteRepository;
 
 #[ORM\Entity(repositoryClass: CompteRepository::class)]
 #[ORM\Table(name: 'compte')]
-class Compte
+class Compte implements PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -40,6 +41,15 @@ class Compte
     {
         $this->mot_de_passe = $mot_de_passe;
         return $this;
+    }
+
+    public function getPassword(): ?string
+    {
+        return $this->mot_de_passe;
+    }
+
+    public function eraseCredentials(): void
+    {
     }
 
     #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'comptes')]

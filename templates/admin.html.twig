@@ -66,6 +66,12 @@
   {# ── Contenu principal ── #}
   <div class="flex-fill overflow-y-auto p-4" style="background:#F6F7FF; min-width:0;">
 
+    {% for label, messages in app.flashes %}
+      {% for message in messages %}
+        <div class="alert alert-{{ label == 'error' ? 'danger' : label }}" role="alert">{{ message }}</div>
+      {% endfor %}
+    {% endfor %}
+
     <div class="page-header mb-3">
       <div class="row align-items-center">
         <div class="col">
@@ -153,9 +159,9 @@
             </thead>
             <tbody id="tableBody">
               {% for entreprise in entreprises %}
-              <tr data-nom="{{ entreprise.nom_entreprise|lower }}" data-statut="{{ entreprise.statut }}">
-                <td class="fw-semibold">{{ entreprise.nom_entreprise }}</td>
-                <td class="text-secondary">{{ entreprise.e_mail }}</td>
+              <tr data-nom="{{ entreprise.getNomEntreprise()|lower }}" data-statut="{{ entreprise.statut }}">
+                <td class="fw-semibold">{{ entreprise.getNomEntreprise() }}</td>
+                <td class="text-secondary">{{ entreprise.getEmail() }}</td>
                 <td class="text-secondary">{{ entreprise.pays }}</td>
                 <td class="text-secondary">{{ entreprise.ville }}</td>
                 <td>{{ entreprise.prenom }} {{ entreprise.nom }}</td>

@@ -56,4 +56,18 @@ class AdministrateurSysteme
         return $this;
     }
 
+    #[ORM\Column(type: 'string', nullable: true)]
+    private ?string $telephone = null;
+
+    public function getTelephone(): ?string
+    {
+        return $this->telephone;
+    }
+
+    public function setTelephone(?string $telephone): self
+    {
+        $this->telephone = $telephone;
+        return $this;
+    }
+
 }

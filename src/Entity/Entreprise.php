@@ -31,12 +31,12 @@ class Entreprise
     #[ORM\Column(type: 'string', nullable: false)]
     private ?string $nom_entreprise = null;
 
-    public function getNom_entreprise(): ?string
+    public function getNomEntreprise(): ?string
     {
         return $this->nom_entreprise;
     }
 
-    public function setNom_entreprise(string $nom_entreprise): self
+    public function setNomEntreprise(string $nom_entreprise): self
     {
         $this->nom_entreprise = $nom_entreprise;
         return $this;
@@ -101,12 +101,12 @@ class Entreprise
     #[ORM\Column(type: 'string', nullable: false)]
     private ?string $matricule_fiscale = null;
 
-    public function getMatricule_fiscale(): ?string
+    public function getMatriculeFiscale(): ?string
     {
         return $this->matricule_fiscale;
     }
 
-    public function setMatricule_fiscale(string $matricule_fiscale): self
+    public function setMatriculeFiscale(string $matricule_fiscale): self
     {
         $this->matricule_fiscale = $matricule_fiscale;
         return $this;
@@ -129,12 +129,12 @@ class Entreprise
     #[ORM\Column(type: 'string', nullable: false)]
     private ?string $e_mail = null;
 
-    public function getE_mail(): ?string
+    public function getEmail(): ?string
     {
         return $this->e_mail;
     }
 
-    public function setE_mail(string $e_mail): self
+    public function setEmail(string $e_mail): self
     {
         $this->e_mail = $e_mail;
         return $this;
@@ -157,12 +157,12 @@ class Entreprise
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $site_web = null;
 
-    public function getSite_web(): ?string
+    public function getSiteWeb(): ?string
     {
         return $this->site_web;
     }
 
-    public function setSite_web(?string $site_web): self
+    public function setSiteWeb(?string $site_web): self
     {
         $this->site_web = $site_web;
         return $this;

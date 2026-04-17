@@ -14,10 +14,13 @@ use App\Form\EmployeType;
 use App\Repository\EntrepriseRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Services\CvExtractionService;
+use App\Services\MailerService;
 use App\Services\PasswordGenerator;
 use App\Services\EmployeCsvImportService;
 use App\Entity\Compte;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 
 
@@ -122,7 +125,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
         ]);
     }
     #[Route('/employe/ajouter', name: 'employe_ajouter', methods: ['GET', 'POST'])]
-    public function ajouter(Request $request,EntityManagerInterface $em,SessionInterface $session,EmployeRepository $employeRepo,EntrepriseRepository $entrepriseRepo,PasswordGenerator $passwordGenerator,CvExtractionService $cvExtractionService,): Response {
+    public function ajouter(Request $request,EntityManagerInterface $em,SessionInterface $session,EmployeRepository $employeRepo,EntrepriseRepository $entrepriseRepo,PasswordGenerator $passwordGenerator,CvExtractionService $cvExtractionService,MailerInterface $mailer,MailerService $mailerService,UserPasswordHasherInterface $passwordHasher): Response {
         if (!$this->isEmployeLoggedIn($session)) {
             return $this->redirectToRoute('login');
         }
@@ -161,11 +164,26 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
             $employe->setEntreprise($entreprise);
 
             $em->persist($employe);
+            $plainPassword = $passwordGenerator->generatePlain();
             $compte = new Compte();
-            $compte->setMot_de_passe($passwordGenerator->generate());
+            $compte->setMot_de_passe($passwordHasher->hashPassword($compte, $plainPassword));
             $compte->setEmploye($employe);
             $em->persist($compte);
             $em->flush();
+
+            try {
+                $mailerService->sendTemporaryPassword(
+                    $mailer,
+                    (string) $employe->getEmail(),
+                    (string) $employe->getPrenom(),
+                    (string) $employe->getNom(),
+                    $plainPassword
+                );
+                $this->addFlash('success', 'Mot de passe envoye par e-mail.');
+            } catch (\Throwable $exception) {
+                $this->addFlash('warning', 'Employé créé, mais l\'envoi de l\'e-mail a échoué.');
+            }
+
             $this->addFlash('success', 'Employé ajouté avec succès.');
             return $this->redirectToRoute('RH_Home');
         }
@@ -188,7 +206,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
     }
 
     #[Route('/employe/import-csv', name: 'employe_import_csv', methods: ['POST'])]
-    public function importCsv(Request $request,SessionInterface $session,EntrepriseRepository $entrepriseRepo,EmployeRepository $employeRepo,EntityManagerInterface $em,PasswordGenerator $passwordGenerator,EmployeCsvImportService $employeCsvImportService): Response
+    public function importCsv(Request $request,SessionInterface $session,EntrepriseRepository $entrepriseRepo,EmployeRepository $employeRepo,EntityManagerInterface $em,PasswordGenerator $passwordGenerator,EmployeCsvImportService $employeCsvImportService,MailerInterface $mailer,MailerService $mailerService,UserPasswordHasherInterface $passwordHasher): Response
     {
         if (!$this->isEmployeLoggedIn($session)) {
             return $this->redirectToRoute('login');
@@ -206,7 +224,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
             $this->addFlash('error', 'Entreprise introuvable pour cet utilisateur.');
             return $this->redirectToRoute('RH_Home');
         }
-        $result = $employeCsvImportService->import($file, $entreprise, $employeRepo, $em, $passwordGenerator);
+        $result = $employeCsvImportService->import($file, $entreprise, $employeRepo, $em, $passwordGenerator, $mailer, $mailerService, $passwordHasher);
         if ($result['fatalError'] !== null) {
             $this->addFlash('error', $result['fatalError']);
             return $this->redirectToRoute('employe_ajouter');
