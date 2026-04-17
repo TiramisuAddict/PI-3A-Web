@@ -40,6 +40,9 @@ class DemandeFormHelper
             'Changement horaires',
             'Heures supplementaires',
             'Autre'
+        ],
+        'Autre' => [
+            'Autre'
         ]
     ];
 

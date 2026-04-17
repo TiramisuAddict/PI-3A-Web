@@ -127,42 +127,71 @@ class DemandeController extends AbstractController
         $detailErrors     = [];
         $submittedDetails = [];
         $submittedType    = null;
+        $submittedAiDescription = '';
+        $submittedAiFieldPlan = ['add' => [], 'remove' => [], 'replaceBase' => false];
+        $aiGenerated = false;
 
         if ($form->isSubmitted()) {
             $formData      = $request->request->all();
             $submittedType = $formData['demande']['typeDemande'] ?? null;
             $submittedDetails = $formData['details'] ?? [];
+            $submittedAiDescription = trim((string) $request->request->get('autre_ai_description', ''));
+            $aiFieldPlanRaw = trim((string) $request->request->get('ai_field_plan', ''));
+            if ('' !== $aiFieldPlanRaw) {
+                $decodedPlan = json_decode($aiFieldPlanRaw, true);
+                if (is_array($decodedPlan)) {
+                    $submittedAiFieldPlan = [
+                        'add' => is_array($decodedPlan['add'] ?? null) ? $decodedPlan['add'] : [],
+                        'remove' => is_array($decodedPlan['remove'] ?? null)
+                            ? array_values(array_map('strval', $decodedPlan['remove']))
+                            : [],
+                        'replaceBase' => true === ($decodedPlan['replaceBase'] ?? false),
+                    ];
+                }
+            }
+            $aiGenerated = '1' === (string) $request->request->get('ai_generated', '0');
+            $aiConfirmed = '1' === (string) $request->request->get('ai_confirmed', '0');
 
             if ($submittedType) {
                 $detailErrors = $this->validateDetails($submittedType, $submittedDetails);
+                if ('Autre' === $submittedType) {
+                    $detailErrors = array_merge(
+                        $detailErrors,
+                        $this->validateAiCustomDetails($submittedDetails, $submittedAiFieldPlan)
+                    );
+                }
             }
 
             $demande->setEmploye($employe);
 
             if ($form->isValid() && empty($detailErrors)) {
-                $this->em->persist($demande);
-                $this->em->flush();
+                if ($aiGenerated && !$aiConfirmed) {
+                    $this->addFlash('warning', 'Veuillez confirmer la demande apres generation IA avant de creer la demande.');
+                } else {
+                    $this->em->persist($demande);
+                    $this->em->flush();
 
-                if (!empty($submittedDetails)) {
-                    $demandeDetail = new DemandeDetail();
-                    $demandeDetail->setDemande($demande);
-                    $demandeDetail->setDetails(json_encode($submittedDetails));
-                    $this->em->persist($demandeDetail);
+                    if (!empty($submittedDetails)) {
+                        $demandeDetail = new DemandeDetail();
+                        $demandeDetail->setDemande($demande);
+                        $demandeDetail->setDetails(json_encode($submittedDetails));
+                        $this->em->persist($demandeDetail);
+                    }
+
+                    $historique = new HistoriqueDemande();
+                    $historique->setDemande($demande);
+                    $historique->setNouveauStatut('Nouvelle');
+                    $historique->setActeur($this->getActorLabel($session));
+                    $historique->setCommentaire('Demande creee');
+                    $historique->setDateAction(new \DateTime());
+                    $this->em->persist($historique);
+                    $this->em->flush();
+
+                    $this->demandeMailer->notifyManagersDemandeCreated($demande);
+
+                    $this->addFlash('success', 'Demande creee avec succes.');
+                    return $this->redirectToRoute('demande_show', ['id' => $demande->getIdDemande()]);
                 }
-
-                $historique = new HistoriqueDemande();
-                $historique->setDemande($demande);
-                $historique->setNouveauStatut('Nouvelle');
-                $historique->setActeur($this->getActorLabel($session));
-                $historique->setCommentaire('Demande creee');
-                $historique->setDateAction(new \DateTime());
-                $this->em->persist($historique);
-                $this->em->flush();
-
-                $this->demandeMailer->notifyManagersDemandeCreated($demande);
-
-                $this->addFlash('success', 'Demande creee avec succes.');
-                return $this->redirectToRoute('demande_show', ['id' => $demande->getIdDemande()]);
             }
         }
 
@@ -172,6 +201,9 @@ class DemandeController extends AbstractController
             'detailErrors'     => $detailErrors,
             'submittedDetails' => $submittedDetails,
             'submittedType'    => $submittedType,
+            'submittedAiDescription' => $submittedAiDescription,
+            'submittedAiFieldPlan' => $submittedAiFieldPlan,
+            'aiGenerated'      => $aiGenerated,
             'email'            => $session->get('employe_email') ?? '',
             'role'             => $session->get('employe_role') ?? '',
         ]);
@@ -725,6 +757,78 @@ class DemandeController extends AbstractController
                     }
                 } catch (\Exception $e) {
                     $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" contient une date invalide.', 'type' => 'format'];
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    private function validateAiCustomDetails(array $details, array $aiFieldPlan): array
+    {
+        $errors = [];
+        $customFields = is_array($aiFieldPlan['add'] ?? null) ? $aiFieldPlan['add'] : [];
+
+        foreach ($customFields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' === $key) {
+                continue;
+            }
+
+            $label = trim((string) ($field['label'] ?? $key));
+            if ('' === $label) {
+                $label = $key;
+            }
+
+            $required = true === ($field['required'] ?? false);
+            $type = strtolower(trim((string) ($field['type'] ?? 'text')));
+            $value = trim((string) ($details[$key] ?? ''));
+
+            if ($required && '' === $value) {
+                $errors[] = [
+                    'field' => $key,
+                    'message' => 'Le champ "' . $label . '" est obligatoire.',
+                    'type' => 'blank',
+                ];
+                continue;
+            }
+
+            if ('' === $value) {
+                continue;
+            }
+
+            if ('number' === $type) {
+                if (!is_numeric($value)) {
+                    $errors[] = [
+                        'field' => $key,
+                        'message' => 'Le champ "' . $label . '" doit etre un nombre valide.',
+                        'type' => 'format',
+                    ];
+                    continue;
+                }
+
+                if ((float) $value < 0) {
+                    $errors[] = [
+                        'field' => $key,
+                        'message' => 'Le champ "' . $label . '" ne peut pas etre negatif.',
+                        'type' => 'format',
+                    ];
+                }
+            }
+
+            if ('date' === $type) {
+                try {
+                    new \DateTime($value);
+                } catch (\Exception) {
+                    $errors[] = [
+                        'field' => $key,
+                        'message' => 'Le champ "' . $label . '" contient une date invalide.',
+                        'type' => 'format',
+                    ];
                 }
             }
         }
