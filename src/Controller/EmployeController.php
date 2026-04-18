@@ -17,14 +17,11 @@ final class EmployeController extends AbstractController
     }
 
     #[Route('/employe/home', name: 'employe_Home', methods: ['GET'])]
-    public function home(SessionInterface $session,EmployeRepository $employeRepo,EntrepriseRepository $entrepriseRepo): Response {
+    public function home(SessionInterface $session): Response {
         if (!$this->isEmployeLoggedIn($session)) {
             return $this->redirectToRoute('login');
         }
 
-        return $this->render('employe/home.html.twig', [
-            'role'  => $session->get('employe_role'),
-            'email' => $session->get('employe_email'),
-        ]);
+        return $this->redirectToRoute('app_employe_feed', [], Response::HTTP_SEE_OTHER);
     }
 }
