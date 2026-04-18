@@ -203,15 +203,7 @@
                             {% if is_event and post.eventImages|length > 0 %}
                                 <div class="row g-2 mt-1">
                                     {% for img in post.eventImages %}
-                                        {% set image_path = img.imagePath|default('') %}
-                                        {% set image_name = image_path|split('/')|last %}
-                                        {% set src = image_path starts with 'http'
-                                            ? image_path
-                                            : (image_path starts with 'uploads/'
-                                                ? asset(image_path)
-                                                : (image_path starts with 'images/'
-                                                    ? asset(image_path)
-                                                    : asset('uploads/events/' ~ image_name))) %}
+                                        {% set src = img.imagePath starts with 'http' ? img.imagePath : asset(img.imagePath) %}
                                         <div class="col-6 col-sm-4">
                                             <img src="{{ src }}" alt="" class="img-fluid rounded-4 border" loading="lazy" style="aspect-ratio: 4/3; object-fit: cover;">
                                         </div>
@@ -436,6 +428,12 @@
             gap: 0.5rem;
             color: #64748b;
             font-size: 0.88rem;
+        }
+        .feed-dot {
+            width: 0.28rem;
+            height: 0.28rem;
+            border-radius: 999px;
+            background: #cbd5e1;
         }
         .feed-post-tag {
             display: inline-flex;
@@ -835,7 +833,7 @@
             function updateLikeSummary(postId, count) {
                 var stats = document.getElementById('like-count-' + postId);
                 if (stats) {
-                    stats.innerHTML = '<i class="ti ti-heart-filled"></i><span>' + count + ' j\'aime</span>';
+                    stats.innerHTML = '<i class="ti ti-heart-filled"></i><span>' + count + ' j\\'aime</span>';
                 }
             }
 
