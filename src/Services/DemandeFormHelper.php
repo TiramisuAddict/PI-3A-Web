@@ -845,7 +845,14 @@ class DemandeFormHelper
             ]
         ];
 
-        return $fieldsMap[$typeDemande] ?? [];
+        $normalizedType = $this->normalizeTypeKey($typeDemande);
+        foreach ($fieldsMap as $knownType => $fields) {
+            if ($this->normalizeTypeKey($knownType) === $normalizedType) {
+                return $fields;
+            }
+        }
+
+        return [];
     }
 
     public function getFieldLabel(string $typeDemande, string $fieldKey): string
@@ -859,5 +866,23 @@ class DemandeFormHelper
         }
 
         return $fieldKey;
+    }
+
+    private function normalizeTypeKey(string $value): string
+    {
+        $normalized = trim(mb_strtolower($value));
+        $replacements = [
+            'à' => 'a', 'â' => 'a', 'ä' => 'a',
+            'ç' => 'c',
+            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'î' => 'i', 'ï' => 'i',
+            'ô' => 'o', 'ö' => 'o',
+            'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+        ];
+
+        $normalized = strtr($normalized, $replacements);
+        $normalized = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
+
+        return $normalized;
     }
 }

@@ -137,6 +137,111 @@
         display: block;
         text-align: left;
     }
+    .decision-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fff;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+    }
+    .decision-card .card-header {
+        background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+    }
+    .decision-score {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 54px;
+        height: 54px;
+        border-radius: 999px;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #1e3a8a;
+        background: #dbeafe;
+        border: 1px solid #bfdbfe;
+    }
+    .decision-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: .78rem;
+        font-weight: 700;
+    }
+    .decision-pill.resolve { background: #dcfce7; color: #166534; }
+    .decision-pill.wait { background: #fef3c7; color: #92400e; }
+    .decision-pill.reject { background: #fee2e2; color: #991b1b; }
+    .decision-pill.review { background: #dbeafe; color: #1d4ed8; }
+    .decision-list {
+        margin: 0;
+        padding-left: 18px;
+        color: #334155;
+        font-size: .9rem;
+    }
+    .decision-list li + li {
+        margin-top: 6px;
+    }
+    .decision-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+    .decision-meta .meta-chip {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: .8rem;
+        color: #475569;
+        font-weight: 600;
+    }
+    .spam-indicator {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        margin-bottom: 14px;
+    }
+    .spam-indicator.success {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+    }
+    .spam-indicator.warning {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+    }
+    .spam-indicator.danger {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+    }
+    .spam-score {
+        min-width: 46px;
+        height: 46px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: .95rem;
+        background: rgba(255,255,255,.7);
+        border: 1px solid currentColor;
+    }
+    .spam-copy strong {
+        display: block;
+        font-size: .85rem;
+        margin-bottom: 3px;
+    }
+    .spam-copy span {
+        display: block;
+        font-size: .84rem;
+        line-height: 1.4;
+    }
 </style>
 {% endblock %}
 
@@ -342,6 +447,85 @@
 
                 {# RIGHT COLUMN #}
                 <div class="col-lg-4">
+
+                    {% if decisionAdvice %}
+                        {% set recommendationClass = decisionAdvice.recommendedStatus == 'Resolue' ? 'resolve' : (decisionAdvice.recommendedStatus == 'En attente' ? 'wait' : (decisionAdvice.recommendedStatus == 'Rejetee' ? 'reject' : 'review')) %}
+                        <div class="decision-card card mb-3">
+                            <div class="card-header">
+                                <h3 class="card-title"><i class="ti ti-brain me-2"></i>Aide a la decision</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex align-items-center gap-3 mb-3">
+                                    <div class="decision-score">{{ (decisionAdvice.confidence * 100)|round }}%</div>
+                                    <div>
+                                        <div class="decision-pill {{ recommendationClass }}">
+                                            <i class="ti ti-sparkles"></i>{{ decisionAdvice.recommendedStatus }}
+                                        </div>
+                                        <div class="mt-2 text-secondary" style="font-size:.9rem;">{{ decisionAdvice.summary }}</div>
+                                    </div>
+                                </div>
+
+                                {% if decisionAdvice.spamLevel is defined %}
+                                    <div class="spam-indicator {{ decisionAdvice.spamLevel.tone }}">
+                                        <div class="spam-score">{{ decisionAdvice.spamScore }}</div>
+                                        <div class="spam-copy">
+                                            <strong>Score test/spam: {{ decisionAdvice.spamLevel.label }}</strong>
+                                            <span>{{ decisionAdvice.spamLevel.description }}</span>
+                                        </div>
+                                    </div>
+                                {% endif %}
+
+                                {% if decisionAdvice.reasons is not empty %}
+                                    <div class="mb-3">
+                                        <div class="detail-label">Pourquoi cette recommandation</div>
+                                        <ul class="decision-list">
+                                            {% for reason in decisionAdvice.reasons %}
+                                                <li>{{ reason }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+
+                                {% if decisionAdvice.missingRequired is not empty %}
+                                    <div class="mb-3">
+                                        <div class="detail-label">Informations manquantes</div>
+                                        <ul class="decision-list">
+                                            {% for missing in decisionAdvice.missingRequired %}
+                                                <li>{{ missing }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+
+                                {% if decisionAdvice.weakRequired is defined and decisionAdvice.weakRequired is not empty %}
+                                    <div class="mb-3">
+                                        <div class="detail-label">Contenu peu fiable</div>
+                                        <ul class="decision-list">
+                                            {% for weak in decisionAdvice.weakRequired %}
+                                                <li>{{ weak }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+
+                                {% if decisionAdvice.warnings is not empty %}
+                                    <div>
+                                        <div class="detail-label">Points de vigilance</div>
+                                        <ul class="decision-list">
+                                            {% for warning in decisionAdvice.warnings %}
+                                                <li>{{ warning }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+
+                                <div class="decision-meta">
+                                    <span class="meta-chip">Completude: {{ (decisionAdvice.completeness * 100)|round }}%</span>
+                                    <span class="meta-chip">Mode: logique tolerante aux donnees sales</span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
 
                     {% if demande.status == 'Annulee' %}
                         <div class="card mb-3">

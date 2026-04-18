@@ -51,10 +51,29 @@
     .inline-map-section { margin-top: 8px; border: 1px solid #c0d0ff; border-radius: 6px; overflow: hidden; background: white; }
     #map { height: 400px; width: 100%; background: #aad3df; border-radius: 4px; }
     .location-input-group input { background: #f8fafc !important; }
+    .classification-ai-box { border: 1px solid rgba(13, 148, 136, 0.2); border-radius: 10px; padding: 14px; background: linear-gradient(180deg, #f4fffd 0%, #eefcf8 100%); }
     .autre-ai-box { border: 1px dashed #4a5def; border-radius: 8px; padding: 14px; background: #f8faff; }
     .ai-status { font-size: .88rem; color: #475569; }
     .ai-status.success { color: #166534; }
     .ai-status.error { color: #b91c1c; }
+    .ai-status.info { color: #0f766e; }
+    .suggestion-summary { background: #ecfeff; border: 1px solid #a5f3fc; color: #155e75; padding: 10px 12px; border-radius: 6px; font-size: .92rem; display: none; }
+    .type-info { font-size: .82rem; color: #64748b; margin-top: 6px; display: block; }
+    .assistant-panel { position: sticky; top: 76px; }
+    .assistant-panel .card-header { align-items: flex-start; flex-direction: column; gap: 4px; }
+    .assistant-eyebrow { font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #0f766e; }
+    .assistant-title { margin: 0; font-size: 1.1rem; color: #0f172a; }
+    .assistant-subtitle { margin: 0; font-size: .9rem; color: #64748b; line-height: 1.45; }
+    .classification-ai-box .form-control { min-height: 112px; resize: vertical; border-radius: 8px; }
+    .assistant-tips { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+    .assistant-tips li { font-size: .93rem; line-height: 1.45; color: #334155; padding-left: 16px; position: relative; }
+    .assistant-tips li::before { content: ""; position: absolute; left: 0; top: 9px; width: 6px; height: 6px; border-radius: 999px; background: #4a5def; }
+    .col-lg-4 > .card { display: none; }
+    .ai-prefill-hint { display: none; margin-bottom: 12px; padding: 10px 12px; border-radius: 8px; background: #effcf6; border: 1px solid #bbf7d0; color: #166534; font-size: .9rem; }
+    .ai-prefill-hint.visible { display: block; }
+    .ai-prefilled-label { display: flex; align-items: center; gap: 8px; }
+    .ai-badge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 7px; border-radius: 999px; font-size: .72rem; font-weight: 700; background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .ai-prefilled-input { border-color: #86efac !important; background: #f6fff9 !important; box-shadow: 0 0 0 0.18rem rgba(34, 197, 94, 0.08); }
 </style>
 {% endblock %}
 
@@ -114,6 +133,7 @@
                                     <div class="col-md-6">
                                         {{ form_label(form.typeDemande, null, {'label_attr': {'class': 'form-label required'}}) }}
                                         {{ form_widget(form.typeDemande, {'attr': {'class': 'form-select' ~ (form.typeDemande.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                        <span id="typeInfo" class="type-info"></span>
                                         {% if form.typeDemande.vars.errors %}
                                             <div class="field-error">
                                                 {% for error in form.typeDemande.vars.errors %}{{ error.message }}{% endfor %}
@@ -171,6 +191,7 @@
                                     <span id="aiStatusText" class="ai-status"></span>
                                 </div>
                             </div>
+                            <div id="aiPrefillHint" class="ai-prefill-hint"></div>
                             <div class="row g-3" id="dynamicFields"></div>
                         </div>
                     </div>
@@ -191,6 +212,39 @@
                 </div>
 
                 <div class="col-lg-4">
+                    <div class="assistant-panel">
+                        <div class="card">
+                            <div class="card-header">
+                                <span class="assistant-eyebrow">Assistant IA</span>
+                                <h3 class="assistant-title">Classement intelligent</h3>
+                                <p class="assistant-subtitle">Ecrivez votre besoin meme avec des fautes. L assistant corrige le texte et propose automatiquement la categorie, le type et la priorite.</p>
+                            </div>
+                            <div class="card-body">
+                                <div class="classification-ai-box">
+                                    <label for="classificationAiPrompt" class="form-label">Decrivez votre besoin</label>
+                                    <textarea
+                                        id="classificationAiPrompt"
+                                        class="form-control"
+                                        rows="4"
+                                        placeholder="Exemple: slt j besoin dacces salesforc pr mn nv poste et c un peu urgent"
+                                    ></textarea>
+                                    <div class="d-grid gap-2 mt-3">
+                                        <button type="button" class="btn btn-primary" id="suggestClassificationBtn">
+                                            <i class="ti ti-wand me-1"></i>Suggerer automatiquement
+                                        </button>
+                                        <span id="classificationStatusText" class="ai-status"></span>
+                                    </div>
+                                    <div id="classificationSummary" class="suggestion-summary mt-2"></div>
+                                </div>
+
+                                <ul class="assistant-tips">
+                                    <li><strong>Titre clair :</strong> gardez un objet simple et descriptif.</li>
+                                    <li><strong>Priorite juste :</strong> reservez le niveau haute aux cas vraiment bloquants.</li>
+                                    <li><strong>Champs specifiques :</strong> apres la suggestion, completez uniquement les informations utiles.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title"><i class="ti ti-lightbulb me-2"></i>Conseils</h3>
@@ -262,12 +316,14 @@
     var DETAIL_ERRORS = {{ detailErrors|json_encode|raw }};
     var SUBMITTED_AI_DESCRIPTION = {{ submittedAiDescription|default('')|json_encode|raw }};
     var SUBMITTED_AI_FIELD_PLAN = {{ submittedAiFieldPlan|default({'add': [], 'remove': [], 'replaceBase': false})|json_encode|raw }};
+    var CLASSIFICATION_AI_ENDPOINT = "{{ path('demande_api_suggest_classification') }}";
     var AUTRE_AI_ENDPOINT = "{{ path('demande_api_autre_generate') }}";
 
     var AUTRE_BASE_REQUIRED_KEYS = ["besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre"];
     var AI_DYNAMIC_FIELDS = [];
     var AI_REMOVED_BASE_FIELDS = [];
     var AI_REPLACE_BASE_FIELDS = false;
+    var AUTO_FILLED_DETAIL_KEYS = {};
     var maps = {};
     var markers = {};
     var selectedLocations = {};
@@ -305,6 +361,91 @@
         status.className = "ai-status";
         if (state) status.classList.add(state);
         status.textContent = text || "";
+    }
+
+    function setAutoFilledDetailKeys(keys) {
+        AUTO_FILLED_DETAIL_KEYS = {};
+        if (!Array.isArray(keys)) {
+            updateAiPrefillHint();
+            return;
+        }
+
+        for (var i = 0; i < keys.length; i++) {
+            var key = String(keys[i] || "").trim();
+            if (!key) continue;
+            AUTO_FILLED_DETAIL_KEYS[key] = true;
+        }
+
+        updateAiPrefillHint();
+    }
+
+    function isAutoFilledDetailKey(key) {
+        return !!AUTO_FILLED_DETAIL_KEYS[String(key || "")];
+    }
+
+    function updateAiPrefillHint() {
+        var hint = document.getElementById("aiPrefillHint");
+        if (!hint) return;
+
+        var count = Object.keys(AUTO_FILLED_DETAIL_KEYS).length;
+        if (count <= 0) {
+            hint.classList.remove("visible");
+            hint.textContent = "";
+            return;
+        }
+
+        hint.classList.add("visible");
+        hint.textContent = count === 1
+            ? "1 champ specifique a ete pre-rempli par l IA. Vous pouvez le modifier."
+            : count + " champs specifiques ont ete pre-remplis par l IA. Vous pouvez les modifier.";
+    }
+
+    function markFieldAsReviewed(inputEl) {
+        if (!inputEl) return;
+        inputEl.classList.remove("ai-prefilled-input");
+
+        var key = String(inputEl.getAttribute("data-field-key") || "").trim();
+        if (key && AUTO_FILLED_DETAIL_KEYS[key]) {
+            delete AUTO_FILLED_DETAIL_KEYS[key];
+            updateAiPrefillHint();
+        }
+
+        var labelId = inputEl.getAttribute("data-ai-label-id");
+        if (labelId) {
+            var badge = document.getElementById(labelId);
+            if (badge) badge.remove();
+        }
+    }
+
+    function setClassificationStatus(text, state) {
+        var status = document.getElementById("classificationStatusText");
+        if (!status) return;
+        status.className = "ai-status";
+        if (state) status.classList.add(state);
+        status.textContent = text || "";
+    }
+
+    function updateClassificationSummary(suggestion) {
+        var summary = document.getElementById("classificationSummary");
+        if (!summary) return;
+
+        if (!suggestion || typeof suggestion !== "object") {
+            summary.style.display = "none";
+            summary.innerHTML = "";
+            return;
+        }
+
+        var detailsCount = suggestion.suggestedDetails && typeof suggestion.suggestedDetails === "object"
+            ? Object.keys(suggestion.suggestedDetails).length
+            : 0;
+
+        summary.style.display = "block";
+        summary.innerHTML = ""
+            + "<strong>Texte corrige:</strong> " + escapeHtml(suggestion.correctedText || "") + "<br>"
+            + "<strong>Suggestion:</strong> " + escapeHtml(suggestion.categorie || "") + " / " + escapeHtml(suggestion.typeDemande || "")
+            + " / " + escapeHtml(suggestion.priorite || "") + "<br>"
+            + "<strong>Confiance:</strong> " + escapeHtml(String(suggestion.confidence || 0)) + "<br>"
+            + "<strong>Champs pre-remplis:</strong> " + escapeHtml(String(detailsCount));
     }
 
     function sanitizeAiCustomField(field) {
@@ -604,6 +745,148 @@
         }
     }
 
+    function updateTypeInfo(typeInfo, category) {
+        if (!typeInfo) return;
+        if (category && CATEGORIES[category]) {
+            typeInfo.textContent = CATEGORIES[category].length + " types disponibles";
+            typeInfo.style.color = "green";
+            return;
+        }
+
+        typeInfo.textContent = "";
+    }
+
+    function applyClassificationSuggestion(suggestion, categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard) {
+        if (!suggestion || typeof suggestion !== "object") return;
+
+        var correctedText = String(suggestion.correctedText || "").trim();
+        var categorie = String(suggestion.categorie || "").trim();
+        var typeDemande = String(suggestion.typeDemande || "").trim();
+        var priorite = String(suggestion.priorite || "").trim().toUpperCase();
+        var titre = String(suggestion.titre || "").trim();
+        var description = String(suggestion.description || "").trim();
+        var suggestedDetails = suggestion.suggestedDetails && typeof suggestion.suggestedDetails === "object"
+            ? suggestion.suggestedDetails
+            : {};
+        setAutoFilledDetailKeys(Object.keys(suggestedDetails));
+
+        if (correctedText) {
+            var promptInput = document.getElementById("classificationAiPrompt");
+            if (promptInput) promptInput.value = correctedText;
+        }
+
+        if (categorie && CATEGORIES[categorie]) {
+            categorieSelect.value = categorie;
+            rebuildTypeOptionsForCategory(typeSelect, categorie);
+            updateTypeInfo(typeInfo, categorie);
+        }
+
+        if (typeDemande) {
+            var canApplyType = false;
+            for (var i = 0; i < typeSelect.options.length; i++) {
+                if (String(typeSelect.options[i].value || "") === typeDemande) {
+                    canApplyType = true;
+                    break;
+                }
+            }
+
+            if (canApplyType) {
+                typeSelect.value = typeDemande;
+            }
+        }
+
+        var prioriteInput = document.getElementById("demande_priorite");
+        if (prioriteInput && priorite) {
+            prioriteInput.value = priorite;
+        }
+
+        var titreInput = document.getElementById("demande_titre");
+        if (titreInput && titre) {
+            titreInput.value = titre;
+        }
+
+        var descriptionInput = document.getElementById("demande_description");
+        if (descriptionInput && description) {
+            descriptionInput.value = description;
+        }
+
+        var autrePromptInput = document.getElementById("autreAiDescription");
+        if (autrePromptInput && correctedText) {
+            autrePromptInput.value = correctedText;
+        }
+
+        var aiGeneratedInput = document.getElementById("aiGeneratedInput");
+        var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        if (aiGeneratedInput) aiGeneratedInput.value = "0";
+        if (aiConfirmedInput) aiConfirmedInput.value = "0";
+        resetAiFieldPlan();
+        setAiStatus("", "");
+        updateAutreAiControls(typeDemande);
+
+        if (typeDemande) {
+            loadDynamicFields(typeDemande, suggestedDetails, dynamicFieldsContainer, dynamicFieldsCard);
+        } else {
+            dynamicFieldsCard.style.display = "none";
+            dynamicFieldsContainer.innerHTML = "";
+        }
+    }
+
+    function requestClassificationSuggestion(categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard) {
+        var button = document.getElementById("suggestClassificationBtn");
+        var promptInput = document.getElementById("classificationAiPrompt");
+        var originalText = button ? button.innerHTML : "";
+        var rawText = promptInput ? String(promptInput.value || "").trim() : "";
+
+        if (!rawText) {
+            setClassificationStatus("Ajoutez une description avant de lancer la suggestion.", "error");
+            if (promptInput) promptInput.focus();
+            updateClassificationSummary(null);
+            return;
+        }
+
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = "<span class='spinner-border spinner-border-sm me-1'></span>Analyse...";
+        }
+
+        setClassificationStatus("Correction et classement en cours...", "info");
+
+        fetch(CLASSIFICATION_AI_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({ text: rawText })
+        })
+            .then(function (response) {
+                return response.json().then(function (json) {
+                    if (!response.ok || !json.success) {
+                        throw new Error(json.message || "Suggestion IA impossible.");
+                    }
+                    return json;
+                });
+            })
+            .then(function (json) {
+                var suggestion = json.suggestion || {};
+                applyClassificationSuggestion(suggestion, categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard);
+                updateClassificationSummary(suggestion);
+                setClassificationStatus("Texte corrige et demande classee automatiquement.", "success");
+            })
+            .catch(function (error) {
+                console.error(error);
+                setAutoFilledDetailKeys([]);
+                updateClassificationSummary(null);
+                setClassificationStatus(error.message || "Suggestion IA impossible.", "error");
+            })
+            .finally(function () {
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                }
+            });
+    }
+
     function applyCategoryAndAutreType(categorieSelect, typeSelect, typeInfo, detectedCategory, silent) {
         if (!detectedCategory || !CATEGORIES[detectedCategory]) return false;
 
@@ -780,6 +1063,15 @@
                     merged[suggestionKeys[j]] = json.suggestedDetails[suggestionKeys[j]];
                 }
 
+                var autoFilledKeys = suggestionKeys.slice();
+                for (var af = 0; af < fieldPlan.add.length; af++) {
+                    var autoField = fieldPlan.add[af];
+                    if (autoField && autoField.key) {
+                        autoFilledKeys.push(autoField.key);
+                    }
+                }
+                setAutoFilledDetailKeys(autoFilledKeys);
+
                 for (var r = 0; r < fieldPlan.remove.length; r++) {
                     delete merged[fieldPlan.remove[r]];
                 }
@@ -918,8 +1210,16 @@
 
     function buildLabel(field) {
         var lbl = document.createElement("label");
-        lbl.className = "form-label" + (field.required ? " required" : "");
+        lbl.className = "form-label" + (field.required ? " required" : "") + (isAutoFilledDetailKey(field.key) ? " ai-prefilled-label" : "");
         lbl.textContent = field.label;
+
+        if (isAutoFilledDetailKey(field.key)) {
+            var badge = document.createElement("span");
+            badge.className = "ai-badge";
+            badge.textContent = "IA";
+            badge.id = "ai-badge-" + String(field.key || "").replace(/[^a-zA-Z0-9_-]+/g, "_");
+            lbl.appendChild(badge);
+        }
         return lbl;
     }
 
@@ -940,6 +1240,7 @@
                 inp.name = "details[" + field.key + "]";
                 inp.value = value;
                 applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
                 return inp;
             case "number":
                 inp = document.createElement("input");
@@ -949,6 +1250,7 @@
                 inp.value = value;
                 inp.min = "0";
                 applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
                 return inp;
             case "date":
                 inp = document.createElement("input");
@@ -960,6 +1262,7 @@
                     autoFillNombreJours();
                 });
                 applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
                 return inp;
             case "textarea":
                 inp = document.createElement("textarea");
@@ -968,6 +1271,7 @@
                 inp.name = "details[" + field.key + "]";
                 inp.value = value;
                 applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
                 return inp;
             case "select":
                 inp = document.createElement("select");
@@ -987,6 +1291,7 @@
                     }
                 }
                 applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
                 return inp;
             default:
                 inp = document.createElement("input");
@@ -995,8 +1300,23 @@
                 inp.name = "details[" + field.key + "]";
                 inp.value = value;
                 applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
                 return inp;
         }
+    }
+
+    function applyAiPrefillState(inputEl, field) {
+        if (!inputEl || !field || !isAutoFilledDetailKey(field.key) || field.type === "hidden") return;
+
+        var badgeId = "ai-badge-" + String(field.key || "").replace(/[^a-zA-Z0-9_-]+/g, "_");
+        inputEl.classList.add("ai-prefilled-input");
+        inputEl.setAttribute("data-ai-label-id", badgeId);
+
+        var eventName = inputEl.tagName === "SELECT" ? "change" : "input";
+        inputEl.addEventListener(eventName, function handleReview() {
+            markFieldAsReviewed(inputEl);
+            inputEl.removeEventListener(eventName, handleReview);
+        });
     }
 
     function autoFillNombreJours() {
@@ -1071,6 +1391,7 @@
         readonlyInput.placeholder = "Cliquez sur la carte ci-dessous pour choisir un lieu";
         readonlyInput.value = existingValue;
         applyInputConstraints(readonlyInput, field);
+        applyAiPrefillState(readonlyInput, field);
         wrapper.appendChild(readonlyInput);
 
         var latInput = document.createElement("input");
@@ -1308,6 +1629,8 @@
         var categorieSelect = document.getElementById("demande_categorie");
         var typeSelect = document.getElementById("demande_typeDemande");
         var typeInfo = document.getElementById("typeInfo");
+        var classificationAiPrompt = document.getElementById("classificationAiPrompt");
+        var suggestClassificationBtn = document.getElementById("suggestClassificationBtn");
         var dynamicFieldsCard = document.getElementById("dynamicFieldsCard");
         var dynamicFieldsContainer = document.getElementById("dynamicFields");
         var generateWithAiBtn = document.getElementById("generateWithAiBtn");
@@ -1336,7 +1659,19 @@
             loadDynamicFields(SUBMITTED_TYPE, SUBMITTED_DETAILS, dynamicFieldsContainer, dynamicFieldsCard);
         }
 
+        updateTypeInfo(typeInfo, categorieSelect.value || "");
         updateAutreAiControls(typeSelect.value || SUBMITTED_TYPE || "");
+
+        if (classificationAiPrompt && !classificationAiPrompt.value) {
+            classificationAiPrompt.value = String((document.getElementById("demande_description") || {}).value || "").trim();
+        }
+
+        if (suggestClassificationBtn) {
+            suggestClassificationBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                requestClassificationSuggestion(categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard);
+            });
+        }
 
         if (generateWithAiBtn) {
             generateWithAiBtn.addEventListener("click", function (event) {
@@ -1406,6 +1741,7 @@
             if (aiGeneratedInput) aiGeneratedInput.value = "0";
             if (aiConfirmedInput) aiConfirmedInput.value = "0";
             resetAiFieldPlan();
+            setAutoFilledDetailKeys([]);
             updateAutreAiControls("");
 
             if (category && CATEGORIES[category]) {
@@ -1415,18 +1751,16 @@
                     opt.value = types[i]; opt.textContent = types[i];
                     typeSelect.appendChild(opt);
                 }
-                if (typeInfo) {
-                    typeInfo.textContent = types.length + " types disponibles";
-                    typeInfo.style.color = "green";
-                }
+                updateTypeInfo(typeInfo, category);
             } else {
-                if (typeInfo) typeInfo.textContent = "";
+                updateTypeInfo(typeInfo, "");
             }
         });
 
         typeSelect.addEventListener("change", function () {
             var type = this.value;
             maps = {}; markers = {}; selectedLocations = {};
+            updateTypeInfo(typeInfo, categorieSelect.value || "");
             if (!type) {
                 dynamicFieldsCard.style.display = "none";
                 dynamicFieldsContainer.innerHTML = "";
@@ -1437,6 +1771,7 @@
             if (aiGeneratedInput) aiGeneratedInput.value = "0";
             if (aiConfirmedInput) aiConfirmedInput.value = "0";
             resetAiFieldPlan();
+            setAutoFilledDetailKeys([]);
             setAiStatus("", "");
             updateAutreAiControls(type);
             loadDynamicFields(type, {}, dynamicFieldsContainer, dynamicFieldsCard);

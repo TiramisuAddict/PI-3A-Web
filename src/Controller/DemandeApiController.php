@@ -57,6 +57,54 @@ class DemandeApiController extends AbstractController
         ]);
     }
 
+    #[Route('/demande-api/suggest-classification', name: 'demande_api_suggest_classification', methods: ['POST'])]
+    public function suggestClassification(Request $request, SessionInterface $session): JsonResponse
+    {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return new JsonResponse(['success' => false, 'message' => 'Vous devez etre connecte.'], 401);
+        }
+
+        if ($this->canManageDemandes($session)) {
+            return new JsonResponse(['success' => false, 'message' => 'Les comptes RH/Admin ne peuvent pas creer de demande employe.'], 403);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            return new JsonResponse(['success' => false, 'message' => 'Payload JSON invalide.'], 400);
+        }
+
+        $rawText = trim((string) ($payload['text'] ?? ''));
+        if ('' === $rawText) {
+            return new JsonResponse(['success' => false, 'message' => 'Ajoutez une description avant de lancer la suggestion intelligente.'], 400);
+        }
+
+        try {
+            $result = $this->aiAssistant->generateClassificationSuggestion(
+                $rawText,
+                $this->formHelper->getCategoryTypes(),
+                $this->formHelper->getPriorites()
+            );
+
+            $suggestedType = (string) ($result['typeDemande'] ?? '');
+            $suggestedFields = $this->formHelper->getFieldsForType($suggestedType);
+            $result['suggestedDetails'] = $this->aiAssistant->extractSuggestedDetailsForType(
+                (string) ($result['correctedText'] ?? $rawText),
+                $suggestedType,
+                $suggestedFields
+            );
+
+            return new JsonResponse([
+                'success' => true,
+                'suggestion' => $result,
+                'model' => $result['model'] ?? null,
+            ]);
+        } catch (\RuntimeException $e) {
+            return new JsonResponse(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Throwable) {
+            return new JsonResponse(['success' => false, 'message' => 'Une erreur inattendue est survenue pendant la suggestion IA.'], 500);
+        }
+    }
+
     #[Route('/demande-api/autre/generate', name: 'demande_api_autre_generate', methods: ['POST'])]
     public function generateAutre(Request $request, SessionInterface $session): JsonResponse
     {

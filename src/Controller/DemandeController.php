@@ -9,6 +9,7 @@ use App\Entity\HistoriqueDemande;
 use App\Form\DemandeType;
 use App\Repository\DemandeRepository;
 use App\Services\DemandeMailer;
+use App\Services\DemandeDecisionAssistant;
 use App\Services\DemandeFormHelper;
 use Doctrine\ORM\EntityManagerInterface;
 use Knp\Component\Pager\PaginatorInterface;
@@ -25,17 +26,20 @@ class DemandeController extends AbstractController
     private EntityManagerInterface $em;
     private DemandeRepository $demandeRepository;
     private DemandeMailer $demandeMailer;
+    private DemandeDecisionAssistant $demandeDecisionAssistant;
 
     public function __construct(
         DemandeFormHelper $formHelper,
         EntityManagerInterface $em,
         DemandeRepository $demandeRepository,
-        DemandeMailer $demandeMailer
+        DemandeMailer $demandeMailer,
+        DemandeDecisionAssistant $demandeDecisionAssistant
     ) {
         $this->formHelper = $formHelper;
         $this->em = $em;
         $this->demandeRepository = $demandeRepository;
         $this->demandeMailer = $demandeMailer;
+        $this->demandeDecisionAssistant = $demandeDecisionAssistant;
     }
 
     #[Route('/demande', name: 'demande_index', methods: ['GET'])]
@@ -411,6 +415,7 @@ class DemandeController extends AbstractController
 
         $detailsData    = [];
         $fieldLabels    = [];
+        $decisionAdvice = null;
         $demandeDetails = $demande->getDemandeDetails();
 
         if ($demandeDetails->count() > 0) {
@@ -422,6 +427,12 @@ class DemandeController extends AbstractController
             }
         }
 
+        $decisionAdvice = $this->demandeDecisionAssistant->analyze(
+            $demande,
+            is_array($detailsData) ? $detailsData : [],
+            $this->formHelper->getFieldsForType((string) $demande->getTypeDemande())
+        );
+
         return $this->render(
             $this->canManageDemandes($session)
                 ? 'demande/adminetrh/show.html.twig'
@@ -430,6 +441,7 @@ class DemandeController extends AbstractController
                 'demande'     => $demande,
                 'detailsData' => $detailsData,
                 'fieldLabels' => $fieldLabels,
+                'decisionAdvice' => $decisionAdvice,
                 'statuses'    => $this->formHelper->getStatuses(),
                 'email'       => $session->get('employe_email') ?? '',
                 'role'        => $session->get('employe_role') ?? '',

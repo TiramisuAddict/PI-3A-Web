@@ -1,0 +1,491 @@
+<?php
+
+namespace App\Services;
+
+use App\Entity\Demande;
+
+class DemandeDecisionAssistant
+{
+    /**
+     * @param array<string, mixed> $details
+     * @param array<int, array<string, mixed>> $fieldDefinitions
+     * @return array<string, mixed>
+     */
+    public function analyze(Demande $demande, array $details, array $fieldDefinitions): array
+    {
+        $missingRequired = [];
+        $weakRequired = [];
+        $filledRequired = 0;
+        $requiredCount = 0;
+        $reasons = [];
+        $warnings = [];
+        $recommendedStatus = 'En cours';
+        $confidence = 0.55;
+        $qualityPenalty = 0.0;
+
+        foreach ($fieldDefinitions as $field) {
+            $key = trim((string) ($field['key'] ?? ''));
+            $label = trim((string) ($field['label'] ?? $key));
+            $required = true === ($field['required'] ?? false);
+            $fieldType = trim((string) ($field['type'] ?? 'text'));
+
+            if (!$required || '' === $key) {
+                continue;
+            }
+
+            ++$requiredCount;
+            $value = trim((string) ($details[$key] ?? ''));
+            if ('' === $value) {
+                $missingRequired[] = $label;
+                continue;
+            }
+
+            ++$filledRequired;
+
+            if ($this->isLowQualityValue($value, $key, $label, $fieldType)) {
+                $weakRequired[] = $label;
+            }
+        }
+
+        $meaningfulRequired = max(0, $filledRequired - count($weakRequired));
+        $completeness = $requiredCount > 0
+            ? round($meaningfulRequired / $requiredCount, 2)
+            : 1.0;
+        $missingSpecificCount = count($missingRequired) + count($weakRequired);
+
+        if ([] !== $missingRequired) {
+            $recommendedStatus = 'En attente';
+            $confidence = match (true) {
+                count($missingRequired) >= 4 => 0.18,
+                count($missingRequired) === 3 => 0.26,
+                count($missingRequired) === 2 => 0.34,
+                default => 0.46,
+            };
+            $reasons[] = 'Des champs obligatoires sont manquants.';
+        } else {
+            $reasons[] = 'Les champs obligatoires principaux sont renseignes.';
+            $confidence = 0.72;
+        }
+
+        if ([] !== $weakRequired) {
+            $recommendedStatus = count($weakRequired) >= 2 ? 'Rejetee' : 'En attente';
+            $confidence = min($confidence, count($weakRequired) >= 2 ? 0.24 : 0.38);
+            $reasons[] = 'Certaines informations obligatoires semblent remplies avec un contenu trop faible ou non exploitable.';
+            $warnings[] = 'Champs suspects: ' . implode(', ', array_slice($weakRequired, 0, 4));
+            $qualityPenalty += min(0.35, 0.12 * count($weakRequired));
+        }
+
+        $type = trim((string) $demande->getTypeDemande());
+        $title = trim((string) $demande->getTitre());
+        $description = trim((string) $demande->getDescription());
+        $descriptionLower = strtolower($description);
+        $priorite = strtoupper(trim((string) $demande->getPriorite()));
+
+        if ($this->isLowQualityValue($title, 'titre', 'Titre', 'text')) {
+            $recommendedStatus = 'Rejetee';
+            $confidence = min($confidence, 0.25);
+            $reasons[] = 'Le titre de la demande est trop vague ou ressemble a un texte de test.';
+            $warnings[] = 'Titre non fiable pour une decision automatique.';
+            $qualityPenalty += 0.2;
+        }
+
+        if ($this->isLowQualityValue($description, 'description', 'Description', 'textarea')) {
+            $recommendedStatus = 'Rejetee';
+            $confidence = min($confidence, 0.22);
+            $reasons[] = 'La description generale est trop pauvre, repetitive ou non exploitable.';
+            $warnings[] = 'Description generale de faible qualite.';
+            $qualityPenalty += 0.22;
+        }
+
+        if ('HAUTE' === $priorite) {
+            $warnings[] = 'Priorite haute: verification humaine recommandee avant cloture.';
+            if ([] === $missingRequired && [] === $weakRequired) {
+                $confidence = min(0.95, $confidence + 0.03);
+            }
+        }
+
+        switch ($type) {
+            case 'Remboursement':
+                $this->analyzeRemboursement($details, $recommendedStatus, $reasons, $warnings, $confidence);
+                break;
+            case 'Conge':
+                $this->analyzeConge($details, $reasons, $warnings, $recommendedStatus, $confidence);
+                break;
+            case 'Acces systeme':
+                $this->analyzeAccesSysteme($details, $reasons, $warnings, $recommendedStatus, $confidence);
+                break;
+            case 'Avance sur salaire':
+                $this->analyzeAvanceSalaire($details, $reasons, $warnings, $recommendedStatus, $confidence);
+                break;
+            case 'Teletravail':
+                $this->analyzeTeletravail($details, $reasons, $warnings, $recommendedStatus, $confidence);
+                break;
+            case 'Probleme technique':
+                $this->analyzeProblemeTechnique($details, $reasons, $warnings, $recommendedStatus, $confidence);
+                break;
+            default:
+                if ([] === $missingRequired && [] === $weakRequired && strlen($description) >= 20) {
+                    $recommendedStatus = 'En cours';
+                    $reasons[] = 'La demande est exploitable mais merite encore une verification metier.';
+                    $confidence = max($confidence, 0.66);
+                }
+                break;
+        }
+
+        if ('Autre' === $type && (strlen($description) < 15 || $this->isLowQualityValue($description, 'description', 'Description', 'textarea')) && ([] !== $missingRequired || [] !== $weakRequired)) {
+            $recommendedStatus = 'Rejetee';
+            $reasons[] = 'La demande est trop vague pour etre traitee en l etat.';
+            $confidence = max($confidence, 0.84);
+        }
+
+        if ('Rejetee' !== $recommendedStatus && 'En attente' !== $recommendedStatus && [] === $missingRequired && [] === $weakRequired) {
+            if ([] === $warnings) {
+                $recommendedStatus = 'Resolue';
+                $reasons[] = 'Aucun blocage majeur detecte dans les informations fournies.';
+                $confidence = max($confidence, 0.8);
+            } elseif ('En cours' !== $recommendedStatus) {
+                $recommendedStatus = 'En cours';
+            }
+        }
+
+        if ($qualityPenalty > 0) {
+            $confidence = max(0.08, $confidence - $qualityPenalty);
+        }
+
+        if ([] !== $missingRequired) {
+            $confidence = min($confidence, match (true) {
+                count($missingRequired) >= 4 => 0.2,
+                count($missingRequired) === 3 => 0.28,
+                count($missingRequired) === 2 => 0.36,
+                default => 0.48,
+            });
+        }
+
+        if ($requiredCount > 0) {
+            if ($completeness <= 0.25) {
+                $confidence = min($confidence, 0.18);
+            } elseif ($completeness <= 0.5) {
+                $confidence = min($confidence, 0.3);
+            } elseif ($completeness <= 0.75) {
+                $confidence = min($confidence, 0.45);
+            }
+        }
+
+        if ($missingSpecificCount >= 3) {
+            $recommendedStatus = 'En attente';
+            $reasons[] = 'Les informations specifiques de la demande sont trop incompletes pour une decision fiable.';
+            $confidence = min($confidence, 0.24);
+        } elseif ($missingSpecificCount === 2) {
+            $recommendedStatus = 'En attente';
+            $reasons[] = 'Plusieurs informations specifiques importantes sont absentes ou faibles.';
+            $confidence = min($confidence, 0.34);
+        }
+
+        $spamScore = $this->calculateSpamScore($demande, $details, $weakRequired, $missingRequired);
+        $spamLevel = $this->getSpamLevel($spamScore);
+
+        return [
+            'recommendedStatus' => $recommendedStatus,
+            'confidence' => round($confidence, 2),
+            'completeness' => $completeness,
+            'missingRequired' => $missingRequired,
+            'weakRequired' => $weakRequired,
+            'spamScore' => $spamScore,
+            'spamLevel' => $spamLevel,
+            'reasons' => array_values(array_unique($reasons)),
+            'warnings' => array_values(array_unique($warnings)),
+            'summary' => $this->buildSummary($recommendedStatus, $missingRequired, $weakRequired, $warnings),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @param array<int, string> $reasons
+     * @param array<int, string> $warnings
+     */
+    private function analyzeRemboursement(array $details, string &$recommendedStatus, array &$reasons, array &$warnings, float &$confidence): void
+    {
+        $justificatif = strtolower(trim((string) ($details['justificatif'] ?? '')));
+        $amount = (float) ($details['montant'] ?? 0);
+
+        if (str_contains($justificatif, 'non')) {
+            $recommendedStatus = 'En attente';
+            $reasons[] = 'Le justificatif est manquant ou annonce comme a fournir.';
+            $confidence = max($confidence, 0.9);
+        }
+
+        if ($amount > 1000) {
+            $warnings[] = 'Montant eleve: validation humaine recommandee.';
+            $recommendedStatus = 'En cours';
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @param array<int, string> $reasons
+     * @param array<int, string> $warnings
+     */
+    private function analyzeConge(array $details, array &$reasons, array &$warnings, string &$recommendedStatus, float &$confidence): void
+    {
+        $start = trim((string) ($details['dateDebut'] ?? ''));
+        $end = trim((string) ($details['dateFin'] ?? ''));
+        $days = (int) ($details['nombreJours'] ?? 0);
+
+        if ('' !== $start && '' !== $end && $start > $end) {
+            $recommendedStatus = 'Rejetee';
+            $reasons[] = 'La date de fin est incoherente avec la date de debut.';
+            $confidence = max($confidence, 0.93);
+        }
+
+        if ($days > 20) {
+            $warnings[] = 'Conge longue duree: verification RH recommandee.';
+            $recommendedStatus = 'En cours';
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @param array<int, string> $reasons
+     * @param array<int, string> $warnings
+     */
+    private function analyzeAccesSysteme(array $details, array &$reasons, array &$warnings, string &$recommendedStatus, float &$confidence): void
+    {
+        $typeAcces = strtolower(trim((string) ($details['typeAcces'] ?? '')));
+        $justification = trim((string) ($details['justification'] ?? ''));
+
+        if ('' === $justification || strlen($justification) < 12) {
+            $recommendedStatus = 'En attente';
+            $reasons[] = 'La justification de l acces est trop courte ou absente.';
+            $confidence = max($confidence, 0.86);
+        }
+
+        if (str_contains($typeAcces, 'admin')) {
+            $warnings[] = 'Acces administrateur demande: validation manuelle indispensable.';
+            $recommendedStatus = 'En cours';
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @param array<int, string> $reasons
+     * @param array<int, string> $warnings
+     */
+    private function analyzeAvanceSalaire(array $details, array &$reasons, array &$warnings, string &$recommendedStatus, float &$confidence): void
+    {
+        $amount = (float) ($details['montant'] ?? 0);
+        $motif = trim((string) ($details['motif'] ?? ''));
+
+        if ($amount <= 0) {
+            $recommendedStatus = 'Rejetee';
+            $reasons[] = 'Le montant demande est invalide.';
+            $confidence = max($confidence, 0.91);
+        }
+
+        if (strlen($motif) < 20) {
+            $recommendedStatus = 'En attente';
+            $reasons[] = 'Le motif financier manque de precision.';
+            $confidence = max($confidence, 0.83);
+        }
+
+        if ($amount > 2000) {
+            $warnings[] = 'Montant eleve: arbitrage RH/finance conseille.';
+            $recommendedStatus = 'En cours';
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @param array<int, string> $reasons
+     * @param array<int, string> $warnings
+     */
+    private function analyzeTeletravail(array $details, array &$reasons, array &$warnings, string &$recommendedStatus, float &$confidence): void
+    {
+        $address = trim((string) ($details['adresseTeletravail'] ?? ''));
+        $days = trim((string) ($details['joursParSemaine'] ?? ''));
+
+        if ('' === $address) {
+            $recommendedStatus = 'En attente';
+            $reasons[] = 'L adresse de teletravail n est pas renseignee.';
+            $confidence = max($confidence, 0.84);
+        }
+
+        if (str_contains(strtolower($days), 'temps plein')) {
+            $warnings[] = 'Teletravail temps plein: validation manager recommandee.';
+            $recommendedStatus = 'En cours';
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @param array<int, string> $reasons
+     * @param array<int, string> $warnings
+     */
+    private function analyzeProblemeTechnique(array $details, array &$reasons, array &$warnings, string &$recommendedStatus, float &$confidence): void
+    {
+        $impact = strtolower(trim((string) ($details['impact'] ?? '')));
+        $description = trim((string) ($details['descriptionProbleme'] ?? ''));
+
+        if ('' === $description || strlen($description) < 12) {
+            $recommendedStatus = 'En attente';
+            $reasons[] = 'La description du probleme est insuffisante.';
+            $confidence = max($confidence, 0.82);
+        }
+
+        if (str_contains($impact, 'bloquant')) {
+            $warnings[] = 'Incident bloquant: priorisation immediate recommandee.';
+            $recommendedStatus = 'En cours';
+        }
+    }
+
+    /**
+     * @param array<int, string> $missingRequired
+     * @param array<int, string> $warnings
+     */
+    private function buildSummary(string $recommendedStatus, array $missingRequired, array $weakRequired, array $warnings): string
+    {
+        return match ($recommendedStatus) {
+            'Resolue' => 'La demande parait complete et traitable sans blocage majeur.',
+            'Rejetee' => [] !== $weakRequired
+                ? 'Le contenu parait trop faible, repetitif ou proche d un texte de test pour etre accepte.'
+                : 'La demande contient une incoherence ou est trop insuffisante pour etre acceptee.',
+            'En attente' => [] !== $missingRequired
+                ? 'Des informations manquent. Il vaut mieux demander un complement avant decision.'
+                : ([] !== $weakRequired
+                    ? 'Les informations presentes existent mais ne sont pas assez fiables ou precises.'
+                    : 'La demande necessite une confirmation ou une piece complementaire.'),
+            default => [] !== $warnings
+                ? 'La demande est exploitable mais requiert une verification humaine.'
+                : 'La demande peut avancer vers une prise en charge.',
+        };
+    }
+
+    private function isLowQualityValue(string $value, string $key = '', string $label = '', string $fieldType = 'text'): bool
+    {
+        $text = trim(mb_strtolower($value));
+        if ('' === $text) {
+            return true;
+        }
+
+        $context = mb_strtolower($key . ' ' . $label . ' ' . $fieldType);
+
+        if ('number' === $fieldType || preg_match('/^\d+(?:[.,]\d+)?$/', $text) === 1) {
+            return false;
+        }
+
+        if ('date' === $fieldType || preg_match('/^\d{4}-\d{2}-\d{2}$/', $text) === 1) {
+            return false;
+        }
+
+        if ('select' === $fieldType) {
+            return false;
+        }
+
+        if (
+            str_contains($context, 'nombre') ||
+            str_contains($context, 'quantite') ||
+            str_contains($context, 'montant') ||
+            str_contains($context, 'cout') ||
+            str_contains($context, 'date') ||
+            str_contains($context, 'jourspar') ||
+            str_contains($context, 'periode')
+        ) {
+            return false;
+        }
+
+        if (mb_strlen($text) < 4) {
+            return true;
+        }
+
+        if (preg_match('/^(a|b|c|d|e|x|z|1|0|\?|\.)\1{2,}$/u', $text) === 1) {
+            return true;
+        }
+
+        if (preg_match('/^(test|aaaa+|bbbb+|cccc+|dddd+|xxxxx+|qsdf+|azerty+|hjkl+|demo|tmp)$/u', $text) === 1) {
+            return true;
+        }
+
+        $lettersOnly = preg_replace('/[^a-zà-ÿ]/u', '', $text) ?? '';
+        $uniqueChars = count(array_unique(preg_split('//u', $lettersOnly, -1, PREG_SPLIT_NO_EMPTY) ?: []));
+        if ('' !== $lettersOnly && mb_strlen($lettersOnly) >= 4 && $uniqueChars <= 2) {
+            return true;
+        }
+
+        $tokens = preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ([] !== $tokens) {
+            $uniqueTokens = count(array_unique($tokens));
+            if (count($tokens) >= 2 && $uniqueTokens <= 1) {
+                return true;
+            }
+        }
+
+        if (
+            (str_contains($context, 'motif') || str_contains($context, 'description') || str_contains($context, 'justification') || str_contains($context, 'titre')) &&
+            mb_strlen($text) < 12
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @param array<int, string> $weakRequired
+     * @param array<int, string> $missingRequired
+     */
+    private function calculateSpamScore(Demande $demande, array $details, array $weakRequired, array $missingRequired): int
+    {
+        $score = 0;
+
+        if ($this->isLowQualityValue((string) $demande->getTitre(), 'titre', 'Titre', 'text')) {
+            $score += 30;
+        }
+
+        if ($this->isLowQualityValue((string) $demande->getDescription(), 'description', 'Description', 'textarea')) {
+            $score += 35;
+        }
+
+        $score += min(30, count($weakRequired) * 12);
+        $score += min(20, count($missingRequired) * 6);
+
+        foreach ($details as $key => $value) {
+            if (!is_scalar($value)) {
+                continue;
+            }
+
+            if ($this->isLowQualityValue((string) $value, (string) $key, (string) $key, 'text')) {
+                $score += 6;
+            }
+        }
+
+        return min(100, $score);
+    }
+
+    /**
+     * @return array<string, string|int>
+     */
+    private function getSpamLevel(int $score): array
+    {
+        if ($score >= 70) {
+            return [
+                'label' => 'Eleve',
+                'tone' => 'danger',
+                'description' => 'La demande ressemble fortement a un test ou a un contenu non exploitable.',
+            ];
+        }
+
+        if ($score >= 40) {
+            return [
+                'label' => 'Moyen',
+                'tone' => 'warning',
+                'description' => 'Plusieurs signaux montrent un contenu peu fiable ou trop faible.',
+            ];
+        }
+
+        return [
+            'label' => 'Faible',
+            'tone' => 'success',
+            'description' => 'Le contenu ne presente pas de signal fort de test ou de spam.',
+        ];
+    }
+}

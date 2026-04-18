@@ -64,6 +64,206 @@ class DemandeAiAssistant
         ];
     }
 
+    /**
+     * @param array<string, array<int, string>> $categoryTypes
+     * @param array<int, string> $priorities
+     * @return array<string, mixed>
+     */
+    public function generateClassificationSuggestion(string $rawText, array $categoryTypes, array $priorities): array
+    {
+        if ('' === trim($this->apiKey)) {
+            throw new \RuntimeException('La cle API Hugging Face est manquante. Configurez HUGGINGFACE_API_KEY.');
+        }
+
+        $normalizedText = trim($rawText);
+        if ('' === $normalizedText) {
+            throw new \RuntimeException('Ajoutez une description avant de lancer la suggestion intelligente.');
+        }
+
+        $prompt = $this->buildClassificationPrompt($normalizedText, $categoryTypes, $priorities);
+        $rawResponse = $this->callHuggingFace($prompt);
+        $parsed = $this->parseJsonResponse($rawResponse);
+
+        $normalized = $this->normalizeClassificationSuggestion($parsed, $normalizedText, $categoryTypes, $priorities);
+        $normalized['model'] = $this->model;
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $fields
+     * @return array<string, string>
+     */
+    public function extractSuggestedDetailsForType(string $rawText, string $typeDemande, array $fields): array
+    {
+        $text = trim($rawText);
+        if ('' === $text || '' === trim($typeDemande) || [] === $fields) {
+            return [];
+        }
+
+        $normalizedText = strtolower($text);
+        $details = [];
+        $allDates = $this->extractAllFrenchDates($text);
+        $amount = $this->extractAmountFromText($normalizedText);
+        $location = $this->firstNonEmpty($this->extractTargetLocation($text), $this->extractCurrentLocation($text));
+        $months = $this->extractMonthDuration($normalizedText);
+
+        foreach ($fields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            $type = trim((string) ($field['type'] ?? 'text'));
+            $label = trim((string) ($field['label'] ?? $key));
+            $options = isset($field['options']) && is_array($field['options'])
+                ? array_values(array_map('strval', $field['options']))
+                : [];
+
+            if ('' === $key) {
+                continue;
+            }
+
+            $value = match ($key) {
+                'typeConge' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Conge maladie' => ['maladie', 'malade', 'medical'],
+                    'Conge sans solde' => ['sans solde'],
+                    'Conge maternite' => ['maternite', 'maternité'],
+                    'Conge paternite' => ['paternite', 'paternité'],
+                    'Conge exceptionnel' => ['exceptionnel', 'mariage', 'deces', 'décès'],
+                    'Conge annuel' => ['conge', 'vacances', 'repos'],
+                ]),
+                'dateDebut', 'dateDebutTeletravail', 'dateDebutHoraires', 'dateDebutFormation', 'dateSouhaitee', 'dateSouhaiteeFormation', 'datePassage', 'dateHeuresSup', 'dateDepense' => $allDates[0] ?? '',
+                'dateFin', 'dateFinTeletravail' => $allDates[1] ?? '',
+                'nombreJours' => $this->extractDaysCount($normalizedText, $allDates),
+                'motif', 'motifHoraires', 'motifTeletravail', 'motifHeuresSup', 'objectif', 'objectifFormation', 'justification', 'justificationLogiciel', 'justificationCertif', 'descriptionProbleme', 'details' => $text,
+                'nombreExemplaires' => $this->extractIntegerNearKeywords($normalizedText, ['exemplaire', 'copie']) ?: '1',
+                'motifAttestation' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Banque' => ['banque', 'credit', 'crédit', 'pret', 'prêt'],
+                    'Visa' => ['visa', 'consulat', 'ambassade'],
+                    'Location immobiliere' => ['location', 'immobiliere', 'immobilier', 'appartement', 'maison'],
+                    'Demarches administratives' => ['administrative', 'administratif', 'dossier', 'papier'],
+                    'Autre' => ['autre'],
+                ]),
+                'destinataire' => $this->extractRecipient($text),
+                'periode' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Dernier mois' => ['dernier mois', '1 mois'],
+                    '3 derniers mois' => ['3 mois', 'trois mois'],
+                    '6 derniers mois' => ['6 mois', 'six mois'],
+                    'Annee en cours' => ['annee en cours', 'année en cours'],
+                    'Annee precedente' => ['annee precedente', 'année precedente', 'année précédente'],
+                ]),
+                'departementActuel' => $this->extractDepartment($text, true),
+                'departementSouhaite' => $this->extractDepartment($text, false),
+                'lieuMutation', 'lieuFormation', 'lieuExamen', 'adresseTeletravail' => $location,
+                'posteSouhaite' => $this->extractTargetRole($text),
+                'preavis' => $this->matchMonthOption($options, $months, $normalizedText, 'Dispense demandee', ['dispense']),
+                'montant', 'cout', 'coutCertif' => null !== $amount ? (string) $amount : '',
+                'modaliteRemboursement' => $this->matchMonthOption($options, $months, $normalizedText),
+                'typeRemboursement' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Frais de transport' => ['transport', 'taxi', 'bus', 'train', 'essence'],
+                    'Frais de mission' => ['mission', 'deplacement', 'déplacement'],
+                    'Frais de formation' => ['formation', 'certification', 'cours'],
+                    'Frais medicaux' => ['medical', 'médical', 'medecin', 'médecin', 'pharmacie'],
+                    'Autre' => ['autre'],
+                ]),
+                'justificatif' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Oui' => ['facture', 'justificatif', 'recu', 'reçu', 'piece jointe', 'pièce jointe'],
+                    'Non - a fournir' => ['a fournir', 'à fournir', 'pas encore'],
+                ], 'Oui'),
+                'typeMateriel' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Fournitures' => ['stylo', 'papier', 'cahier', 'fourniture'],
+                    'Mobilier' => ['chaise', 'bureau', 'mobilier'],
+                    'Equipement' => ['equipement', 'équipement'],
+                    'Autre' => ['autre'],
+                ]),
+                'descriptionMateriel' => $this->extractObjectDescription($text),
+                'quantite', 'nombreHeures' => $this->extractFirstInteger($normalizedText),
+                'urgence' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Tres urgente' => ['tres urgent', 'très urgent'],
+                    'Urgente' => ['urgent', 'urgence', 'bloquant'],
+                    'Normale' => ['normal'],
+                ], $options[0] ?? ''),
+                'motifBadge' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Badge perdu' => ['badge perdu', 'perdu'],
+                    'Badge defectueux' => ['defectueux', 'defectueux', 'abime', 'abîme', 'ne marche pas'],
+                    'Extension acces' => ['extension acces', 'nouvel acces', 'zone'],
+                    'Nouveau badge' => ['nouveau badge', 'badge'],
+                ]),
+                'zonesAcces' => $this->extractAccessZones($text),
+                'quantiteCarte' => $this->matchClosestNumericOption($options, $this->extractFirstInteger($normalizedText)),
+                'titreFonction' => $this->extractTargetRole($text),
+                'telephone' => $this->extractPhoneNumber($text),
+                'email' => $this->extractEmailAddress($text),
+                'typeMaterielInfo' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Ordinateur portable' => ['portable', 'laptop'],
+                    'Ordinateur fixe' => ['fixe', 'desktop'],
+                    'Ecran' => ['ecran', 'écran', 'moniteur'],
+                    'Clavier/Souris' => ['clavier', 'souris'],
+                    'Casque' => ['casque', 'headset'],
+                    'Webcam' => ['webcam', 'camera'],
+                    'Autre' => ['autre'],
+                ]),
+                'motifMateriel' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Remplacement' => ['remplacement', 'remplacer'],
+                    'Mise a niveau' => ['mise a niveau', 'upgrade', 'amelioration', 'amélioration'],
+                    'Nouveau besoin' => ['nouveau', 'besoin'],
+                ]),
+                'specifications' => $text,
+                'systeme', 'nomLogiciel' => $this->extractSystemName($text),
+                'typeAcces' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Administrateur' => ['admin', 'administrateur'],
+                    'Lecture/Ecriture' => ['ecriture', 'écriture', 'modifier', 'edition', 'édition'],
+                    'Lecture seule' => ['lecture seule', 'consultation', 'voir'],
+                ]),
+                'version' => $this->extractVersion($text),
+                'typeLicence' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Abonnement mensuel' => ['mensuel', 'mois'],
+                    'Abonnement annuel' => ['annuel', 'an'],
+                    'Open source' => ['open source', 'gratuit'],
+                    'Achat' => ['achat', 'acheter'],
+                ]),
+                'typeProbleme' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Materiel' => ['materiel', 'matériel', 'pc', 'ordinateur', 'ecran'],
+                    'Logiciel' => ['logiciel', 'application', 'software'],
+                    'Reseau' => ['reseau', 'réseau', 'wifi', 'internet'],
+                    'Email' => ['email', 'mail', 'outlook'],
+                    'Imprimante' => ['imprimante'],
+                    'Autre' => ['autre'],
+                ]),
+                'impact' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Bloquant' => ['bloquant', 'impossible de travailler'],
+                    'Important' => ['important', 'urgent'],
+                    'Modere' => ['modere', 'modéré'],
+                    'Faible' => ['faible', 'leger', 'léger'],
+                ]),
+                'nomFormation', 'nomFormationExt', 'nomCertification' => $this->extractTrainingName($text),
+                'formateur', 'organisme', 'organismeCertif' => $this->extractOrganization($text),
+                'duree', 'dureeChangement' => $this->extractDurationLabel($options, $normalizedText),
+                'typeTeletravail' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Teletravail regulier' => ['regulier', 'régulier', 'chaque semaine'],
+                    'Teletravail occasionnel' => ['occasionnel'],
+                    'Teletravail exceptionnel' => ['exceptionnel', 'urgent'],
+                ]),
+                'joursParSemaine' => $this->matchDaysPerWeekOption($options, $normalizedText),
+                'joursSouhaites' => $this->extractWeekDays($normalizedText),
+                'horairesActuels', 'horairesSouhaites', 'heureDebut', 'heureFin' => $this->extractTimeWindow($normalizedText, $key),
+                'valideParResponsable' => $this->matchOptionByKeywords($options, $normalizedText, [
+                    'Oui' => ['valide', 'validé', 'accord responsable', 'approuve'],
+                    'En attente de validation' => ['attente', 'pas encore'],
+                ], $options[1] ?? ($options[0] ?? '')),
+                default => $this->inferGenericFieldValue($key, $type, $label, $options, $text, $normalizedText, $allDates, $amount, $location),
+            };
+
+            $value = trim((string) $value);
+            if ('' !== $value) {
+                $details[$key] = $value;
+            }
+        }
+
+        return $details;
+    }
+
     private function buildPrompt(
         array $generalContext,
         array $currentDetails,
@@ -138,6 +338,52 @@ class DemandeAiAssistant
             . "Libelles metiers des champs: " . json_encode($fieldLabels, JSON_UNESCAPED_UNICODE) . "\n"
             . "Contexte utilisateur: " . json_encode($context, JSON_UNESCAPED_UNICODE) . "\n"
             . "Exemple de forme attendue: " . json_encode($rootSchemaExample, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * @param array<string, array<int, string>> $categoryTypes
+     * @param array<int, string> $priorities
+     */
+    private function buildClassificationPrompt(string $rawText, array $categoryTypes, array $priorities): string
+    {
+        $availableCategories = array_values(array_keys($categoryTypes));
+        $typeMap = [];
+
+        foreach ($categoryTypes as $category => $types) {
+            $typeMap[(string) $category] = array_values(array_map('strval', $types));
+        }
+
+        $example = [
+            'correctedText' => 'Je souhaite obtenir un acces a Salesforce pour mon nouveau poste.',
+            'categorie' => 'Informatique',
+            'typeDemande' => 'Acces systeme',
+            'priorite' => 'NORMALE',
+            'titre' => 'Demande d acces a Salesforce',
+            'description' => 'Le collaborateur demande un acces a Salesforce dans le cadre de sa nouvelle prise de poste.',
+            'confidence' => 0.93,
+        ];
+
+        return "Tu es un assistant de classification de demandes internes en francais.\n"
+            . "Ta mission:\n"
+            . "1. Corriger l orthographe, la grammaire et les fautes de frappe du texte utilisateur.\n"
+            . "2. Conserver le sens metier du besoin.\n"
+            . "3. Choisir la meilleure categorie, le meilleur type de demande et la priorite la plus adaptee.\n"
+            . "4. Produire un titre court et une description propre pour un stockage fiable.\n"
+            . "Renvoie STRICTEMENT un JSON valide, sans markdown.\n"
+            . "Clés obligatoires: correctedText, categorie, typeDemande, priorite, titre, description, confidence.\n"
+            . "Categories autorisees: " . json_encode($availableCategories, JSON_UNESCAPED_UNICODE) . "\n"
+            . "Types autorises par categorie: " . json_encode($typeMap, JSON_UNESCAPED_UNICODE) . "\n"
+            . "Priorites autorisees: " . json_encode(array_values($priorities), JSON_UNESCAPED_UNICODE) . "\n"
+            . "Regles:\n"
+            . "- correctedText: texte corrige, naturel et professionnel.\n"
+            . "- categorie: une seule categorie autorisee.\n"
+            . "- typeDemande: un seul type appartenant a la categorie choisie.\n"
+            . "- priorite: uniquement une valeur autorisee.\n"
+            . "- titre: court, clair, exploitable en base.\n"
+            . "- description: 1 a 3 phrases propres, sans inventer des details absents.\n"
+            . "- confidence: nombre entre 0 et 1.\n"
+            . "Texte utilisateur brut: " . json_encode($rawText, JSON_UNESCAPED_UNICODE) . "\n"
+            . "Exemple attendu: " . json_encode($example, JSON_UNESCAPED_UNICODE);
     }
 
     private function callHuggingFace(string $prompt): string
@@ -908,5 +1154,570 @@ class DemandeAiAssistant
         }
 
         return $text;
+    }
+
+    /**
+     * @param array<string, mixed> $parsed
+     * @param array<string, array<int, string>> $categoryTypes
+     * @param array<int, string> $priorities
+     * @return array<string, mixed>
+     */
+    private function normalizeClassificationSuggestion(array $parsed, string $rawText, array $categoryTypes, array $priorities): array
+    {
+        $correctedText = trim((string) ($parsed['correctedText'] ?? ''));
+        if ('' === $correctedText) {
+            $correctedText = preg_replace('/\s+/', ' ', $rawText) ?? $rawText;
+            $correctedText = trim($correctedText);
+        }
+
+        $categorie = trim((string) ($parsed['categorie'] ?? ''));
+        $typeDemande = trim((string) ($parsed['typeDemande'] ?? ''));
+        $priorite = strtoupper(trim((string) ($parsed['priorite'] ?? 'NORMALE')));
+        $titre = trim((string) ($parsed['titre'] ?? ''));
+        $description = trim((string) ($parsed['description'] ?? ''));
+        $confidence = (float) ($parsed['confidence'] ?? 0.0);
+
+        $allTypes = [];
+        foreach ($categoryTypes as $category => $types) {
+            foreach ($types as $type) {
+                $allTypes[(string) $type] = (string) $category;
+            }
+        }
+
+        if ('' === $categorie || !isset($categoryTypes[$categorie])) {
+            $categorie = $this->inferCategoryFromDescription([
+                'description' => $correctedText,
+                'titre' => $titre,
+            ]);
+        }
+
+        if ('' === $categorie || !isset($categoryTypes[$categorie])) {
+            if ('' !== $typeDemande && isset($allTypes[$typeDemande])) {
+                $categorie = $allTypes[$typeDemande];
+            } else {
+                $categorie = 'Autre';
+            }
+        }
+
+        if ('' === $typeDemande || !in_array($typeDemande, $categoryTypes[$categorie] ?? [], true)) {
+            $typeDemande = $this->inferTypeFromDescription($correctedText, $categorie, $categoryTypes);
+        }
+
+        if ('' === $typeDemande || !in_array($typeDemande, $categoryTypes[$categorie] ?? [], true)) {
+            $typeDemande = $categoryTypes[$categorie][0] ?? 'Autre';
+        }
+
+        if (!in_array($priorite, $priorities, true)) {
+            $priorite = $this->inferPriorityFromDescription($correctedText, $priorities);
+        }
+
+        if (!in_array($priorite, $priorities, true)) {
+            $priorite = 'NORMALE';
+        }
+
+        if ('' === $titre) {
+            $titre = $this->buildTitleFromType($typeDemande, $correctedText);
+        }
+
+        if ('' === $description) {
+            $description = $correctedText;
+        }
+
+        if ($confidence < 0 || $confidence > 1) {
+            $confidence = 0.0;
+        }
+
+        return [
+            'correctedText' => $correctedText,
+            'categorie' => $categorie,
+            'typeDemande' => $typeDemande,
+            'priorite' => $priorite,
+            'titre' => $titre,
+            'description' => $description,
+            'confidence' => round($confidence, 2),
+        ];
+    }
+
+    /**
+     * @param array<string, array<int, string>> $categoryTypes
+     */
+    private function inferTypeFromDescription(string $text, string $categorie, array $categoryTypes): string
+    {
+        $normalized = strtolower($text);
+
+        $keywordMap = [
+            'Conge' => ['conge', 'vacance', 'repos', 'absence', 'maladie'],
+            'Attestation de travail' => ['attestation de travail', 'attestation travail'],
+            'Attestation de salaire' => ['attestation de salaire', 'salaire attestation', 'fiche de salaire'],
+            'Certificat de travail' => ['certificat de travail'],
+            'Mutation' => ['mutation', 'changement de departement', 'transfert'],
+            'Demission' => ['demission', 'demissionner', 'depart de l entreprise'],
+            'Avance sur salaire' => ['avance sur salaire', 'avance salaire', 'salaire avance'],
+            'Remboursement' => ['remboursement', 'rembourser', 'frais', 'facture'],
+            'Materiel de bureau' => ['stylo', 'papier', 'fourniture', 'materiel de bureau', 'mobilier'],
+            'Badge acces' => ['badge', 'acces badge', 'badge perdu'],
+            'Carte de visite' => ['carte de visite', 'business card'],
+            'Materiel informatique' => ['ordinateur', 'pc', 'laptop', 'ecran', 'clavier', 'souris', 'webcam', 'casque'],
+            'Acces systeme' => ['acces systeme', 'acces application', 'compte', 'permission', 'salesforce', 'erp', 'crm'],
+            'Logiciel' => ['logiciel', 'licence', 'software', 'application a installer'],
+            'Probleme technique' => ['bug', 'probleme', 'panne', 'imprimante', 'wifi', 'reseau', 'email'],
+            'Formation interne' => ['formation interne'],
+            'Formation externe' => ['formation externe', 'formation'],
+            'Certification' => ['certification', 'certif', 'examen'],
+            'Teletravail' => ['teletravail', 'travail a distance', 'remote'],
+            'Changement horaires' => ['horaire', 'changement d horaire', 'emploi du temps'],
+            'Heures supplementaires' => ['heures supplementaires', 'heure sup', 'overtime'],
+            'Autre' => ['autre'],
+        ];
+
+        $availableTypes = $categoryTypes[$categorie] ?? [];
+        foreach ($availableTypes as $type) {
+            $keywords = $keywordMap[$type] ?? [];
+            foreach ($keywords as $keyword) {
+                if (str_contains($normalized, $keyword)) {
+                    return $type;
+                }
+            }
+        }
+
+        if (in_array('Autre', $availableTypes, true)) {
+            return 'Autre';
+        }
+
+        return $availableTypes[0] ?? '';
+    }
+
+    /**
+     * @param array<int, string> $priorities
+     */
+    private function inferPriorityFromDescription(string $text, array $priorities): string
+    {
+        $normalized = strtolower($text);
+
+        if (
+            str_contains($normalized, 'urgent') ||
+            str_contains($normalized, 'urgence') ||
+            str_contains($normalized, 'bloquant') ||
+            str_contains($normalized, 'au plus vite') ||
+            str_contains($normalized, 'immediat')
+        ) {
+            return in_array('HAUTE', $priorities, true) ? 'HAUTE' : ($priorities[0] ?? 'NORMALE');
+        }
+
+        if (
+            str_contains($normalized, 'quand possible') ||
+            str_contains($normalized, 'pas urgent') ||
+            str_contains($normalized, 'faible')
+        ) {
+            return in_array('BASSE', $priorities, true) ? 'BASSE' : ($priorities[0] ?? 'NORMALE');
+        }
+
+        return in_array('NORMALE', $priorities, true) ? 'NORMALE' : ($priorities[0] ?? 'NORMALE');
+    }
+
+    private function buildTitleFromType(string $typeDemande, string $correctedText): string
+    {
+        if ('' !== trim($typeDemande)) {
+            return 'Demande - ' . $typeDemande;
+        }
+
+        $excerpt = trim($correctedText);
+        if (strlen($excerpt) > 80) {
+            $excerpt = substr($excerpt, 0, 77) . '...';
+        }
+
+        return '' !== $excerpt ? $excerpt : 'Nouvelle demande';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function extractAllFrenchDates(string $text): array
+    {
+        $normalized = strtolower($text);
+        preg_match_all('/\b(\d{1,2})\s+(janvier|fevrier|fÃ©vrier|mars|avril|mai|juin|juillet|aout|aoÃ»t|septembre|octobre|novembre|decembre|dÃ©cembre)(?:\s+(\d{4}))?\b/u', $normalized, $matches, PREG_SET_ORDER);
+
+        $dates = [];
+        foreach ($matches as $match) {
+            $day = (int) ($match[1] ?? 0);
+            $monthRaw = (string) ($match[2] ?? '');
+            $year = isset($match[3]) && '' !== $match[3]
+                ? (int) $match[3]
+                : (int) (new \DateTimeImmutable())->format('Y');
+
+            $months = [
+                'janvier' => 1,
+                'fevrier' => 2,
+                'fÃ©vrier' => 2,
+                'mars' => 3,
+                'avril' => 4,
+                'mai' => 5,
+                'juin' => 6,
+                'juillet' => 7,
+                'aout' => 8,
+                'aoÃ»t' => 8,
+                'septembre' => 9,
+                'octobre' => 10,
+                'novembre' => 11,
+                'decembre' => 12,
+                'dÃ©cembre' => 12,
+            ];
+
+            $month = $months[$monthRaw] ?? 0;
+            if ($month > 0 && checkdate($month, $day, $year)) {
+                $dates[] = sprintf('%04d-%02d-%02d', $year, $month, $day);
+            }
+        }
+
+        return array_values(array_unique($dates));
+    }
+
+    private function extractDaysCount(string $text, array $dates): string
+    {
+        if (preg_match('/\b(\d+)\s+jours?\b/i', $text, $matches) === 1) {
+            return (string) ((int) ($matches[1] ?? 0));
+        }
+
+        if (count($dates) >= 2) {
+            try {
+                $start = new \DateTimeImmutable($dates[0]);
+                $end = new \DateTimeImmutable($dates[1]);
+                if ($end >= $start) {
+                    return (string) ($start->diff($end)->days + 1);
+                }
+            } catch (\Throwable) {
+            }
+        }
+
+        return '';
+    }
+
+    private function extractIntegerNearKeywords(string $text, array $keywords): string
+    {
+        foreach ($keywords as $keyword) {
+            if (preg_match('/\b(\d+)\s+' . preg_quote($keyword, '/') . 's?\b/i', $text, $matches) === 1) {
+                return (string) ((int) ($matches[1] ?? 0));
+            }
+        }
+
+        return '';
+    }
+
+    private function extractFirstInteger(string $text): string
+    {
+        if (preg_match('/\b(\d+)\b/', $text, $matches) === 1) {
+            return (string) ((int) ($matches[1] ?? 0));
+        }
+
+        return '';
+    }
+
+    private function extractRecipient(string $text): string
+    {
+        if (preg_match('/(?:destinataire|pour)\s*[:\-]?\s*([A-Za-z0-9À-ÿ\'\-\s]{3,80})/u', $text, $matches) === 1) {
+            return trim((string) ($matches[1] ?? ''));
+        }
+
+        return '';
+    }
+
+    private function extractDepartment(string $text, bool $current): string
+    {
+        $patterns = $current
+            ? ['/(?:departement actuel|service actuel|actuellement en)\s*[:\-]?\s*([A-Za-zÀ-ÿ\'\-\s]{3,80})/iu']
+            : ['/(?:departement souhaite|service souhaite|vers)\s*[:\-]?\s*([A-Za-zÀ-ÿ\'\-\s]{3,80})/iu'];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $text, $matches) === 1) {
+                return trim((string) ($matches[1] ?? ''));
+            }
+        }
+
+        return '';
+    }
+
+    private function extractTargetRole(string $text): string
+    {
+        if (preg_match('/(?:poste|fonction|role)\s*(?:souhaite|demand[ée])?\s*[:\-]?\s*([A-Za-zÀ-ÿ0-9\'\-\s]{3,80})/iu', $text, $matches) === 1) {
+            return trim((string) ($matches[1] ?? ''));
+        }
+
+        return '';
+    }
+
+    private function extractMonthDuration(string $text): int
+    {
+        if (preg_match('/\b(\d+)\s*mois\b/i', $text, $matches) === 1) {
+            return (int) ($matches[1] ?? 0);
+        }
+
+        return 0;
+    }
+
+    /**
+     * @param array<int, string> $options
+     * @param array<string, array<int, string>> $keywordMap
+     */
+    private function matchOptionByKeywords(array $options, string $text, array $keywordMap, string $fallback = ''): string
+    {
+        foreach ($keywordMap as $targetOption => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (str_contains($text, strtolower((string) $keyword))) {
+                    foreach ($options as $option) {
+                        if (strcasecmp($option, $targetOption) === 0) {
+                            return $option;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * @param array<int, string> $options
+     */
+    private function matchMonthOption(array $options, int $months, string $text, string $specialOption = '', array $specialKeywords = []): string
+    {
+        foreach ($specialKeywords as $keyword) {
+            if (str_contains($text, strtolower($keyword)) && '' !== $specialOption) {
+                foreach ($options as $option) {
+                    if (strcasecmp($option, $specialOption) === 0) {
+                        return $option;
+                    }
+                }
+            }
+        }
+
+        if ($months > 0) {
+            foreach ($options as $option) {
+                if (preg_match('/\b' . $months . '\s*mois\b/i', $option) === 1) {
+                    return $option;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<int, string> $options
+     */
+    private function matchClosestNumericOption(array $options, string $number): string
+    {
+        $target = (int) $number;
+        if ($target <= 0) {
+            return '';
+        }
+
+        $closest = '';
+        $distance = PHP_INT_MAX;
+        foreach ($options as $option) {
+            $value = (int) preg_replace('/\D+/', '', $option);
+            if ($value <= 0) {
+                continue;
+            }
+
+            $delta = abs($value - $target);
+            if ($delta < $distance) {
+                $distance = $delta;
+                $closest = $option;
+            }
+        }
+
+        return $closest;
+    }
+
+    private function extractPhoneNumber(string $text): string
+    {
+        if (preg_match('/(\+?\d[\d\s]{6,}\d)/', $text, $matches) === 1) {
+            return trim((string) ($matches[1] ?? ''));
+        }
+
+        return '';
+    }
+
+    private function extractEmailAddress(string $text): string
+    {
+        if (preg_match('/([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})/i', $text, $matches) === 1) {
+            return trim((string) ($matches[1] ?? ''));
+        }
+
+        return '';
+    }
+
+    private function extractSystemName(string $text): string
+    {
+        if (preg_match('/(?:acces|acc[èe]s|sur|application|logiciel|outil)\s+(?:a|à|au|aux|de)?\s*([A-Za-z0-9._\- ]{2,60})/iu', $text, $matches) === 1) {
+            return trim((string) ($matches[1] ?? ''));
+        }
+
+        return '';
+    }
+
+    private function extractVersion(string $text): string
+    {
+        if (preg_match('/\b(v(?:ersion)?\s*\d+(?:\.\d+)*)\b/i', $text, $matches) === 1) {
+            return trim((string) ($matches[1] ?? ''));
+        }
+
+        return '';
+    }
+
+    private function extractTrainingName(string $text): string
+    {
+        if (preg_match('/(?:formation|certification)\s*[:\-]?\s*([A-Za-z0-9À-ÿ\'\-\s]{3,80})/iu', $text, $matches) === 1) {
+            return trim((string) ($matches[1] ?? ''));
+        }
+
+        return '';
+    }
+
+    private function extractOrganization(string $text): string
+    {
+        if (preg_match('/(?:organisme|par|chez)\s*[:\-]?\s*([A-Za-z0-9À-ÿ\'\-\s]{3,80})/iu', $text, $matches) === 1) {
+            return trim((string) ($matches[1] ?? ''));
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<int, string> $options
+     */
+    private function extractDurationLabel(array $options, string $text): string
+    {
+        foreach ($options as $option) {
+            if (str_contains($text, strtolower($option))) {
+                return $option;
+            }
+        }
+
+        $months = $this->extractMonthDuration($text);
+        if ($months > 0) {
+            foreach ($options as $option) {
+                if (str_contains(strtolower($option), (string) $months)) {
+                    return $option;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<int, string> $options
+     */
+    private function matchDaysPerWeekOption(array $options, string $text): string
+    {
+        if (str_contains($text, 'temps plein')) {
+            return in_array('Temps plein', $options, true) ? 'Temps plein' : '';
+        }
+
+        if (preg_match('/\b(\d+)\s*jours?\b/i', $text, $matches) === 1) {
+            $days = (int) ($matches[1] ?? 0);
+            foreach ($options as $option) {
+                if (str_contains(strtolower($option), (string) $days)) {
+                    return $option;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    private function extractWeekDays(string $text): string
+    {
+        $days = [];
+        $map = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+        foreach ($map as $day) {
+            if (str_contains($text, $day)) {
+                $days[] = ucfirst($day);
+            }
+        }
+
+        return implode(', ', $days);
+    }
+
+    private function extractTimeWindow(string $text, string $key): string
+    {
+        preg_match_all('/\b(\d{1,2}[:h]\d{2}|\d{1,2}h)\b/i', $text, $matches);
+        $times = array_values(array_unique(array_map(static fn($t) => str_replace('h', ':', strtolower((string) $t)), $matches[1] ?? [])));
+
+        if ([] === $times) {
+            return '';
+        }
+
+        return match ($key) {
+            'heureDebut' => $times[0] ?? '',
+            'heureFin' => $times[1] ?? '',
+            'horairesActuels', 'horairesSouhaites' => implode(' - ', array_slice($times, 0, 2)),
+            default => '',
+        };
+    }
+
+    private function extractObjectDescription(string $text): string
+    {
+        return trim($text);
+    }
+
+    private function extractAccessZones(string $text): string
+    {
+        if (preg_match('/(?:zone|zones|acces a|acc[èe]s a)\s*[:\-]?\s*([A-Za-z0-9À-ÿ\'\-\s,]{3,100})/iu', $text, $matches) === 1) {
+            return trim((string) ($matches[1] ?? ''));
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<int, string> $dates
+     * @param array<int, string> $options
+     */
+    private function inferGenericFieldValue(
+        string $key,
+        string $type,
+        string $label,
+        array $options,
+        string $text,
+        string $normalizedText,
+        array $dates,
+        ?float $amount,
+        string $location
+    ): string {
+        if ('date' === $type) {
+            return $dates[0] ?? '';
+        }
+
+        if ('number' === $type) {
+            if (null !== $amount && (str_contains(strtolower($key), 'montant') || str_contains(strtolower($label), 'cout'))) {
+                return (string) $amount;
+            }
+
+            return $this->extractFirstInteger($normalizedText);
+        }
+
+        if ('location' === $type) {
+            return $location;
+        }
+
+        if ('select' === $type) {
+            foreach ($options as $option) {
+                if (str_contains($normalizedText, strtolower($option))) {
+                    return $option;
+                }
+            }
+        }
+
+        if ('textarea' === $type) {
+            return $text;
+        }
+
+        if ('text' === $type && !str_contains(strtolower($key), 'email') && !str_contains(strtolower($key), 'telephone')) {
+            return '';
+        }
+
+        return '';
     }
 }
