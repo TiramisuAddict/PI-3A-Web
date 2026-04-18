@@ -219,7 +219,15 @@
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function () {
+    function initSidebarInteractions() {
+      var sidebarRoot = document.currentScript ? document.currentScript.closest('aside') : document.querySelector('aside');
+      if (sidebarRoot && sidebarRoot.dataset.sidebarInitialized === 'true') {
+        return;
+      }
+      if (sidebarRoot) {
+        sidebarRoot.dataset.sidebarInitialized = 'true';
+      }
+
       // Auto-submit filter form
       var filterForm = document.getElementById('sidebar-project-filter-form');
       if (filterForm) {
@@ -264,7 +272,10 @@
           modal.show();
         });
       });
-    });
+    }
+
+    document.addEventListener('DOMContentLoaded', initSidebarInteractions);
+    document.addEventListener('turbo:load', initSidebarInteractions);
   </script>
   {% endif %}
 </aside>
