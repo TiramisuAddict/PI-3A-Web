@@ -49,17 +49,18 @@ class CalendarSubscriber implements EventSubscriberInterface
 
         $taches = $qb->getQuery()->getResult();
 
+        // Couleurs alignées sur la palette Tabler
         $statusColors = [
-            'A_FAIRE'  => '#97979f',
-            'EN_COURS' => '#2563eb',
-            'BLOCQUEE' => '#ef4444',
-            'TERMINEE' => '#16a34a',
+            'A_FAIRE'  => '#667382', // tblr-secondary
+            'EN_COURS' => '#4263eb', // tblr-primary
+            'BLOCQUEE' => '#d63939', // tblr-danger
+            'TERMINEE' => '#2fb344', // tblr-success
         ];
 
         $priorityColors = [
-            'HAUTE'   => '#ef4444',
-            'MOYENNE' => '#f59e0b',
-            'BASSE'   => '#22c55e',
+            'HAUTE'   => '#d63939', // tblr-danger
+            'MOYENNE' => '#f76707', // tblr-orange/warning
+            'BASSE'   => '#2fb344', // tblr-success
         ];
 
         foreach ($taches as $tache) {

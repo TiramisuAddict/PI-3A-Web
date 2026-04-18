@@ -345,7 +345,14 @@
             const data = await resp.json();
 
             if (!resp.ok || !data.ok) {
-                setStatus('Erreur : ' + (data.message ?? 'Impossible de générer la description.'), 'error');
+                const msg = data.message ?? 'Impossible de générer la description.';
+                const isRateLimit = msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('dépassé');
+                setStatus(
+                    isRateLimit
+                        ? 'Quota IA momentanément dépassé — réessayez dans quelques secondes.'
+                        : 'Erreur : ' + msg,
+                    'error'
+                );
                 return;
             }
 

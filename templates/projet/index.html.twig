@@ -262,14 +262,23 @@
             color: var(--tblr-primary);
         }
 
-        /* ── FullCalendar tweaks ── */
+        /* ── FullCalendar — style Tabler ── */
         #calendar-holder {
             min-height: 500px;
         }
-        .fc .fc-toolbar-title {
-            font-size: 1.1rem;
-            font-weight: 700;
+
+        /* Toolbar */
+        .fc .fc-toolbar {
+            padding-bottom: 0.75rem;
+            margin-bottom: 0 !important;
+            border-bottom: 1px solid var(--tblr-border-color);
         }
+        .fc .fc-toolbar-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--tblr-body-color);
+        }
+
         /* Boutons toolbar */
         .fc .fc-button,
         .fc .fc-button-primary {
@@ -285,7 +294,7 @@
         }
         .fc .fc-button:hover,
         .fc .fc-button-primary:hover {
-            background-color: rgba(74,93,239,.08) !important;
+            background-color: rgba(var(--tblr-primary-rgb), .08) !important;
             border-color: var(--tblr-primary) !important;
             color: var(--tblr-primary) !important;
         }
@@ -299,6 +308,65 @@
         .fc .fc-button-primary:focus {
             box-shadow: none !important;
         }
+
+        /* En-tête jours de la semaine */
+        .fc .fc-col-header {
+            background: var(--tblr-bg-surface-secondary, #f6f8fb);
+        }
+        .fc .fc-col-header-cell {
+            padding: 6px 0;
+            border-color: var(--tblr-border-color);
+        }
+        .fc .fc-col-header-cell-cushion {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: var(--tblr-secondary-color, #667382);
+            text-decoration: none;
+        }
+
+        /* Grille */
+        .fc td, .fc th {
+            border-color: var(--tblr-border-color);
+        }
+
+        /* Week-end : légère teinte grise */
+        .fc .fc-day-sat,
+        .fc .fc-day-sun {
+            background: rgba(var(--tblr-secondary-rgb, 103,114,130), .04);
+        }
+
+        /* Jours hors du mois courant */
+        .fc .fc-day-other .fc-daygrid-day-number {
+            color: var(--tblr-muted-color, #adb5bd);
+            font-weight: 400;
+        }
+
+        /* Numéro de jour */
+        .fc .fc-daygrid-day-number {
+            font-size: 13px;
+            color: var(--tblr-secondary-color, #667382);
+            font-weight: 600;
+            padding: 4px 8px;
+        }
+
+        /* Aujourd'hui */
+        .fc .fc-day-today {
+            background: rgba(var(--tblr-primary-rgb), .04) !important;
+        }
+        .fc .fc-day-today .fc-daygrid-day-number {
+            background: var(--tblr-primary);
+            color: #fff;
+            border-radius: 6px;
+            width: 26px;
+            height: 26px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
         /* Bouton + ajouter tâche sur les cellules */
         .fc-daygrid-day:not(.fc-day-other) .fc-daygrid-day-top {
             flex-direction: row;
@@ -313,7 +381,7 @@
             height: 20px;
             border-radius: 4px;
             border: none;
-            background: rgba(74,93,239,.1);
+            background: rgba(var(--tblr-primary-rgb), .1);
             color: var(--tblr-primary);
             font-size: 14px;
             font-weight: 700;
@@ -330,12 +398,19 @@
             background: var(--tblr-primary);
             color: #fff;
         }
+
+        /* Événements */
         .fc .fc-daygrid-event {
             border-radius: 4px;
             font-size: 12px;
-            padding: 1px 5px;
-            border: none;
-            margin-bottom: 1px;
+            padding: 1px 6px 1px 8px;
+            /* Garde uniquement la bordure gauche (indicateur priorité) */
+            border-top: none !important;
+            border-right: none !important;
+            border-bottom: none !important;
+            border-left-width: 3px !important;
+            border-left-style: solid !important;
+            margin-bottom: 2px;
         }
         .fc .fc-daygrid-event .fc-event-title {
             font-weight: 500;
@@ -343,40 +418,101 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        .fc .fc-daygrid-event-dot {
-            display: none;
+        .fc .fc-daygrid-event-dot { display: none; }
+        .fc .fc-event-time         { display: none !important; }
+        /* Légende statuts sous le calendrier */
+        .fc-status-legend {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            font-size: 12px;
+            color: var(--tblr-secondary-color, #667382);
         }
-        .fc .fc-event-time {
-            display: none !important;
+        .fc-status-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
-        .fc td, .fc th {
+        .fc-status-legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        /* Vue liste (listWeek) */
+        .fc .fc-list {
+            border: 1px solid var(--tblr-border-color);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .fc .fc-list-day th {
+            background: var(--tblr-bg-surface-secondary, #f6f8fb) !important;
             border-color: var(--tblr-border-color);
         }
-        .fc .fc-daygrid-day-number {
-            font-size: 13px;
-            color: var(--tblr-secondary-color, #667382);
-            font-weight: 600;
+        .fc .fc-list-day-cushion {
+            padding: 6px 12px;
         }
-        .fc .fc-day-today {
-            background: rgba(74,93,239,.04) !important;
-        }
-        .fc .fc-day-today .fc-daygrid-day-number {
-            background: var(--tblr-primary);
-            color: #fff;
-            border-radius: 6px;
-            width: 26px;
-            height: 26px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .fc .fc-col-header-cell-cushion {
+        .fc .fc-list-day-text,
+        .fc .fc-list-day-side-text {
             font-size: 12px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: .04em;
-            color: var(--tblr-secondary-color, #667382);
+            text-decoration: none !important;
+            color: var(--tblr-secondary-color, #667382) !important;
+        }
+        .fc .fc-list-event td {
+            border-color: var(--tblr-border-color);
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        .fc .fc-list-event:hover td {
+            background: rgba(var(--tblr-primary-rgb), .05) !important;
+            cursor: pointer;
+        }
+        .fc .fc-list-event-title a {
+            color: var(--tblr-body-color) !important;
             text-decoration: none;
+            font-weight: 500;
+        }
+        .fc .fc-list-event-dot {
+            border-width: 8px;
+            border-radius: 4px;
+        }
+        .fc .fc-list-empty {
+            background: var(--tblr-bg-surface-secondary, #f6f8fb);
+            font-size: 13px;
+            color: var(--tblr-secondary-color, #667382);
+            min-height: 120px;
+        }
+        .fc .fc-list-empty-cushion {
+            margin: 2em 0;
+        }
+
+        /* Vue semaine (timeGrid) */
+        .fc .fc-timegrid-slot {
+            height: 2rem;
+            border-color: var(--tblr-border-color);
+        }
+        .fc .fc-timegrid-slot-label-cushion {
+            font-size: 11px;
+            color: var(--tblr-secondary-color, #667382);
+        }
+        .fc .fc-timegrid-now-indicator-line {
+            border-color: var(--tblr-danger, #d63939);
+        }
+        .fc .fc-timegrid-now-indicator-arrow {
+            border-top-color: var(--tblr-danger, #d63939);
+            border-bottom-color: var(--tblr-danger, #d63939);
+        }
+
+        /* Scrollbar fine */
+        .fc .fc-scroller::-webkit-scrollbar { width: 4px; height: 4px; }
+        .fc .fc-scroller::-webkit-scrollbar-thumb {
+            background: var(--tblr-border-color);
+            border-radius: 4px;
         }
     </style>
 {% endblock %}
@@ -613,6 +749,28 @@
                     <div class="card">
                         <div class="card-body">
                             <div id="calendar-holder"></div>
+                            <div class="fc-status-legend mt-2">
+                                <span class="fc-status-legend-item">
+                                    <span class="fc-status-legend-dot" style="background:#667382;"></span>À faire
+                                </span>
+                                <span class="fc-status-legend-item">
+                                    <span class="fc-status-legend-dot" style="background:#4263eb;"></span>En cours
+                                </span>
+                                <span class="fc-status-legend-item">
+                                    <span class="fc-status-legend-dot" style="background:#d63939;"></span>Bloquée
+                                </span>
+                                <span class="fc-status-legend-item">
+                                    <span class="fc-status-legend-dot" style="background:#2fb344;"></span>Terminée
+                                </span>
+                                <span class="ms-3 fc-status-legend-item text-muted" style="border-left:1px solid var(--tblr-border-color);padding-left:12px;">
+                                    <i class="ti ti-info-circle me-1"></i>Bordure gauche = priorité
+                                    <span style="display:inline-flex;gap:4px;margin-left:4px;">
+                                        <span style="width:3px;height:14px;background:#d63939;border-radius:2px;"></span>Haute
+                                        <span style="width:3px;height:14px;background:#f76707;border-radius:2px;margin-left:6px;"></span>Moyenne
+                                        <span style="width:3px;height:14px;background:#2fb344;border-radius:2px;margin-left:6px;"></span>Basse
+                                    </span>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
