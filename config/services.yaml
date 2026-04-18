@@ -26,3 +26,9 @@ services:
     App\Service\GeminiService:
         arguments:
             $apiKey: '%env(GEMINI_API_KEY)%'
+
+    App\Services\CvExtractionService:
+        arguments:
+            $groqApiUrl: '%env(GROQ_API_URL)%'
+            $groqApiKey: '%env(GROQ_API_KEY)%'
+            $groqModel: '%env(GROQ_MODEL)%'

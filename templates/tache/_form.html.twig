@@ -105,7 +105,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="ti ti-brain me-2 text-info"></i>Équilibrage de charge — Équipe projet
+                    <i class="ti ti-brain me-2 text-info"></i>Suggestion d'assignation — Compétences &amp; charge
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
@@ -134,7 +134,8 @@
                                 <tr>
                                     <th>Employé</th>
                                     <th class="text-center">Disponibilité</th>
-                                    <th class="text-center">Score</th>
+                                    <th class="text-center">Compétences</th>
+                                    <th class="text-center">Score charge</th>
                                     <th class="text-center">Tâches actives</th>
                                     <th class="text-center">Urgentes</th>
                                     <th></th>
@@ -183,6 +184,14 @@
         return map[status] ?? 'bg-secondary-lt';
     }
 
+    function skillsBadgeClass(score) {
+        if (score === null || score === undefined) { return 'bg-secondary-lt text-muted'; }
+        if (score >= 70) { return 'bg-success-lt text-success'; }
+        if (score >= 40) { return 'bg-info-lt text-info'; }
+        if (score >= 20) { return 'bg-warning-lt text-warning'; }
+        return 'bg-secondary-lt text-muted';
+    }
+
     function applyEmployee(id) {
         for (let i = 0; i < selectEmploye.options.length; i++) {
             if (parseInt(selectEmploye.options[i].value, 10) === id) {
@@ -197,7 +206,13 @@
         showState('loading');
         getModal().show();
 
-        const url = btnSuggest.dataset.workloadUrl;
+        const titreEl = document.getElementById('tache_titre');
+        const descEl  = document.getElementById('tache_description');
+        const params  = new URLSearchParams();
+        if (titreEl && titreEl.value.trim()) { params.set('titre', titreEl.value.trim()); }
+        if (descEl  && descEl.value.trim())  { params.set('description', descEl.value.trim()); }
+        const baseUrl = btnSuggest.dataset.workloadUrl;
+        const url     = params.toString() ? baseUrl + '?' + params.toString() : baseUrl;
         let data;
         try {
             const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -224,7 +239,10 @@
         // Populate suggestion banner
         if (data.suggestion) {
             const s = data.suggestion;
-            suggNameEl.textContent  = s.statusLabel + '  ' + s.prenom + ' ' + s.nom + ' — suggéré';
+            const skillsInfo = (s.skillsScore !== null && s.skillsScore !== undefined)
+                ? ' · Compétences : ' + (s.skillsLabel ?? '') + ' (' + s.skillsScore + '%)'
+                : '';
+            suggNameEl.textContent  = s.statusLabel + '  ' + s.prenom + ' ' + s.nom + skillsInfo + ' — suggéré';
             suggReasonEl.textContent = s.reason;
         }
 
@@ -243,6 +261,9 @@
                     '<strong>' + escHtml(emp.prenom + ' ' + emp.nom) + '</strong>',
                 '</td>',
                 '<td class="text-center"><span class="badge ' + statusBadgeClass(emp.status) + '">' + escHtml(emp.statusLabel) + '</span></td>',
+                '<td class="text-center">' + (emp.skillsScore !== null && emp.skillsScore !== undefined
+                    ? '<span class="badge ' + skillsBadgeClass(emp.skillsScore) + '">' + escHtml(emp.skillsLabel ?? '') + ' (' + emp.skillsScore + '%)</span>'
+                    : '<span class="text-muted">—</span>') + '</td>',
                 '<td class="text-center fw-bold">' + emp.score + '</td>',
                 '<td class="text-center">' + emp.activeTasks + '</td>',
                 '<td class="text-center">' + (emp.urgentTasks > 0 ? '<span class="badge bg-danger-lt text-danger">' + emp.urgentTasks + '</span>' : '0') + '</td>',

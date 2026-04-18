@@ -51,7 +51,7 @@ final class AdminController extends AbstractController
                     $em->persist($employe);
                     $compte = new Compte();
                     $compte->setMot_de_passe($passwordGenerator->generate());
-                    $compte->setEmployé($employe);
+                    $compte->setEmploye($employe);
 
                     $em->persist($compte);
                 } elseif ($action === 'refuser') {

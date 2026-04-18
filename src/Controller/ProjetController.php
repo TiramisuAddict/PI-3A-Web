@@ -21,6 +21,9 @@ use Symfony\UX\Chartjs\Builder\ChartBuilderInterface;
 use Symfony\UX\Chartjs\Model\Chart;
 use App\Service\GeminiService;
 use App\Service\TaskNotificationService;
+use App\Repository\CompetenceEmployeRepository;
+use App\Service\GoogleCalendarService;
+use App\Service\GoogleTokenSessionService;
 
 
 #[Route('/projet')]
@@ -213,7 +216,7 @@ final class ProjetController extends AbstractController
         }
 
         $projet = new Projet();
-        $choices = $this->buildEmployeChoices($employeRepository);
+        $choices = $this->buildEmployeChoices($employeRepository, $rbac['currentEmploye']);
         $form = $this->createForm(ProjetType::class, $projet, [
             'chef_projets_choices' => $choices['chefProjets'],
             'membres_choices' => $choices['membres'],
@@ -265,7 +268,7 @@ final class ProjetController extends AbstractController
             throw $this->createAccessDeniedException('Acces refuse.');
         }
 
-        $choices = $this->buildEmployeChoices($employeRepository);
+        $choices = $this->buildEmployeChoices($employeRepository, $rbac['currentEmploye']);
         $form = $this->createForm(ProjetType::class, $projet, [
             'chef_projets_choices' => $choices['chefProjets'],
             'membres_choices' => $choices['membres'],
@@ -559,11 +562,50 @@ final class ProjetController extends AbstractController
     }
 
     /**
+     * Normalises text and returns a lowercased, stopword-filtered string for comparison.
+     */
+    private function tokenizeSkills(string $text): string
+    {
+        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = mb_strtolower($text, 'UTF-8');
+        $text = (string) preg_replace('/[^\pL\pN+#\s]/u', ' ', $text);
+        $text = (string) preg_replace('/\s+/u', ' ', $text);
+        return trim($text);
+    }
+
+    /**
+     * Converts a normalised string into a set of unique keyword tokens (stopwords removed).
+     *
+     * @return array<string, true>
+     */
+    private function buildTokenSet(string $text): array
+    {
+        static $stopwords = ['le','la','les','de','du','des','un','une','et','en',
+            'au','aux','ce','se','sa','son','ses','je','tu','il','elle','nous',
+            'vous','ils','elles','par','sur','sous','dans','avec','pour','que',
+            'qui','est','sont','pas','plus','ou','on','mais','donc','ni','car',
+            'the','a','an','of','to','in','is','are','for','and','or','not',
+            'be','it','at','by','this','that','was','with','as'];
+
+        $words = (array) preg_split('/\s+/u', trim($text), -1, PREG_SPLIT_NO_EMPTY);
+        $tokens = [];
+        foreach ($words as $word) {
+            if (mb_strlen((string) $word) >= 2 && !in_array($word, $stopwords, true)) {
+                $tokens[(string) $word] = true;
+            }
+        }
+        return $tokens;
+    }
+
+    /**
      * @return array{chefProjets: array<int, \App\Entity\Employe>, membres: array<int, \App\Entity\Employe>}
      */
-    private function buildEmployeChoices(EmployeRepository $employeRepository): array
+    private function buildEmployeChoices(EmployeRepository $employeRepository, ?Employe $currentEmploye = null): array
     {
-        $employes = $employeRepository->findAll();
+        $entreprise = $currentEmploye?->getEntreprise();
+        $employes = $entreprise !== null
+            ? $employeRepository->findByEntrepriseAndFilters($entreprise, null, null)
+            : $employeRepository->findAll();
 
         usort($employes, static function ($a, $b): int {
             $nomA = mb_strtolower((string) $a->getNom());
@@ -648,7 +690,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/workload', name: 'app_projet_workload', methods: ['GET'])]
-    public function workloadAnalysis(Projet $projet, SessionInterface $session, EmployeRepository $employeRepository): JsonResponse
+    public function workloadAnalysis(Projet $projet, Request $request, SessionInterface $session, EmployeRepository $employeRepository, CompetenceEmployeRepository $competenceRepo): JsonResponse
     {
         $rbac = $this->buildRbacContext($session, $employeRepository);
 
@@ -656,8 +698,17 @@ final class ProjetController extends AbstractController
             return $this->json(['ok' => false, 'message' => 'Acces refuse.'], Response::HTTP_FORBIDDEN);
         }
 
-        $today = new \DateTime('today');
-        $results = [];
+        // Build task text for skills matching from optional query params
+        $titre       = trim((string) $request->query->get('titre', ''));
+        $description = trim((string) $request->query->get('description', ''));
+        $taskText    = '';
+        if ($titre !== '' || $description !== '') {
+            $taskText = $this->tokenizeSkills($titre . ' ' . $description);
+        }
+
+        $today           = new \DateTime('today');
+        $results         = [];
+        $competenceTexts = [];
 
         foreach ($projet->getMembresEquipe() as $employe) {
             $score = 0.0;
@@ -721,6 +772,21 @@ final class ProjetController extends AbstractController
                 $dot = '🟢';
             }
 
+            // Read competence profile directly from the database
+            $competence  = $competenceRepo->findOneBy(['employe' => $employe]);
+            $profileText = '';
+            if ($competence !== null) {
+                $parts = array_filter([
+                    $competence->getSkills()     ?? '',
+                    $competence->getFormations() ?? '',
+                    $competence->getExperience() ?? '',
+                ], static fn (string $p): bool => trim($p) !== '');
+                if ($parts !== []) {
+                    $profileText = $this->tokenizeSkills(implode(' ', $parts));
+                }
+            }
+            $competenceTexts[] = $profileText;
+
             $results[] = [
                 'id'          => $employe->getId_employe(),
                 'nom'         => $employe->getNom(),
@@ -730,17 +796,55 @@ final class ProjetController extends AbstractController
                 'urgentTasks' => $urgentCount,
                 'status'      => $status,
                 'statusLabel' => $dot . ' ' . $statusLabel,
+                'skillsScore' => null,
+                'skillsLabel' => null,
             ];
         }
 
-        // Sort ascending: lowest score = most available
-        usort($results, static fn (array $a, array $b): int => $a['score'] <=> $b['score']);
+        // Skills matching: Dice coefficient between task keywords and employee profile keywords
+        $hasSkillsData = $taskText !== '' && array_filter($competenceTexts, static fn (string $t): bool => $t !== '') !== [];
+        if ($hasSkillsData) {
+            $sourceTokens = $this->buildTokenSet($taskText);
+            foreach ($results as $i => $row) {
+                $raw = 0.0;
+                if ($competenceTexts[$i] !== '') {
+                    $targetTokens = $this->buildTokenSet($competenceTexts[$i]);
+                    $intersection = count(array_intersect_key($sourceTokens, $targetTokens));
+                    $raw = ($intersection > 0)
+                        ? (2.0 * $intersection) / (count($sourceTokens) + count($targetTokens))
+                        : 0.0;
+                }
+                $pct = (int) round($raw * 100);
+                $results[$i]['skillsScore'] = $pct;
+                $results[$i]['skillsLabel'] = match (true) {
+                    $pct >= 70 => 'Excellent',
+                    $pct >= 40 => 'Bon',
+                    $pct >= 20 => 'Partiel',
+                    default    => 'Faible',
+                };
+            }
+            // Combined ranking: skills match (primary) + availability (modifier)
+            usort($results, static function (array $a, array $b): int {
+                $aRank = ($a['skillsScore'] / 10.0) - ($a['score'] * 0.5);
+                $bRank = ($b['skillsScore'] / 10.0) - ($b['score'] * 0.5);
+                return $bRank <=> $aRank;
+            });
+        } else {
+            // Sort ascending: lowest workload score = most available
+            usort($results, static fn (array $a, array $b): int => $a['score'] <=> $b['score']);
+        }
 
         // Build the top suggestion with a human-readable reason
         $suggestion = null;
         if (!empty($results)) {
             $top = $results[0];
-            if ($top['activeTasks'] === 0) {
+            if ($hasSkillsData && $top['skillsScore'] !== null) {
+                $reason = sprintf(
+                    'Meilleure correspondance compétences (%d%%) avec un score de charge de %.1f.',
+                    $top['skillsScore'],
+                    $top['score']
+                );
+            } elseif ($top['activeTasks'] === 0) {
                 $reason = 'Aucune tâche active — complètement disponible.';
             } elseif ($top['status'] === 'disponible') {
                 $reason = sprintf(
@@ -804,5 +908,115 @@ final class ProjetController extends AbstractController
         $normalizedRole = mb_strtolower(trim((string) $role));
 
         return in_array($normalizedRole, ['chef projet', 'chef_projet', 'chefprojet', 'responsable'], true);
+    }
+
+    // ── Google Calendar sync ──────────────────────────────────────────────────
+
+    /**
+     * Returns the list of projects the logged-in employee belongs to (as member or responsable).
+     * Used to populate the project picker in the sync modal.
+     */
+    #[Route('/calendar/projects', name: 'app_calendar_projects', methods: ['GET'])]
+    public function calendarProjects(SessionInterface $session, EmployeRepository $employeRepository): JsonResponse
+    {
+        $employe = $this->resolveCurrentEmploye($session, $employeRepository);
+        if ($employe === null) {
+            return $this->json(['ok' => false, 'message' => 'Non connecté.'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $projects = [];
+
+        foreach ($employe->getProjetsEquipe() as $projet) {
+            $projects[] = ['id' => $projet->getIdProjet(), 'nom' => $projet->getNom()];
+        }
+
+        foreach ($employe->getProjetsResponsables() as $projet) {
+            // avoid duplicates
+            $ids = array_column($projects, 'id');
+            if (!in_array($projet->getIdProjet(), $ids, true)) {
+                $projects[] = ['id' => $projet->getIdProjet(), 'nom' => $projet->getNom()];
+            }
+        }
+
+        usort($projects, static fn (array $a, array $b): int => $a['nom'] <=> $b['nom']);
+
+        return $this->json(['ok' => true, 'projects' => $projects]);
+    }
+
+    /**
+     * Syncs the authenticated employee's tasks in the given project to Google Calendar.
+     */
+    #[Route('/calendar/sync/{id_projet}', name: 'app_calendar_sync', methods: ['POST'])]
+    public function syncToCalendar(
+        Projet $projet,
+        SessionInterface $session,
+        EmployeRepository $employeRepository,
+        GoogleCalendarService $calendarService,
+        GoogleTokenSessionService $googleToken
+    ): JsonResponse {
+        $employe = $this->resolveCurrentEmploye($session, $employeRepository);
+        if ($employe === null) {
+            return $this->json(['ok' => false, 'message' => 'Non connecté.'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$googleToken->isLinked()) {
+            return $this->json(['ok' => false, 'message' => 'Compte Google non lié.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $synced  = [];
+        $skipped = [];
+
+        foreach ($employe->getTaches() as $tache) {
+            if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
+                continue;
+            }
+
+            $dateDebut  = $tache->getDateDeb();
+            $dateLimite = $tache->getDateLimite();
+
+            if ($dateDebut === null || $dateLimite === null) {
+                $skipped[] = $tache->getTitre();
+                continue;
+            }
+
+            // Use start-of-day for date-only fields so the Calendar API gets a valid dateTime
+            $start = \DateTime::createFromInterface($dateDebut)->setTime(8, 0, 0);
+            $end   = \DateTime::createFromInterface($dateLimite)->setTime(18, 0, 0);
+
+            $prioriteLabel = match ($tache->getPriorite()) {
+                Tache::PRIORITE_HAUTE   => '🔴 Haute',
+                Tache::PRIORITE_MOYENNE => '🟡 Moyenne',
+                Tache::PRIORITE_BASSE   => '🟢 Basse',
+                default                 => $tache->getPriorite() ?? '',
+            };
+
+            $description = sprintf(
+                "Projet : %s\nPriorité : %s\nStatut : %s\n\n%s",
+                $projet->getNom(),
+                $prioriteLabel,
+                $tache->getStatutTache() ?? '',
+                $tache->getDescription() ?? ''
+            );
+
+            try {
+                $event = $calendarService->createEvent(
+                    '[' . $projet->getNom() . '] ' . ($tache->getTitre() ?? ''),
+                    $start,
+                    $end,
+                    'primary',
+                    'Africa/Tunis',
+                    $description
+                );
+                $synced[] = ['titre' => $tache->getTitre(), 'link' => $event['htmlLink']];
+            } catch (\Throwable $e) {
+                $skipped[] = $tache->getTitre();
+            }
+        }
+
+        return $this->json([
+            'ok'      => true,
+            'synced'  => $synced,
+            'skipped' => $skipped,
+        ]);
     }
 }

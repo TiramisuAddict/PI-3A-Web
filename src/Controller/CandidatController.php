@@ -3,6 +3,8 @@
 namespace App\Controller;
 
 use App\Entity\Candidat;
+use App\Entity\Offre;
+
 use App\Form\PostulerType;
 use App\Repository\CandidatRepository;
 use App\Repository\OffreRepository;
@@ -15,8 +17,9 @@ use Symfony\Component\Routing\Attribute\Route;
 
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 
-
 use App\Form\CandidatType;
+use App\Service\GoogleMeetService;
+use App\Service\GoogleTokenSessionService;
 
 final class CandidatController extends AbstractController
 {
@@ -252,5 +255,108 @@ final class CandidatController extends AbstractController
         ]);
     }
 
-    #
+    #[Route('/candidats/matching/oid={offreId}', name: 'app_candidature_matching', methods: ['GET'])]
+    public function contextMatching(ManagerRegistry $doctrine, int $offreId, Request $request): Response {
+        $entityManager = $doctrine->getManager();
+        $matchingService = new \App\Service\ContextMatchingService();
+        
+        $numberOfWantedCandidats = $request->query->getInt('numberOfWantedCandidats', 10000);
+        if ($numberOfWantedCandidats <= 0) { $numberOfWantedCandidats = 10000; }
+        $i = 0;
+
+        $offre = $doctrine->getRepository(Offre::class)->find($offreId);
+
+        $offreDescription = $offre->getDescription();
+        $processedOffreDescription = $matchingService->preprocessRichText($offreDescription);
+
+        $offreCandidats = $offre->getCandidats();
+        foreach ($offreCandidats as $candidat){
+            $pdfcontent = $candidat->getCvData();
+            $textFromPdf = $matchingService->extractTextFromPDF($pdfcontent);
+            
+            $matchingResult = $matchingService->match($processedOffreDescription, $textFromPdf);
+            $candidat->setScore($matchingResult);
+            
+            if ($matchingResult >= 0.4 && $i < $numberOfWantedCandidats) {
+                $candidat->setEtat("Présélectionné");
+                $i++;
+            } else {
+                $candidat->setEtat("Refusé");
+            }
+        
+            $entityManager->persist($candidat);
+        }
+        $entityManager->flush();
+        
+        $this->addFlash('success', $i . ' candidat(s) présélectionné(s).');
+        return $this->redirectToRoute('app_candidat_dashboard', ['offreId' => $offreId]);
+    }
+
+    #[Route('/candidats/meeting/create', name: 'app_candidature_create_meeting', methods: ['POST'])]
+    public function createMeeting(Request $request, ManagerRegistry $doctrine, GoogleMeetService $googleMeetService, GoogleTokenSessionService $GoogleTokenSessionService): Response {   
+        
+        if (!$GoogleTokenSessionService->isLinked()) {
+            $this->addFlash('error', 'Vous devez lier un compte Google pour créer une réunion Meet.');
+            return $this->redirectToRoute('app_candidat_dashboard');
+        }
+
+        $offreId = $request->request->getInt('offreId', 0);
+        $candidatId = $request->request->getInt('candidatId', 0);
+        $meetingDate = trim((string) $request->request->get('meetingDate', ''));
+        $meetingTime = trim((string) $request->request->get('meetingTime', ''));
+
+        $entityManager = $doctrine->getManager();
+        $candidat = $doctrine->getRepository(Candidat::class)->find($candidatId);
+
+        $start = \DateTimeImmutable::createFromFormat('Y-m-d H:i', $meetingDate . ' ' . $meetingTime, new \DateTimeZone('Europe/Paris'));
+        $end = $start->modify('+1 hour');
+
+        try {
+            $candidateName = trim(($candidat->getVisiteur()?->getNom() ?? '') . ' ' . ($candidat->getVisiteur()?->getPrenom() ?? ''));
+            $visitorEmail = $candidat->getVisiteur()?->getEMail();
+            $meeting = $googleMeetService->createMeetEvent(
+                'Entretien candidat - ' . ($candidateName !== '' ? $candidateName : 'Momentum'),
+                $start,
+                $end,
+                'primary',
+                'Europe/Paris',
+                'Entretien de recrutement',
+                $visitorEmail
+            );
+
+            if (!$this->appendMeetingLinkToCandidateNote($candidat, $meeting, $visitorEmail)) {
+                $this->addFlash('error', 'Réunion créée sans lien exploitable.');
+                return $this->redirectToRoute('app_candidat_dashboard', ['offreId' => $offreId, 'candidatId' => $candidatId]);
+            }
+
+            $entityManager->persist($candidat);
+            $entityManager->flush();
+
+            $this->addFlash('success', 'Lien Meet ajouté à la note du candidat.');
+        } catch (\Throwable $e) {
+            $this->addFlash('error', 'Impossible de créer la réunion Meet pour le moment.');
+        }
+
+        return $this->redirectToRoute('app_candidat_dashboard', ['offreId' => $offreId, 'candidatId' => $candidatId]);
+    }
+
+    private function appendMeetingLinkToCandidateNote(Candidat $candidat, array $meeting, ?string $visitorEmail): bool {
+        $meetingLink = is_string($meeting['meetLink'] ?? null) && $meeting['meetLink'] !== ''
+            ? $meeting['meetLink']
+            : (is_string($meeting['htmlLink'] ?? null) ? $meeting['htmlLink'] : '');
+
+        if ($meetingLink === '') { return false; }
+        
+        $existingNote = trim((string) ($candidat->getNote() ?? ''));
+        $line = sprintf(
+            'Meeting link [%s]: %s%s',
+            (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Paris')))->format('Y-m-d H:i'),
+            $meetingLink,
+            is_string($visitorEmail) && $visitorEmail !== '' ? ' | invite sent to ' . $visitorEmail : ''
+        );
+
+        $candidat->setNote($existingNote === '' ? $line : ($existingNote . PHP_EOL . $line));
+
+        return true;
+    }
 }

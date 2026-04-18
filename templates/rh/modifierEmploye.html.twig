@@ -1,0 +1,93 @@
+{% if employe_select is defined and employe_select %}
+<div class="modal fade {% if show_modifier is defined and show_modifier %}show{% endif %}"
+     id="editEmployeeModal"
+     tabindex="-1"
+     {% if show_modifier is defined and show_modifier %}style="display:block;"{% endif %}>
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header mt-3">
+        <div>
+          <h2 class="h2 modal-title">Modifier l'employé</h2>
+          <small class="text-muted">{{ employe_select.getPrenom() }} {{ employe_select.getNom() }}</small>
+        </div>
+        <a href="{{ path('RH_Home') }}" class="btn-close" aria-label="Fermer"></a>
+      </div>
+
+      <div class="modal-body p-4">
+        {% if employe_select.getRole() == 'administrateur entreprise' %}
+          <div class="alert alert-warning" role="alert">
+            <div class="d-flex gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon alert-icon icon-2"><path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636-2.87l-8.106-13.536a1.914 1.914 0 0 0-3.274 0z"/><path d="M12 16h.01"/></svg>
+              <div>
+                <h4 class="alert-heading">Modification impossible</h4>
+                <div class="alert-description">Le profil administrateur ne peut pas être modifié.</div>
+              </div>
+            </div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6"><div class="form-label small mb-1">Nom</div><div class="form-control form-control-sm bg-light">{{ employe_select.getNom() }}</div></div>
+            <div class="col-md-6"><div class="form-label small mb-1">Prénom</div><div class="form-control form-control-sm bg-light">{{ employe_select.getPrenom() }}</div></div>
+            <div class="col-md-6"><div class="form-label small mb-1">Email</div><div class="form-control form-control-sm bg-light">{{ employe_select.getEmail() }}</div></div>
+            <div class="col-md-6"><div class="form-label small mb-1">Téléphone</div><div class="form-control form-control-sm bg-light">{{ employe_select.getTelephone() }}</div></div>
+            <div class="col-md-6"><div class="form-label small mb-1">Poste</div><div class="form-control form-control-sm bg-light">{{ employe_select.getPoste() }}</div></div>
+            <div class="col-md-6"><div class="form-label small mb-1">Rôle</div><div class="form-control form-control-sm bg-light">{{ employe_select.getRole() }}</div></div>
+          </div>
+          <form method="POST" action="{{ path('employe_supprimer', {id: employe_select.getId_employe()}) }}" onsubmit="return confirm('Supprimer cet employé ?');" class="mt-3">
+            <button type="submit" class="btn btn-sm w-100 text-white bg-red p-2">Supprimer</button>
+          </form>
+        {% else %}
+          {{ form_start(form, {action: path('employe_details', {id: employe_select.getId_employe()}), method: 'POST', attr: {class: 'row g-0', novalidate: 'novalidate'}}) }}
+          {{ include('components/controleSaisieAlert.html.twig', {'form': form}) }}
+          <div class="row g-3">
+            <div class="col-md-6">
+              {{ form_label(form.nom, 'Nom', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.nom, {'attr': {'class': 'form-control', 'placeholder': 'Nom'}}) }}
+            </div>
+            <div class="col-md-6">
+              {{ form_label(form.prenom, 'Prénom', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.prenom, {'attr': {'class': 'form-control', 'placeholder': 'Prénom'}}) }}
+            </div>
+            <div class="col-md-6">
+              {{ form_label(form.e_mail, 'Email', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.e_mail, {'attr': {'class': 'form-control', 'placeholder': 'Email'}}) }}
+            </div>
+            <div class="col-md-6">
+              {{ form_label(form.telephone, 'Téléphone', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.telephone, {'attr': {'class': 'form-control', 'placeholder': 'Téléphone'}}) }}
+            </div>
+            <div class="col-md-6">
+              {{ form_label(form.poste, 'Poste', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.poste, {'attr': {'class': 'form-control', 'placeholder': 'Ex: Développeur, Manager...'}}) }}
+            </div>
+            <div class="col-md-6">
+              {{ form_label(form.role, 'Rôle', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.role, {'attr': {'class': 'form-select'}}) }}
+            </div>
+            <div class="col-md-6">
+              {{ form_label(form.date_embauche, "Date d'embauche", {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.date_embauche, {'attr': {'class': 'form-control'}}) }}
+            </div>
+            <div class="col-md-6">
+              {{ form_label(form.cv_data, 'CV (PDF)', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.cv_data, {'attr': {'class': 'form-control', 'accept': '.pdf,application/pdf'}}) }}
+              {% if employe_select.getCv_nom() %}
+                <div class="form-text">CV actuel: {{ employe_select.getCv_nom() }}</div>
+                <a href="{{ path('app_employe_download_cv', {id: employe_select.getId_employe()}) }}" class="btn btn-sm btn-outline-primary mt-2" target="_blank" rel="noopener">Telecharger CV</a>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="modal-footer bg-white px-0 pb-0 mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-sm text-white px-5 py-2" style="background:#4254D6;">Enregistrer</button>
+            {{ form_end(form) }}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if show_modifier is defined and show_modifier %}
+<div class="modal-backdrop fade show"></div>
+{% endif %}
+{% endif %}
