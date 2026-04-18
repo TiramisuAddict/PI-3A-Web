@@ -29,6 +29,21 @@ class DemandeAiAssistant
             throw new \RuntimeException('La cle API Hugging Face est manquante. Configurez HUGGINGFACE_API_KEY.');
         }
 
+        $typeDemande = trim((string) ($generalContext['typeDemande'] ?? 'Autre'));
+        if ('' !== $typeDemande && 'Autre' !== $typeDemande) {
+            throw new \RuntimeException('L assistant de generation de champs est reserve au type Autre.');
+        }
+
+        $sourceText = $this->firstNonEmpty(
+            trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+            trim((string) ($generalContext['description'] ?? '')),
+            trim((string) ($generalContext['titre'] ?? ''))
+        );
+
+        if ('' === $sourceText && [] === $currentDetails) {
+            throw new \RuntimeException('Ajoutez une description initiale avant de lancer la generation IA pour le type Autre.');
+        }
+
         $allowedKeys = [];
         $requiredKeys = [];
         $fieldLabels = [];
@@ -56,10 +71,12 @@ class DemandeAiAssistant
         $normalized = $this->normalizeSuggestions($parsed, $allowedKeys, $requiredKeys, $selectOptions, $currentDetails, $generalContext);
 
         return [
+            'correctedText' => $normalized['correctedText'],
             'generatedDescription' => $normalized['generatedDescription'],
             'suggestedGeneral' => $normalized['suggestedGeneral'],
             'suggestedDetails' => $normalized['suggestedDetails'],
             'dynamicFieldPlan' => $normalized['dynamicFieldPlan'],
+            'dynamicFieldConfidence' => $normalized['dynamicFieldConfidence'],
             'model' => $this->model,
         ];
     }
@@ -88,6 +105,35 @@ class DemandeAiAssistant
         $normalized['model'] = $this->model;
 
         return $normalized;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function generateDescriptionFromTitle(string $title, ?string $typeDemande = null, ?string $categorie = null): array
+    {
+        if ('' === trim($this->apiKey)) {
+            throw new \RuntimeException('La cle API Hugging Face est manquante. Configurez HUGGINGFACE_API_KEY.');
+        }
+
+        $normalizedTitle = trim($title);
+        if ('' === $normalizedTitle) {
+            throw new \RuntimeException('Ajoutez un titre avant de lancer la generation de description.');
+        }
+
+        $prompt = $this->buildDescriptionFromTitlePrompt($normalizedTitle, $typeDemande, $categorie);
+        $rawResponse = $this->callHuggingFace($prompt);
+        $parsed = $this->parseJsonResponse($rawResponse);
+
+        $description = trim((string) ($parsed['description'] ?? ''));
+        if ('' === $description) {
+            $description = 'Le collaborateur soumet une demande concernant : ' . $normalizedTitle . '.';
+        }
+
+        return [
+            'description' => $description,
+            'model' => $this->model,
+        ];
     }
 
     /**
@@ -291,6 +337,7 @@ class DemandeAiAssistant
         ];
 
         $rootSchemaExample = [
+            'correctedText' => 'Je souhaite une avance sur salaire pour une depense imprvue ce mois-ci.',
             'general' => [
                 'titre' => 'Avance sur salaire exceptionnelle',
                 'description' => 'Le collaborateur demande une avance sur salaire pour couvrir une depense urgente.',
@@ -308,6 +355,7 @@ class DemandeAiAssistant
                     'options' => [],
                 ],
             ],
+            'replace_base' => false,
         ];
 
         $optionalFieldKeys = [];
@@ -319,11 +367,12 @@ class DemandeAiAssistant
 
         return "Tu es un assistant RH/IT qui aide a rediger des demandes internes professionnelles en francais.\n"
             . "Renvoie STRICTEMENT un JSON valide, sans markdown, sans texte avant/apres.\n"
-            . "Tu dois renvoyer un objet JSON racine avec les cles: general, details, remove_fields, custom_fields.\n"
+            . "Tu dois renvoyer un objet JSON racine avec les cles: correctedText, general, details, remove_fields, custom_fields, replace_base.\n"
             . "Les cles details autorisees sont: " . json_encode(array_values($allowedKeys), JSON_UNESCAPED_UNICODE) . "\n"
             . "Cles details obligatoires: " . json_encode(array_values(array_filter($allowedKeys, fn($k) => !empty($requiredKeys[$k]))), JSON_UNESCAPED_UNICODE) . "\n"
             . "Cles details optionnelles supprimables: " . json_encode($optionalFieldKeys, JSON_UNESCAPED_UNICODE) . "\n"
             . "Contraintes:\n"
+            . "- correctedText: correction orthographique et grammaticale du userPromptAutre, ton professionnel, sens conserve.\n"
             . "- general.titre: phrase courte, professionnelle et precise.\n"
             . "- general.description: resume complet de la demande (2 a 5 lignes).\n"
             . "- general.priorite: uniquement HAUTE, NORMALE ou BASSE.\n"
@@ -334,7 +383,9 @@ class DemandeAiAssistant
             . "- pieceOuContexte: details complementaires utiles.\n"
             . "- remove_fields: tableau de cles optionnelles inutiles (jamais de champ obligatoire).\n"
             . "- custom_fields: 0 a 8 champs supplementaires utiles selon le texte employe.\n"
+            . "- Evite les champs generiques vagues (ex: objet/details) si aucune valeur metier concrete n est detectable.\n"
             . "- Chaque custom_field: key, label, type(text|textarea|select|number|date), required(boolean), value(string), options(array string pour select).\n"
+            . "- replace_base: booleen. false par defaut. Mets true uniquement si custom_fields couvre mieux le besoin et contient au moins 2 champs metier solides.\n"
             . "Libelles metiers des champs: " . json_encode($fieldLabels, JSON_UNESCAPED_UNICODE) . "\n"
             . "Contexte utilisateur: " . json_encode($context, JSON_UNESCAPED_UNICODE) . "\n"
             . "Exemple de forme attendue: " . json_encode($rootSchemaExample, JSON_UNESCAPED_UNICODE);
@@ -383,6 +434,26 @@ class DemandeAiAssistant
             . "- description: 1 a 3 phrases propres, sans inventer des details absents.\n"
             . "- confidence: nombre entre 0 et 1.\n"
             . "Texte utilisateur brut: " . json_encode($rawText, JSON_UNESCAPED_UNICODE) . "\n"
+            . "Exemple attendu: " . json_encode($example, JSON_UNESCAPED_UNICODE);
+    }
+
+    private function buildDescriptionFromTitlePrompt(string $title, ?string $typeDemande, ?string $categorie): string
+    {
+        $example = [
+            'description' => 'Le collaborateur souhaite prendre un conge annuel pour une periode estivale. Cette demande vise a organiser son absence de maniere anticipee et claire.',
+        ];
+
+        return "Tu aides a rediger des descriptions professionnelles de demandes internes en francais.\n"
+            . "A partir d un titre, genere une description courte, claire et naturelle.\n"
+            . "Renvoie STRICTEMENT un JSON valide avec une seule cle: description.\n"
+            . "Contraintes:\n"
+            . "- 1 a 3 phrases maximum.\n"
+            . "- Ton professionnel et simple.\n"
+            . "- Ne pas inventer de dates, montants ou details precis absents du titre.\n"
+            . "- Si le type ou la categorie sont fournis, reste coherent avec eux.\n"
+            . "Titre: " . json_encode($title, JSON_UNESCAPED_UNICODE) . "\n"
+            . "Type de demande: " . json_encode((string) ($typeDemande ?? ''), JSON_UNESCAPED_UNICODE) . "\n"
+            . "Categorie: " . json_encode((string) ($categorie ?? ''), JSON_UNESCAPED_UNICODE) . "\n"
             . "Exemple attendu: " . json_encode($example, JSON_UNESCAPED_UNICODE);
     }
 
@@ -529,6 +600,8 @@ class DemandeAiAssistant
         $detailsPayload = isset($parsed['details']) && is_array($parsed['details']) ? $parsed['details'] : $parsed;
         $removePayload = isset($parsed['remove_fields']) && is_array($parsed['remove_fields']) ? $parsed['remove_fields'] : [];
         $customPayload = isset($parsed['custom_fields']) && is_array($parsed['custom_fields']) ? $parsed['custom_fields'] : [];
+        $replaceBasePayload = $this->toBooleanFlag($parsed['replace_base'] ?? false);
+        $correctedTextPayload = trim((string) ($parsed['correctedText'] ?? ''));
 
         $details = [];
 
@@ -639,15 +712,34 @@ class DemandeAiAssistant
             );
         }
 
+        $correctedText = $this->firstNonEmpty(
+            $correctedTextPayload,
+            trim((string) ($generalPayload['description'] ?? '')),
+            trim((string) ($details['descriptionBesoin'] ?? '')),
+            trim((string) ($generalContext['aiDescriptionPrompt'] ?? ''))
+        );
+        $correctedText = trim((string) (preg_replace('/\s+/u', ' ', $correctedText) ?? $correctedText));
+
+        $replaceBase = $this->shouldReplaceBaseFields($replaceBasePayload, $customFields);
+        $dynamicFieldConfidence = $this->buildAutrePlanConfidence(
+            $customFields,
+            array_values(array_keys($removeFields)),
+            $replaceBase,
+            $correctedText,
+            $generatedDescription
+        );
+
         return [
+            'correctedText' => $correctedText,
             'generatedDescription' => $generatedDescription,
             'suggestedGeneral' => $suggestedGeneral,
             'suggestedDetails' => $details,
             'dynamicFieldPlan' => [
                 'add' => $customFields,
                 'remove' => array_values(array_keys($removeFields)),
-                'replaceBase' => [] !== $customFields,
+                'replaceBase' => $replaceBase,
             ],
+            'dynamicFieldConfidence' => $dynamicFieldConfidence,
         ];
     }
 
@@ -749,28 +841,133 @@ class DemandeAiAssistant
             ];
         }
 
-        if ([] === $customFields) {
-            $customFields[] = [
-                'key' => 'ai_objet_demande',
-                'label' => 'Objet de la demande',
-                'type' => 'text',
-                'required' => true,
-                'value' => $this->inferDefaultTitle($generalContext),
-            ];
+        return $this->normalizeCustomFields($customFields, []);
+    }
 
-            $customFields[] = [
-                'key' => 'ai_details_traitement',
-                'label' => 'Details a traiter',
-                'type' => 'textarea',
-                'required' => true,
-                'value' => $this->firstNonEmpty(
-                    trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-                    trim((string) ($generalContext['description'] ?? ''))
-                ),
+    /**
+     * @param mixed $value
+     */
+    private function toBooleanFlag(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value)) {
+            return 1 === $value;
+        }
+
+        if (is_string($value)) {
+            return in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'oui'], true);
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $customFields
+     */
+    private function shouldReplaceBaseFields(bool $replaceBaseRequested, array $customFields): bool
+    {
+        if (!$replaceBaseRequested || count($customFields) < 2) {
+            return false;
+        }
+
+        $requiredCount = 0;
+        foreach ($customFields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            if (true === ($field['required'] ?? false)) {
+                ++$requiredCount;
+            }
+        }
+
+        return $requiredCount >= 1;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $customFields
+     * @param array<int, string> $removeFields
+     * @return array<string, string|int>
+     */
+    private function buildAutrePlanConfidence(
+        array $customFields,
+        array $removeFields,
+        bool $replaceBase,
+        string $correctedText,
+        string $generatedDescription
+    ): array {
+        $score = 45;
+        $customCount = count($customFields);
+        $removeCount = count($removeFields);
+        $requiredCount = 0;
+        $filledCount = 0;
+
+        foreach ($customFields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            if (true === ($field['required'] ?? false)) {
+                ++$requiredCount;
+            }
+
+            if ('' !== trim((string) ($field['value'] ?? ''))) {
+                ++$filledCount;
+            }
+        }
+
+        $score += min(24, $customCount * 6);
+        $score += min(12, $filledCount * 2);
+
+        if ($requiredCount > 0) {
+            $score += 6;
+        }
+
+        if ($replaceBase) {
+            $score -= 12;
+        }
+
+        if (0 === $customCount && 0 === $removeCount) {
+            $score -= 8;
+        }
+
+        if (mb_strlen($correctedText) >= 20) {
+            $score += 6;
+        }
+
+        if (mb_strlen($generatedDescription) >= 35) {
+            $score += 8;
+        }
+
+        $score = max(15, min(96, $score));
+
+        if ($score >= 75) {
+            return [
+                'score' => $score,
+                'label' => 'Elevee',
+                'tone' => 'success',
+                'message' => 'Le plan de champs est solide et bien exploitable.',
             ];
         }
 
-        return $this->normalizeCustomFields($customFields, []);
+        if ($score >= 55) {
+            return [
+                'score' => $score,
+                'label' => 'Moyenne',
+                'tone' => 'info',
+                'message' => 'Le plan est utile mais merite une verification rapide.',
+            ];
+        }
+
+        return [
+            'score' => $score,
+            'label' => 'Faible',
+            'tone' => 'warning',
+            'message' => 'Le plan est prudent, completez manuellement si besoin.',
+        ];
     }
 
     /**

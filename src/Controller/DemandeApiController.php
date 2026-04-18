@@ -105,6 +105,46 @@ class DemandeApiController extends AbstractController
         }
     }
 
+    #[Route('/demande-api/generate-description', name: 'demande_api_generate_description', methods: ['POST'])]
+    public function generateDescription(Request $request, SessionInterface $session): JsonResponse
+    {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return new JsonResponse(['success' => false, 'message' => 'Vous devez etre connecte.'], 401);
+        }
+
+        if ($this->canManageDemandes($session)) {
+            return new JsonResponse(['success' => false, 'message' => 'Les comptes RH/Admin ne peuvent pas creer de demande employe.'], 403);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            return new JsonResponse(['success' => false, 'message' => 'Payload JSON invalide.'], 400);
+        }
+
+        $title = trim((string) ($payload['title'] ?? ''));
+        if ('' === $title) {
+            return new JsonResponse(['success' => false, 'message' => 'Ajoutez un titre avant de lancer la generation IA.'], 400);
+        }
+
+        try {
+            $result = $this->aiAssistant->generateDescriptionFromTitle(
+                $title,
+                (string) ($payload['typeDemande'] ?? ''),
+                (string) ($payload['categorie'] ?? '')
+            );
+
+            return new JsonResponse([
+                'success' => true,
+                'description' => $result['description'] ?? '',
+                'model' => $result['model'] ?? null,
+            ]);
+        } catch (\RuntimeException $e) {
+            return new JsonResponse(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Throwable) {
+            return new JsonResponse(['success' => false, 'message' => 'Une erreur inattendue est survenue pendant la generation IA.'], 500);
+        }
+    }
+
     #[Route('/demande-api/autre/generate', name: 'demande_api_autre_generate', methods: ['POST'])]
     public function generateAutre(Request $request, SessionInterface $session): JsonResponse
     {
@@ -136,10 +176,12 @@ class DemandeApiController extends AbstractController
 
             return new JsonResponse([
                 'success' => true,
+                'correctedText' => $result['correctedText'] ?? '',
                 'generatedDescription' => $result['generatedDescription'] ?? '',
                 'suggestedGeneral' => $result['suggestedGeneral'] ?? [],
                 'suggestedDetails' => $result['suggestedDetails'] ?? [],
                 'dynamicFieldPlan' => $result['dynamicFieldPlan'] ?? ['add' => [], 'remove' => [], 'replaceBase' => false],
+                'dynamicFieldConfidence' => $result['dynamicFieldConfidence'] ?? ['score' => 0, 'label' => 'Faible', 'tone' => 'warning', 'message' => 'Aucune evaluation disponible.'],
                 'model' => $result['model'] ?? null,
             ]);
         } catch (\RuntimeException $e) {
