@@ -647,7 +647,11 @@ class DemandeAiAssistant
 
         $generatedDescription = trim((string) ($details['descriptionBesoin'] ?? ''));
         if ('' === $generatedDescription) {
-            $generatedDescription = trim((string) ($generalContext['aiDescriptionPrompt'] ?? ''));
+            $generatedDescription = $this->firstNonEmpty(
+                trim((string) ($generalPayload['description'] ?? '')),
+                trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                trim((string) ($generalContext['description'] ?? ''))
+            );
         }
 
         if ('' === trim((string) ($details['besoinPersonnalise'] ?? ''))) {
@@ -670,9 +674,7 @@ class DemandeAiAssistant
             $details['descriptionBesoin'] = $generatedDescription;
         }
 
-        if (!isset($details['pieceOuContexte']) || '' === trim((string) $details['pieceOuContexte'])) {
-            $details['pieceOuContexte'] = trim((string) ($generalContext['description'] ?? ''));
-        }
+        $details['pieceOuContexte'] = '';
 
         $priorite = strtoupper(trim((string) ($generalPayload['priorite'] ?? $generalContext['priorite'] ?? 'NORMALE')));
         if (!in_array($priorite, ['HAUTE', 'NORMALE', 'BASSE'], true)) {
@@ -689,6 +691,7 @@ class DemandeAiAssistant
             'description' => $this->firstNonEmpty(
                 trim((string) ($generalPayload['description'] ?? '')),
                 trim((string) ($details['descriptionBesoin'] ?? '')),
+                trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
                 trim((string) ($generalContext['description'] ?? ''))
             ),
             'priorite' => $priorite,
@@ -716,7 +719,8 @@ class DemandeAiAssistant
 
         $customFields = $this->normalizeCustomFields($customPayload, array_merge($allowedKeys, array_keys($removeFields)));
         $inferredCustomFields = $this->inferCustomFieldsFromDescription($generalContext, $details);
-        $customFields = $this->mergeCustomFields($customFields, $inferredCustomFields);
+        // Keep deterministic keyword-based inference first for Autre to avoid noisy LLM extras.
+        $customFields = $this->mergeCustomFields($inferredCustomFields, $customFields);
 
         $inferredUrgence = $this->inferUrgenceFromDescription($generalContext);
         if (isset($selectOptions['niveauUrgenceAutre']) && in_array($inferredUrgence, $selectOptions['niveauUrgenceAutre'], true)) {
@@ -735,6 +739,7 @@ class DemandeAiAssistant
 
         if ('' === trim((string) ($details['descriptionBesoin'] ?? ''))) {
             $details['descriptionBesoin'] = $this->firstNonEmpty(
+                trim((string) ($generalPayload['description'] ?? '')),
                 trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
                 trim((string) ($generalContext['description'] ?? ''))
             );
@@ -789,6 +794,7 @@ class DemandeAiAssistant
         $targetLocation = $this->extractTargetLocation($rawText);
         $hasFormationContext = $this->containsAnyWord($rawText, ['formation', 'certification', 'cours', 'training']) || '' !== $formationType;
         $hasTransportContext = $this->containsAnyWord($rawText, ['transport', 'deplacement', 'trajet', 'navette']);
+        $hasParkingContext = $this->containsAnyWord($rawText, ['parking', 'stationnement', 'place de parking', 'place reservee', 'place reserve', 'acces parking']);
 
         if ($hasFormationContext || $hasTransportContext) {
             if ($hasFormationContext) {
@@ -848,6 +854,52 @@ class DemandeAiAssistant
                 'value' => $this->firstNonEmpty(
                     trim((string) ($details['descriptionBesoin'] ?? '')),
                     trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                    trim((string) ($generalContext['description'] ?? ''))
+                ),
+            ];
+        }
+
+        if ($hasParkingContext) {
+            $parkingType = 'Place reservee';
+            if ($this->containsAnyWord($rawText, ['autorisation temporaire', 'temporaire'])) {
+                $parkingType = 'Autorisation temporaire';
+            } elseif ($this->containsAnyWord($rawText, ['acces parking', 'badge parking', 'acces'])) {
+                $parkingType = 'Acces parking';
+            }
+
+            $customFields[] = [
+                'key' => 'ai_type_stationnement',
+                'label' => 'Type de demande parking',
+                'type' => 'select',
+                'required' => true,
+                'value' => $parkingType,
+                'options' => ['Place reservee', 'Acces parking', 'Autorisation temporaire', 'Autre'],
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_zone_souhaitee',
+                'label' => 'Zone ou emplacement souhaite',
+                'type' => 'text',
+                'required' => true,
+                'value' => $this->extractParkingZone($rawText),
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_horaire_arrivee',
+                'label' => 'Horaire habituel d arrivee',
+                'type' => 'text',
+                'required' => false,
+                'value' => $this->extractPreferredArrivalTime($rawText),
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_justification_stationnement',
+                'label' => 'Justification du besoin parking',
+                'type' => 'textarea',
+                'required' => true,
+                'value' => $this->firstNonEmpty(
+                    trim((string) ($details['descriptionBesoin'] ?? '')),
+                    $this->extractPrimaryIntentFromPrompt((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
                     trim((string) ($generalContext['description'] ?? ''))
                 ),
             ];
@@ -1292,11 +1344,68 @@ class DemandeAiAssistant
      */
     private function buildInferenceText(array $generalContext): string
     {
+        $prompt = (string) ($generalContext['aiDescriptionPrompt'] ?? '');
+        $primaryIntent = $this->extractPrimaryIntentFromPrompt($prompt);
+
         return trim(implode(' ', [
+            $primaryIntent,
             (string) ($generalContext['titre'] ?? ''),
             (string) ($generalContext['description'] ?? ''),
-            (string) ($generalContext['aiDescriptionPrompt'] ?? ''),
+            $prompt,
         ]));
+    }
+
+    private function extractPrimaryIntentFromPrompt(string $prompt): string
+    {
+        $text = trim($prompt);
+        if ('' === $text) {
+            return '';
+        }
+
+        if (preg_match("/[\"'«](.{12,260}?)[\"'»]/u", $text, $matches) === 1) {
+            $quoted = trim((string) ($matches[1] ?? ''));
+            if ('' !== $quoted) {
+                return $quoted;
+            }
+        }
+
+        $clean = $text;
+        $clean = preg_replace('/\b(?:bonjour|salut|slt)\b[\s,;:]*/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\bje\s+souhaite\s+(?:soumettre|faire|creer|cr[eé]er)\s+une\s+demande\s+(?:li[ée]e\s+[aà]|concernant|pour)\s*/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\bcette\s+demande\s+correspond\s+.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s+/', ' ', $clean) ?? $clean;
+
+        return trim((string) substr($clean, 0, 280));
+    }
+
+    private function extractParkingZone(string $text): string
+    {
+        if (preg_match("/\b(?:proche|pres|pr[eè]s|a\s+cote\s+de|a\s+proximite\s+de)\s+([A-Za-zÀ-ÿ0-9'’\- ]{2,80})/iu", $text, $matches) === 1) {
+            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
+        }
+
+        if ($this->containsWord($text, 'entree')) {
+            return 'Entree principale';
+        }
+
+        if ($this->containsWord($text, 'parking')) {
+            return 'Parking principal';
+        }
+
+        return '';
+    }
+
+    private function extractPreferredArrivalTime(string $text): string
+    {
+        if (preg_match('/\b([01]?\d|2[0-3])[:h]([0-5]\d)\b/u', $text, $matches) === 1) {
+            return sprintf('%02d:%02d', (int) ($matches[1] ?? 0), (int) ($matches[2] ?? 0));
+        }
+
+        if ($this->containsAnyWord($text, ['jarrive tot', 'j arrive tot', 'arrive tot', 'arrivee tot', 'tres tot'])) {
+            return 'Tot le matin';
+        }
+
+        return '';
     }
 
     /**

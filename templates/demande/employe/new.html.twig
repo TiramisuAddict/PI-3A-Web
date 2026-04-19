@@ -361,7 +361,7 @@
     var AUTRE_AI_ENDPOINT = "{{ path('demande_api_autre_generate') }}";
 
     var AUTRE_BASE_REQUIRED_KEYS = ["besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre"];
-    var AUTRE_HIDDEN_DUPLICATE_KEYS = ["besoinPersonnalise", "niveauUrgenceAutre"];
+    var AUTRE_HIDDEN_DUPLICATE_KEYS = ["besoinPersonnalise", "niveauUrgenceAutre", "pieceOuContexte"];
     var AI_DYNAMIC_FIELDS = [];
     var AI_REMOVED_BASE_FIELDS = [];
     var AI_REPLACE_BASE_FIELDS = false;
@@ -1286,6 +1286,15 @@
             modalEl.classList.remove("show");
             modalEl.style.display = "none";
         }
+
+        // Manual fallback cleanup when Bootstrap modal JS API is not available.
+        document.body.classList.remove("modal-open");
+        document.body.style.removeProperty("padding-right");
+
+        var backdrops = document.querySelectorAll(".modal-backdrop");
+        for (var i = 0; i < backdrops.length; i++) {
+            backdrops[i].remove();
+        }
     }
 
     function buildAutreConfidenceMessage(confidence) {
@@ -1416,22 +1425,42 @@
                     merged.descriptionBesoin = json.generatedDescription;
                 }
 
-                if (fieldPlan.replaceBase) {
-                    if (!String(merged.besoinPersonnalise || "").trim()) {
-                        merged.besoinPersonnalise = String((json.suggestedGeneral || {}).titre || general.titre || "Demande personnalisee");
-                    }
+                var generatedDescription = String(json.generatedDescription || "").trim();
+                var suggestedGeneralDescription = String((json.suggestedGeneral || {}).description || "").trim();
+                var aiGeneratedDescription = generatedDescription
+                    || suggestedGeneralDescription
+                    || String(general.aiDescriptionPrompt || "").trim()
+                    || String(general.description || "").trim();
 
-                    if (!String(merged.descriptionBesoin || "").trim()) {
-                        merged.descriptionBesoin = String((json.suggestedGeneral || {}).description || json.generatedDescription || general.aiDescriptionPrompt || "");
-                    }
-
-                    if (!String(merged.niveauUrgenceAutre || "").trim()) {
-                        merged.niveauUrgenceAutre = "Normale";
-                    }
+                if (!String(merged.descriptionBesoin || "").trim() && aiGeneratedDescription) {
+                    merged.descriptionBesoin = aiGeneratedDescription;
                 }
 
-                applySuggestedGeneralFields(json.suggestedGeneral || {}, json.generatedDescription || "");
+                if (!String(merged.besoinPersonnalise || "").trim()) {
+                    merged.besoinPersonnalise = String((json.suggestedGeneral || {}).titre || general.titre || "Demande personnalisee");
+                }
+
+                if (!String(merged.descriptionBesoin || "").trim()) {
+                    merged.descriptionBesoin = aiGeneratedDescription;
+                }
+
+                if (!String(merged.niveauUrgenceAutre || "").trim()) {
+                    merged.niveauUrgenceAutre = "Normale";
+                }
+
+                // For Autre generation, also sync the general section.
+                applySuggestedGeneralFields(json.suggestedGeneral || {}, aiGeneratedDescription || "");
                 applyAiSuggestedCategory(json.suggestedGeneral || {}, categorieSelect, typeSelect, typeInfo);
+
+                var generalTitleInput = document.getElementById("demande_titre");
+                var generalDescriptionInput = document.getElementById("demande_description");
+                if (generalTitleInput && String(merged.besoinPersonnalise || "").trim()) {
+                    generalTitleInput.value = String(merged.besoinPersonnalise || "").trim();
+                }
+                if (generalDescriptionInput && aiGeneratedDescription) {
+                    generalDescriptionInput.value = aiGeneratedDescription;
+                }
+
                 loadDynamicFields(typeSelect.value, merged, dynamicFieldsContainer, dynamicFieldsCard);
 
                 if (aiGeneratedInput) aiGeneratedInput.value = "1";
@@ -1440,8 +1469,8 @@
                 if (regenerateBtn) regenerateBtn.style.display = "inline-block";
                 var confidenceStatus = buildAutreConfidenceMessage(json.dynamicFieldConfidence || null);
                 var baseMessage = correctedText
-                    ? "Texte corrige et suggestion IA appliquee avec champs adaptatifs."
-                    : "Suggestion IA appliquee avec champs adaptatifs.";
+                    ? "Texte corrige et champs Autre pre-remplis par IA."
+                    : "Champs Autre pre-remplis par IA.";
                 var finalMessage = confidenceStatus.text
                     ? baseMessage + " " + confidenceStatus.text
                     : baseMessage + " Verifiez puis confirmez la creation.";
@@ -2192,6 +2221,7 @@
         var aiGeneratedInput = document.getElementById("aiGeneratedInput");
         var aiConfirmedInput = document.getElementById("aiConfirmedInput");
         var aiModalEl = document.getElementById("aiConfirmModal");
+        var aiModalRejectBtn = document.getElementById("aiModalRejectBtn");
         var aiModalConfirmBtn = document.getElementById("aiModalConfirmBtn");
         var aiModalRegenerateBtn = document.getElementById("aiModalRegenerateBtn");
         var aiConfirmPreview = document.getElementById("aiConfirmPreview");
@@ -2364,6 +2394,12 @@
             aiModalRegenerateBtn.addEventListener("click", function () {
                 closeAiModal(aiModal, aiModalEl);
                 requestAutreAiGeneration(categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard);
+            });
+        }
+
+        if (aiModalRejectBtn) {
+            aiModalRejectBtn.addEventListener("click", function () {
+                closeAiModal(aiModal, aiModalEl);
             });
         }
 
