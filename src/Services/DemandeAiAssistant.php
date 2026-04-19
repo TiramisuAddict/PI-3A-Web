@@ -1415,7 +1415,11 @@ class DemandeAiAssistant
     {
         $text = strtolower($this->buildInferenceText($generalContext));
 
-        if ($this->containsAny($text, ['finance', 'financier', 'financiere', 'salaire', 'avance', 'remboursement', 'budget', 'paye', 'paie', 'montant', 'facture', 'tnd', 'dt'])) {
+        $hasFinanceContext = $this->containsAny($text, ['finance', 'financier', 'financiere', 'salaire', 'remboursement', 'budget', 'paye', 'paie', 'montant', 'facture', 'tnd', 'dt'])
+            || $this->containsFragment($text, 'avance sur salaire')
+            || ($this->containsFragment($text, 'avance') && $this->containsAny($text, ['salaire', 'paie', 'paye']));
+
+        if ($hasFinanceContext) {
             return 'Administrative';
         }
 
@@ -1668,6 +1672,9 @@ class DemandeAiAssistant
         $description = trim((string) ($parsed['description'] ?? ''));
         $confidence = (float) ($parsed['confidence'] ?? 0.0);
 
+        $categorie = $this->resolveKnownCategoryAlias($categorie, $categoryTypes);
+        $typeDemande = $this->resolveKnownTypeAlias($typeDemande, $categoryTypes, $categorie);
+
         $allTypes = [];
         foreach ($categoryTypes as $category => $types) {
             foreach ($types as $type) {
@@ -1686,6 +1693,7 @@ class DemandeAiAssistant
                 'description' => $correctedText,
                 'titre' => $titre,
             ]);
+            $categorie = $this->resolveKnownCategoryAlias($categorie, $categoryTypes);
         }
 
         if ('' === $categorie || !isset($categoryTypes[$categorie])) {
@@ -1696,8 +1704,11 @@ class DemandeAiAssistant
             }
         }
 
+        $typeDemande = $this->resolveKnownTypeAlias($typeDemande, $categoryTypes, $categorie);
+
         if ('' === $typeDemande || !in_array($typeDemande, $categoryTypes[$categorie] ?? [], true)) {
             $typeDemande = $this->inferTypeFromDescription($correctedText, $categorie, $categoryTypes);
+            $typeDemande = $this->resolveKnownTypeAlias($typeDemande, $categoryTypes, $categorie);
         }
 
         if ('' === $typeDemande || !in_array($typeDemande, $categoryTypes[$categorie] ?? [], true)) {
@@ -1848,6 +1859,73 @@ class DemandeAiAssistant
         }
 
         return '' !== $excerpt ? $excerpt : 'Nouvelle demande';
+    }
+
+    /**
+     * @param array<string, array<int, string>> $categoryTypes
+     */
+    private function resolveKnownCategoryAlias(string $candidate, array $categoryTypes): string
+    {
+        $candidate = trim($candidate);
+        if ('' === $candidate) {
+            return '';
+        }
+
+        if (isset($categoryTypes[$candidate])) {
+            return $candidate;
+        }
+
+        $normalizedCandidate = $this->normalizeForSearch($candidate);
+        foreach (array_keys($categoryTypes) as $knownCategory) {
+            if ($this->normalizeForSearch((string) $knownCategory) === $normalizedCandidate) {
+                return (string) $knownCategory;
+            }
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * @param array<string, array<int, string>> $categoryTypes
+     */
+    private function resolveKnownTypeAlias(string $candidate, array $categoryTypes, string $category = ''): string
+    {
+        $candidate = trim($candidate);
+        if ('' === $candidate) {
+            return '';
+        }
+
+        $normalizedCandidate = $this->normalizeForSearch($candidate);
+        if ('' === $normalizedCandidate) {
+            return $candidate;
+        }
+
+        $candidateSets = [];
+        if ('' !== $category && isset($categoryTypes[$category])) {
+            $candidateSets[] = $categoryTypes[$category];
+        }
+        foreach ($categoryTypes as $types) {
+            $candidateSets[] = $types;
+        }
+
+        foreach ($candidateSets as $types) {
+            if (!is_array($types)) {
+                continue;
+            }
+
+            foreach ($types as $knownType) {
+                $knownType = (string) $knownType;
+                if ($knownType === $candidate) {
+                    return $knownType;
+                }
+
+                if ($this->normalizeForSearch($knownType) === $normalizedCandidate) {
+                    return $knownType;
+                }
+            }
+        }
+
+        return $candidate;
     }
 
     /**
@@ -2097,8 +2175,12 @@ class DemandeAiAssistant
 
     private function extractOrganization(string $text): string
     {
-        if (preg_match('/(?:organisme|par|chez)\s*[:\-]?\s*([A-Za-z0-9À-ÿ\'\-\s]{3,80})/iu', $text, $matches) === 1) {
-            return trim((string) ($matches[1] ?? ''));
+        if (preg_match('/(?:organisme(?:\s+de\s+formation)?|chez)\s*[:\-]?\s*([A-Za-z0-9À-ÿ\'\-\s]{3,80})/iu', $text, $matches) === 1) {
+            $value = trim((string) ($matches[1] ?? ''));
+            $value = preg_replace('/\b(?:je\s+reste\s+disponible|je\s+vous\s+remercie|merci|cordialement|avance\s+pour\s+votre\s+retour)\b.*$/iu', '', $value) ?? $value;
+            $value = trim((string) $value);
+
+            return $value;
         }
 
         return '';

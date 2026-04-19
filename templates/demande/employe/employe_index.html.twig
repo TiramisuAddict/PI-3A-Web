@@ -167,6 +167,26 @@
     .card.table-card .card-footer {
         flex-shrink: 0;
     }
+    .card.table-card .card-footer nav,
+    .card.table-card .card-footer .pagination {
+        margin: 0;
+    }
+    #demande-table tbody tr.demande-row {
+        min-height: 68px;
+    }
+    #demande-table tbody tr.demande-row > td {
+        height: 68px;
+    }
+    #demande-table tbody td {
+        vertical-align: middle;
+    }
+    #demande-table tbody tr.demande-row > td:nth-child(2),
+    #demande-table tbody tr.demande-row > td:nth-child(3) {
+        white-space: nowrap;
+    }
+    #demande-table .category-tag {
+        white-space: nowrap;
+    }
     .search-filter-bar {
         display: flex;
         align-items: center;
@@ -441,7 +461,8 @@
 (function () {
     "use strict";
 
-    var ROW_HEIGHT = 49;
+    var DEFAULT_ROW_HEIGHT = 54;
+    var BOTTOM_SAFE_GAP = 18;
     var currentLimit = {{ limit|default(10) }};
     var resizeTimer = null;
     var searchTimer = null;
@@ -450,18 +471,44 @@
     var currentSearchTerm = "";
     var fetchSequence = 0;
 
+    function getMeasuredRowHeight(tableCard) {
+        if (!tableCard) return DEFAULT_ROW_HEIGHT;
+
+        var sampleRow = tableCard.querySelector('#demande-table tbody tr.demande-row');
+        if (sampleRow) {
+            var measured = sampleRow.getBoundingClientRect().height;
+            if (measured > 0) {
+                return measured;
+            }
+        }
+
+        return DEFAULT_ROW_HEIGHT;
+    }
+
     function calculateOptimalLimit() {
         var tableCard = document.querySelector('.card.table-card');
         if (!tableCard) return currentLimit;
+
+        var rowHeight = getMeasuredRowHeight(tableCard);
         var cardRect = tableCard.getBoundingClientRect();
         var thead = tableCard.querySelector('thead');
         var footer = tableCard.querySelector('.card-footer');
+        var tableViewport = tableCard.querySelector('.table-responsive');
         var theadHeight = thead ? thead.offsetHeight : 42;
         var footerHeight = footer ? footer.offsetHeight : 52;
-        var viewportBottom = window.innerHeight;
-        var availableHeight = viewportBottom - cardRect.top - theadHeight - footerHeight - 4;
-        if (availableHeight < ROW_HEIGHT) availableHeight = ROW_HEIGHT;
-        var rows = Math.floor(availableHeight / ROW_HEIGHT);
+        var availableHeight = 0;
+
+        if (tableViewport && tableViewport.clientHeight > 0) {
+            availableHeight = tableViewport.clientHeight - theadHeight - BOTTOM_SAFE_GAP;
+        }
+
+        if (availableHeight <= 0) {
+            var viewportBottom = window.innerHeight;
+            availableHeight = viewportBottom - cardRect.top - theadHeight - footerHeight - BOTTOM_SAFE_GAP;
+        }
+
+        if (availableHeight < rowHeight) availableHeight = rowHeight;
+        var rows = Math.floor(availableHeight / rowHeight);
         if (rows < 1) rows = 1;
         if (rows > 100) rows = 100;
         return rows;
