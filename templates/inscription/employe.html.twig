@@ -5,6 +5,84 @@
 {% block stylesheets %}
     {{ parent() }}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
+    <style>
+        .reason-quality-wrap {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            border: 1px solid rgba(13, 110, 253, 0.18);
+            border-radius: 0.75rem;
+            background: linear-gradient(135deg, rgba(13, 110, 253, 0.07), rgba(25, 135, 84, 0.06));
+        }
+
+        .reason-quality-ring {
+            --score-color: #dc3545;
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            background: conic-gradient(var(--score-color) calc(var(--score, 0) * 1%), #e9ecef 0);
+            transition: background 0.25s ease;
+        }
+
+        .reason-quality-ring::before {
+            content: '';
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: #ffffff;
+            position: absolute;
+        }
+
+        .reason-quality-value {
+            position: relative;
+            z-index: 1;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #1f2937;
+        }
+
+        .reason-quality-feedback {
+            margin: 0;
+            color: #334155;
+            font-size: 0.9rem;
+            line-height: 1.35;
+        }
+
+        .reason-quality-label {
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+        }
+
+        @media (max-width: 575.98px) {
+            .reason-quality-wrap {
+                gap: 0.75rem;
+                padding: 0.65rem;
+            }
+
+            .reason-quality-ring {
+                width: 58px;
+                height: 58px;
+            }
+
+            .reason-quality-ring::before {
+                width: 44px;
+                height: 44px;
+            }
+
+            .reason-quality-value {
+                font-size: 0.8rem;
+            }
+        }
+    </style>
 {% endblock %}
 
 {% block body %}
@@ -259,6 +337,15 @@
                                 <div class="mb-3">
                                     <label for="raison" class="form-label">Raison</label>
                                     <textarea id="raison" name="raison" class="form-control" rows="5" placeholder="Expliquez pourquoi vous voulez suivre cette formation...">{{ typed_reason|default('') }}</textarea>
+                                    <div class="reason-quality-wrap" id="reason-quality-wrap" aria-live="polite">
+                                        <div class="reason-quality-ring" id="reason-quality-ring" style="--score: 0; --score-color: #dc3545;">
+                                            <span class="reason-quality-value" id="reason-quality-value">0%</span>
+                                        </div>
+                                        <div>
+                                            <span class="reason-quality-label">Qualite de la raison</span>
+                                            <p class="reason-quality-feedback" id="reason-quality-feedback">Saisissez votre raison pour afficher le score.</p>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="d-flex flex-wrap gap-2">
                                     <button class="btn btn-outline-primary" type="button" data-action="analyze">Corriger LanguageTool</button>
@@ -556,6 +643,9 @@
     if (reasonForm) {
         const reasonField = document.getElementById('raison');
         const noticeBox = document.getElementById('assistant-notice');
+        const qualityRing = document.getElementById('reason-quality-ring');
+        const qualityValue = document.getElementById('reason-quality-value');
+        const qualityFeedback = document.getElementById('reason-quality-feedback');
         const analyzeUrl = reasonForm.dataset.analyzeUrl;
         const generateUrl = reasonForm.dataset.generateUrl;
 
@@ -565,6 +655,59 @@
             noticeBox.classList.add(variant === 'error' ? 'alert-danger' : 'alert-info');
             noticeBox.textContent = message;
         };
+
+        const evaluateReasonQuality = () => {
+            if (!reasonField || !qualityRing || !qualityValue || !qualityFeedback) return;
+
+            const text = (reasonField.value || '').trim();
+            if (text === '') {
+                qualityRing.style.setProperty('--score', '0');
+                qualityRing.style.setProperty('--score-color', '#dc3545');
+                qualityValue.textContent = '0%';
+                qualityFeedback.textContent = 'Saisissez votre raison pour afficher le score.';
+                return;
+            }
+
+            const words = text.split(/\s+/).filter(Boolean);
+            const sentences = text
+                .split(/[.!?]+/)
+                .map((part) => part.trim())
+                .filter(Boolean);
+            const uniqueWords = new Set(words.map((word) => word.toLowerCase()));
+
+            let score = 0;
+            score += Math.min(35, Math.round((text.length / 220) * 35));
+            score += Math.min(30, Math.round((words.length / 40) * 30));
+            score += Math.min(15, Math.round((sentences.length / 4) * 15));
+            score += Math.min(10, Math.round((uniqueWords.size / Math.max(words.length, 1)) * 10));
+
+            const hasMotivation = /(objectif|motivation|progresser|ameliorer|competence|carriere|equipe|projet|entreprise)/i.test(text);
+            if (hasMotivation) score += 10;
+
+            if (words.length < 8) score -= 10;
+            score = Math.max(0, Math.min(100, score));
+
+            let color = '#dc3545';
+            let feedback = 'Ajoutez plus de details concrets pour renforcer votre demande.';
+
+            if (score >= 75) {
+                color = '#198754';
+                feedback = 'Excellente raison. Le message est detaille et convaincant.';
+            } else if (score >= 45) {
+                color = '#f59f00';
+                feedback = 'Bonne base. Precisez l objectif et l impact attendu pour monter le score.';
+            }
+
+            qualityRing.style.setProperty('--score', String(score));
+            qualityRing.style.setProperty('--score-color', color);
+            qualityValue.textContent = score + '%';
+            qualityFeedback.textContent = feedback;
+        };
+
+        if (reasonField) {
+            reasonField.addEventListener('input', evaluateReasonQuality);
+            evaluateReasonQuality();
+        }
 
         const postAction = async (url, mode) => {
             const formData = new FormData();
@@ -576,7 +719,10 @@
                 setNotice(payload && payload.message ? payload.message : 'Une erreur est survenue.', 'error');
                 return;
             }
-            if (reasonField && payload.text) reasonField.value = payload.text;
+            if (reasonField && payload.text) {
+                reasonField.value = payload.text;
+                evaluateReasonQuality();
+            }
             setNotice(payload.message || (mode === 'analyze' ? 'Correction terminee.' : 'Generation terminee.'), 'info');
         };
 
