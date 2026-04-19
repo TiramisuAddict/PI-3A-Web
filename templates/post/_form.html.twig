@@ -1,59 +1,52 @@
+{% macro inline_errors(field) %}
+    {% if field.vars.errors|length > 0 %}
+        <div class="mt-1">
+            {% for error in field.vars.errors %}
+                <div class="text-danger small">{{ error.message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endmacro %}
+
 {# Type "evenement" = 2 (aligne sur FeedController / post_type_evenement) #}
 {% set post_type_evenement = 2 %}
 {% set current_type = form.vars.data is not null and form.vars.data.typePost is not null ? form.vars.data.typePost : 1 %}
 {% set existing_event_images = form.vars.data is not null ? form.vars.data.eventImages : [] %}
 
 {{ form_start(form, { attr: { class: 'post-crud-form', novalidate: 'novalidate' } }) }}
-{% if form.vars.submitted and not form.vars.valid %}
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <div class="d-flex">
-            <div><i class="ti ti-alert-circle me-3"></i></div>
-            <div class="flex-grow-1">
-                <strong>Formulaire invalide</strong>
-                <div class="small mt-2">Veuillez corriger les erreurs ci-dessous :</div>
-                <ul class="small mb-0 mt-2">
-                {% for field in form %}
-                    {% for error in field.vars.errors %}
-                        <li><strong>{{ field.vars.label|default(field.vars.name) }} :</strong> {{ error.message }}</li>
-                    {% endfor %}
-                {% endfor %}
-                {% for error in form.vars.errors %}
-                    <li>{{ error.message }}</li>
-                {% endfor %}
-                </ul>
-            </div>
-        </div>
-        <a class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></a>
-    </div>
-{% endif %}
 
 <div class="row g-4">
     <div class="col-12">
-        {{ form_row(form.titre, {
-            label: 'Titre *',
+        {{ form_label(form.titre, 'Titre *', { label_attr: { class: 'form-label' } }) }}
+        {{ form_widget(form.titre, {
             attr: {
-                class: 'form-control',
+                class: 'form-control' ~ (form.titre.vars.errors|length > 0 ? ' is-invalid' : ''),
                 placeholder: 'Entrez le titre de la publication'
             }
         }) }}
+        {{ _self.inline_errors(form.titre) }}
     </div>
 
     <div class="col-12">
-        {{ form_row(form.contenu, {
-            label: 'Contenu *',
+        {{ form_label(form.contenu, 'Contenu *', { label_attr: { class: 'form-label' } }) }}
+        {{ form_widget(form.contenu, {
             attr: {
-                class: 'form-control',
+                class: 'form-control' ~ (form.contenu.vars.errors|length > 0 ? ' is-invalid' : ''),
                 placeholder: 'Entrez le contenu',
                 rows: 6
             }
         }) }}
+        {{ _self.inline_errors(form.contenu) }}
     </div>
 
     <div class="col-md-8">
-        {{ form_row(form.type_post, {
-            label: 'Type de publication *',
-            attr: { class: 'form-select' }
+        {{ form_label(form.type_post, 'Type de publication *', { label_attr: { class: 'form-label' } }) }}
+        {{ form_widget(form.type_post, {
+            attr: {
+                class: 'form-select' ~ (form.type_post.vars.errors|length > 0 ? ' is-invalid' : '')
+            }
         }) }}
+        {{ _self.inline_errors(form.type_post) }}
     </div>
 
     <div class="col-md-4">
@@ -69,6 +62,7 @@
                     Actif
                 </label>
             </div>
+            {{ _self.inline_errors(form.active) }}
         </div>
     </div>
 </div>
@@ -84,45 +78,60 @@
     </div>
     <div class="row g-3">
         <div class="col-md-6">
-            {{ form_row(form.date_evenement, {
-                label: 'Date de debut',
-                attr: { class: 'form-control' }
-            }) }}
-        </div>
-        <div class="col-md-6">
-            {{ form_row(form.date_fin_evenement, {
-                label: 'Date de fin',
-                attr: { class: 'form-control' }
-            }) }}
-        </div>
-        <div class="col-md-6">
-            {{ form_row(form.lieu, {
-                label: 'Lieu',
+            {{ form_label(form.date_evenement, 'Date de debut', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(form.date_evenement, {
                 attr: {
-                    class: 'form-control',
+                    class: 'form-control' ~ (form.date_evenement.vars.errors|length > 0 ? ' is-invalid' : '')
+                }
+            }) }}
+            {{ _self.inline_errors(form.date_evenement) }}
+        </div>
+
+        <div class="col-md-6">
+            {{ form_label(form.date_fin_evenement, 'Date de fin', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(form.date_fin_evenement, {
+                attr: {
+                    class: 'form-control' ~ (form.date_fin_evenement.vars.errors|length > 0 ? ' is-invalid' : '')
+                }
+            }) }}
+            {{ _self.inline_errors(form.date_fin_evenement) }}
+        </div>
+
+        <div class="col-md-6">
+            {{ form_label(form.lieu, 'Lieu', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(form.lieu, {
+                attr: {
+                    class: 'form-control' ~ (form.lieu.vars.errors|length > 0 ? ' is-invalid' : ''),
                     placeholder: 'Entrez le lieu'
                 }
             }) }}
+            {{ _self.inline_errors(form.lieu) }}
+            {{ form_help(form.lieu) }}
         </div>
+
         <div class="col-md-6">
-            {{ form_row(form.capacite_max, {
-                label: 'Capacite maximum',
+            {{ form_label(form.capacite_max, 'Capacite maximum', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(form.capacite_max, {
                 attr: {
-                    class: 'form-control',
+                    class: 'form-control' ~ (form.capacite_max.vars.errors|length > 0 ? ' is-invalid' : ''),
                     placeholder: 'Nombre de places'
                 }
             }) }}
+            {{ _self.inline_errors(form.capacite_max) }}
         </div>
+
         <div class="col-12 mt-4 pt-3 border-top">
             <h4 class="mb-3">Images de l'evenement</h4>
-            {{ form_row(form.event_image_files, {
-                label: 'Selectionner des images',
+            {{ form_label(form.event_image_files, 'Selectionner des images', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(form.event_image_files, {
                 attr: {
-                    class: 'form-control',
+                    class: 'form-control' ~ (form.event_image_files.vars.errors|length > 0 ? ' is-invalid' : ''),
                     accept: '.jpg,.jpeg,.png,.webp',
                     multiple: 'multiple'
                 }
             }) }}
+            {{ _self.inline_errors(form.event_image_files) }}
+            {{ form_help(form.event_image_files) }}
             <p class="text-secondary small mt-2 mb-0">
                 Choisissez plusieurs fichiers d'un coup. L'upload accepte 10 images ou plus.
             </p>
