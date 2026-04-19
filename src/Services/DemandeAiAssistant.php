@@ -784,17 +784,17 @@ class DemandeAiAssistant
 
         $amount = $this->extractAmountFromText($text);
         $date = $this->extractFrenchDate($generalContext);
-        $formationType = $this->inferFormationType($text);
+        $formationType = $this->inferFormationType($rawText);
         $currentLocation = $this->extractCurrentLocation($rawText);
         $targetLocation = $this->extractTargetLocation($rawText);
 
-        if ($this->containsAny($text, ['formation', 'certification', 'transport', 'deplacement', 'déplacement'])) {
+        if ($this->containsAnyWord($text, ['formation', 'certification', 'transport', 'deplacement', 'deplacement'])) {
             $customFields[] = [
                 'key' => 'ai_type_formation',
                 'label' => 'Type de formation',
                 'type' => 'select',
                 'required' => true,
-                'value' => '' !== $formationType ? $formationType : 'Formation externe',
+                'value' => '' !== $formationType ? $formationType : 'Autre',
                 'options' => ['Formation interne', 'Formation externe', 'Certification', 'Autre'],
             ];
 
@@ -814,7 +814,7 @@ class DemandeAiAssistant
                 'value' => $targetLocation,
             ];
 
-            if ($this->containsAny($text, ['transport', 'deplacement', 'déplacement', 'moyen de transport'])) {
+            if ($this->containsAnyWord($text, ['transport', 'deplacement', 'deplacement']) || $this->containsWord($text, 'moyen de transport')) {
                 $customFields[] = [
                     'key' => 'ai_type_transport',
                     'label' => 'Type de transport souhaite',
@@ -1136,20 +1136,48 @@ class DemandeAiAssistant
 
     private function inferFormationType(string $text): string
     {
-        if (str_contains($text, 'certification')) {
+        $explicitType = $this->extractExplicitFormationType($text);
+        if ('' !== $explicitType) {
+            return $explicitType;
+        }
+
+        if ($this->containsWord($text, 'certification')) {
             return 'Certification';
         }
 
-        if (str_contains($text, 'interne')) {
+        if ($this->containsWord($text, 'formation interne') || ($this->containsWord($text, 'formation') && $this->containsWord($text, 'interne'))) {
             return 'Formation interne';
         }
 
-        if (str_contains($text, 'externe') || str_contains($text, 'transport') || str_contains($text, 'deplacement') || str_contains($text, 'déplacement')) {
+        if ($this->containsWord($text, 'formation externe') || ($this->containsWord($text, 'formation') && $this->containsWord($text, 'externe'))) {
             return 'Formation externe';
         }
 
-        if (str_contains($text, 'formation')) {
-            return 'Formation externe';
+        if (
+            $this->containsWord($text, 'type de formation') ||
+            preg_match('/formation\s+est\s+une\s+formation/iu', $text) === 1
+        ) {
+            return 'Autre';
+        }
+
+        return '';
+    }
+
+    private function extractExplicitFormationType(string $text): string
+    {
+        $normalized = $this->normalizeForSearch($text);
+        if ('' === $normalized) {
+            return '';
+        }
+
+        if (preg_match('/type de formation\s*(?:est|:|-)?\s*(interne|externe|certification|autre)\b/i', $normalized, $matches) === 1) {
+            return match (strtolower((string) ($matches[1] ?? ''))) {
+                'interne' => 'Formation interne',
+                'externe' => 'Formation externe',
+                'certification' => 'Certification',
+                'autre' => 'Autre',
+                default => '',
+            };
         }
 
         return '';
@@ -1157,6 +1185,10 @@ class DemandeAiAssistant
 
     private function extractCurrentLocation(string $rawText): string
     {
+        if (preg_match('/(?:lieu\s+de\s+d[ée]part(?:\s+actuel)?|depart\s+actuel|d[ée]part\s+de)\s*[:\-]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:vers|a|à|pour|la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;]|$)/iu', $rawText, $matches) === 1) {
+            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
+        }
+
         if (preg_match('/(?:actuellement|je\s+suis\s+actuellement|je\s+suis|situee?|située?)\s+(?:a|à|dans)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80})/iu', $rawText, $matches) === 1) {
             return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
         }
@@ -1166,15 +1198,19 @@ class DemandeAiAssistant
 
     private function extractTargetLocation(string $rawText): string
     {
-        if (preg_match('/formation\s+(?:a|à|dans)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80})/iu', $rawText, $matches) === 1) {
+        if (preg_match('/(?:lieu\s+de\s+d[ée]part(?:\s+actuel)?\s*[:\-]?\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?\s+vers\s+|\bvers\s+)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;]|$)/iu', $rawText, $matches) === 1) {
             return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
         }
 
-        if (preg_match('/(?:vers|destination\s*:?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80})/iu', $rawText, $matches) === 1) {
+        if (preg_match('/formation\s+(?:a|à|dans)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;]|$)/iu', $rawText, $matches) === 1) {
             return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
         }
 
-        if (preg_match('/\bdans\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80})/iu', $rawText, $matches) === 1) {
+        if (preg_match('/(?:vers|destination\s*:?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;]|$)/iu', $rawText, $matches) === 1) {
+            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
+        }
+
+        if (preg_match('/\bdans\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;]|$)/iu', $rawText, $matches) === 1) {
             return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
         }
 
@@ -1186,6 +1222,11 @@ class DemandeAiAssistant
         $clean = trim($value);
         $clean = preg_replace('/[\.,;:]+$/', '', $clean) ?? $clean;
         $clean = preg_replace('/\s+/', ' ', $clean) ?? $clean;
+
+        $clean = preg_replace('/\s+(?:la|le|les)\s+formation\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s+type\s+de\s+formation\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s+formation\s+est\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s+vers\s+.*$/iu', '', $clean) ?? $clean;
 
         $parts = preg_split('/\s+(?:et|mais|car|pour|puis|avec|qui|que)\s+/iu', $clean);
         if (is_array($parts) && isset($parts[0])) {
@@ -1226,7 +1267,7 @@ class DemandeAiAssistant
             return 'Informatique';
         }
 
-        if ($this->containsAny($text, ['formation', 'certification', 'cours', 'training'])) {
+        if ($this->containsAnyWord($text, ['formation', 'certification', 'cours', 'training'])) {
             return 'Formation';
         }
 
@@ -1240,12 +1281,77 @@ class DemandeAiAssistant
     private function containsAny(string $text, array $keywords): bool
     {
         foreach ($keywords as $keyword) {
-            if (str_contains($text, strtolower((string) $keyword))) {
+            if ($this->containsFragment($text, (string) $keyword)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function containsFragment(string $text, string $fragment): bool
+    {
+        $normalizedText = $this->normalizeForSearch($text);
+        $normalizedFragment = $this->normalizeForSearch($fragment);
+
+        if ('' === $normalizedText || '' === $normalizedFragment) {
+            return false;
+        }
+
+        return str_contains($normalizedText, $normalizedFragment);
+    }
+
+    private function containsWord(string $text, string $keyword): bool
+    {
+        $needle = trim($this->normalizeForSearch($keyword));
+        if ('' === $needle) {
+            return false;
+        }
+
+        $haystack = $this->normalizeForSearch($text);
+        if ('' === $haystack) {
+            return false;
+        }
+
+        $escaped = preg_quote($needle, '/');
+
+        return 1 === preg_match('/(?<![a-z0-9])' . $escaped . '(?![a-z0-9])/', $haystack);
+    }
+
+    private function containsAnyWord(string $text, array $keywords): bool
+    {
+        foreach ($keywords as $keyword) {
+            if ($this->containsWord($text, (string) $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalizeForSearch(string $text): string
+    {
+        $normalized = mb_strtolower(trim($text), 'UTF-8');
+        if ('' === $normalized) {
+            return '';
+        }
+
+        if (class_exists('Transliterator')) {
+            $transliterated = \Transliterator::create('NFD; [:Nonspacing Mark:] Remove; NFC')?->transliterate($normalized);
+            if (is_string($transliterated) && '' !== $transliterated) {
+                $normalized = $transliterated;
+            }
+        } else {
+            $iconv = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $normalized);
+            if (is_string($iconv) && '' !== $iconv) {
+                $normalized = strtolower($iconv);
+            }
+        }
+
+        $normalized = preg_replace('/[^a-z0-9]+/', ' ', $normalized) ?? $normalized;
+        $normalized = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
+
+        return trim($normalized);
     }
 
     /**
@@ -1409,6 +1515,12 @@ class DemandeAiAssistant
             }
         }
 
+        $explicitTypeMatch = $this->findExplicitTypeMatch($correctedText, $categoryTypes);
+        if (null !== $explicitTypeMatch) {
+            $categorie = $explicitTypeMatch['categorie'];
+            $typeDemande = $explicitTypeMatch['typeDemande'];
+        }
+
         if ('' === $categorie || !isset($categoryTypes[$categorie])) {
             $categorie = $this->inferCategoryFromDescription([
                 'description' => $correctedText,
@@ -1466,9 +1578,9 @@ class DemandeAiAssistant
     /**
      * @param array<string, array<int, string>> $categoryTypes
      */
-    private function inferTypeFromDescription(string $text, string $categorie, array $categoryTypes): string
+    private function inferTypeFromDescription(string $text, string $categorie, array $categoryTypes, bool $allowFallback = true): string
     {
-        $normalized = strtolower($text);
+        $normalized = $text;
 
         $keywordMap = [
             'Conge' => ['conge', 'vacance', 'repos', 'absence', 'maladie'],
@@ -1499,10 +1611,15 @@ class DemandeAiAssistant
         foreach ($availableTypes as $type) {
             $keywords = $keywordMap[$type] ?? [];
             foreach ($keywords as $keyword) {
-                if (str_contains($normalized, $keyword)) {
+                $isExactSensitiveKeyword = in_array($keyword, ['formation'], true);
+                if (($isExactSensitiveKeyword && $this->containsWord($normalized, $keyword)) || (!$isExactSensitiveKeyword && $this->containsFragment($normalized, $keyword))) {
                     return $type;
                 }
             }
+        }
+
+        if (!$allowFallback) {
+            return '';
         }
 
         if (in_array('Autre', $availableTypes, true)) {
@@ -1510,6 +1627,25 @@ class DemandeAiAssistant
         }
 
         return $availableTypes[0] ?? '';
+    }
+
+    /**
+     * @param array<string, array<int, string>> $categoryTypes
+     * @return array{categorie:string,typeDemande:string}|null
+     */
+    private function findExplicitTypeMatch(string $text, array $categoryTypes): ?array
+    {
+        foreach ($categoryTypes as $category => $types) {
+            $matchedType = $this->inferTypeFromDescription($text, (string) $category, $categoryTypes, false);
+            if ('' !== $matchedType && 'Autre' !== $matchedType && in_array($matchedType, $types, true)) {
+                return [
+                    'categorie' => (string) $category,
+                    'typeDemande' => (string) $matchedType,
+                ];
+            }
+        }
+
+        return null;
     }
 
     /**
