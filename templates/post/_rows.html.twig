@@ -1,5 +1,5 @@
 {% for post in posts %}
-    <tr>
+    <tr data-post-row="1">
         <td class="fw-semibold">{{ post.titre|length > 30 ? post.titre|slice(0, 30) ~ '…' : post.titre }}</td>
         <td><span class="badge {% if post.typePost == 2 %}bg-yellow-lt text-yellow{% else %}bg-azure-lt text-azure{% endif %}">{{ post.typePost == 2 ? 'Événement' : 'Annonce' }}</span></td>
         <td><span class="badge {% if post.active %}bg-green-lt text-green{% else %}bg-secondary-lt text-secondary{% endif %}">{{ post.active ? 'Actif' : 'Inactif' }}</span></td>

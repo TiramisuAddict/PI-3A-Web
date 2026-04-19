@@ -2,21 +2,22 @@
 
 namespace App\Controller;
 
-use App\Entity\Post;
 use App\Entity\EventImage;
+use App\Entity\Post;
 use App\Form\PostType;
 use App\Repository\PostRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Form\FormInterface;
 
 /**
- * CRUD administration des publications (posts / événements).
+ * CRUD administration des publications (posts / evenements).
  */
 #[Route('/post')]
 final class PostController extends AbstractController
@@ -29,7 +30,7 @@ final class PostController extends AbstractController
     }
 
     /**
-     * `post.utilisateur_id` référence `employé.id_employe` (contrainte FK en base).
+     * `post.utilisateur_id` reference `employe.id_employe` (contrainte FK en base).
      */
     private function resolvePostAuthorEmployeId(Request $request, Connection $connection): int
     {
@@ -58,16 +59,15 @@ final class PostController extends AbstractController
         }
 
         throw new \RuntimeException(
-            'Impossible de définir l’auteur du post : aucun id employé en session (employee_id / id_employe) '
-            .'et aucune ligne dans la table employé. Créez au moins un employé en base ou connectez l’employé.'
+            'Impossible de definir l auteur du post : aucun id employe en session (employee_id / id_employe) '
+            .'et aucune ligne dans la table employe. Creez au moins un employe en base ou connectez l employe.'
         );
     }
 
     #[Route('/', name: 'app_post_index', methods: ['GET'])]
     public function index(Request $request, PostRepository $postRepository): Response
     {
-        $search = $request->query->getString('search', '');
-        $search = trim($search);
+        $search = trim($request->query->getString('search', ''));
         $posts = $postRepository->findForAdminIndex('' !== $search ? $search : null);
 
         return $this->render('post/index.html.twig', [
@@ -93,12 +93,6 @@ final class PostController extends AbstractController
         $post->setUtilisateurId($authorEmployeId);
         $post->setDateCreation(new \DateTimeImmutable());
 
-        // Add one empty EventImage BEFORE createForm()
-        // This ensures CollectionType has entities to render
-        // The template will hide/show this section based on typePost value
-        $newEventImage = new EventImage();
-        $post->addEventImage($newEventImage);
-
         $form = $this->createForm(PostType::class, $post);
         if ($request->isMethod('POST')) {
             $post->setDateCreation(new \DateTimeImmutable());
@@ -107,7 +101,7 @@ final class PostController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $this->handleEventImageUploads($post, $form);
-            
+
             $entityManager->persist($post);
             $entityManager->flush();
 
@@ -126,8 +120,7 @@ final class PostController extends AbstractController
     #[Route('/rows', name: 'app_post_rows', methods: ['GET'])]
     public function rows(Request $request, PostRepository $postRepository): Response
     {
-        $search = $request->query->getString('search', '');
-        $search = trim($search);
+        $search = trim($request->query->getString('search', ''));
         $posts = $postRepository->findForAdminIndex('' !== $search ? $search : null);
 
         return $this->render('post/_rows.html.twig', [
@@ -136,27 +129,25 @@ final class PostController extends AbstractController
     }
 
     #[Route('/{id_post}', name: 'app_post_show', methods: ['GET'])]
-    public function show(Post $post): Response
+    public function show(#[MapEntity(id: 'id_post')] Post $post): Response
     {
-
         $apiKey = $_ENV['GOOGLE_MAPS_API_KEY'];
-        
+
         return $this->render('post/show.html.twig', [
             'post' => $post,
             'google_maps_api_key' => $apiKey,
         ]);
-
     }
 
     #[Route('/{id_post}/edit', name: 'app_post_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, Post $post, EntityManagerInterface $entityManager): Response
+    public function edit(Request $request, #[MapEntity(id: 'id_post')] Post $post, EntityManagerInterface $entityManager): Response
     {
         $form = $this->createForm(PostType::class, $post);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $this->handleEventImageUploads($post, $form);
-            
+
             $entityManager->flush();
 
             return $this->redirectToRoute('app_post_index', [], Response::HTTP_SEE_OTHER);
@@ -168,8 +159,29 @@ final class PostController extends AbstractController
         ]);
     }
 
+    #[Route('/{id_post}/images/{id_image}/delete', name: 'app_post_event_image_delete', methods: ['POST'])]
+    public function deleteEventImage(
+        Request $request,
+        #[MapEntity(id: 'id_post')] Post $post,
+        #[MapEntity(id: 'id_image')] EventImage $eventImage,
+        EntityManagerInterface $entityManager
+    ): Response {
+        if ($eventImage->getPost()?->getIdPost() !== $post->getIdPost()) {
+            throw $this->createNotFoundException('Image introuvable pour cette publication.');
+        }
+
+        if ($this->isCsrfTokenValid('delete_event_image_'.$eventImage->getIdImage(), $request->getPayload()->getString('_token'))) {
+            $this->deleteEventImageFile($eventImage);
+            $post->removeEventImage($eventImage);
+            $entityManager->remove($eventImage);
+            $entityManager->flush();
+        }
+
+        return $this->redirectToRoute('app_post_edit', ['id_post' => $post->getIdPost()], Response::HTTP_SEE_OTHER);
+    }
+
     #[Route('/{id_post}', name: 'app_post_delete', methods: ['POST'])]
-    public function delete(Request $request, Post $post, EntityManagerInterface $entityManager): Response
+    public function delete(Request $request, #[MapEntity(id: 'id_post')] Post $post, EntityManagerInterface $entityManager): Response
     {
         if ($this->isCsrfTokenValid('delete'.$post->getIdPost(), $request->getPayload()->getString('_token'))) {
             $entityManager->remove($post);
@@ -181,41 +193,62 @@ final class PostController extends AbstractController
 
     private function handleEventImageUploads(Post $post, FormInterface $form): void
     {
-        // Only process uploads for Événement posts (typePost = 2)
-        if ($post->getTypePost() !== 2) {
+        if ($post->getTypePost() !== 2 || !$form->has('event_image_files')) {
+            return;
+        }
+
+        $uploadedFiles = $form->get('event_image_files')->getData();
+        if (!\is_iterable($uploadedFiles)) {
             return;
         }
 
         $uploadDir = $this->getParameter('uploads_dir') . '/events';
         $this->ensureUploadDirectoryExists($uploadDir);
 
-        // Get the embedded eventImages form collection
-        $eventImagesForm = $form->get('eventImages');
+        $nextOrder = $this->resolveNextEventImageOrder($post);
 
-        // Process each EventImage in the collection
-        foreach ($eventImagesForm as $eventImageForm) {
-            // Get the actual EventImage entity from the form (safe mapping)
-            $eventImage = $eventImageForm->getData();
-            
-            if (!$eventImage instanceof EventImage) {
+        foreach ($uploadedFiles as $uploadedFile) {
+            if ($uploadedFile === null) {
                 continue;
             }
 
-            // Retrieve the uploaded file from the form (image_path is unmapped)
-            $uploadedFile = $eventImageForm->get('image_path')->getData();
+            $extension = $uploadedFile->guessExtension() ?: $uploadedFile->getClientOriginalExtension() ?: 'bin';
+            $filename = $this->generateUniqueFilename() . '.' . $extension;
+            $uploadedFile->move($uploadDir, $filename);
 
-            if ($uploadedFile) {
-                // Generate unique filename and move file
-                $filename = $this->generateUniqueFilename() . '.' . $uploadedFile->guessExtension();
-                $uploadedFile->move($uploadDir, $filename);
+            $eventImage = new EventImage();
+            $eventImage->setImagePath($filename);
+            $eventImage->setOrdre($nextOrder++);
 
-                // Set the filename directly on the EventImage entity
-                $eventImage->setImagePath($filename);
-            }
-
-            // Ensure the EventImage is associated with the Post
-            $eventImage->setPost($post);
+            $post->addEventImage($eventImage);
         }
+    }
+
+    private function deleteEventImageFile(EventImage $eventImage): void
+    {
+        $imagePath = $eventImage->getImagePath();
+        if (!$imagePath) {
+            return;
+        }
+
+        $filePath = $this->getParameter('uploads_dir') . '/events/' . basename($imagePath);
+        if ($this->filesystem->exists($filePath)) {
+            $this->filesystem->remove($filePath);
+        }
+    }
+
+    private function resolveNextEventImageOrder(Post $post): int
+    {
+        $maxOrder = -1;
+
+        foreach ($post->getEventImages() as $eventImage) {
+            $currentOrder = $eventImage->getOrdre();
+            if ($currentOrder !== null && $currentOrder > $maxOrder) {
+                $maxOrder = $currentOrder;
+            }
+        }
+
+        return $maxOrder + 1;
     }
 
     private function generateUniqueFilename(): string

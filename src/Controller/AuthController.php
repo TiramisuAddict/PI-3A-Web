@@ -16,8 +16,8 @@ final class AuthController extends AbstractController
     private function redirectByRole(string $role): Response
     {
         return match($role) {
-            'administrateur entreprise' => $this->redirectToRoute('RH_Home'),
-            'RH'=> $this->redirectToRoute('RH_Home'),
+            'administrateur entreprise' => $this->redirectToRoute('app_admin_dashboard'),
+            'RH'=> $this->redirectToRoute('app_admin_dashboard'),
             default => $this->redirectToRoute('employe_Home'),
         };
     }

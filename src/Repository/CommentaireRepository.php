@@ -21,6 +21,19 @@ class CommentaireRepository extends ServiceEntityRepository
         parent::__construct($registry, Commentaire::class);
     }
 
+    /**
+     * @return Commentaire[]
+     */
+    public function findForPostAdmin(int $postId): array
+    {
+        return $this->createQueryBuilder('c')
+            ->andWhere('c.post = :postId')
+            ->setParameter('postId', $postId)
+            ->orderBy('c.date_commentaire', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
 //    /**
 //     * @return Commentaire[] Returns an array of Commentaire objects
 //     */
