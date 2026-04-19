@@ -787,16 +787,20 @@ class DemandeAiAssistant
         $formationType = $this->inferFormationType($rawText);
         $currentLocation = $this->extractCurrentLocation($rawText);
         $targetLocation = $this->extractTargetLocation($rawText);
+        $hasFormationContext = $this->containsAnyWord($rawText, ['formation', 'certification', 'cours', 'training']) || '' !== $formationType;
+        $hasTransportContext = $this->containsAnyWord($rawText, ['transport', 'deplacement', 'trajet', 'navette']);
 
-        if ($this->containsAnyWord($text, ['formation', 'certification', 'transport', 'deplacement', 'deplacement'])) {
-            $customFields[] = [
-                'key' => 'ai_type_formation',
-                'label' => 'Type de formation',
-                'type' => 'select',
-                'required' => true,
-                'value' => '' !== $formationType ? $formationType : 'Autre',
-                'options' => ['Formation interne', 'Formation externe', 'Certification', 'Autre'],
-            ];
+        if ($hasFormationContext || $hasTransportContext) {
+            if ($hasFormationContext) {
+                $customFields[] = [
+                    'key' => 'ai_type_formation',
+                    'label' => 'Type de formation',
+                    'type' => 'select',
+                    'required' => true,
+                    'value' => '' !== $formationType ? $formationType : 'Autre',
+                    'options' => ['Formation interne', 'Formation externe', 'Certification', 'Autre'],
+                ];
+            }
 
             $customFields[] = [
                 'key' => 'ai_lieu_depart_actuel',
@@ -814,7 +818,7 @@ class DemandeAiAssistant
                 'value' => $targetLocation,
             ];
 
-            if ($this->containsAnyWord($text, ['transport', 'deplacement', 'deplacement']) || $this->containsWord($text, 'moyen de transport')) {
+            if ($hasTransportContext || $this->containsWord($rawText, 'moyen de transport')) {
                 $customFields[] = [
                     'key' => 'ai_type_transport',
                     'label' => 'Type de transport souhaite',
@@ -1185,7 +1189,12 @@ class DemandeAiAssistant
 
     private function extractCurrentLocation(string $rawText): string
     {
-        if (preg_match('/(?:lieu\s+de\s+d[ée]part(?:\s+actuel)?|depart\s+actuel|d[ée]part\s+de)\s*[:\-]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:vers|a|à|pour|la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;]|$)/iu', $rawText, $matches) === 1) {
+        $routeLocations = $this->extractRouteLocations($rawText);
+        if ('' !== $routeLocations['from']) {
+            return $routeLocations['from'];
+        }
+
+        if (preg_match('/(?:lieu\s+de\s+d[ée]part(?:\s+actuel)?|depart\s+actuel|d[ée]part\s+de)\s*[:\-]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:vers|a|à|pour|la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
             return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
         }
 
@@ -1198,23 +1207,65 @@ class DemandeAiAssistant
 
     private function extractTargetLocation(string $rawText): string
     {
-        if (preg_match('/(?:lieu\s+de\s+d[ée]part(?:\s+actuel)?\s*[:\-]?\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?\s+vers\s+|\bvers\s+)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;]|$)/iu', $rawText, $matches) === 1) {
+        $routeLocations = $this->extractRouteLocations($rawText);
+        if ('' !== $routeLocations['to']) {
+            return $routeLocations['to'];
+        }
+
+        if (preg_match('/(?:lieu\s+de\s+d[ée]part(?:\s+actuel)?\s*[:\-]?\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?\s+vers\s+|\bvers\s+)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
             return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
         }
 
-        if (preg_match('/formation\s+(?:a|à|dans)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;]|$)/iu', $rawText, $matches) === 1) {
+        if (preg_match('/formation\s+(?:a|à|dans)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
             return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
         }
 
-        if (preg_match('/(?:vers|destination\s*:?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;]|$)/iu', $rawText, $matches) === 1) {
+        if (preg_match('/(?:vers|destination\s*:?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
             return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
         }
 
-        if (preg_match('/\bdans\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;]|$)/iu', $rawText, $matches) === 1) {
+        if (preg_match('/\bdans\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
             return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
         }
 
         return '';
+    }
+
+    /**
+     * @return array{from:string,to:string}
+     */
+    private function extractRouteLocations(string $rawText): array
+    {
+        if (
+            preg_match('/(.{0,220}?)\bvers\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation)\b|[\.,;"\'»”]|$)/iu', $rawText, $contextMatch) === 1
+        ) {
+            $leftContext = trim((string) ($contextMatch[1] ?? ''));
+            $to = $this->cleanupLocationCandidate((string) ($contextMatch[2] ?? ''));
+
+            if (
+                preg_match('/(?:de|du|des|d[\'’]|depuis)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80})$/iu', $leftContext, $fromMatch) === 1
+            ) {
+                $from = $this->cleanupLocationCandidate((string) ($fromMatch[1] ?? ''));
+                if ('' !== $from && '' !== $to) {
+                    return ['from' => $from, 'to' => $to];
+                }
+            }
+        }
+
+        $patterns = [
+            '/\b(?:(?:de|du|des)\s+|d[\'’]\s*)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)\s+(?:vers|a|à|jusqu(?:\'|e)?\s+a?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation)\b|[\.,;"\'»”]|$)/iu',
+            '/\b(?:depuis|depart\s+de)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)\s+(?:vers|a|à|jusqu(?:\'|e)?\s+a?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation)\b|[\.,;"\'»”]|$)/iu',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $rawText, $matches) === 1) {
+                $from = $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
+                $to = $this->cleanupLocationCandidate((string) ($matches[2] ?? ''));
+                return ['from' => $from, 'to' => $to];
+            }
+        }
+
+        return ['from' => '', 'to' => ''];
     }
 
     private function cleanupLocationCandidate(string $value): string

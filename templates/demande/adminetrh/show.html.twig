@@ -242,6 +242,9 @@
         font-size: .84rem;
         line-height: 1.4;
     }
+    .post-history-panels .card {
+        height: 100%;
+    }
 </style>
 {% endblock %}
 
@@ -443,6 +446,7 @@
                             </div>
                         </div>
                     {% endif %}
+
                 </div>{# end col-lg-8 #}
 
                 {# RIGHT COLUMN #}
@@ -527,8 +531,13 @@
                         </div>
                     {% endif %}
 
+                </div>{# end col-lg-4 #}
+            </div>
+
+            <div class="row g-3 mb-3 post-history-panels">
+                <div class="col-lg-7">
                     {% if demande.status == 'Annulee' %}
-                        <div class="card mb-3">
+                        <div class="card h-100">
                             <div class="card-header" style="background:#dc3545;border-color:#dc3545;">
                                 <h3 class="card-title text-white">
                                     <i class="ti ti-ban me-2"></i>Demande Annulee
@@ -543,7 +552,7 @@
                         </div>
 
                     {% elseif demande.status == 'Rejetee' %}
-                        <div class="card mb-3">
+                        <div class="card h-100">
                             <div class="card-header" style="background:#dc3545;border-color:#dc3545;">
                                 <h3 class="card-title text-white">
                                     <i class="ti ti-x me-2"></i>Demande rejetee
@@ -567,7 +576,7 @@
                         </div>
 
                     {% elseif demande.status == 'Resolue' %}
-                        <div class="card mb-3">
+                        <div class="card h-100">
                             <div class="card-header" style="background:#28a745;border-color:#28a745;">
                                 <h3 class="card-title text-white">
                                     <i class="ti ti-circle-check me-2"></i>Demande Resolue
@@ -583,7 +592,7 @@
                         </div>
 
                     {% else %}
-                        <div class="card mb-3">
+                        <div class="card h-100">
                             <div class="card-header">
                                 <h3 class="card-title">
                                     <i class="ti ti-settings me-2"></i>Changer le statut
@@ -628,8 +637,10 @@
                             </div>
                         </div>
                     {% endif %}
+                </div>
 
-                    <div class="card">
+                <div class="col-lg-5">
+                    <div class="card h-100">
                         <div class="card-header">
                             <h3 class="card-title"><i class="ti ti-link me-2"></i>Actions rapides</h3>
                         </div>
@@ -651,8 +662,7 @@
                             </div>
                         </div>
                     </div>
-
-                </div>{# end col-lg-4 #}
+                </div>
             </div>
         </div>
     </div>
