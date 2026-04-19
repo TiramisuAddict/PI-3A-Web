@@ -361,9 +361,29 @@ final class CandidatController extends AbstractController
     }
 
     #[Route('/recrutement/dashboard/statistiques', name: 'app_recrutement_statistiques')]
-    public function statNav(CandidatRepository $candidat_repository, OffreRepository $offre_repository, SessionInterface $session): Response {
+    public function statNav(Request $request, CandidatRepository $candidat_repository, OffreRepository $offre_repository, SessionInterface $session): Response {
         $candidats = $candidat_repository->findAll();
         $offres = $offre_repository->findAll();
+
+        $selectedOffreId = $request->query->getInt('offreId', 0);
+        $selectedOffre = null;
+
+        foreach ($offres as $offre) {
+            if ($offre->getId() === $selectedOffreId) {
+                $selectedOffre = $offre;
+                break;
+            }
+        }
+
+        if (!$selectedOffre && !empty($offres)) {
+            $selectedOffre = $offres[0];
+            $selectedOffreId = $selectedOffre->getId() ?? 0;
+        }
+
+        $selectedOffreCandidats = [];
+        if ($selectedOffre) {
+            $selectedOffreCandidats = $candidat_repository->findByOffreId($selectedOffre->getId());
+        }
 
         $totalOffres = count($offres);
         $offresOuvertes = 0;
@@ -409,14 +429,55 @@ final class CandidatController extends AbstractController
             $statsEtat['Autres']++;
         }
 
+        usort($selectedOffreCandidats, fn (Candidat $a, Candidat $b) =>
+            strcmp(
+                $a->getDateCandidature()?->format('Y-m-d') ?? '',
+                $b->getDateCandidature()?->format('Y-m-d') ?? ''
+            )
+        );
+
+        $candidaturesByDay = [];
+        $scoreDistribution = [0, 0, 0, 0, 0];
+
+        foreach ($selectedOffreCandidats as $candidat) {
+            $dateLabel = $candidat->getDateCandidature()?->format('Y-m-d') ?? 'Sans date';
+
+            if (!array_key_exists($dateLabel, $candidaturesByDay)) {
+                $candidaturesByDay[$dateLabel] = 0;
+            }
+            $candidaturesByDay[$dateLabel]++;
+
+            $score = $candidat->getScore();
+            if ($score === null) {
+                continue;
+            }
+
+            if ($score < 0.2) {
+                $scoreDistribution[0]++;
+            } elseif ($score < 0.4) {
+                $scoreDistribution[1]++;
+            } elseif ($score < 0.6) {
+                $scoreDistribution[2]++;
+            } elseif ($score < 0.8) {
+                $scoreDistribution[3]++;
+            } else {
+                $scoreDistribution[4]++;
+            }
+        }
+
         return $this->render('candidat/statistics_page.html.twig', [
             'offres' => $offres,
             'candidats' => $candidats,
+            'selectedOffreId' => $selectedOffreId,
+            'selectedOffre' => $selectedOffre,
             'totalOffres' => $totalOffres,
             'offresOuvertes' => $offresOuvertes,
             'totalCandidats' => count($candidats),
             'statsEtat' => $statsEtat,
-            
+            'chartCandidatureLabels' => array_keys($candidaturesByDay),
+            'chartCandidatureValues' => array_values($candidaturesByDay),
+            'chartScoreDistributionLabels' => ['0.0-0.2', '0.2-0.4', '0.4-0.6', '0.6-0.8', '0.8-1.0'],
+            'chartScoreDistributionValues' => $scoreDistribution,
             'email' => $session->get('employe_email') ?? '',
             'role' => $session->get('employe_role') ?? '',
         ]);
