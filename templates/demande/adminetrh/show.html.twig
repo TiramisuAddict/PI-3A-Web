@@ -91,42 +91,6 @@
     }
     .status-option-btn.btn-reject:hover { background:#dc3545; color:white; }
 
-    .resolved-banner {
-        background: linear-gradient(135deg,#f0fff4 0%,#d4edda 100%);
-        border: 1.5px solid #c3e6cb;
-        border-radius: 10px;
-        padding: 18px 22px;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        margin-bottom: 20px;
-    }
-    .resolved-banner .resolved-icon {
-        width: 46px; height: 46px; border-radius: 50%;
-        background: #28a745;
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    }
-    .resolved-banner h4 { margin:0 0 4px; font-size:1rem; font-weight:700; color:#155724; }
-    .resolved-banner p  { margin:0; color:#1e7e34; font-size:.875rem; }
-
-    .cancelled-banner {
-        background: linear-gradient(135deg,#fff5f5 0%,#ffe0e0 100%);
-        border: 1.5px solid #f5c6cb;
-        border-radius: 10px;
-        padding: 18px 22px;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        margin-bottom: 20px;
-    }
-    .cancelled-banner .cancelled-icon {
-        width: 46px; height: 46px; border-radius: 50%;
-        background: #dc3545;
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    }
-    .cancelled-banner h4 { margin:0 0 4px; font-size:1rem; font-weight:700; color:#842029; }
-    .cancelled-banner p  { margin:0; color:#b02a37; font-size:.875rem; }
-
     .modal-comment-label {
         font-size: 0.8rem;
         font-weight: 600;
@@ -242,8 +206,264 @@
         font-size: .84rem;
         line-height: 1.4;
     }
-    .post-history-panels .card {
-        height: 100%;
+
+    /* Harmonize global card layout and AI block styling */
+    .page-wrapper {
+        background: #f5f7fb;
+    }
+
+    .page-body .card {
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+        overflow: hidden;
+    }
+
+    .page-body .card-header {
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 14px 18px;
+    }
+
+    .page-body .card-body {
+        padding: 18px;
+    }
+
+    .card-title {
+        font-size: 1.03rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0;
+    }
+
+    .detail-value {
+        line-height: 1.5;
+        word-break: break-word;
+    }
+
+    .timeline-item {
+        padding-left: 20px;
+        padding-bottom: 14px;
+    }
+
+    .status-option-btn {
+        min-height: 45px;
+        border-width: 1.5px;
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: none;
+        padding: 8px 12px;
+        font-size: .88rem;
+    }
+
+    .status-option-btn i {
+        font-size: 1rem;
+        opacity: .95;
+    }
+
+    .sidebar-stack {
+        position: sticky;
+        top: 80px;
+    }
+
+    .sidebar-stack .card {
+        margin-bottom: 14px;
+    }
+
+    .sidebar-stack .card:last-child {
+        margin-bottom: 0;
+    }
+
+    .status-management-card .card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .status-current-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #f8fafc;
+    }
+
+    .status-current-label {
+        color: #475569;
+        font-size: .8rem;
+        text-transform: uppercase;
+        letter-spacing: .45px;
+        font-weight: 700;
+    }
+
+    .status-picker-label {
+        font-size: .76rem;
+        letter-spacing: .45px;
+        font-weight: 700;
+    }
+
+    .status-help {
+        border-radius: 10px;
+        padding: 10px 12px;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        font-size: .84rem;
+        line-height: 1.4;
+    }
+
+    .status-help i {
+        font-size: 1rem;
+        margin-top: 1px;
+    }
+
+    .status-help-danger {
+        background: #fff1f2;
+        color: #9f1239;
+        border: 1px solid #fecdd3;
+    }
+
+    .status-help-success {
+        background: #f0fdf4;
+        color: #166534;
+        border: 1px solid #bbf7d0;
+    }
+
+    .status-option-btn.btn-encours {
+        color: #a16207;
+        border-color: #fbbf24;
+        background: #fffaf0;
+    }
+    .status-option-btn.btn-encours:hover {
+        background: #fef3c7;
+        color: #854d0e;
+    }
+
+    .status-option-btn.btn-attente {
+        color: #c2410c;
+        border-color: #fb923c;
+        background: #fff7ed;
+    }
+    .status-option-btn.btn-attente:hover {
+        background: #ffedd5;
+        color: #9a3412;
+    }
+
+    .status-option-btn.btn-resolve {
+        color: #166534;
+        border-color: #4ade80;
+        background: #f0fdf4;
+    }
+    .status-option-btn.btn-resolve:hover {
+        background: #dcfce7;
+        color: #14532d;
+    }
+
+    .status-option-btn.btn-reject {
+        color: #b91c1c;
+        border-color: #f87171;
+        background: #fef2f2;
+    }
+    .status-option-btn.btn-reject:hover {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .decision-card {
+        border: 1px solid #dbe7ff;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.07);
+    }
+
+    .decision-card .card-header {
+        background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%);
+        padding: 12px 14px;
+    }
+
+    .decision-card .card-body {
+        padding: 12px 14px;
+    }
+
+    .decision-score {
+        min-width: 42px;
+        height: 42px;
+        font-size: .8rem;
+    }
+
+    .decision-pill {
+        padding: 4px 8px;
+        font-size: .72rem;
+        gap: 4px;
+    }
+
+    .decision-card .text-secondary {
+        font-size: .84rem !important;
+    }
+
+    .decision-list li {
+        line-height: 1.38;
+        font-size: .84rem;
+    }
+
+    .decision-list li + li {
+        margin-top: 4px;
+    }
+
+    .decision-meta {
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .decision-meta .meta-chip {
+        padding: 4px 8px;
+        font-size: .74rem;
+    }
+
+    .spam-indicator {
+        border-radius: 12px;
+        gap: 10px;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+
+    .spam-score {
+        min-width: 38px;
+        height: 38px;
+        font-size: .78rem;
+    }
+
+    .spam-copy strong {
+        font-size: .78rem;
+    }
+
+    .spam-copy span {
+        font-size: .77rem;
+    }
+
+    .badge.bg-warning {
+        color: #4b5563 !important;
+    }
+
+    @media (max-width: 991.98px) {
+        .page-body .card-body {
+            padding: 14px;
+        }
+
+        .status-option-btn {
+            min-height: 42px;
+            font-size: .84rem;
+        }
+
+        .sidebar-stack {
+            position: static;
+            top: auto;
+        }
+
+        .decision-card .card-body {
+            padding: 10px 12px;
+        }
     }
 </style>
 {% endblock %}
@@ -291,38 +511,9 @@
                 </div>
             {% endfor %}
 
-            {% if demande.status == 'Annulee' %}
-            <div class="cancelled-banner">
-                <div class="cancelled-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
-                         fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </div>
-                <div>
-                    <h4>Demande annulee par l'employe</h4>
-                    <p>Cette demande a ete annulee. Elle ne peut plus etre traitee ni changer de statut.</p>
-                </div>
-            </div>
-            {% elseif demande.status == 'Resolue' %}
-            <div class="resolved-banner">
-                <div class="resolved-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
-                         fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                </div>
-                <div>
-                    <h4>Demande resolue</h4>
-                    <p>Cette demande a ete resolue. Le statut est definitif. Vous pouvez toujours modifier ses informations.</p>
-                </div>
-            </div>
-            {% endif %}
-
-            <div class="row">
+            <div class="row g-4 align-items-start">
                 {# LEFT COLUMN #}
-                <div class="col-lg-8">
+                <div class="col-xl-8 col-lg-7">
                     <div class="card mb-3">
                         <div class="card-header">
                             <h3 class="card-title"><i class="ti ti-info-circle me-2"></i>Informations generales</h3>
@@ -450,7 +641,97 @@
                 </div>{# end col-lg-8 #}
 
                 {# RIGHT COLUMN #}
-                <div class="col-lg-4">
+                <div class="col-xl-4 col-lg-5">
+                    <div class="sidebar-stack">
+
+                        <div class="card status-management-card mb-3">
+                            <div class="card-header">
+                                <h3 class="card-title"><i class="ti ti-settings me-2"></i>Gestion du statut</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="status-current-row">
+                                    <span class="status-current-label">Statut actuel</span>
+                                    <span class="status-current-badge">
+                                        {% if demande.status == 'Nouvelle' %}
+                                            <span class="badge bg-info"><i class="ti ti-sparkles me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'En cours' %}
+                                            <span class="badge bg-warning"><i class="ti ti-loader me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'En attente' %}
+                                            <span class="badge bg-orange"><i class="ti ti-clock me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Resolue' %}
+                                            <span class="badge bg-success"><i class="ti ti-check me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Rejetee' %}
+                                            <span class="badge bg-danger"><i class="ti ti-x me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Reconsideration' %}
+                                            <span class="badge bg-primary"><i class="ti ti-lock-open me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Annulee' %}
+                                            <span class="badge bg-danger"><i class="ti ti-ban me-1"></i>{{ demande.status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary"><i class="ti ti-lock me-1"></i>{{ demande.status }}</span>
+                                        {% endif %}
+                                    </span>
+                                </div>
+
+                                {% if demande.status == 'Annulee' %}
+                                    <div class="status-help status-help-danger">
+                                        <i class="ti ti-alert-circle"></i>
+                                        <span>La demande a ete annulee par l'employe. Aucun changement de statut n'est possible.</span>
+                                    </div>
+                                {% elseif demande.status == 'Rejetee' %}
+                                    <div class="status-help status-help-danger">
+                                        <i class="ti ti-lock"></i>
+                                        <span>Demande verrouillee. Utilisez la reconsideration pour rouvrir le traitement.</span>
+                                    </div>
+                                    <button type="button"
+                                            class="btn btn-primary w-100"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalStatus-reconsideration">
+                                        <i class="ti ti-lock-open me-1"></i>Passer en reconsideration
+                                    </button>
+                                {% elseif demande.status == 'Resolue' %}
+                                    <div class="status-help status-help-success">
+                                        <i class="ti ti-checks"></i>
+                                        <span>La demande est resolue. Le statut est final, mais les informations peuvent toujours etre modifiees.</span>
+                                    </div>
+                                {% else %}
+                                    <label class="form-label text-muted mb-2 status-picker-label">
+                                        CHOISIR UN NOUVEAU STATUT
+                                    </label>
+
+                                    {% if demande.status != 'En cours' %}
+                                    <button type="button"
+                                            class="status-option-btn btn-encours"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalStatus-encours">
+                                        <i class="ti ti-loader"></i>Passer en cours
+                                    </button>
+                                    {% endif %}
+
+                                    {% if demande.status != 'En attente' %}
+                                    <button type="button"
+                                            class="status-option-btn btn-attente"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalStatus-attente">
+                                        <i class="ti ti-clock"></i>Mettre en attente
+                                    </button>
+                                    {% endif %}
+
+                                    <button type="button"
+                                            class="status-option-btn btn-resolve"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalStatus-resolue">
+                                        <i class="ti ti-check"></i>Marquer comme resolue
+                                    </button>
+
+                                    <button type="button"
+                                            class="status-option-btn btn-reject"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalStatus-rejetee">
+                                        <i class="ti ti-x"></i>Rejeter la demande
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
 
                     {% if decisionAdvice %}
                         {% set recommendationClass = decisionAdvice.recommendedStatus == 'Resolue' ? 'resolve' : (decisionAdvice.recommendedStatus == 'En attente' ? 'wait' : (decisionAdvice.recommendedStatus == 'Rejetee' ? 'reject' : 'review')) %}
@@ -531,139 +812,11 @@
                         </div>
                     {% endif %}
 
+                    </div>
+
                 </div>{# end col-lg-4 #}
             </div>
 
-            <div class="row g-3 mb-3 post-history-panels">
-                <div class="col-lg-7">
-                    {% if demande.status == 'Annulee' %}
-                        <div class="card h-100">
-                            <div class="card-header" style="background:#dc3545;border-color:#dc3545;">
-                                <h3 class="card-title text-white">
-                                    <i class="ti ti-ban me-2"></i>Demande Annulee
-                                </h3>
-                            </div>
-                            <div class="card-body">
-                                <p class="text-muted mb-0">
-                                    <i class="ti ti-alert-circle me-1 text-danger"></i>
-                                    Cette demande a ete annulee par l'employe. Aucune action de modification n'est possible.
-                                </p>
-                            </div>
-                        </div>
-
-                    {% elseif demande.status == 'Rejetee' %}
-                        <div class="card h-100">
-                            <div class="card-header" style="background:#dc3545;border-color:#dc3545;">
-                                <h3 class="card-title text-white">
-                                    <i class="ti ti-x me-2"></i>Demande rejetee
-                                </h3>
-                            </div>
-                            <div class="card-body">
-                                <p class="text-muted mb-2">
-                                    <i class="ti ti-alert-circle me-1 text-danger"></i>
-                                    Cette demande est verrouillee pour les changements de statut.
-                                </p>
-                                <p class="text-muted mb-3">
-                                    Cliquez sur <strong>Reconsideration</strong> pour rouvrir les changements de statut.
-                                </p>
-                                <button type="button"
-                                        class="btn btn-primary w-100"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modalStatus-reconsideration">
-                                        <i class="ti ti-lock-open me-1"></i>Passer en reconsideration
-                                </button>
-                            </div>
-                        </div>
-
-                    {% elseif demande.status == 'Resolue' %}
-                        <div class="card h-100">
-                            <div class="card-header" style="background:#28a745;border-color:#28a745;">
-                                <h3 class="card-title text-white">
-                                    <i class="ti ti-circle-check me-2"></i>Demande Resolue
-                                </h3>
-                            </div>
-                            <div class="card-body">
-                                <p class="text-muted mb-0">
-                                    <i class="ti ti-lock me-1 text-success"></i>
-                                    Le statut est definitif et ne peut plus etre modifie.
-                                    Vous pouvez toujours modifier les informations via le bouton Modifier.
-                                </p>
-                            </div>
-                        </div>
-
-                    {% else %}
-                        <div class="card h-100">
-                            <div class="card-header">
-                                <h3 class="card-title">
-                                    <i class="ti ti-settings me-2"></i>Changer le statut
-                                </h3>
-                            </div>
-                            <div class="card-body">
-                                <label class="form-label text-muted mb-3" style="font-size:0.8rem;">
-                                    CHOISIR UN NOUVEAU STATUT
-                                </label>
-
-                                {% if demande.status != 'En cours' %}
-                                <button type="button"
-                                        class="status-option-btn btn-encours"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modalStatus-encours">
-                                    <i class="ti ti-loader"></i>Passer en cours
-                                </button>
-                                {% endif %}
-
-                                {% if demande.status != 'En attente' %}
-                                <button type="button"
-                                        class="status-option-btn btn-attente"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modalStatus-attente">
-                                    <i class="ti ti-clock"></i>Mettre en attente
-                                </button>
-                                {% endif %}
-
-                                <button type="button"
-                                        class="status-option-btn btn-resolve"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modalStatus-resolue">
-                                    <i class="ti ti-check"></i>Marquer comme resolue
-                                </button>
-
-                                <button type="button"
-                                        class="status-option-btn btn-reject"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modalStatus-rejetee">
-                                    <i class="ti ti-x"></i>Rejeter la demande
-                                </button>
-                            </div>
-                        </div>
-                    {% endif %}
-                </div>
-
-                <div class="col-lg-5">
-                    <div class="card h-100">
-                        <div class="card-header">
-                            <h3 class="card-title"><i class="ti ti-link me-2"></i>Actions rapides</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="d-grid gap-2">
-                                {% if demande.status != 'Annulee' %}
-                                    <a href="{{ path('demande_edit', {id: demande.idDemande}) }}"
-                                       class="btn btn-outline-primary">
-                                        <i class="ti ti-edit me-1"></i>Modifier
-                                    </a>
-                                {% else %}
-                                    <button class="btn btn-outline-secondary" disabled>
-                                        <i class="ti ti-lock me-1"></i>Modifier (Indisponible)
-                                    </button>
-                                {% endif %}
-                                <a href="{{ path('demande_index') }}" class="btn btn-outline-secondary">
-                                    <i class="ti ti-arrow-left me-1"></i>Retour a la liste
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
