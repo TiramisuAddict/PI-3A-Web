@@ -8,7 +8,7 @@
         .dashboard-hr {
             background: #f5f7fb;
             min-height: 100vh;
-            padding: 1.5rem 0 2rem;
+            padding: 1.25rem 0 2rem;
         }
 
         .offer-item {
@@ -97,11 +97,11 @@
 
 {% block javascripts %}
     {{ parent() }}
-    <script src="https://cdn.jsdelivr.net/npm/tinymce@7/tinymce.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const modalTitle = document.getElementById('offreModalTitle');
             const modalSubtitle = document.getElementById('offreModalSubtitle');
+            const offreModal = document.getElementById('offreModal');
 
             const createAction = '{{ path('app_offre_create') }}';
             const updateActionTemplate = '{{ path('app_offre_update', { id: '__ID__' }) }}';
@@ -115,14 +115,64 @@
             const categorieInput = document.getElementById('{{ form.categorie.vars.id }}');
             const descriptionInput = document.getElementById('{{ form.description.vars.id }}');
 
-            if (window.tinymce) {
-                tinymce.init({
-                    selector: '.tinymce-editor',
-                    menubar: false,
-                    height: 220,
-                    plugins: 'lists link code',
-                    toolbar: 'undo redo | bold italic underline | bullist numlist | link | code',
-                    branding: false
+            let tinyMceInitPromise = null;
+
+            function initTinyMceIfNeeded() {
+                if (!descriptionInput) {
+                    return Promise.resolve();
+                }
+
+                if (window.tinymce && window.tinymce.get('{{ form.description.vars.id }}')) {
+                    return Promise.resolve();
+                }
+
+                if (tinyMceInitPromise) {
+                    return tinyMceInitPromise;
+                }
+
+                tinyMceInitPromise = new Promise(function (resolve) {
+                    function startEditor() {
+                        if (!window.tinymce) {
+                            resolve();
+                            return;
+                        }
+
+                        window.tinymce.init({
+                            selector: '.tinymce-editor',
+                            menubar: false,
+                            height: 220,
+                            plugins: 'lists link code',
+                            toolbar: 'undo redo | bold italic underline | bullist numlist | link | code',
+                            branding: false,
+                            setup: function (editor) {
+                                editor.on('init', function () {
+                                    resolve();
+                                });
+                            }
+                        });
+                    }
+
+                    if (window.tinymce) {
+                        startEditor();
+                        return;
+                    }
+
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/tinymce@7/tinymce.min.js';
+                    script.referrerPolicy = 'origin';
+                    script.onload = startEditor;
+                    script.onerror = function () {
+                        resolve();
+                    };
+                    document.head.appendChild(script);
+                });
+
+                return tinyMceInitPromise;
+            }
+
+            if (offreModal) {
+                offreModal.addEventListener('show.bs.modal', function () {
+                    initTinyMceIfNeeded();
                 });
             }
 
@@ -406,7 +456,6 @@
                         {{ form_end(form, {'render_rest': false}) }}
                     </div>
                 </div>
-            </div>
             </div>
         </div>
         {# Modal ============================================================== #}

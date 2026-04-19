@@ -1,0 +1,230 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Statistiques | Dashboard RH{% endblock %}
+
+{% block stylesheets %}
+	{{ parent() }}
+	<style>
+		.stats-dashboard {
+			background: #f5f7fb;
+			min-height: 100vh;
+			padding: 1.25rem 0 2rem;
+		}
+
+		.stats-card {
+			border: 1px solid rgba(15, 23, 42, 0.08);
+			border-radius: 10px;
+			background: #fff;
+		}
+
+		.stat-label {
+			font-size: .875rem;
+			color: #64748b;
+			margin-bottom: .25rem;
+		}
+
+		.stat-value {
+			font-size: 1.8rem;
+			line-height: 1.1;
+			font-weight: 700;
+			color: #111827;
+		}
+	</style>
+{% endblock %}
+
+{% block body %}
+	{{ include('components/navbar.html.twig') }}
+	<div class="d-flex" style="min-height:calc(100vh - 56px);">
+		{{ include('components/sidebar.html.twig', {'active_page': 'offres','sidebar_role': role}) }}
+
+		<div class="stats-dashboard flex-grow-1">
+			<div class="container-xl">
+				{{ include('offre/_navigation_tab.html.twig') }}
+
+				<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+					<div>
+						<h1 class="h2 mb-1">Statistiques de recrutement</h1>
+						<p class="text-secondary mb-0">Vue rapide et simple des offres et candidatures.</p>
+					</div>
+				</div>
+
+				<div class="row g-3 mb-3">
+					<div class="col-12 col-md-6 col-xl-3">
+						<div class="stats-card p-3 h-100">
+							<div class="stat-label">Total offres</div>
+							<div class="stat-value">{{ totalOffres }}</div>
+						</div>
+					</div>
+
+					<div class="col-12 col-md-6 col-xl-3">
+						<div class="stats-card p-3 h-100">
+							<div class="stat-label">Offres ouvertes</div>
+							<div class="stat-value">{{ offresOuvertes }}</div>
+						</div>
+					</div>
+
+					<div class="col-12 col-md-6 col-xl-3">
+						<div class="stats-card p-3 h-100">
+							<div class="stat-label">Total candidats</div>
+							<div class="stat-value">{{ totalCandidats }}</div>
+						</div>
+					</div>
+
+					<div class="col-12 col-md-6 col-xl-3">
+						<div class="stats-card p-3 h-100">
+							<div class="stat-label">Candidats traites</div>
+							<div class="stat-value">{{ totalCandidats - statsEtat['En attente'] }}</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="card stats-card">
+					<div class="card-body">
+						<h3 class="card-title mb-3">Repartition par etat</h3>
+
+						<div class="row g-2">
+							<div class="col-12 col-md-6 col-xl-4">
+								<div class="d-flex justify-content-between align-items-center p-2 border rounded">
+									<span>En attente</span>
+									<span class="badge bg-yellow-lt text-yellow">{{ statsEtat['En attente'] }}</span>
+								</div>
+							</div>
+							<div class="col-12 col-md-6 col-xl-4">
+								<div class="d-flex justify-content-between align-items-center p-2 border rounded">
+									<span>Preselectionnes</span>
+									<span class="badge bg-blue-lt text-blue">{{ statsEtat['Preselectionne'] }}</span>
+								</div>
+							</div>
+							<div class="col-12 col-md-6 col-xl-4">
+								<div class="d-flex justify-content-between align-items-center p-2 border rounded">
+									<span>Acceptees</span>
+									<span class="badge bg-green-lt text-green">{{ statsEtat['Acceptee'] }}</span>
+								</div>
+							</div>
+							<div class="col-12 col-md-6 col-xl-4">
+								<div class="d-flex justify-content-between align-items-center p-2 border rounded">
+									<span>Refuses</span>
+									<span class="badge bg-red-lt text-red">{{ statsEtat['Refuse'] }}</span>
+								</div>
+							</div>
+							<div class="col-12 col-md-6 col-xl-4">
+								<div class="d-flex justify-content-between align-items-center p-2 border rounded">
+									<span>Autres</span>
+									<span class="badge bg-secondary-lt text-secondary">{{ statsEtat['Autres'] }}</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+                <div class="card stats-card">
+                    Moyen de{{ (totalCandidats / totalOffres) |number_format(2) }} candidats par offre
+                     </div>
+
+                {# offres #}
+                Choose offre:
+                <select class="form-select w-auto" onchange="location = this.value;">
+                    <option value="{{ path('app_recrutement_statistiques') }}" {% if !selectedOffre %}selected{% endif %}>Toutes les offres</option>
+                    {% for offre in offres %}
+                        <option value="{{ path('app_recrutement_statistiques', { offreId: offre.id }) }}" {% if selectedOffre and selectedOffre.id == offre.id %}selected{% endif %}>
+                            {{ offre.titre }}
+                        </option>
+                    {% endfor %}
+                </select>
+			</div>
+
+            {# tabler line chart for number of candidtures in function of time #}
+            <div class="card">
+                <div class="card-body">
+                    <div id="chart-demo-line" class="position-relative "></div>
+                </div>
+                </div>
+
+                <script>
+                    document.addEventListener("DOMContentLoaded", function () {
+                        window.ApexCharts && (new ApexCharts(document.getElementById('chart-demo-line'), {
+                            chart: {
+                                type: "line",
+                                fontFamily: 'inherit',
+                                height: 240,
+                                parentHeightOffset: 0,
+                                toolbar: {
+                                    show: false,
+                                },
+                                animations: {
+                                    enabled: false
+                                },
+                            },
+                            stroke: {
+                                width: 2,
+                                lineCap: "round",
+                                curve: "straight",
+                            },
+                            series: [{
+                                name: "Session Duration",
+                                data: [117, 92, 94, 98, 75, 110, 69, 80, 109, 113, 115, 95]
+                            },{
+                                name: "Page Views",
+                                data: [59, 80, 61, 66, 70, 84, 87, 64, 94, 56, 55, 67]
+                            },{
+                                name: "Total Visits",
+                                data: [53, 51, 52, 41, 46, 60, 45, 43, 30, 50, 58, 59]
+                            }],
+                            tooltip: {
+                                theme: 'dark'
+                            },
+                            grid: {
+                                padding: {
+                                    top: -20,
+                                    right: 0,
+                                    left: -4,
+                                    bottom: -4
+                                },
+                                strokeDashArray: 4,
+                            },
+                            xaxis: {
+                                labels: {
+                                    padding: 0,
+                                },
+                                tooltip: {
+                                    enabled: false
+                                },
+                                type: 'datetime',
+                            },
+                            yaxis: {
+                                labels: {
+                                    padding: 4
+                                },
+                            },
+                            labels: [
+                                '2020-06-21', '2020-06-22', '2020-06-23', '2020-06-24', '2020-06-25', '2020-06-26', '2020-06-27', '2020-06-28', '2020-06-29', '2020-06-30', '2020-07-01', '2020-07-02'
+                            ],
+                            colors: [
+                                'color-mix(in srgb, transparent, var(--tblr-yellow) 100%)', 
+                                'color-mix(in srgb, transparent, var(--tblr-green) 100%)', 
+                                'color-mix(in srgb, transparent, var(--tblr-primary) 100%)'
+                            ],
+                            legend: {
+                                show: true,
+                                position: 'bottom',
+                                offsetY: 12,
+                                markers: {
+                                    width: 10,
+                                    height: 10,
+                                    radius: 100,
+                                },
+                                itemMargin: {
+                                    horizontal: 8,
+                                    vertical: 8
+                                },
+                            },
+                        })).render();
+                    });
+                </script>
+
+
+            {# a chart about scores #}
+                
+		</div>
+	</div>
+{% endblock %}

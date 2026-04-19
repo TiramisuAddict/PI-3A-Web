@@ -210,17 +210,16 @@
 			<div class="col-12 col-xl-4">
 				<div class="card panel-card details-sticky">
 					<div class="card-body">
-						<h3 class="card-title mb-3 h2">Details du Candidat</h3>
 
 						{% if selectedCandidat %}
-							<div class="details-section">
+							<div class="mb-2">
 								<div class="fw-bold fs-3 text-dark mb-1">{{ selectedCandidat.visiteur.nom }} {{ selectedCandidat.visiteur.prenom }}</div>
 								<div class="text-secondary">{{ selectedCandidat.visiteur.eMail }}</div>
 								<div class="text-secondary">{{ selectedCandidat.visiteur.telephone }}</div>
 							</div>
 
 							<div class="details-section">
-								<div class="h3 mb-2">Documents</div>
+								<div class="h4 mb-2">Documents</div>
 								<div class="doc-actions">
 									{% if selectedCandidat.cvData %}
 										<a href="{{ path('app_candidature_download_cv', { id: selectedCandidat.id }) }}" class="btn btn-primary" target="_blank" rel="noopener">

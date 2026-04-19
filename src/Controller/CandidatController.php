@@ -359,4 +359,67 @@ final class CandidatController extends AbstractController
 
         return true;
     }
+
+    #[Route('/recrutement/dashboard/statistiques', name: 'app_recrutement_statistiques')]
+    public function statNav(CandidatRepository $candidat_repository, OffreRepository $offre_repository, SessionInterface $session): Response {
+        $candidats = $candidat_repository->findAll();
+        $offres = $offre_repository->findAll();
+
+        $totalOffres = count($offres);
+        $offresOuvertes = 0;
+
+        foreach ($offres as $offre) {
+            $etat = strtoupper((string) $offre->getEtat());
+            if ($etat === 'OUVERT') {
+                $offresOuvertes++;
+            }
+        }
+
+        $statsEtat = [
+            'En attente' => 0,
+            'Preselectionne' => 0,
+            'Acceptee' => 0,
+            'Refuse' => 0,
+            'Autres' => 0,
+        ];
+
+        foreach ($candidats as $candidat) {
+            $etat = mb_strtolower(trim((string) $candidat->getEtat()));
+
+            if (str_contains($etat, 'attente')) {
+                $statsEtat['En attente']++;
+                continue;
+            }
+
+            if (str_contains($etat, 'preselection') || str_contains($etat, 'presel')) {
+                $statsEtat['Preselectionne']++;
+                continue;
+            }
+
+            if (str_contains($etat, 'accept')) {
+                $statsEtat['Acceptee']++;
+                continue;
+            }
+
+            if (str_contains($etat, 'refus')) {
+                $statsEtat['Refuse']++;
+                continue;
+            }
+
+            $statsEtat['Autres']++;
+        }
+
+        return $this->render('candidat/statistics_page.html.twig', [
+            'offres' => $offres,
+            'candidats' => $candidats,
+            'totalOffres' => $totalOffres,
+            'offresOuvertes' => $offresOuvertes,
+            'totalCandidats' => count($candidats),
+            'statsEtat' => $statsEtat,
+            
+            'email' => $session->get('employe_email') ?? '',
+            'role' => $session->get('employe_role') ?? '',
+        ]);
+    }
+
 }
