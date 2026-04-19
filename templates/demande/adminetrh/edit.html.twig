@@ -8,6 +8,14 @@
 <style>
     .form-label.required::after { content: " *"; color: #dc2626; }
     .field-error { color: #dc2626; font-size: 0.875rem; margin-top: 6px; display: block; }
+    .client-valid {
+        border-color: #16a34a !important;
+        background: #f0fdf4 !important;
+        box-shadow: 0 0 0 0.16rem rgba(34, 197, 94, 0.12);
+    }
+    .field-label-valid {
+        color: #166534 !important;
+    }
     .map-wrapper { position: relative; }
     .map-zoom-controls { position: absolute; top: 10px; left: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 4px; }
     .map-zoom-controls button { width: 32px; height: 32px; background: white; border: 1px solid #ddd; border-radius: 4px; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
@@ -258,11 +266,22 @@
     var selectedLocations = {};
 
     document.addEventListener("DOMContentLoaded", function () {
+        var form = document.getElementById("demandeForm");
         var categorieSelect = document.getElementById("demande_categorie");
         var typeSelect = document.getElementById("demande_typeDemande");
         var typeInfo = document.getElementById("typeInfo");
         var dynamicFieldsCard = document.getElementById("dynamicFieldsCard");
         var dynamicFieldsContainer = document.getElementById("dynamicFields");
+
+        setupLiveFieldValidation(form);
+
+        if (form) {
+            form.addEventListener("submit", function (event) {
+                if (!validateDemandeFormBeforeSubmit(form)) {
+                    event.preventDefault();
+                }
+            });
+        }
 
         if (CURRENT_TYPE) {
             loadFields(CURRENT_TYPE, EXISTING_DETAILS, dynamicFieldsContainer, dynamicFieldsCard);
@@ -543,10 +562,222 @@
         container.appendChild(error);
     }
 
+    function applyInputConstraints(inputEl, field) {
+        if (!inputEl || !field) return;
+
+        var isRequired = !!field.required && field.type !== "hidden";
+        if (isRequired) {
+            inputEl.required = true;
+            inputEl.setAttribute("data-required", "1");
+        }
+
+        inputEl.setAttribute("data-field-key", String(field.key || ""));
+        inputEl.setAttribute("data-field-label", String(field.label || field.key || ""));
+    }
+
+    function getInputLabelText(inputEl) {
+        if (!inputEl) return "ce champ";
+
+        var directLabel = String(inputEl.getAttribute("data-field-label") || "").trim();
+        if (directLabel) {
+            return directLabel;
+        }
+
+        var id = String(inputEl.id || "").trim();
+        if (id) {
+            var labelEl = document.querySelector('label[for="' + id.replace(/"/g, '\\"') + '"]');
+            if (labelEl) {
+                return String(labelEl.textContent || "").replace(/\*/g, "").trim() || "ce champ";
+            }
+        }
+
+        var name = String(inputEl.getAttribute("name") || "").trim();
+        if (name) {
+            return name
+                .replace(/^details\[/, "")
+                .replace(/^demande\[/, "")
+                .replace(/\]$/, "")
+                .replace(/_/g, " ") || "ce champ";
+        }
+
+        return "ce champ";
+    }
+
+    function getClientFieldToken(inputEl) {
+        if (!inputEl) return "";
+        var byName = String(inputEl.getAttribute("name") || "").trim();
+        if (byName) return byName;
+        return String(inputEl.id || "").trim();
+    }
+
+    function resolveInputLabelElement(inputEl) {
+        if (!inputEl) return null;
+
+        var form = inputEl.closest("form") || document;
+        var id = String(inputEl.id || "").trim();
+        if (id) {
+            var byFor = form.querySelector('label[for="' + id.replace(/"/g, '\\"') + '"]');
+            if (byFor) return byFor;
+        }
+
+        var fieldKey = String(inputEl.getAttribute("data-field-key") || "").trim();
+        if (fieldKey) {
+            var escaped = fieldKey.replace(/"/g, '\\"');
+            var byKey = form.querySelector('label[data-field-key="' + escaped + '"]');
+            if (byKey) return byKey;
+        }
+
+        var group = inputEl.closest(".mb-3, .col-md-6, .col-12");
+        if (group) {
+            return group.querySelector("label.form-label");
+        }
+
+        return null;
+    }
+
+    function setInputLabelValidState(inputEl, isValid) {
+        var labelEl = resolveInputLabelElement(inputEl);
+        if (!labelEl) return;
+
+        if (isValid) {
+            labelEl.classList.add("field-label-valid");
+        } else {
+            labelEl.classList.remove("field-label-valid");
+        }
+    }
+
+    function clearClientErrorForInput(inputEl) {
+        if (!inputEl) return;
+        var token = getClientFieldToken(inputEl);
+        if (!token) return;
+
+        var form = inputEl.closest("form");
+        if (!form) return;
+
+        var escaped = token.replace(/"/g, '\\"');
+        var errors = form.querySelectorAll('.client-field-error[data-field="' + escaped + '"]');
+        for (var i = 0; i < errors.length; i++) {
+            errors[i].remove();
+        }
+    }
+
+    function clearClientFieldErrors(form) {
+        if (!form) return;
+
+        var errors = form.querySelectorAll(".client-field-error");
+        for (var i = 0; i < errors.length; i++) {
+            errors[i].remove();
+        }
+
+        var invalidInputs = form.querySelectorAll(".client-invalid");
+        for (var j = 0; j < invalidInputs.length; j++) {
+            invalidInputs[j].classList.remove("client-invalid");
+            invalidInputs[j].classList.remove("is-invalid");
+            invalidInputs[j].classList.remove("is-invalid-custom");
+        }
+    }
+
+    function updateClientFieldVisualState(inputEl) {
+        if (!inputEl || inputEl.disabled) return;
+
+        var inputType = String(inputEl.type || "").toLowerCase();
+        if (inputType === "hidden") return;
+
+        var isRequired = inputEl.hasAttribute("required") || inputEl.getAttribute("data-required") === "1";
+        if (!isRequired) return;
+
+        var value = String(inputEl.value || "").trim();
+        if (value === "") {
+            inputEl.classList.remove("is-valid");
+            inputEl.classList.remove("client-valid");
+            setInputLabelValidState(inputEl, false);
+            return;
+        }
+
+        clearClientErrorForInput(inputEl);
+        inputEl.classList.remove("client-invalid");
+        inputEl.classList.remove("is-invalid");
+        inputEl.classList.remove("is-invalid-custom");
+        inputEl.classList.add("is-valid");
+        inputEl.classList.add("client-valid");
+        setInputLabelValidState(inputEl, true);
+    }
+
+    function appendClientFieldError(inputEl, message) {
+        if (!inputEl || !message) return;
+
+        clearClientErrorForInput(inputEl);
+
+        inputEl.classList.add("client-invalid");
+        inputEl.classList.remove("is-valid");
+        inputEl.classList.remove("client-valid");
+        setInputLabelValidState(inputEl, false);
+        if (inputEl.closest("#dynamicFields")) {
+            inputEl.classList.add("is-invalid-custom");
+        } else {
+            inputEl.classList.add("is-invalid");
+        }
+
+        var error = document.createElement("div");
+        error.className = "field-error client-field-error";
+        error.textContent = message;
+        error.setAttribute("data-field", getClientFieldToken(inputEl));
+        inputEl.insertAdjacentElement("afterend", error);
+    }
+
+    function setupLiveFieldValidation(form) {
+        if (!form || form.__liveValidationBound) return;
+
+        var handler = function (event) {
+            var inputEl = event.target;
+            if (!inputEl) return;
+            var tag = String(inputEl.tagName || "").toUpperCase();
+            if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT") return;
+            updateClientFieldVisualState(inputEl);
+        };
+
+        form.addEventListener("input", handler, true);
+        form.addEventListener("change", handler, true);
+        form.__liveValidationBound = true;
+    }
+
+    function validateDemandeFormBeforeSubmit(form) {
+        if (!form) return true;
+
+        clearClientFieldErrors(form);
+
+        var hasErrors = false;
+        var requiredInputs = form.querySelectorAll("[required], [data-required='1']");
+
+        for (var i = 0; i < requiredInputs.length; i++) {
+            var inputEl = requiredInputs[i];
+            if (!inputEl || inputEl.disabled) continue;
+
+            var inputType = String(inputEl.type || "").toLowerCase();
+            if (inputType === "hidden") continue;
+
+            var value = String(inputEl.value || "").trim();
+            if (value !== "") continue;
+
+            hasErrors = true;
+            var label = getInputLabelText(inputEl);
+            appendClientFieldError(inputEl, 'Il faut remplir le champ "' + label + '".');
+        }
+
+        if (!hasErrors) {
+            for (var j = 0; j < requiredInputs.length; j++) {
+                updateClientFieldVisualState(requiredInputs[j]);
+            }
+        }
+
+        return !hasErrors;
+    }
+
     function buildLabel(f) {
         var lbl = document.createElement("label");
         lbl.className = "form-label" + (f.required ? " required" : "");
         lbl.textContent = f.label;
+        lbl.setAttribute("data-field-key", String(f.key || ""));
         return lbl;
     }
 
@@ -558,16 +789,19 @@
                 inp.type = "hidden";
                 inp.name = "details[" + f.key + "]";
                 inp.value = val;
+                applyInputConstraints(inp, f);
                 return inp;
             case "text":
                 inp = document.createElement("input");
                 inp.type = "text"; inp.className = "form-control" + err;
                 inp.name = "details[" + f.key + "]"; inp.value = val;
+                applyInputConstraints(inp, f);
                 return inp;
             case "number":
                 inp = document.createElement("input");
                 inp.type = "number"; inp.className = "form-control" + err;
                 inp.name = "details[" + f.key + "]"; inp.value = val; inp.min = "0";
+                applyInputConstraints(inp, f);
                 return inp;
             case "date":
                 inp = document.createElement("input");
@@ -576,11 +810,13 @@
                 inp.addEventListener("change", function () {
                     autoFillNombreJours();
                 });
+                applyInputConstraints(inp, f);
                 return inp;
             case "textarea":
                 inp = document.createElement("textarea");
                 inp.className = "form-control" + err; inp.rows = 3;
                 inp.name = "details[" + f.key + "]"; inp.value = val;
+                applyInputConstraints(inp, f);
                 return inp;
             case "select":
                 inp = document.createElement("select");
@@ -597,11 +833,13 @@
                         inp.appendChild(o);
                     }
                 }
+                applyInputConstraints(inp, f);
                 return inp;
             default:
                 inp = document.createElement("input");
                 inp.type = "text"; inp.className = "form-control" + err;
                 inp.name = "details[" + f.key + "]"; inp.value = val;
+                applyInputConstraints(inp, f);
                 return inp;
         }
     }
@@ -675,6 +913,7 @@
         readonlyInput.id = "locval-" + f.key;
         readonlyInput.placeholder = "Cliquez sur la carte ci-dessous pour choisir un lieu";
         readonlyInput.value = val;
+        applyInputConstraints(readonlyInput, f);
         wrapper.appendChild(readonlyInput);
 
         var latInp = document.createElement("input");
@@ -871,6 +1110,7 @@
         if (valInp) valInp.value = loc.name;
         if (latInp) latInp.value = loc.lat;
         if (lonInp) lonInp.value = loc.lon;
+        updateClientFieldVisualState(valInp);
         var infoEl = document.getElementById("mapselected-" + key);
         if (infoEl) {
             infoEl.innerHTML = "<strong style='color:#16a34a'>Destination confirmee:</strong> " + loc.name +
@@ -890,6 +1130,11 @@
         if (valInp) valInp.value = "";
         if (latInp) latInp.value = "";
         if (lonInp) lonInp.value = "";
+        if (valInp) {
+            valInp.classList.remove("is-valid");
+            valInp.classList.remove("client-valid");
+            setInputLabelValidState(valInp, false);
+        }
         updateMapInfo(key, "Cliquez sur la carte pour choisir un lieu");
         var infoEl = document.getElementById("mapselected-" + key);
         if (infoEl) { infoEl.className = "map-selected-info"; infoEl.innerHTML = ""; }

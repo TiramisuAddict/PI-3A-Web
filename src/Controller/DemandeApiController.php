@@ -2,13 +2,11 @@
 
 namespace App\Controller;
 
-use App\Form\DemandeDetailType;
 use App\Services\DemandeAiAssistant;
 use App\Services\DemandeFormHelper;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Routing\Annotation\Route;
 
@@ -35,26 +33,6 @@ class DemandeApiController extends AbstractController
     {
         $types = $this->formHelper->getTypesForCategory($categorie);
         return new JsonResponse($types);
-    }
-
-    #[Route('/demande-api/detail-form/{type}', name: 'demande_api_detail_form', methods: ['GET'])]
-    public function getDetailForm(string $type): Response
-    {
-        $fields = $this->formHelper->getFieldsForType($type);
-
-        if (empty($fields)) {
-            return new Response('', Response::HTTP_OK);
-        }
-
-        $detailForm = $this->createForm(DemandeDetailType::class, null, [
-            'fields' => $fields,
-            'existing_details' => [],
-        ]);
-
-        return $this->render('demande/_detail_fields.html.twig', [
-            'detailForm' => $detailForm->createView(),
-            'fields' => $fields,
-        ]);
     }
 
     #[Route('/demande-api/suggest-classification', name: 'demande_api_suggest_classification', methods: ['POST'])]

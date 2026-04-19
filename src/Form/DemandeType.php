@@ -93,6 +93,12 @@ class DemandeType extends AbstractType
             ->add('description', TextareaType::class, [
                 'label' => 'Description',
                 'required' => false,
+                'constraints' => [
+                    new Assert\Length([
+                        'max' => 2000,
+                        'maxMessage' => 'La description ne peut pas depasser {{ limit }} caracteres.',
+                    ]),
+                ],
             ])
             ->add('priorite', ChoiceType::class, [
                 'choices' => $prioriteChoices,

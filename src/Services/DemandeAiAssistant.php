@@ -126,9 +126,7 @@ class DemandeAiAssistant
         $parsed = $this->parseJsonResponse($rawResponse);
 
         $description = trim((string) ($parsed['description'] ?? ''));
-        if ('' === $description) {
-            $description = 'Le collaborateur soumet une demande concernant : ' . $normalizedTitle . '.';
-        }
+        $description = $this->normalizeGeneratedDescriptionFromTitle($description, $normalizedTitle);
 
         return [
             'description' => $description,
@@ -440,21 +438,51 @@ class DemandeAiAssistant
     private function buildDescriptionFromTitlePrompt(string $title, ?string $typeDemande, ?string $categorie): string
     {
         $example = [
-            'description' => 'Le collaborateur souhaite prendre un conge annuel pour une periode estivale. Cette demande vise a organiser son absence de maniere anticipee et claire.',
+            'description' => 'Bonjour, je souhaite soumettre une demande de conge annuel pour raison de sante. Cette demande me permettra de gerer ma situation personnelle dans de bonnes conditions tout en restant organise vis-a-vis de l equipe. Je reste disponible pour fournir toute precision utile et je vous remercie par avance pour votre traitement.',
         ];
 
         return "Tu aides a rediger des descriptions professionnelles de demandes internes en francais.\n"
-            . "A partir d un titre, genere une description courte, claire et naturelle.\n"
+            . "A partir d un titre, genere une description developpee, claire, naturelle, polie et exploitable directement dans un formulaire RH/IT.\n"
             . "Renvoie STRICTEMENT un JSON valide avec une seule cle: description.\n"
             . "Contraintes:\n"
-            . "- 1 a 3 phrases maximum.\n"
-            . "- Ton professionnel et simple.\n"
+            . "- 3 a 5 phrases.\n"
+            . "- 65 a 120 mots environ.\n"
+            . "- Ecris a la premiere personne (je).\n"
+            . "- Commence par 'Bonjour,'.\n"
+            . "- Inclure explicitement le besoin principal mentionne dans le titre.\n"
+            . "- Inclure une phrase de contexte utile et une phrase de politesse/conclusion.\n"
+            . "- Ton professionnel, simple et courtois.\n"
             . "- Ne pas inventer de dates, montants ou details precis absents du titre.\n"
+            . "- Eviter les formulations vagues (ex: demande concernant...).\n"
             . "- Si le type ou la categorie sont fournis, reste coherent avec eux.\n"
             . "Titre: " . json_encode($title, JSON_UNESCAPED_UNICODE) . "\n"
             . "Type de demande: " . json_encode((string) ($typeDemande ?? ''), JSON_UNESCAPED_UNICODE) . "\n"
             . "Categorie: " . json_encode((string) ($categorie ?? ''), JSON_UNESCAPED_UNICODE) . "\n"
             . "Exemple attendu: " . json_encode($example, JSON_UNESCAPED_UNICODE);
+    }
+
+    private function normalizeGeneratedDescriptionFromTitle(string $description, string $title): string
+    {
+        $clean = trim((string) (preg_replace('/\s+/u', ' ', $description) ?? $description));
+
+        if ('' === $clean) {
+            return 'Bonjour, je souhaite soumettre une demande liee a "' . $title . '". Cette demande correspond a un besoin concret que je souhaite traiter de maniere claire et conforme aux procedures internes. Je reste disponible pour tout complement d information et je vous remercie par avance pour votre retour.';
+        }
+
+        $lower = strtolower($clean);
+        if (!str_starts_with($lower, 'bonjour')) {
+            $clean = 'Bonjour, ' . ltrim($clean, ',;:. ');
+        }
+
+        if (!preg_match('/[.!?]$/', $clean)) {
+            $clean .= '.';
+        }
+
+        if (strlen($clean) < 120) {
+            $clean .= ' Cette demande est importante pour assurer une bonne organisation de mon activite et faciliter son traitement administratif. Je reste disponible pour fournir tout complement utile si necessaire.';
+        }
+
+        return $clean;
     }
 
     private function callHuggingFace(string $prompt): string

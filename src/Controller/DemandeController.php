@@ -708,6 +708,11 @@ class DemandeController extends AbstractController
             $type     = $field['type'] ?? 'text';
             $value    = $details[$key] ?? null;
 
+            if ($value !== null && !is_scalar($value)) {
+                $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" contient un format invalide.', 'type' => 'format'];
+                continue;
+            }
+
             if ($required && ($value === null || trim((string) $value) === '')) {
                 $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" est obligatoire.', 'type' => 'blank'];
                 continue;
@@ -771,6 +776,20 @@ class DemandeController extends AbstractController
                     $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" contient une date invalide.', 'type' => 'format'];
                 }
             }
+
+            if ($type === 'select') {
+                $options = isset($field['options']) && is_array($field['options'])
+                    ? array_values(array_map('strval', $field['options']))
+                    : [];
+
+                if ([] !== $options && !in_array((string) $value, $options, true)) {
+                    $errors[] = ['field' => $key, 'message' => 'La valeur choisie pour "' . $label . '" est invalide.', 'type' => 'format'];
+                }
+            }
+
+            if (($type === 'text' || $type === 'textarea') && mb_strlen(trim((string) $value)) > 2000) {
+                $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" ne peut pas depasser 2000 caracteres.', 'type' => 'format'];
+            }
         }
 
         return $errors;
@@ -798,7 +817,18 @@ class DemandeController extends AbstractController
 
             $required = true === ($field['required'] ?? false);
             $type = strtolower(trim((string) ($field['type'] ?? 'text')));
-            $value = trim((string) ($details[$key] ?? ''));
+            $rawValue = $details[$key] ?? '';
+
+            if ('' !== $rawValue && !is_scalar($rawValue)) {
+                $errors[] = [
+                    'field' => $key,
+                    'message' => 'Le champ "' . $label . '" contient un format invalide.',
+                    'type' => 'format',
+                ];
+                continue;
+            }
+
+            $value = trim((string) $rawValue);
 
             if ($required && '' === $value) {
                 $errors[] = [
@@ -842,6 +872,28 @@ class DemandeController extends AbstractController
                         'type' => 'format',
                     ];
                 }
+            }
+
+            if ('select' === $type) {
+                $options = isset($field['options']) && is_array($field['options'])
+                    ? array_values(array_map('strval', $field['options']))
+                    : [];
+
+                if ([] !== $options && !in_array($value, $options, true)) {
+                    $errors[] = [
+                        'field' => $key,
+                        'message' => 'La valeur choisie pour "' . $label . '" est invalide.',
+                        'type' => 'format',
+                    ];
+                }
+            }
+
+            if (($type === 'text' || $type === 'textarea') && mb_strlen($value) > 2000) {
+                $errors[] = [
+                    'field' => $key,
+                    'message' => 'Le champ "' . $label . '" ne peut pas depasser 2000 caracteres.',
+                    'type' => 'format',
+                ];
             }
         }
 
