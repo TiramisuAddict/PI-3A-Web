@@ -4,6 +4,8 @@ namespace App\Controller\Employe;
 
 use App\Entity\Commentaire;
 use App\Entity\Employe;
+use App\Entity\Notification;
+use App\Entity\Post;
 use App\Repository\EmployeRepository;
 use App\Repository\PostRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -214,6 +216,25 @@ class FeedController extends AbstractController
         )->fetchOne();
     }
 
+    private function createPostNotification(Post $post, int $actorUserId, string $title, string $message): void
+    {
+        $ownerUserId = (int) $post->getUtilisateurId();
+        if ($ownerUserId <= 0 || $ownerUserId === $actorUserId) {
+            return;
+        }
+
+        $notification = new Notification();
+        $notification->setUserId($ownerUserId);
+        $notification->setTitre($title);
+        $notification->setMessage($message);
+        $notification->setDateCreation(new \DateTime());
+        $notification->setIsRead(false);
+        $notification->setPost($post);
+
+        $this->em->persist($notification);
+        $this->em->flush();
+    }
+
     #[Route('/feed', name: 'app_employe_feed', methods: ['GET'])]
     public function feed(Request $request, SessionInterface $session): Response
     {
@@ -367,6 +388,14 @@ class FeedController extends AbstractController
                 [$userId, $id_post]
             );
             $liked = true;
+
+            $actorName = $this->resolveAuthorLabels([$userId])[$userId] ?? 'Employe';
+            $this->createPostNotification(
+                $post,
+                $userId,
+                'Nouveau j\'aime',
+                sprintf('%s a aime votre publication "%s".', $actorName, (string) $post->getTitre())
+            );
         }
 
         $count = (int) $conn->executeQuery(
@@ -424,6 +453,13 @@ class FeedController extends AbstractController
         $this->em->flush();
 
         $authorLabels = $this->resolveAuthorLabels([$userId]);
+        $authorName = $authorLabels[$userId] ?? 'Employe';
+        $this->createPostNotification(
+            $post,
+            $userId,
+            'Nouveau commentaire',
+            sprintf('%s a commente votre publication "%s".', $authorName, (string) $post->getTitre())
+        );
 
         return new JsonResponse([
             'success' => true,
@@ -557,6 +593,14 @@ class FeedController extends AbstractController
                 [$userId, $id_post, 'GOING']
             );
             $participating = true;
+
+            $actorName = $this->resolveAuthorLabels([$userId])[$userId] ?? 'Employe';
+            $this->createPostNotification(
+                $post,
+                $userId,
+                'Nouvelle participation',
+                sprintf('%s participe a votre evenement "%s".', $actorName, (string) $post->getTitre())
+            );
         }
 
         $count = (int) $conn->executeQuery(

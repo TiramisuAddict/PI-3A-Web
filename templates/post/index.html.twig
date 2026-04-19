@@ -26,7 +26,7 @@
                                 <label class="form-label" for="post-search-input">Rechercher</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="ti ti-search"></i></span>
-                                    <input type="search" id="post-search-input" name="search" value="{{ search|default('') }}" class="form-control" placeholder="Rechercher par titre ou contenu…" autocomplete="off" aria-busy="false">
+                                    <input type="search" id="post-search-input" name="search" value="{{ search|default('') }}" class="form-control" placeholder="Rechercher par titre ou contenu..." autocomplete="off" aria-busy="false">
                                 </div>
                                 <p id="post-search-meta" class="text-secondary small mt-2 mb-0 {{ search|default('') == '' ? 'd-none' : '' }}">{% if search|default('') != '' %}{{ posts|length }} résultat{{ posts|length > 1 ? 's' : '' }} trouvé{{ posts|length > 1 ? 's' : '' }}{% endif %}</p>
                             </div>
@@ -36,7 +36,7 @@
             </div>
 
             <div class="card">
-                <div class="table-responsive">
+                <div class="table-responsive" id="posts-table-wrapper">
                     <table class="table table-vcenter card-table">
                         <thead>
                             <tr>
@@ -51,14 +51,14 @@
                             {% include 'post/_rows.html.twig' %}
                         </tbody>
                     </table>
-                    <div class="card-body" id="empty-state" style="display:none;">
-                        <div class="empty">
-                            <div class="empty-header">404</div>
-                            <div class="empty-title">Aucune publication trouvée</div>
-                            <div class="empty-subtitle text-secondary">Créez une nouvelle publication pour commencer.</div>
-                            <div class="empty-action">
-                                <a href="{{ path('app_post_new') }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Créer une publication</a>
-                            </div>
+                </div>
+                <div class="card-body {{ posts|length > 0 ? 'd-none' : '' }}" id="empty-state">
+                    <div class="empty">
+                        <div class="empty-header">404</div>
+                        <div class="empty-title">Aucune publication trouvée</div>
+                        <div class="empty-subtitle text-secondary">Créez une nouvelle publication pour commencer.</div>
+                        <div class="empty-action">
+                            <a href="{{ path('app_post_new') }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Créer une publication</a>
                         </div>
                     </div>
                 </div>
@@ -71,97 +71,104 @@
 {% block javascripts %}
     {{ parent() }}
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            console.log('1. Script started');
-            
-            const form = document.getElementById('post-search-form');
-            const input = document.getElementById('post-search-input');
-            const tbody = document.getElementById('posts-table-body');
-            const meta = document.getElementById('post-search-meta');
-            const rowsUrl = form?.dataset?.rowsUrl;
-            
-            console.log('2. Elements:', {
-                form: !!form,
-                input: !!input,
-                tbody: !!tbody,
-                rowsUrl: rowsUrl
-            });
-            
-            if (!form || !input || !tbody || !rowsUrl) {
-                console.error('STOP: Missing elements');
+        function initPostSearchPage() {
+            var form = document.getElementById('post-search-form');
+            var input = document.getElementById('post-search-input');
+            var tbody = document.getElementById('posts-table-body');
+            var meta = document.getElementById('post-search-meta');
+            var emptyState = document.getElementById('empty-state');
+            var tableWrapper = document.getElementById('posts-table-wrapper');
+            var rowsUrl = form ? form.dataset.rowsUrl : null;
+
+            if (!form || !input || !tbody || !rowsUrl || form.dataset.searchInitialized === 'true') {
                 return;
             }
 
-            // STOP form from submitting normally
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                console.log('Form submit blocked');
-                fetchRows(input.value);
-            });
+            form.dataset.searchInitialized = 'true';
 
-            let debounceTimer = null;
+            var debounceTimer = null;
+            var abortController = null;
+
+            function updateMeta(query, count) {
+                if (!meta) {
+                    return;
+                }
+
+                if (query.trim() === '') {
+                    meta.classList.add('d-none');
+                    meta.textContent = '';
+                    return;
+                }
+
+                meta.classList.remove('d-none');
+                meta.textContent = count + ' résultat' + (count !== 1 ? 's' : '') + ' trouvé' + (count !== 1 ? 's' : '');
+            }
+
+            function updateEmptyState(hasRows) {
+                if (!emptyState || !tableWrapper) {
+                    return;
+                }
+
+                emptyState.classList.toggle('d-none', hasRows);
+                tableWrapper.classList.toggle('d-none', !hasRows);
+            }
 
             async function fetchRows(query) {
-                console.log('3. fetchRows called with:', query);
-                
-                const url = rowsUrl + '?search=' + encodeURIComponent(query);
-                console.log('4. Fetching URL:', url);
-                
+                if (abortController) {
+                    abortController.abort();
+                }
+
+                abortController = new AbortController();
+                input.setAttribute('aria-busy', 'true');
+
                 try {
-                    const res = await fetch(url, {
+                    var url = rowsUrl + '?search=' + encodeURIComponent(query);
+                    var response = await fetch(url, {
                         method: 'GET',
-                        headers: { 
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        signal: abortController.signal
                     });
-                    
-                    console.log('5. Response status:', res.status);
-                    
-                    if (!res.ok) {
-                        throw new Error('HTTP ' + res.status);
+
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
                     }
-                    
-                    const html = await res.text();
-                    console.log('6. Got HTML, length:', html.length);
-                    console.log('7. HTML preview:', html.substring(0, 200));
-                    
+
+                    var html = await response.text();
                     tbody.innerHTML = html;
-                    console.log('8. Table updated!');
-                    
-                    // Update URL
-                    const newUrl = query.trim() === '' 
-                        ? window.location.pathname 
+
+                    var count = tbody.querySelectorAll('tr[data-post-row]').length;
+                    updateMeta(query, count);
+                    updateEmptyState(count > 0);
+
+                    var newUrl = query.trim() === ''
+                        ? window.location.pathname
                         : window.location.pathname + '?search=' + encodeURIComponent(query);
                     window.history.replaceState({}, '', newUrl);
-                    
-                    // Update meta
-                    if (meta) {
-                        const rows = tbody.querySelectorAll('tr');
-                        const hasEmpty = tbody.querySelector('td[colspan]');
-                        const count = hasEmpty ? 0 : rows.length;
-                        
-                        if (query.trim() === '') {
-                            meta.classList.add('d-none');
-                        } else {
-                            meta.classList.remove('d-none');
-                            meta.textContent = count + ' résultat' + (count !== 1 ? 's' : '') + ' trouvé' + (count !== 1 ? 's' : '');
-                        }
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        console.error('Post search failed:', error);
                     }
-                    
-                } catch (e) {
-                    console.error('9. Error:', e);
+                } finally {
+                    input.setAttribute('aria-busy', 'false');
                 }
             }
 
-            input.addEventListener('input', function() {
-                console.log('Input event fired, value:', input.value);
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(function() {
-                    fetchRows(input.value);
-                }, 300);
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                fetchRows(input.value);
             });
-            
-            console.log('10. All listeners attached - ready!');
-        });
+
+            input.addEventListener('input', function () {
+                window.clearTimeout(debounceTimer);
+                debounceTimer = window.setTimeout(function () {
+                    fetchRows(input.value);
+                }, 250);
+            });
+
+            updateEmptyState(tbody.querySelectorAll('tr[data-post-row]').length > 0);
+        }
+
+        document.addEventListener('DOMContentLoaded', initPostSearchPage);
+        document.addEventListener('turbo:load', initPostSearchPage);
     </script>
 {% endblock %}

@@ -269,12 +269,20 @@ class Post
         if (!$this->getEventImages()->contains($eventImage)) {
             $this->getEventImages()->add($eventImage);
         }
+
+        if ($eventImage->getPost() !== $this) {
+            $eventImage->setPost($this);
+        }
+
         return $this;
     }
 
     public function removeEventImage(EventImage $eventImage): self
     {
-        $this->getEventImages()->removeElement($eventImage);
+        if ($this->getEventImages()->removeElement($eventImage) && $eventImage->getPost() === $this) {
+            $eventImage->setPost(null);
+        }
+
         return $this;
     }
 
