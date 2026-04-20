@@ -134,6 +134,35 @@ class DemandeRepository extends ServiceEntityRepository
         return $qb;
     }
 
+    public function countRecentSameTypeForEmploye(
+        int $employeId,
+        string $typeDemande,
+        \DateTimeInterface $referenceDate,
+        int $windowDays = 7,
+        ?int $referenceDemandeId = null
+    ): int {
+        $startDate = (new \DateTimeImmutable($referenceDate->format('Y-m-d')))->modify('-' . max(0, $windowDays) . ' days');
+
+        $qb = $this->createQueryBuilder('d')
+            ->select('COUNT(d.id_demande)')
+            ->andWhere('IDENTITY(d.employe) = :employeId')
+            ->andWhere('d.type_demande = :typeDemande')
+            ->andWhere('d.date_creation >= :startDate')
+            ->setParameter('employeId', $employeId)
+            ->setParameter('typeDemande', $typeDemande)
+            ->setParameter('startDate', $startDate)
+            ->setParameter('referenceDate', $referenceDate);
+
+        if (null !== $referenceDemandeId) {
+            $qb->andWhere('(d.date_creation < :referenceDate OR (d.date_creation = :referenceDate AND d.id_demande < :referenceDemandeId))')
+               ->setParameter('referenceDemandeId', $referenceDemandeId);
+        } else {
+            $qb->andWhere('d.date_creation < :referenceDate');
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
     private function isResolvedStatus(string $status): bool
     {
         return in_array($status, self::RESOLVED_STATUS_VARIANTS, true);

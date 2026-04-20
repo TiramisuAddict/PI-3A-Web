@@ -3,9 +3,14 @@
 namespace App\Services;
 
 use App\Entity\Demande;
+use App\Repository\DemandeRepository;
 
 class DemandeDecisionAssistant
 {
+    public function __construct(private readonly DemandeRepository $demandeRepository)
+    {
+    }
+
     /**
      * @param array<string, mixed> $details
      * @param array<int, array<string, mixed>> $fieldDefinitions
@@ -182,6 +187,25 @@ class DemandeDecisionAssistant
         }
 
         $spamScore = $this->calculateSpamScore($demande, $details, $weakRequired, $missingRequired);
+
+        $repeatPenalty = $this->buildRepeatTypePenalty($demande);
+        if ($repeatPenalty['count'] > 0) {
+            $confidence = max(0.08, $confidence - $repeatPenalty['confidencePenalty']);
+            $spamScore = min(100, $spamScore + $repeatPenalty['spamPenalty']);
+
+            $reasons[] = sprintf(
+                'Des demandes de meme type (%s) ont ete creees recemment par le meme employe (%d sur %d jours).',
+                (string) $demande->getTypeDemande(),
+                $repeatPenalty['count'],
+                $repeatPenalty['windowDays']
+            );
+            $warnings[] = 'Risque de demande repetitive: la priorisation automatique est volontairement reduite.';
+
+            if ($repeatPenalty['count'] >= 2 && 'Rejetee' !== $recommendedStatus) {
+                $recommendedStatus = 'En attente';
+            }
+        }
+
         $spamLevel = $this->getSpamLevel($spamScore);
 
         return [
@@ -195,6 +219,65 @@ class DemandeDecisionAssistant
             'reasons' => array_values(array_unique($reasons)),
             'warnings' => array_values(array_unique($warnings)),
             'summary' => $this->buildSummary($recommendedStatus, $missingRequired, $weakRequired, $warnings),
+            'repeatTypePenalty' => $repeatPenalty,
+        ];
+    }
+
+    /**
+     * @return array{count:int,windowDays:int,confidencePenalty:float,spamPenalty:int}
+     */
+    private function buildRepeatTypePenalty(Demande $demande): array
+    {
+        $employeId = $demande->getEmploye()?->getId_employe();
+        $typeDemande = trim((string) $demande->getTypeDemande());
+        $dateCreation = $demande->getDateCreation();
+        $demandeId = $demande->getIdDemande();
+
+        if (0 === strcasecmp($typeDemande, 'Autre')) {
+            return [
+                'count' => 0,
+                'windowDays' => 7,
+                'confidencePenalty' => 0.0,
+                'spamPenalty' => 0,
+            ];
+        }
+
+        if (null === $employeId || '' === $typeDemande || null === $dateCreation) {
+            return [
+                'count' => 0,
+                'windowDays' => 7,
+                'confidencePenalty' => 0.0,
+                'spamPenalty' => 0,
+            ];
+        }
+
+        $windowDays = 7;
+        $recentCount = $this->demandeRepository->countRecentSameTypeForEmploye(
+            (int) $employeId,
+            $typeDemande,
+            $dateCreation,
+            $windowDays,
+            $demandeId
+        );
+
+        if ($recentCount <= 0) {
+            return [
+                'count' => 0,
+                'windowDays' => $windowDays,
+                'confidencePenalty' => 0.0,
+                'spamPenalty' => 0,
+            ];
+        }
+
+        // Progressive penalty: each additional nearby same-type demande lowers ranking for this demande only.
+        $confidencePenalty = min(0.32, 0.08 + (($recentCount - 1) * 0.06));
+        $spamPenalty = min(35, 10 + (($recentCount - 1) * 8));
+
+        return [
+            'count' => $recentCount,
+            'windowDays' => $windowDays,
+            'confidencePenalty' => round($confidencePenalty, 2),
+            'spamPenalty' => $spamPenalty,
         ];
     }
 
