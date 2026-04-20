@@ -23,9 +23,11 @@ services:
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
 
-    App\Service\GeminiService:
+    App\Service\TaskDescriptionService:
         arguments:
-            $apiKey: '%env(GEMINI_API_KEY)%'
+            $apiKey: '%env(GROQ_API_KEY)%'
+            $apiUrl: '%env(GROQ_API_URL)%'
+            $model: '%env(GROQ_MODEL)%'
 
     App\Services\CvExtractionService:
         arguments:

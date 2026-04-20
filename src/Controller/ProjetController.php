@@ -19,7 +19,7 @@ use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Knp\Component\Pager\PaginatorInterface;
 use Symfony\UX\Chartjs\Builder\ChartBuilderInterface;
 use Symfony\UX\Chartjs\Model\Chart;
-use App\Service\GeminiService;
+use App\Service\TaskDescriptionService;
 use App\Service\TaskNotificationService;
 use App\Repository\CompetenceEmployeRepository;
 use App\Service\GoogleCalendarService;
@@ -562,6 +562,46 @@ final class ProjetController extends AbstractController
     }
 
     /**
+     * Soft recall with fuzzy token matching.
+     * For each required task token, award credit if any profile token matches:
+     *  - exactly           → 1.0
+     *  - substring of each other → 0.7
+     *  - similar_text >= 75 % → proportional credit
+     * Returns a value in [0.0, 1.0]: fraction of task requirements covered.
+     *
+     * @param string[] $taskTokens
+     * @param string[] $profileTokens
+     */
+    private function computeSkillsScore(array $taskTokens, array $profileTokens): float
+    {
+        if ($taskTokens === [] || $profileTokens === []) {
+            return 0.0;
+        }
+
+        $totalCredit = 0.0;
+        foreach ($taskTokens as $need) {
+            $best = 0.0;
+            foreach ($profileTokens as $have) {
+                if ($need === $have) {
+                    $best = 1.0;
+                    break;
+                }
+                if (mb_strpos($have, $need) !== false || mb_strpos($need, $have) !== false) {
+                    $best = max($best, 0.7);
+                    continue;
+                }
+                similar_text($need, $have, $pct);
+                if ($pct >= 75.0) {
+                    $best = max($best, $pct / 100.0);
+                }
+            }
+            $totalCredit += $best;
+        }
+
+        return $totalCredit / count($taskTokens);
+    }
+
+    /**
      * Normalises text and returns a lowercased, stopword-filtered string for comparison.
      */
     private function tokenizeSkills(string $text): string
@@ -801,18 +841,16 @@ final class ProjetController extends AbstractController
             ];
         }
 
-        // Skills matching: Dice coefficient between task keywords and employee profile keywords
+        // Skills matching: soft recall with fuzzy token matching
+        // Measures what fraction of the task's required skills the employee covers.
         $hasSkillsData = $taskText !== '' && array_filter($competenceTexts, static fn (string $t): bool => $t !== '') !== [];
         if ($hasSkillsData) {
-            $sourceTokens = $this->buildTokenSet($taskText);
+            $taskTokens = array_keys($this->buildTokenSet($taskText));
             foreach ($results as $i => $row) {
                 $raw = 0.0;
-                if ($competenceTexts[$i] !== '') {
-                    $targetTokens = $this->buildTokenSet($competenceTexts[$i]);
-                    $intersection = count(array_intersect_key($sourceTokens, $targetTokens));
-                    $raw = ($intersection > 0)
-                        ? (2.0 * $intersection) / (count($sourceTokens) + count($targetTokens))
-                        : 0.0;
+                if ($competenceTexts[$i] !== '' && count($taskTokens) > 0) {
+                    $profileTokens = array_keys($this->buildTokenSet($competenceTexts[$i]));
+                    $raw = $this->computeSkillsScore($taskTokens, $profileTokens);
                 }
                 $pct = (int) round($raw * 100);
                 $results[$i]['skillsScore'] = $pct;
@@ -870,7 +908,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/tache/generate-description', name: 'app_tache_generate_description', methods: ['POST'])]
-    public function generateTaskDescription(Request $request, SessionInterface $session, EmployeRepository $employeRepository, GeminiService $geminiService): JsonResponse
+    public function generateTaskDescription(Request $request, SessionInterface $session, EmployeRepository $employeRepository, TaskDescriptionService $taskDescriptionService): JsonResponse
     {
         $rbac = $this->buildRbacContext($session, $employeRepository);
         if (!$rbac['canManageTasks']) {
@@ -895,7 +933,7 @@ final class ProjetController extends AbstractController
         }
 
         try {
-            $description = $geminiService->generateTaskDescription($taskTitle, $projectName);
+            $description = $taskDescriptionService->generateTaskDescription($taskTitle, $projectName);
         } catch (\RuntimeException $e) {
             return $this->json(['ok' => false, 'message' => $e->getMessage()], Response::HTTP_BAD_GATEWAY);
         }

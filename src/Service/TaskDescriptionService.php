@@ -4,7 +4,7 @@ namespace App\Service;
 
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-class GeminiService
+class TaskDescriptionService
 {
     public function __construct(
         private HttpClientInterface $httpClient,
