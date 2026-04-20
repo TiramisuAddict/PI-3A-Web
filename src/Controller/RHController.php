@@ -71,6 +71,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
         SessionInterface $session,
         EntrepriseRepository $entrepriseRepo,
         CvExtractionService $cvExtractionService,
+        PaginatorInterface $paginator,
     ): Response {
         if (!$this->isEmployeLoggedIn($session)) {
             return $this->redirectToRoute('login');
@@ -114,7 +115,11 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
         $entreprise = $entrepriseRepo->find($idEntreprise);
         $search = $request->query->get('search');
         $role = $request->query->get('role');
-        $employes = $employeRepo->findByEntrepriseAndFilters($entreprise, $search, $role);
+        $employes = $paginator->paginate(
+            $employeRepo->createFilteredQueryBuilder($entreprise, $search, $role),
+            max(1, (int) $request->query->get('page', 1)),
+            8
+        );
 
         $formAjout = $this->createForm(EmployeType::class, new Employe());
 
@@ -130,7 +135,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
         ]);
     }
     #[Route('/employe/ajouter', name: 'employe_ajouter', methods: ['GET', 'POST'])]
-    public function ajouter(Request $request,EntityManagerInterface $em,SessionInterface $session,EmployeRepository $employeRepo,EntrepriseRepository $entrepriseRepo,PasswordGenerator $passwordGenerator,CvExtractionService $cvExtractionService,MailerInterface $mailer,MailerService $mailerService,UserPasswordHasherInterface $passwordHasher): Response {
+    public function ajouter(Request $request,EntityManagerInterface $em,SessionInterface $session,EmployeRepository $employeRepo,EntrepriseRepository $entrepriseRepo,PasswordGenerator $passwordGenerator,CvExtractionService $cvExtractionService,MailerInterface $mailer,MailerService $mailerService,UserPasswordHasherInterface $passwordHasher, PaginatorInterface $paginator): Response {
         if (!$this->isEmployeLoggedIn($session)) {
             return $this->redirectToRoute('login');
         }
@@ -197,7 +202,11 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
         $entreprise = $entrepriseRepo->find($idEntreprise);
         $search = $request->query->get('search');
         $role = $request->query->get('role');
-        $employes = $employeRepo->findByEntrepriseAndFilters($entreprise, $search, $role);
+        $employes = $paginator->paginate(
+            $employeRepo->createFilteredQueryBuilder($entreprise, $search, $role),
+            max(1, (int) $request->query->get('page', 1)),
+            8
+        );
 
         return $this->render('rh/Home.html.twig', [
             'employes'=> $employes,

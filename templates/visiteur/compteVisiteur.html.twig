@@ -81,4 +81,11 @@
 
     </div>
 </div>
+
+{% if google_phone_form is defined %}
+    {{ include('auth/google_complete_phone.html.twig', {
+        google_phone_form: google_phone_form,
+        google_email: google_email|default('')
+    }) }}
+{% endif %}
 {% endblock %}

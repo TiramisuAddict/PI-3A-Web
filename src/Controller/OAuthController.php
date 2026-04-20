@@ -3,12 +3,13 @@
 namespace App\Controller;
 
 use App\Entity\Visiteur;
+use App\Form\VisiteurType;
 use App\Repository\VisiteurRepository;
-use App\Services\TwilioVerifyService;
+use App\Services\OAuthGoogleService;
+use Doctrine\ORM\EntityManagerInterface;
 use KnpU\OAuth2ClientBundle\Client\ClientRegistry;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
@@ -17,137 +18,79 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class OAuthController extends AbstractController
 {
-    private function clearOtpFlow(SessionInterface $session, TwilioVerifyService $twilioVerifyService, string $flow): void
-    {
-        foreach ($twilioVerifyService->getOtpSessionKeys($flow) as $key) {
-            $session->remove($key);
-        }
-    }
+	#[Route('/connect/google', name: 'oauth_google_start', methods: ['GET'])]
+	public function connectGoogle(ClientRegistry $clientRegistry, SessionInterface $session): RedirectResponse
+	{
+		$session->set('oauth_google_mode', 'login');
 
-    private function clearCurrentLoginSession(SessionInterface $session): void
-    {
-        foreach ([
-            'admin_logged_in',
-            'admin_email',
-            'employe_logged_in',
-            'employe_id',
-            'employe_email',
-            'employe_role',
-            'employe_id_entreprise',
-            'visiteur_logged_in',
-            'visiteur_id',
-            'visiteur_nom',
-            'visiteur_prenom',
-            'visiteur_email',
-        ] as $key) {
-            $session->remove($key);
-        }
-    }
+		return $clientRegistry->getClient('google')->redirect(['openid', 'email', 'profile'], [
+			'prompt' => 'select_account',
+		]);
+	}
 
-    #[Route('/connect/google', name: 'oauth_google_start', methods: ['GET'])]
-    public function connectGoogle(ClientRegistry $clientRegistry, SessionInterface $session): RedirectResponse
-    {
-        $session->set('oauth_google_target', 'visiteur');
-        $session->set('oauth_google_mode', 'login');
+	#[Route('/connect/google/register', name: 'oauth_google_register_start', methods: ['GET'])]
+	public function connectGoogleRegister(ClientRegistry $clientRegistry, SessionInterface $session): RedirectResponse
+	{
+		$session->set('oauth_google_mode', 'register');
 
-        return $clientRegistry
-            ->getClient('google')
-            ->redirect(['openid', 'email', 'profile'], [
-                'prompt' => 'select_account',
-            ]);
-    }
+		return $clientRegistry->getClient('google')->redirect(['openid', 'email', 'profile'], [
+			'prompt' => 'select_account',
+		]);
+	}
 
-    #[Route('/connect/google/register', name: 'oauth_google_register_start', methods: ['GET'])]
-    public function connectGoogleRegister(ClientRegistry $clientRegistry, SessionInterface $session): RedirectResponse
-    {
-        $session->set('oauth_google_target', 'visiteur');
-        $session->set('oauth_google_mode', 'register');
+	#[Route('/connect/google/check', name: 'oauth_google_check', methods: ['GET'])]
+	public function checkGoogle(ClientRegistry $clientRegistry,SessionInterface $session,VisiteurRepository $visiteurRepository,EntityManagerInterface $entityManager,UserPasswordHasherInterface $passwordHasher,OAuthGoogleService $oauthGoogleService): Response {
+		$mode = $session->get('oauth_google_mode', 'login');
+		$session->remove('oauth_google_mode');
 
-        return $clientRegistry
-            ->getClient('google')
-            ->redirect(['openid', 'email', 'profile'], [
-                'prompt' => 'select_account',
-            ]);
-    }
+		try {
+			$googleUser = $clientRegistry->getClient('google')->fetchUser();
+		} catch (IdentityProviderException $exception) {
+			$this->addFlash('error', 'Connexion Google refusée: ' . $exception->getMessage());
 
-    #[Route('/connect/google/check', name: 'oauth_google_check', methods: ['GET'])]
-    public function checkGoogle(ClientRegistry $clientRegistry,SessionInterface $session,VisiteurRepository $visiteurRepository,TwilioVerifyService $twilioVerifyService,EntityManagerInterface $entityManager,UserPasswordHasherInterface $passwordHasher): Response {
-        $target = (string) $session->get('oauth_google_target', '');
-        $mode = (string) $session->get('oauth_google_mode', 'login');
-        $session->remove('oauth_google_target');
-        $session->remove('oauth_google_mode');
+			return $this->redirectToRoute('login');
+		} catch (\Throwable $exception) {
+			$this->addFlash('error', 'Erreur pendant la connexion Google.');
 
-        if ($target !== 'visiteur') {
-            $this->addFlash('error', 'Session OAuth invalide. Veuillez recommencer.');
-            return $this->redirectToRoute('login');
-        }
+			return $this->redirectToRoute('login');
+		}
 
-        try {
-            $googleUser = $clientRegistry->getClient('google')->fetchUser();
-        } catch (IdentityProviderException $exception) {
-            $this->addFlash('error', 'Connexion Google refusée: ' . $exception->getMessage());
-            return $this->redirectToRoute('login');
-        } catch (\Throwable $exception) {
-            $this->addFlash('error', 'Erreur pendant la connexion Google.');
-            return $this->redirectToRoute('login');
-        }
+		$oauthGoogleService->clearCurrentLoginSession($session);
 
-        $email = strtolower(trim((string) $googleUser->getEmail()));
-        if ($email === '') {
-            $this->addFlash('error', 'Votre compte Google ne contient pas d\'email exploitable.');
-            return $this->redirectToRoute('login');
-        }
+		$result = $oauthGoogleService->findOrCreateVisiteurFromGoogle(
+			$mode,
+			$googleUser,
+			$visiteurRepository,
+			$entityManager,
+			$passwordHasher
+		);
 
-        $this->clearOtpFlow($session, $twilioVerifyService, 'two_factor');
-        $this->clearCurrentLoginSession($session);
+		if ($result['error'] !== null) {
+			$this->addFlash('error', $result['error']);
 
-        $visiteur = $visiteurRepository->findOneBy(['e_mail' => $email]);
+			return $this->redirectToRoute($mode === 'register' ? 'compte_visiteur' : 'login');
+		}
 
-        if ($mode === 'register' && $visiteur) {
-            $this->addFlash('error', 'Ce compte Google est deja associe a un visiteur. Choisissez un autre compte Google.');
-            return $this->redirectToRoute('compte_visiteur');
-        }
+		$visiteur = $result['visiteur'];
+		if (!$visiteur) {
+			$this->addFlash('error', 'Erreur de connexion Google.');
 
-        if (!$visiteur) {
-            $firstName = trim((string) ($googleUser->getFirstName() ?? ''));
-            $lastName = trim((string) ($googleUser->getLastName() ?? ''));
+			return $this->redirectToRoute('login');
+		}
 
-            if ($firstName === '' && $lastName === '') {
-                $fullName = trim((string) ($googleUser->getName() ?? ''));
-                if ($fullName !== '') {
-                    $parts = preg_split('/\s+/', $fullName);
-                    $firstName = (string) ($parts[0] ?? 'Visiteur');
-                    $lastName = (string) (count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : 'Google');
-                }
-            }
+		if ($visiteur->getTelephone() <= 0) {
+			$session->set('oauth_google_complete_phone_visiteur_id', $visiteur->getId_visiteur());
 
-            if ($firstName === '') {
-                $firstName = 'Visiteur';
-            }
+			return $this->redirectToRoute('compte_visiteur');
+		}
 
-            if ($lastName === '') {
-                $lastName = 'Google';
-            }
+		$oauthGoogleService->loginVisiteur($session, $visiteur);
 
-            $visiteur = new Visiteur();
-            $visiteur->setPrenom($firstName);
-            $visiteur->setNom($lastName);
-            $visiteur->setEmail($email);
-            $visiteur->setTelephone(0);
-            $visiteur->setMotdepasse($passwordHasher->hashPassword($visiteur, bin2hex(random_bytes(24))));
+		return $this->redirectToRoute('app_offre_home');
+	}
 
-            $entityManager->persist($visiteur);
-            $entityManager->flush();
-
-            $this->addFlash('success', 'Compte visiteur cree automatiquement via Google.');
-        }
-
-        $session->set('visiteur_logged_in', true);
-        $session->set('visiteur_id', $visiteur->getId_visiteur());
-        $session->set('visiteur_nom', $visiteur->getNom());
-        $session->set('visiteur_prenom', $visiteur->getPrenom());
-        $session->set('visiteur_email', $visiteur->getEmail());
-
-        return $this->redirectToRoute('app_offre_home');
-    }
+	#[Route('/connect/google/phone', name: 'oauth_google_phone', methods: ['GET', 'POST'])]
+	public function completePhone(): Response {
+		return $this->redirectToRoute('compte_visiteur');
+	}
 }

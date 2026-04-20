@@ -23,7 +23,7 @@ class MailerService
             ->to($toEmail)
             ->subject('Vos identifiants de connexion')
             ->text(sprintf(
-                "Bonjour %s %s,\n\nVotre compte a ete cree.\nMot de passe temporaire: %s\n\nMerci de le changer apres votre premiere connexion.",
+                "Bonjour %s %s,\n\nVotre compte a ete cree.\nMot de passe: %s\n\nMerci de le changer apres votre premiere connexion.",
                 $prenom,
                 $nom,
                 $plainPassword

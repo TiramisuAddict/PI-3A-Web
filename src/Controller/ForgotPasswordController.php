@@ -53,8 +53,8 @@ final class ForgotPasswordController extends AbstractController
 
             if ($admin) {
                 $userType = 'admin';
-                $userId = (int) $admin->getId();
-                $destination = trim((string) $admin->getTelephone());
+                $userId =  $admin->getId();
+                $destination =$admin->getTelephone();
             }
 
             if ($userType === null) {
@@ -63,8 +63,8 @@ final class ForgotPasswordController extends AbstractController
                     $compte = $employe->getComptes()->first();
                     if ($compte) {
                         $userType = 'employe';
-                        $userId = (int) $employe->getId_employe();
-                        $destination = trim((string) $employe->getTelephone());
+                        $userId =$employe->getId_employe();
+                        $destination = $employe->getTelephone();
                     }
                 }
             }
@@ -103,8 +103,8 @@ final class ForgotPasswordController extends AbstractController
         $otpForm->handleRequest($request);
 
         if ($otpForm->isSubmitted() && $otpForm->isValid()) {
-            $code = (string) $otpForm->get('code')->getData();
-            $destination = (string) $session->get('reset_password_destination', '');
+            $code =$otpForm->get('code')->getData();
+            $destination =$session->get('reset_password_destination', '');
 
             if ($twilioVerifyService->verifyCode($destination, $code, 'sms')) {
                 $session->set('reset_password_verified', true);
@@ -117,7 +117,7 @@ final class ForgotPasswordController extends AbstractController
         return $this->render('auth/login.html.twig', [
             'form' => $loginForm->createView(),
             'two_factor_form' => $otpForm->createView(),
-            'two_factor_destination' => (string) $session->get('reset_password_destination', ''),
+            'two_factor_destination' => $session->get('reset_password_destination', ''),
             'otp_resend_remaining_seconds' => 0,
             'otp_simple_resend' => true,
             'otp_close_url' => $this->generateUrl('forgot_password', ['cancel_forgot' => 1]),
@@ -133,11 +133,11 @@ final class ForgotPasswordController extends AbstractController
             return $this->redirectToRoute('forgot_password');
         }
 
-        if (!$this->isCsrfTokenValid('forgot_password_resend', (string) $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('forgot_password_resend', $request->request->get('_token'))) {
             return $this->redirectToRoute('forgot_password_verify');
         }
 
-        $destination = (string) $session->get('reset_password_destination', '');
+        $destination = $session->get('reset_password_destination', '');
         if ($destination === '') {
             return $this->redirectToRoute('forgot_password');
         }
@@ -160,10 +160,10 @@ final class ForgotPasswordController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $newPassword = (string) $form->get('password')->getData();
-            $confirmPassword = (string) $form->get('confirm_password')->getData();
-            $userType = (string) $session->get('reset_password_user_type', '');
-            $userId = (int) $session->get('reset_password_user_id', 0);
+            $newPassword = $form->get('password')->getData();
+            $confirmPassword = $form->get('confirm_password')->getData();
+            $userType = $session->get('reset_password_user_type', '');
+            $userId =$session->get('reset_password_user_id', 0);
 
             if ($newPassword !== $confirmPassword) {
                 $this->addFlash('error', 'Le mot de passe et la confirmation doivent etre identiques.');

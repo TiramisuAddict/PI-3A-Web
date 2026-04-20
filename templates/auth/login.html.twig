@@ -139,7 +139,7 @@ function togglePassword() {
 </script>
 
 {% if two_factor_form is defined %}
-  {{ include('auth/two_factor.html.twig', {
+  {{ include('2FA/two_factor.html.twig', {
     otp_form: two_factor_form,
     destination: two_factor_destination|default(''),
     otp_close_url: otp_close_url|default(path('login', {'cancel_2fa': 1})),
@@ -150,13 +150,13 @@ function togglePassword() {
 {% endif %}
 
 {% if forgot_password_form is defined %}
-  {{ include('auth/forgot_password_component.html.twig', {
+  {{ include('forgot_password/forgot_password_component.html.twig', {
     forgot_password_form: forgot_password_form
   }) }}
 {% endif %}
 
 {% if reset_password_form is defined %}
-  {{ include('auth/reset_password_component.html.twig', {
+  {{ include('forgot_password/reset_password_component.html.twig', {
     reset_password_form: reset_password_form
   }) }}
 {% endif %}

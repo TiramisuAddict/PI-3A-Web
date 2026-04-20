@@ -121,7 +121,7 @@ class EmployeCsvImportService
             $plainPassword = $passwordGenerator->generatePlain();
             $compte = new Compte();
             $compte->setMot_de_passe($passwordHasher->hashPassword($compte, $plainPassword));
-            $compte->setEmployé($employe);
+            $compte->setEmploye($employe);
 
             $entityManager->persist($employe);
             $entityManager->persist($compte);

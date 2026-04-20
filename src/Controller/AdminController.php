@@ -34,7 +34,7 @@ final class AdminController extends AbstractController
         }
 
         $allowedStatuses = ['acceptée', 'en attente', 'refusée'];
-        $statusFilter = trim((string) $request->query->get('status', ''));
+        $statusFilter = $request->query->get('status', '');
         if (!in_array($statusFilter, $allowedStatuses, true)) {
             $statusFilter = '';
         }
@@ -186,7 +186,7 @@ final class AdminController extends AbstractController
         $allFilteredEntreprises = $entrepriseRepo->findByFilters($search, $status);
         $entreprises = $paginator->paginate(
             $entrepriseRepo->createByFiltersQueryBuilder($search, $status),
-            max(1, (int) $request->query->get('page', 1)),
+            max(1,  $request->query->get('page', 1)),
             6
         );
 
@@ -197,7 +197,7 @@ final class AdminController extends AbstractController
             $entreprise = $entrepriseRepo->find($id);
             if ($entreprise) {
                if ($action === 'accepter') {
-                    $recipientEmail = trim((string) $entreprise->getEmail());
+                    $recipientEmail = $entreprise->getEmail();
                     $entreprise->setStatut('acceptée');
                     $employe = new Employe();
                     $employe->setNom($entreprise->getNom());
@@ -257,7 +257,7 @@ final class AdminController extends AbstractController
             }
         }
 
-        return $this->render('admin.html.twig', [
+            return $this->render('admin/admin.html.twig', [
             'entreprises' => $entreprises,
             'stats_total' => count($allFilteredEntreprises),
             'stats_accepte' => $accepte,
