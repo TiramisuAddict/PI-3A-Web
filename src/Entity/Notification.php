@@ -2,11 +2,9 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-
 use App\Repository\NotificationRepository;
+use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: NotificationRepository::class)]
 #[ORM\Table(name: 'notification')]
@@ -17,33 +15,38 @@ class Notification
     #[ORM\Column(type: 'integer')]
     private ?int $id_notification = null;
 
-    public function getId_notification(): ?int
+    public function getIdNotification(): ?int
     {
         return $this->id_notification;
     }
 
-    public function setId_notification(int $id_notification): self
+    public function setIdNotification(int $id_notification): self
     {
         $this->id_notification = $id_notification;
+
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'notifications')]
-    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id_employe')]
-    private ?Employe $employé = null;
+    #[ORM\Column(type: 'integer', nullable: false)]
+    #[Assert\NotNull(message: 'L’identifiant utilisateur est obligatoire.')]
+    #[Assert\Type(type: 'integer', message: 'L’identifiant utilisateur doit être un entier.')]
+    private ?int $user_id = null;
 
-    public function getEmployé(): ?Employe
+    public function getUserId(): ?int
     {
-        return $this->employé;
+        return $this->user_id;
     }
 
-    public function setEmployé(?Employe $employé): self
+    public function setUserId(int $user_id): self
     {
-        $this->employé = $employé;
+        $this->user_id = $user_id;
+
         return $this;
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Assert\NotBlank(message: 'Le titre est obligatoire.')]
+    #[Assert\Length(min: 3, max: 255, minMessage: 'Le titre doit contenir au moins {{ limit }} caractères.')]
     private ?string $titre = null;
 
     public function getTitre(): ?string
@@ -54,10 +57,13 @@ class Notification
     public function setTitre(string $titre): self
     {
         $this->titre = $titre;
+
         return $this;
     }
 
     #[ORM\Column(type: 'text', nullable: false)]
+    #[Assert\NotBlank(message: 'Le message est obligatoire.')]
+    #[Assert\Length(min: 3, minMessage: 'Le message doit contenir au moins {{ limit }} caractères.')]
     private ?string $message = null;
 
     public function getMessage(): ?string
@@ -68,34 +74,46 @@ class Notification
     public function setMessage(string $message): self
     {
         $this->message = $message;
+
         return $this;
     }
 
     #[ORM\Column(type: 'datetime', nullable: false)]
+    #[Assert\NotNull(message: 'La date de création est obligatoire.')]
+    #[Assert\Type(\DateTimeInterface::class)]
+    #[Assert\DateTime(message: 'La date de création doit être valide.')]
     private ?\DateTimeInterface $date_creation = null;
 
-    public function getDate_creation(): ?\DateTimeInterface
+    public function getDateCreation(): ?\DateTimeInterface
     {
         return $this->date_creation;
     }
 
-    public function setDate_creation(\DateTimeInterface $date_creation): self
+    public function setDateCreation(\DateTimeInterface $date_creation): self
     {
         $this->date_creation = $date_creation;
+
         return $this;
     }
 
     #[ORM\Column(type: 'boolean', nullable: true)]
+    #[Assert\Type(type: 'bool', message: 'La valeur « lu » doit être vrai ou faux.')]
     private ?bool $is_read = null;
 
-    public function is_read(): ?bool
+    public function isRead(): ?bool
     {
         return $this->is_read;
     }
 
-    public function setIs_read(?bool $is_read): self
+    public function getIsRead(): ?bool
+    {
+        return $this->is_read;
+    }
+
+    public function setIsRead(?bool $is_read): self
     {
         $this->is_read = $is_read;
+
         return $this;
     }
 
@@ -111,7 +129,7 @@ class Notification
     public function setPost(?Post $post): self
     {
         $this->post = $post;
+
         return $this;
     }
-
 }

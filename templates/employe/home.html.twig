@@ -1,7 +1,0 @@
-{% extends 'base.html.twig' %}
-{% block body %}
-{{ include('components/navbar.html.twig') }}
-<div class="d-flex overflow-hidden" style="height:calc(100vh - 56px);">
-{{ include('components/sidebar.html.twig', {'active_page': 'accueil','sidebar_role': role}) }}
-</div>
-{% endblock %}

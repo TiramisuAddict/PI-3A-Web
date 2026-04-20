@@ -1,0 +1,1260 @@
+{% extends 'base.html.twig' %}
+{% import _self as feed %}
+
+{% macro comment_item(comment, postId, currentUserId, feed_route_comment_edit, feed_route_comment_delete) %}
+    <article
+        class="feed-comment-card"
+        id="comment-{{ comment.id_commentaire }}"
+        data-comment-id="{{ comment.id_commentaire }}"
+        data-post-id="{{ postId }}"
+        data-parent-id="{{ comment.parent_id is not null ? comment.parent_id : '' }}"
+        data-edit-url="{{ path(feed_route_comment_edit, {id_commentaire: comment.id_commentaire}) }}"
+        data-delete-url="{{ path(feed_route_comment_delete, {id_commentaire: comment.id_commentaire}) }}"
+        data-edit-token="{{ csrf_token('feed_comment_edit_' ~ comment.id_commentaire) }}"
+        data-delete-token="{{ csrf_token('feed_comment_delete_' ~ comment.id_commentaire) }}"
+    >
+        <div class="feed-comment-shell">
+            <div class="feed-comment-avatar">
+                {{ comment.author_name|slice(0, 2)|upper }}
+            </div>
+            <div class="feed-comment-main">
+                <div class="feed-comment-head">
+                    <div class="feed-comment-meta">
+                        <span class="feed-comment-author">{{ comment.author_name }}</span>
+                        <span class="feed-comment-date" data-comment-date="{{ comment.date_commentaire }}">{{ comment.date_commentaire|date('d/m/Y H:i') }}</span>
+                        {% if comment.edited_at %}
+                            <span class="feed-comment-edited">Modifie</span>
+                        {% endif %}
+                    </div>
+                    <div class="feed-comment-tools">
+                        {% if currentUserId is not null %}
+                            <button type="button" class="feed-comment-tool" data-action="reply-toggle">Repondre</button>
+                        {% endif %}
+                        {% if currentUserId is not null and comment.owned_by_current_user %}
+                            <button type="button" class="feed-comment-tool" data-action="edit-toggle">Modifier</button>
+                            <button type="button" class="feed-comment-tool danger" data-action="delete-comment">Supprimer</button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="feed-comment-content" data-comment-content>{{ comment.contenu|nl2br }}</div>
+
+                <form class="feed-edit-form" data-comment-id="{{ comment.id_commentaire }}" style="display:none;">
+                    <input type="hidden" name="_token" value="{{ csrf_token('feed_comment_edit_' ~ comment.id_commentaire) }}">
+                    <textarea class="form-control feed-comment-textarea" name="contenu" rows="3" maxlength="2000" required>{{ comment.contenu }}</textarea>
+                    <div class="feed-comment-form-actions">
+                        <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
+                        <button type="button" class="btn btn-ghost-secondary btn-sm" data-action="edit-cancel">Annuler</button>
+                    </div>
+                </form>
+
+                {% if currentUserId is not null %}
+                    <form class="feed-reply-form" data-post-id="{{ postId }}" data-parent-id="{{ comment.id_commentaire }}" style="display:none;">
+                        <input type="hidden" name="_token" value="{{ csrf_token('feed_comment_' ~ postId) }}">
+                        <input type="hidden" name="parent_id" value="{{ comment.id_commentaire }}">
+                        <div class="feed-reply-shell">
+                            <textarea class="form-control feed-comment-textarea" name="contenu" rows="2" maxlength="2000" placeholder="Ecrire une reponse..." required></textarea>
+                            <div class="feed-comment-form-actions">
+                                <button type="submit" class="btn btn-primary btn-sm">Repondre</button>
+                                <button type="button" class="btn btn-ghost-secondary btn-sm" data-action="reply-cancel">Annuler</button>
+                            </div>
+                        </div>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if comment.replies is not empty %}
+            <div class="feed-comment-replies">
+                {% for reply in comment.replies %}
+                    {{ _self.comment_item(reply, postId, currentUserId, feed_route_comment_edit, feed_route_comment_delete) }}
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="feed-comment-replies" data-empty-replies="true"></div>
+        {% endif %}
+    </article>
+{% endmacro %}
+
+{% block title %}Fil d'actualite - Espace Employe{% endblock %}
+
+{% block body %}
+{% set TYPE_ANNONCE = post_type_annonce|default(1) %}
+{% set TYPE_EVENEMENT = post_type_evenement|default(2) %}
+{% set current_user_initials = current_user_label|default('Employe')|slice(0, 2)|upper %}
+
+{{ include('components/navbar.html.twig') }}
+
+<div
+    id="feed-root"
+    class="d-flex overflow-hidden"
+    style="height:calc(100vh - 56px);"
+    data-comment-url-template="{{ path(feed_route_comment, {id_post: '__POST__'}) }}"
+    data-comment-edit-url-template="{{ path(feed_route_comment_edit, {id_commentaire: '__COMMENT__'}) }}"
+    data-comment-delete-url-template="{{ path(feed_route_comment_delete, {id_commentaire: '__COMMENT__'}) }}"
+>
+    {{ include('components/sidebar.html.twig', {'active_page': 'accueil', 'sidebar_role': role}) }}
+
+    <div class="flex-fill overflow-y-auto p-4 feed-page-shell">
+        <div class="feed-container">
+            <div class="feed-page-head">
+                <div>
+                    <p class="feed-kicker">Espace collaborateur</p>
+                    <h1 class="feed-title">Le fil d'actualite de l'entreprise</h1>
+                    <p class="feed-subtitle">Annonces, evenements et conversations utiles, reunis dans une experience plus claire et plus vivante.</p>
+                </div>
+                <div class="dropdown">
+                    <button type="button" class="btn btn-light feed-filter-btn" id="filterDropdownBtn" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                        <i class="ti ti-adjustments-horizontal"></i>
+                        <span>Filtrer</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end" aria-labelledby="filterDropdownBtn">
+                        <a class="dropdown-item{% if filter|default('all') == 'all' %} active{% endif %}" href="{{ path('app_employe_feed') }}">Toutes les publications</a>
+                        <a class="dropdown-item{% if filter|default('all') == 'annonce' %} active{% endif %}" href="{{ path('app_employe_feed', {filter: 'annonce'}) }}">Annonces uniquement</a>
+                        <a class="dropdown-item{% if filter|default('all') == 'evenement' %} active{% endif %}" href="{{ path('app_employe_feed', {filter: 'evenement'}) }}">Evenements uniquement</a>
+                    </div>
+                </div>
+            </div>
+
+            {% for post in posts %}
+                {% if post.active %}
+                    {% set is_event = post.typePost == TYPE_EVENEMENT %}
+                    {% set is_annonce = post.typePost == TYPE_ANNONCE %}
+                    {% set pid = post.idPost %}
+                    {% set like_n = likes_count[pid]|default(0) %}
+                    {% set com_n = comments_count[pid]|default(0) %}
+                    {% set part_n = participants_count[pid]|default(0) %}
+                    {% set restantes = places_restantes[pid]|default(null) %}
+                    {% set comments = comments_by_post[pid]|default([]) %}
+                    {% set liked = pid in user_liked_post_ids|default([]) %}
+                    {% set participating = pid in user_participates_post_ids|default([]) %}
+                    {% set author = author_labels[post.utilisateurId]|default('Employe') %}
+                    {% set initials = author|slice(0, 2)|upper %}
+
+                    <article class="feed-post-card" data-post-id="{{ pid }}" data-capacite-max="{{ post.capaciteMax is not null ? post.capaciteMax : '' }}">
+                        <div class="feed-post-head">
+                            <div class="feed-author-block">
+                                <div class="feed-avatar {% if is_event %}event{% else %}announcement{% endif %}">{{ initials }}</div>
+                                <div>
+                                    <div class="feed-author-name">{{ author }}</div>
+                                    <div class="feed-post-meta">
+                                        <span>{{ post.dateCreation ? post.dateCreation|date('d/m/Y H:i') : '' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="feed-post-tag {% if is_event %}event{% else %}announcement{% endif %}">
+                                {% if is_event %}Evenement{% elseif is_annonce %}Annonce{% else %}Publication{% endif %}
+                            </span>
+                        </div>
+
+                        <div class="feed-post-body">
+                            <h2 class="feed-post-title">{{ post.titre }}</h2>
+                            <p class="feed-post-content">{{ post.contenu }}</p>
+
+                            {% if is_event %}
+                                <div class="feed-event-panel">
+                                    {% if post.dateEvenement %}
+                                        <div class="feed-event-item">
+                                            <i class="ti ti-calendar-event"></i>
+                                            <div>
+                                                <span class="feed-event-label">Date debut</span>
+                                                <strong>{{ post.dateEvenement|date('d/m/Y') }}</strong>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                    {% if post.dateFinEvenement %}
+                                        <div class="feed-event-item">
+                                            <i class="ti ti-calendar-time"></i>
+                                            <div>
+                                                <span class="feed-event-label">Date fin</span>
+                                                <strong>{{ post.dateFinEvenement|date('d/m/Y') }}</strong>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                    {% if post.lieu %}
+                                        <div class="feed-event-item">
+                                            <i class="ti ti-map-pin"></i>
+                                            <div>
+                                                <span class="feed-event-label">Lieu</span>
+                                                <strong>{{ post.lieu }}</strong>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                    {% if post.capaciteMax is not null %}
+                                        <div class="feed-event-item">
+                                            <i class="ti ti-users"></i>
+                                            <div>
+                                                <span class="feed-event-label">Capacite</span>
+                                                <strong>{{ post.capaciteMax }} places</strong>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                {% if post.lieu %}
+                                    <div class="feed-map-link-wrap">
+                                        <a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer" href="https://www.google.com/maps/search/?api=1&query={{ post.lieu|url_encode }}">
+                                            <i class="ti ti-map-pin me-1"></i> Voir sur Google Maps
+                                        </a>
+                                    </div>
+                                {% endif %}
+                            {% endif %}
+
+                            {% if is_event and post.eventImages|length > 0 %}
+                                <div class="row g-2 mt-1">
+                                    {% for img in post.eventImages %}
+                                        {% set src = img.imagePath starts with 'http' ? img.imagePath : asset(img.imagePath) %}
+                                        <div class="col-6 col-sm-4">
+                                            <img src="{{ src }}" alt="" class="img-fluid rounded-4 border" loading="lazy" style="aspect-ratio: 4/3; object-fit: cover;">
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="feed-stats-row">
+                            <span class="feed-stat" id="like-count-{{ pid }}">
+                                <i class="ti ti-heart-filled"></i>
+                                <span>{{ like_n }} j'aime</span>
+                            </span>
+                            <span class="feed-stat" id="com-count-{{ pid }}">
+                                <i class="ti ti-message-circle"></i>
+                                <span>{{ com_n }} commentaire{{ com_n > 1 ? 's' : '' }}</span>
+                            </span>
+                            {% if is_event %}
+                                <span class="feed-stat" id="part-count-{{ pid }}">
+                                    <i class="ti ti-user-check"></i>
+                                    <span>{{ part_n }} participant{{ part_n > 1 ? 's' : '' }}</span>
+                                </span>
+                                {% if restantes is not null %}
+                                    <span class="feed-places-badge" id="places-restantes-{{ pid }}">{{ restantes }} places restantes</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+
+                        <div class="feed-actions-row">
+                            <button
+                                type="button"
+                                class="feed-action-button feed-like-button {% if liked %}is-active{% endif %}"
+                                data-post-id="{{ pid }}"
+                                data-action="like"
+                                data-csrf="{{ csrf_token('feed_like_' ~ pid) }}"
+                            >
+                                <span class="feed-action-icon">
+                                    <i class="ti {% if liked %}ti-heart-filled{% else %}ti-heart{% endif %}"></i>
+                                </span>
+                                <span class="feed-action-label">J'aime</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="feed-action-button"
+                                data-post-id="{{ pid }}"
+                                data-action="comment"
+                            >
+                                <span class="feed-action-icon">
+                                    <i class="ti ti-message-circle"></i>
+                                </span>
+                                <span class="feed-action-label">Commentaires</span>
+                            </button>
+
+                            {% if is_event %}
+                                <button
+                                    type="button"
+                                    class="feed-action-button feed-participation-button {% if participating %}is-active{% endif %}"
+                                    data-post-id="{{ pid }}"
+                                    data-action="participate"
+                                    data-csrf="{{ csrf_token('feed_participate_' ~ pid) }}"
+                                >
+                                    <span class="feed-action-icon">
+                                        <i class="ti {% if participating %}ti-circle-check-filled{% else %}ti-circle-check{% endif %}"></i>
+                                    </span>
+                                    <span class="feed-action-label feed-action-text">{% if participating %}Annuler{% else %}Participer{% endif %}</span>
+                                </button>
+                            {% endif %}
+                        </div>
+
+                        <section class="feed-comments-section" id="comments-section-{{ pid }}" style="display:none;">
+                            <div class="feed-comments-list" id="comments-list-{{ pid }}">
+                                {% if comments is not empty %}
+                                    {% for comment in comments %}
+                                        {{ feed.comment_item(comment, pid, current_user_id, feed_route_comment_edit, feed_route_comment_delete) }}
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="feed-empty-comments" id="comments-empty-{{ pid }}">Aucun commentaire pour l'instant. Lancez la conversation.</div>
+                                {% endif %}
+                            </div>
+
+                            {% if current_user_id is not null %}
+                                <form class="feed-comment-composer feed-comment-form" data-post-id="{{ pid }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('feed_comment_' ~ pid) }}">
+                                    <div class="feed-composer-avatar">{{ current_user_initials }}</div>
+                                    <div class="feed-composer-main">
+                                        <textarea class="form-control feed-comment-textarea feed-comment-input" name="contenu" rows="2" maxlength="2000" placeholder="Ajouter un commentaire..." required></textarea>
+                                        <div class="feed-comment-form-actions">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="ti ti-send me-1"></i> Publier
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            {% endif %}
+                        </section>
+                    </article>
+                {% endif %}
+            {% else %}
+                <div class="feed-empty-state">
+                    <i class="ti ti-inbox"></i>
+                    <h3>Aucune publication pour le moment</h3>
+                    <p>Les nouvelles annonces et evenements apparaitront ici des qu'ils seront publies.</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <style>
+        .feed-page-shell {
+            background:
+                radial-gradient(circle at top right, rgba(57, 91, 255, 0.12), transparent 24rem),
+                radial-gradient(circle at left center, rgba(0, 185, 140, 0.10), transparent 26rem),
+                #f4f6fb;
+        }
+        .feed-container {
+            max-width: 52rem;
+            margin: 0 auto;
+        }
+        .feed-page-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .feed-kicker {
+            margin: 0 0 0.35rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #5360f5;
+        }
+        .feed-title {
+            margin: 0;
+            font-size: clamp(1.8rem, 2.8vw, 2.5rem);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            color: #0f172a;
+        }
+        .feed-subtitle {
+            margin: 0.45rem 0 0;
+            max-width: 38rem;
+            color: #64748b;
+        }
+        .feed-filter-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            border-radius: 999px;
+            padding: 0.75rem 1rem;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        }
+        .feed-post-card {
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 1.6rem;
+            box-shadow: 0 22px 60px rgba(15, 23, 42, 0.08);
+            margin-bottom: 1.25rem;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+        .feed-post-head,
+        .feed-post-body,
+        .feed-stats-row,
+        .feed-actions-row,
+        .feed-comments-section {
+            padding-left: 1.4rem;
+            padding-right: 1.4rem;
+        }
+        .feed-post-head {
+            padding-top: 1.35rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        .feed-author-block {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+        }
+        .feed-avatar,
+        .feed-composer-avatar,
+        .feed-comment-avatar {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+        }
+        .feed-avatar {
+            width: 3rem;
+            height: 3rem;
+            color: #0f172a;
+        }
+        .feed-avatar.announcement {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(59, 130, 246, 0.04));
+            color: #1d4ed8;
+        }
+        .feed-avatar.event {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.16), rgba(249, 115, 22, 0.05));
+            color: #c2410c;
+        }
+        .feed-author-name,
+        .feed-post-title {
+            color: #0f172a;
+        }
+        .feed-author-name {
+            font-weight: 700;
+        }
+        .feed-post-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #64748b;
+            font-size: 0.88rem;
+        }
+        .feed-dot {
+            width: 0.28rem;
+            height: 0.28rem;
+            border-radius: 999px;
+            background: #cbd5e1;
+        }
+        .feed-post-tag {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 0.45rem 0.8rem;
+            font-size: 0.77rem;
+            font-weight: 700;
+        }
+        .feed-post-tag.announcement {
+            background: rgba(59, 130, 246, 0.12);
+            color: #1d4ed8;
+        }
+        .feed-post-tag.event {
+            background: rgba(249, 115, 22, 0.12);
+            color: #c2410c;
+        }
+        .feed-post-body {
+            padding-top: 1rem;
+            padding-bottom: 1.1rem;
+        }
+        .feed-post-title {
+            margin: 0 0 0.75rem;
+            font-size: 1.2rem;
+            font-weight: 800;
+        }
+        .feed-post-content {
+            margin: 0;
+            color: #334155;
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+        .feed-event-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+            gap: 0.85rem;
+            margin: 1.15rem 0 1rem;
+            padding: 1rem;
+            border-radius: 1.15rem;
+            background: linear-gradient(135deg, rgba(255, 247, 237, 0.95), rgba(255, 255, 255, 0.92));
+            border: 1px solid rgba(249, 115, 22, 0.14);
+        }
+        .feed-event-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            color: #9a3412;
+        }
+        .feed-event-item i {
+            font-size: 1.1rem;
+            margin-top: 0.2rem;
+        }
+        .feed-event-label {
+            display: block;
+            margin-bottom: 0.15rem;
+            font-size: 0.78rem;
+            color: #9f6b4c;
+        }
+        .feed-map-link-wrap {
+            margin-bottom: 0.4rem;
+        }
+        .feed-stats-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            padding-top: 0.95rem;
+            padding-bottom: 0.95rem;
+            border-top: 1px solid rgba(148, 163, 184, 0.14);
+            color: #64748b;
+        }
+        .feed-stat {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.92rem;
+        }
+        .feed-stat i {
+            color: #5360f5;
+        }
+        .feed-places-badge {
+            margin-left: auto;
+            padding: 0.42rem 0.75rem;
+            border-radius: 999px;
+            background: rgba(16, 185, 129, 0.12);
+            color: #047857;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+        .feed-actions-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+            gap: 0.8rem;
+            padding-top: 0.2rem;
+            padding-bottom: 1.2rem;
+        }
+        .feed-action-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.7rem;
+            min-height: 3.2rem;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 1rem;
+            background: #f8fafc;
+            color: #334155;
+            font-weight: 700;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+        }
+        .feed-action-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+            border-color: rgba(83, 96, 245, 0.24);
+        }
+        .feed-action-icon {
+            width: 2rem;
+            height: 2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
+        }
+        .feed-action-icon i {
+            font-size: 1.05rem;
+            color: #64748b;
+        }
+        .feed-action-count {
+            min-width: 1.5rem;
+            text-align: center;
+        }
+        .feed-like-button.is-active {
+            background: linear-gradient(135deg, rgba(255, 236, 239, 0.95), rgba(255, 255, 255, 0.92));
+            border-color: rgba(244, 63, 94, 0.2);
+            color: #be123c;
+        }
+        .feed-like-button.is-active .feed-action-icon {
+            background: rgba(244, 63, 94, 0.12);
+        }
+        .feed-like-button.is-active .feed-action-icon i {
+            color: #e11d48;
+        }
+        .feed-like-button .feed-action-icon i {
+            color: #475569;
+        }
+        .feed-participation-button.is-active {
+            background: linear-gradient(135deg, rgba(83, 96, 245, 0.94), rgba(99, 102, 241, 0.9));
+            border-color: transparent;
+            color: #fff;
+        }
+        .feed-participation-button.is-active .feed-action-icon {
+            background: rgba(255, 255, 255, 0.16);
+            box-shadow: none;
+        }
+        .feed-participation-button.is-active .feed-action-icon i {
+            color: #fff;
+        }
+        .feed-action-button[data-action="comment"] .feed-action-icon i {
+            color: #5360f5;
+        }
+        .feed-comments-section {
+            padding-top: 0.2rem;
+            padding-bottom: 1.4rem;
+            border-top: 1px solid rgba(148, 163, 184, 0.14);
+            background: linear-gradient(180deg, rgba(248, 250, 252, 0.72), rgba(255, 255, 255, 0.95));
+        }
+        .feed-comments-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        .feed-empty-comments {
+            padding: 1rem 1.1rem;
+            border: 1px dashed rgba(148, 163, 184, 0.35);
+            border-radius: 1rem;
+            color: #64748b;
+            background: rgba(255, 255, 255, 0.76);
+        }
+        .feed-comment-card {
+            border-radius: 1.1rem;
+        }
+        .feed-comment-shell {
+            display: flex;
+            gap: 0.85rem;
+            padding: 1rem;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            border-radius: 1.1rem;
+            background: #fff;
+            box-shadow: 0 14px 32px rgba(15, 23, 42, 0.04);
+        }
+        .feed-comment-avatar,
+        .feed-composer-avatar {
+            width: 2.4rem;
+            height: 2.4rem;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, rgba(83, 96, 245, 0.14), rgba(16, 185, 129, 0.12));
+            color: #334155;
+        }
+        .feed-comment-main,
+        .feed-composer-main {
+            flex: 1;
+            min-width: 0;
+        }
+        .feed-comment-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.45rem;
+        }
+        .feed-comment-meta {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            color: #64748b;
+            font-size: 0.84rem;
+        }
+        .feed-comment-author {
+            font-weight: 700;
+            font-size: 0.92rem;
+            color: #0f172a;
+        }
+        .feed-comment-edited {
+            padding: 0.2rem 0.45rem;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.06);
+            color: #475569;
+            font-size: 0.73rem;
+            font-weight: 700;
+        }
+        .feed-comment-tools {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+        .feed-comment-tool {
+            border: 0;
+            background: transparent;
+            color: #5360f5;
+            font-size: 0.82rem;
+            font-weight: 700;
+            padding: 0.2rem 0.3rem;
+        }
+        .feed-comment-tool.danger {
+            color: #dc2626;
+        }
+        .feed-comment-content {
+            color: #334155;
+            line-height: 1.65;
+            word-break: break-word;
+        }
+        .feed-comment-replies {
+            margin-left: 3.1rem;
+            margin-top: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .feed-comment-composer,
+        .feed-reply-shell {
+            display: flex;
+            gap: 0.85rem;
+            padding: 1rem;
+            border-radius: 1.1rem;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            background: rgba(255, 255, 255, 0.96);
+        }
+        .feed-edit-form,
+        .feed-reply-form {
+            margin-top: 0.8rem;
+        }
+        .feed-comment-textarea {
+            border-radius: 0.95rem;
+            border-color: rgba(148, 163, 184, 0.32);
+            resize: vertical;
+        }
+        .feed-comment-form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.55rem;
+            margin-top: 0.7rem;
+        }
+        .feed-empty-state {
+            padding: 3rem 1.5rem;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px dashed rgba(148, 163, 184, 0.28);
+            border-radius: 1.6rem;
+            color: #64748b;
+        }
+        .feed-empty-state i {
+            font-size: 2.4rem;
+            color: #5360f5;
+        }
+        .feed-empty-state h3 {
+            margin: 1rem 0 0.45rem;
+            color: #0f172a;
+        }
+        @media (max-width: 768px) {
+            .feed-page-head {
+                align-items: stretch;
+                flex-direction: column;
+            }
+            .feed-post-head,
+            .feed-comment-head {
+                flex-direction: column;
+            }
+            .feed-comments-section,
+            .feed-post-head,
+            .feed-post-body,
+            .feed-stats-row,
+            .feed-actions-row {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+            .feed-comment-replies {
+                margin-left: 1rem;
+            }
+            .feed-comment-shell,
+            .feed-comment-composer,
+            .feed-reply-shell {
+                padding: 0.85rem;
+            }
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var feedRoot = document.getElementById('feed-root');
+            if (!feedRoot) return;
+
+            function buildUrl(template, value) {
+                return template.replace('__POST__', value).replace('__COMMENT__', value);
+            }
+
+            function escapeHtml(value) {
+                return String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function nl2br(value) {
+                return escapeHtml(value).replace(/\n/g, '<br>');
+            }
+
+            function formatDate(iso) {
+                if (!iso) return '';
+                var date = new Date(iso);
+                if (isNaN(date.getTime())) return '';
+                return date.toLocaleString('fr-FR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            async function sendAction(url, data) {
+                var body = new URLSearchParams();
+                Object.keys(data || {}).forEach(function (key) {
+                    if (data[key] !== undefined && data[key] !== null) {
+                        body.append(key, data[key]);
+                    }
+                });
+
+                var response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: body.toString(),
+                    credentials: 'same-origin'
+                });
+
+                var payload;
+                try {
+                    payload = await response.json();
+                } catch (error) {
+                    payload = { success: false, message: 'Reponse serveur invalide.' };
+                }
+
+                if (!response.ok && payload.success === undefined) {
+                    payload.success = false;
+                }
+
+                return payload;
+            }
+
+            function updateLikeSummary(postId, count) {
+                var stats = document.getElementById('like-count-' + postId);
+                if (stats) {
+                    stats.innerHTML = '<i class="ti ti-heart-filled"></i><span>' + count + ' j\\'aime</span>';
+                }
+            }
+
+            function updateCommentSummary(postId, count) {
+                var stats = document.getElementById('com-count-' + postId);
+                if (stats) {
+                    var plural = count > 1 ? 's' : '';
+                    stats.innerHTML = '<i class="ti ti-message-circle"></i><span>' + count + ' commentaire' + plural + '</span>';
+                }
+            }
+
+            function updateParticipationSummary(postId, count) {
+                var stats = document.getElementById('part-count-' + postId);
+                if (stats) {
+                    var plural = count > 1 ? 's' : '';
+                    stats.innerHTML = '<i class="ti ti-user-check"></i><span>' + count + ' participant' + plural + '</span>';
+                }
+            }
+
+            function updateRemainingPlaces(postId, remainingPlaces) {
+                var badge = document.getElementById('places-restantes-' + postId);
+                if (badge && remainingPlaces !== null && remainingPlaces !== undefined) {
+                    badge.textContent = remainingPlaces + ' places restantes';
+                }
+            }
+
+            function ensureCommentsList(postId) {
+                var list = document.getElementById('comments-list-' + postId);
+                if (!list) return null;
+
+                var empty = document.getElementById('comments-empty-' + postId);
+                if (empty) {
+                    empty.remove();
+                }
+
+                return list;
+            }
+
+            function ensureRepliesContainer(card) {
+                var replies = null;
+                Array.prototype.forEach.call(card.children, function (child) {
+                    if (!replies && child.classList && child.classList.contains('feed-comment-replies')) {
+                        replies = child;
+                    }
+                });
+                if (!replies) {
+                    replies = document.createElement('div');
+                    replies.className = 'feed-comment-replies';
+                    card.appendChild(replies);
+                }
+                replies.removeAttribute('data-empty-replies');
+                return replies;
+            }
+
+            function setButtonLoading(button, isLoading) {
+                if (!button) return;
+                button.disabled = isLoading;
+                button.style.opacity = isLoading ? '0.7' : '1';
+            }
+
+            function createCommentElement(comment) {
+                var wrapper = document.createElement('div');
+                var editUrl = buildUrl(feedRoot.dataset.commentEditUrlTemplate, comment.id_commentaire);
+                var deleteUrl = buildUrl(feedRoot.dataset.commentDeleteUrlTemplate, comment.id_commentaire);
+                var editedBadge = comment.edited_at ? '<span class="feed-comment-edited">Modifie</span>' : '';
+                var ownerTools = comment.owned_by_current_user
+                    ? '<button type="button" class="feed-comment-tool" data-action="edit-toggle">Modifier</button><button type="button" class="feed-comment-tool danger" data-action="delete-comment">Supprimer</button>'
+                    : '';
+
+                wrapper.innerHTML = '' +
+                    '<article class="feed-comment-card" id="comment-' + comment.id_commentaire + '" data-comment-id="' + comment.id_commentaire + '" data-post-id="' + comment.post_id + '" data-parent-id="' + (comment.parent_id || '') + '" data-edit-url="' + editUrl + '" data-delete-url="' + deleteUrl + '" data-edit-token="' + escapeHtml(comment.edit_token || '') + '" data-delete-token="' + escapeHtml(comment.delete_token || '') + '">' +
+                        '<div class="feed-comment-shell">' +
+                            '<div class="feed-comment-avatar">' + escapeHtml(comment.author_name.split(' ').map(function (part) { return part.charAt(0); }).join('').slice(0, 2).toUpperCase()) + '</div>' +
+                            '<div class="feed-comment-main">' +
+                                '<div class="feed-comment-head">' +
+                                    '<div class="feed-comment-meta">' +
+                                        '<span class="feed-comment-author">' + escapeHtml(comment.author_name) + '</span>' +
+                                        '<span class="feed-comment-date" data-comment-date="' + escapeHtml(comment.date_commentaire) + '">' + escapeHtml(formatDate(comment.date_commentaire)) + '</span>' +
+                                        editedBadge +
+                                    '</div>' +
+                                    '<div class="feed-comment-tools">' +
+                                        '<button type="button" class="feed-comment-tool" data-action="reply-toggle">Repondre</button>' +
+                                        ownerTools +
+                                    '</div>' +
+                                '</div>' +
+                                '<div class="feed-comment-content" data-comment-content>' + nl2br(comment.contenu) + '</div>' +
+                                '<form class="feed-edit-form" data-comment-id="' + comment.id_commentaire + '" style="display:none;">' +
+                                    '<input type="hidden" name="_token" value="' + escapeHtml(comment.edit_token || '') + '">' +
+                                    '<textarea class="form-control feed-comment-textarea" name="contenu" rows="3" maxlength="2000" required>' + escapeHtml(comment.contenu) + '</textarea>' +
+                                    '<div class="feed-comment-form-actions">' +
+                                        '<button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>' +
+                                        '<button type="button" class="btn btn-ghost-secondary btn-sm" data-action="edit-cancel">Annuler</button>' +
+                                    '</div>' +
+                                '</form>' +
+                                '<form class="feed-reply-form" data-post-id="' + comment.post_id + '" data-parent-id="' + comment.id_commentaire + '" style="display:none;">' +
+                                    '<input type="hidden" name="_token" value="' + escapeHtml(document.querySelector('.feed-comment-form[data-post-id="' + comment.post_id + '"] [name="_token"]') ? document.querySelector('.feed-comment-form[data-post-id="' + comment.post_id + '"] [name="_token"]').value : '') + '">' +
+                                    '<input type="hidden" name="parent_id" value="' + comment.id_commentaire + '">' +
+                                    '<div class="feed-reply-shell">' +
+                                        '<textarea class="form-control feed-comment-textarea" name="contenu" rows="2" maxlength="2000" placeholder="Ecrire une reponse..." required></textarea>' +
+                                        '<div class="feed-comment-form-actions">' +
+                                            '<button type="submit" class="btn btn-primary btn-sm">Repondre</button>' +
+                                            '<button type="button" class="btn btn-ghost-secondary btn-sm" data-action="reply-cancel">Annuler</button>' +
+                                        '</div>' +
+                                    '</div>' +
+                                '</form>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="feed-comment-replies" data-empty-replies="true"></div>' +
+                    '</article>';
+
+                return wrapper.firstElementChild;
+            }
+
+            function addCommentToUi(comment) {
+                var element = createCommentElement(comment);
+
+                if (comment.parent_id) {
+                    var parent = document.getElementById('comment-' + comment.parent_id);
+                    if (parent) {
+                        ensureRepliesContainer(parent).appendChild(element);
+                    }
+                } else {
+                    var list = ensureCommentsList(comment.post_id);
+                    if (list) {
+                        list.prepend(element);
+                    }
+                }
+            }
+
+            function removeCommentFromUi(commentId) {
+                var card = document.getElementById('comment-' + commentId);
+                if (!card) return;
+
+                var repliesContainer = card.parentElement;
+                card.remove();
+
+                if (repliesContainer && repliesContainer.classList.contains('feed-comment-replies') && repliesContainer.children.length === 0) {
+                    repliesContainer.setAttribute('data-empty-replies', 'true');
+                }
+            }
+
+            function ensureEmptyState(postId) {
+                var list = document.getElementById('comments-list-' + postId);
+                if (!list) return;
+
+                if (list.children.length === 0) {
+                    var empty = document.createElement('div');
+                    empty.className = 'feed-empty-comments';
+                    empty.id = 'comments-empty-' + postId;
+                    empty.textContent = "Aucun commentaire pour l'instant. Lancez la conversation.";
+                    list.appendChild(empty);
+                }
+            }
+
+            feedRoot.addEventListener('click', async function (event) {
+                var actionButton = event.target.closest('[data-action]');
+                if (!actionButton) return;
+
+                var action = actionButton.getAttribute('data-action');
+
+                if (action === 'comment' && actionButton.classList.contains('feed-action-button')) {
+                    var postId = actionButton.getAttribute('data-post-id');
+                    var section = document.getElementById('comments-section-' + postId);
+                    if (!section) return;
+
+                    var isHidden = section.style.display === 'none';
+                    section.style.display = isHidden ? 'block' : 'none';
+
+                    if (isHidden) {
+                        var input = section.querySelector('.feed-comment-input');
+                        if (input) input.focus();
+                    }
+                    return;
+                }
+
+                if (action === 'like' && actionButton.classList.contains('feed-action-button')) {
+                    var likePostId = actionButton.getAttribute('data-post-id');
+                    var likeIcon = actionButton.querySelector('.feed-action-icon i');
+
+                    setButtonLoading(actionButton, true);
+                    try {
+                        var likeData = await sendAction('/employe/like/' + likePostId, {
+                            _token: actionButton.getAttribute('data-csrf')
+                        });
+
+                        if (likeData.success) {
+                            actionButton.classList.toggle('is-active', !!likeData.liked);
+                            if (likeIcon) {
+                                likeIcon.className = 'ti ' + (likeData.liked ? 'ti-heart-filled' : 'ti-heart');
+                            }
+                            updateLikeSummary(likePostId, likeData.count);
+                        } else {
+                            alert(likeData.message || 'Erreur lors de la mise a jour du like');
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        alert('Erreur lors de la mise a jour du like');
+                    } finally {
+                        setButtonLoading(actionButton, false);
+                    }
+                    return;
+                }
+
+                if (action === 'participate' && actionButton.classList.contains('feed-action-button')) {
+                    var participatePostId = actionButton.getAttribute('data-post-id');
+                    var participateIcon = actionButton.querySelector('.feed-action-icon i');
+                    var participateText = actionButton.querySelector('.feed-action-text');
+
+                    setButtonLoading(actionButton, true);
+                    try {
+                        var participateData = await sendAction('/employe/participate/' + participatePostId, {
+                            _token: actionButton.getAttribute('data-csrf')
+                        });
+
+                        if (participateData.success) {
+                            actionButton.classList.toggle('is-active', !!participateData.participating);
+                            if (participateIcon) {
+                                participateIcon.className = 'ti ' + (participateData.participating ? 'ti-circle-check-filled' : 'ti-circle-check');
+                            }
+                            if (participateText) {
+                                participateText.textContent = participateData.participating ? 'Annuler' : 'Participer';
+                            }
+                            updateParticipationSummary(participatePostId, participateData.count);
+                            updateRemainingPlaces(participatePostId, participateData.remaining_places);
+                        } else {
+                            alert(participateData.message || 'Erreur lors de la mise a jour de la participation');
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        alert('Erreur lors de la mise a jour de la participation');
+                    } finally {
+                        setButtonLoading(actionButton, false);
+                    }
+                    return;
+                }
+
+                var card = actionButton.closest('.feed-comment-card');
+                if (!card) return;
+
+                var replyForm = card.querySelector('.feed-reply-form');
+                var editForm = card.querySelector('.feed-edit-form');
+                var contentNode = card.querySelector('[data-comment-content]');
+
+                if (action === 'reply-toggle' && replyForm) {
+                    var replyVisible = replyForm.style.display === 'block';
+                    replyForm.style.display = replyVisible ? 'none' : 'block';
+                    if (!replyVisible) {
+                        var replyTextarea = replyForm.querySelector('textarea');
+                        if (replyTextarea) replyTextarea.focus();
+                    }
+                    return;
+                }
+
+                if (action === 'reply-cancel' && replyForm) {
+                    replyForm.style.display = 'none';
+                    replyForm.reset();
+                    return;
+                }
+
+                if (action === 'edit-toggle' && editForm && contentNode) {
+                    var editVisible = editForm.style.display === 'block';
+                    editForm.style.display = editVisible ? 'none' : 'block';
+                    contentNode.style.display = editVisible ? 'block' : 'none';
+                    if (!editVisible) {
+                        var editTextarea = editForm.querySelector('textarea');
+                        if (editTextarea) editTextarea.focus();
+                    }
+                    return;
+                }
+
+                if (action === 'edit-cancel' && editForm && contentNode) {
+                    editForm.style.display = 'none';
+                    contentNode.style.display = 'block';
+                    return;
+                }
+
+                if (action === 'delete-comment') {
+                    if (!window.confirm('Supprimer ce commentaire et ses reponses ?')) {
+                        return;
+                    }
+
+                    setButtonLoading(actionButton, true);
+                    try {
+                        var deleteData = await sendAction(card.dataset.deleteUrl, {
+                            _token: card.dataset.deleteToken
+                        });
+
+                        if (deleteData.success) {
+                            removeCommentFromUi(deleteData.deleted_comment_id);
+                            updateCommentSummary(deleteData.post_id, deleteData.count);
+                            ensureEmptyState(deleteData.post_id);
+                        } else {
+                            alert(deleteData.message || 'Erreur lors de la suppression du commentaire');
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        alert('Erreur lors de la suppression du commentaire');
+                    } finally {
+                        setButtonLoading(actionButton, false);
+                    }
+                }
+            });
+
+            feedRoot.addEventListener('submit', async function (event) {
+                var form = event.target;
+                if (!form.matches('.feed-comment-form, .feed-reply-form, .feed-edit-form')) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                if (form.matches('.feed-comment-form')) {
+                    var postId = form.getAttribute('data-post-id');
+                    var textarea = form.querySelector('.feed-comment-input');
+                    var submitButton = form.querySelector('button[type="submit"]');
+                    var content = textarea ? textarea.value.trim() : '';
+                    var token = form.querySelector('[name="_token"]').value;
+
+                    if (!content) return;
+
+                    setButtonLoading(submitButton, true);
+                    try {
+                        var commentData = await sendAction(buildUrl(feedRoot.dataset.commentUrlTemplate, postId), {
+                            _token: token,
+                            contenu: content
+                        });
+
+                        if (commentData.success) {
+                            addCommentToUi(commentData.comment);
+                            updateCommentSummary(postId, commentData.count);
+                            textarea.value = '';
+                            document.getElementById('comments-section-' + postId).style.display = 'block';
+                        } else {
+                            alert(commentData.message || 'Erreur lors de la publication du commentaire');
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        alert('Erreur lors de la publication du commentaire');
+                    } finally {
+                        setButtonLoading(submitButton, false);
+                    }
+                    return;
+                }
+
+                if (form.matches('.feed-reply-form')) {
+                    var replyPostId = form.getAttribute('data-post-id');
+                    var parentId = form.getAttribute('data-parent-id');
+                    var replyTextareaField = form.querySelector('textarea');
+                    var replySubmitButton = form.querySelector('button[type="submit"]');
+                    var replyContent = replyTextareaField ? replyTextareaField.value.trim() : '';
+                    var replyToken = form.querySelector('[name="_token"]').value;
+
+                    if (!replyContent) return;
+
+                    setButtonLoading(replySubmitButton, true);
+                    try {
+                        var replyData = await sendAction(buildUrl(feedRoot.dataset.commentUrlTemplate, replyPostId), {
+                            _token: replyToken,
+                            contenu: replyContent,
+                            parent_id: parentId
+                        });
+
+                        if (replyData.success) {
+                            addCommentToUi(replyData.comment);
+                            updateCommentSummary(replyPostId, replyData.count);
+                            form.reset();
+                            form.style.display = 'none';
+                        } else {
+                            alert(replyData.message || 'Erreur lors de la publication de la reponse');
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        alert('Erreur lors de la publication de la reponse');
+                    } finally {
+                        setButtonLoading(replySubmitButton, false);
+                    }
+                    return;
+                }
+
+                if (form.matches('.feed-edit-form')) {
+                    var commentCard = form.closest('.feed-comment-card');
+                    var editTextareaField = form.querySelector('textarea');
+                    var editSubmitButton = form.querySelector('button[type="submit"]');
+                    var editContent = editTextareaField ? editTextareaField.value.trim() : '';
+                    var commentContentNode = commentCard ? commentCard.querySelector('[data-comment-content]') : null;
+
+                    if (!commentCard || !editContent) return;
+
+                    setButtonLoading(editSubmitButton, true);
+                    try {
+                        var editData = await sendAction(commentCard.dataset.editUrl, {
+                            _token: commentCard.dataset.editToken,
+                            contenu: editContent
+                        });
+
+                        if (editData.success) {
+                            if (commentContentNode) {
+                                commentContentNode.innerHTML = nl2br(editData.comment.contenu);
+                                commentContentNode.style.display = 'block';
+                            }
+                            form.style.display = 'none';
+
+                            var badge = commentCard.querySelector('.feed-comment-edited');
+                            if (!badge) {
+                                badge = document.createElement('span');
+                                badge.className = 'feed-comment-edited';
+                                badge.textContent = 'Modifie';
+                                var meta = commentCard.querySelector('.feed-comment-meta');
+                                if (meta) meta.appendChild(badge);
+                            }
+                        } else {
+                            alert(editData.message || 'Erreur lors de la modification du commentaire');
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        alert('Erreur lors de la modification du commentaire');
+                    } finally {
+                        setButtonLoading(editSubmitButton, false);
+                    }
+                }
+            });
+        });
+    </script>
+{% endblock %}

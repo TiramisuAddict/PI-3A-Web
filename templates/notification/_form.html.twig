@@ -1,0 +1,79 @@
+{{ form_start(form, { attr: { class: 'notification-crud-form', novalidate: 'novalidate' } }) }}
+{% if form.vars.submitted and not form.vars.valid %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <div class="d-flex">
+            <div><i class="ti ti-alert-circle me-3"></i></div>
+            <div class="flex-grow-1">
+                <strong>Formulaire invalide</strong>
+                <div class="small mt-2">Veuillez corriger les erreurs ci-dessous :</div>
+                <ul class="small mb-0 mt-2">
+                {% for field in form %}
+                    {% for error in field.vars.errors %}
+                        <li><strong>{{ field.vars.label|default(field.vars.name) }} :</strong> {{ error.message }}</li>
+                    {% endfor %}
+                {% endfor %}
+                {% for error in form.vars.errors %}
+                    <li>{{ error.message }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <a class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></a>
+    </div>
+{% endif %}
+
+<div class="row g-3">
+    <div class="col-12">
+        {{ form_row(form.titre, {
+            label: 'Titre *',
+            attr: {
+                class: 'form-control',
+                placeholder: 'Entrez le titre de la notification'
+            }
+        }) }}
+    </div>
+
+    <div class="col-12">
+        {{ form_row(form.message, {
+            label: 'Message *',
+            attr: {
+                class: 'form-control',
+                placeholder: 'Entrez le contenu du message',
+                rows: 5
+            }
+        }) }}
+    </div>
+
+    <div class="col-md-6">
+        {{ form_row(form.userId, {
+            label: 'ID Utilisateur *',
+            attr: {
+                class: 'form-control',
+                type: 'number',
+                placeholder: '1'
+            }
+        }) }}
+    </div>
+
+    <div class="col-md-6">
+        {{ form_row(form.isRead, {
+            label: 'Marquer comme lu',
+            attr: { class: 'form-check-input' }
+        }) }}
+    </div>
+
+    <div class="col-12">
+        {{ form_row(form.post, {
+            label: 'Post associé',
+            attr: { class: 'form-select' }
+        }) }}
+    </div>
+
+    <div class="col-12">
+        <div class="form-footer">
+            <a href="{{ cancel_path|default('#') }}" class="btn btn-link">Annuler</a>
+            <button type="submit" class="btn btn-primary"><i class="ti ti-check me-1"></i>{{ submit_label|default('Enregistrer') }}</button>
+        </div>
+    </div>
+</div>
+{{ form_end(form) }}

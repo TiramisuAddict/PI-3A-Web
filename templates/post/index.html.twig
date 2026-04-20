@@ -1,0 +1,167 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Publications — Momentum{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Publications</h2>
+                </div>
+                <div class="col-auto">
+                    <a class="btn btn-primary" href="{{ path('app_post_new') }}"><i class="ti ti-plus me-1"></i>Créer une publication</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="card-body">
+                    <form id="post-search-form" method="get" action="{{ path('app_post_index') }}" class="mb-0" data-rows-url="{{ path('app_post_rows') }}">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-8 col-lg-6">
+                                <label class="form-label" for="post-search-input">Rechercher</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="ti ti-search"></i></span>
+                                    <input type="search" id="post-search-input" name="search" value="{{ search|default('') }}" class="form-control" placeholder="Rechercher par titre ou contenu…" autocomplete="off" aria-busy="false">
+                                </div>
+                                <p id="post-search-meta" class="text-secondary small mt-2 mb-0 {{ search|default('') == '' ? 'd-none' : '' }}">{% if search|default('') != '' %}{{ posts|length }} résultat{{ posts|length > 1 ? 's' : '' }} trouvé{{ posts|length > 1 ? 's' : '' }}{% endif %}</p>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                            <tr>
+                                <th>Titre</th>
+                                <th>Type</th>
+                                <th>État</th>
+                                <th>Création</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="posts-table-body">
+                            {% include 'post/_rows.html.twig' %}
+                        </tbody>
+                    </table>
+                    <div class="card-body" id="empty-state" style="display:none;">
+                        <div class="empty">
+                            <div class="empty-header">404</div>
+                            <div class="empty-title">Aucune publication trouvée</div>
+                            <div class="empty-subtitle text-secondary">Créez une nouvelle publication pour commencer.</div>
+                            <div class="empty-action">
+                                <a href="{{ path('app_post_new') }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Créer une publication</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('1. Script started');
+            
+            const form = document.getElementById('post-search-form');
+            const input = document.getElementById('post-search-input');
+            const tbody = document.getElementById('posts-table-body');
+            const meta = document.getElementById('post-search-meta');
+            const rowsUrl = form?.dataset?.rowsUrl;
+            
+            console.log('2. Elements:', {
+                form: !!form,
+                input: !!input,
+                tbody: !!tbody,
+                rowsUrl: rowsUrl
+            });
+            
+            if (!form || !input || !tbody || !rowsUrl) {
+                console.error('STOP: Missing elements');
+                return;
+            }
+
+            // STOP form from submitting normally
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                console.log('Form submit blocked');
+                fetchRows(input.value);
+            });
+
+            let debounceTimer = null;
+
+            async function fetchRows(query) {
+                console.log('3. fetchRows called with:', query);
+                
+                const url = rowsUrl + '?search=' + encodeURIComponent(query);
+                console.log('4. Fetching URL:', url);
+                
+                try {
+                    const res = await fetch(url, {
+                        method: 'GET',
+                        headers: { 
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    
+                    console.log('5. Response status:', res.status);
+                    
+                    if (!res.ok) {
+                        throw new Error('HTTP ' + res.status);
+                    }
+                    
+                    const html = await res.text();
+                    console.log('6. Got HTML, length:', html.length);
+                    console.log('7. HTML preview:', html.substring(0, 200));
+                    
+                    tbody.innerHTML = html;
+                    console.log('8. Table updated!');
+                    
+                    // Update URL
+                    const newUrl = query.trim() === '' 
+                        ? window.location.pathname 
+                        : window.location.pathname + '?search=' + encodeURIComponent(query);
+                    window.history.replaceState({}, '', newUrl);
+                    
+                    // Update meta
+                    if (meta) {
+                        const rows = tbody.querySelectorAll('tr');
+                        const hasEmpty = tbody.querySelector('td[colspan]');
+                        const count = hasEmpty ? 0 : rows.length;
+                        
+                        if (query.trim() === '') {
+                            meta.classList.add('d-none');
+                        } else {
+                            meta.classList.remove('d-none');
+                            meta.textContent = count + ' résultat' + (count !== 1 ? 's' : '') + ' trouvé' + (count !== 1 ? 's' : '');
+                        }
+                    }
+                    
+                } catch (e) {
+                    console.error('9. Error:', e);
+                }
+            }
+
+            input.addEventListener('input', function() {
+                console.log('Input event fired, value:', input.value);
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(function() {
+                    fetchRows(input.value);
+                }, 300);
+            });
+            
+            console.log('10. All listeners attached - ready!');
+        });
+    </script>
+{% endblock %}

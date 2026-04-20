@@ -1,0 +1,65 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Likes — Momentum{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Likes</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <i class="ti ti-info-circle me-2"></i>
+                <strong>Liste en lecture seule</strong> — Les likes sont gérés automatiquement par le système.
+                <a class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></a>
+            </div>
+            
+            <div class="card">
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+                <tr>
+                    <th>Post</th>
+                    <th>Date du like</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for like_post in like_posts %}
+                <tr>
+                    <td>{% if like_post.post %}<a href="{{ path('app_post_show', {id_post: like_post.post.idPost}) }}" class="btn btn-ghost-primary">{{ like_post.post.titre|length > 30 ? like_post.post.titre|slice(0, 30) ~ '…' : like_post.post.titre }}</a>{% else %}—{% endif %}</td>
+                    <td class="text-secondary small">{{ like_post.dateLike ? like_post.dateLike|date('d/m/Y H:i') : '' }}</td>
+                    <td class="text-end text-nowrap">
+                        <div class="d-flex align-items-center justify-content-end gap-2">
+                            <form class="d-inline" method="post" action="{{ path('app_like_post_delete', { id_like: like_post.idLike }) }}" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce like ?');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ like_post.idLike) }}">
+                                <button type="submit" class="btn btn-icon btn-ghost-danger" title="Supprimer"><i class="ti ti-trash" style="font-size: 1.25rem;"></i></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="3" class="text-center py-4">
+                        <div class="empty">
+                            <div class="empty-header">404</div>
+                            <div class="empty-title">Aucun like trouvé</div>
+                            <div class="empty-subtitle text-secondary">Aucun like trouvé</div>
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
