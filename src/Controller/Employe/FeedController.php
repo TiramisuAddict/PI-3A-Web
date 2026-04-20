@@ -8,6 +8,8 @@ use App\Entity\Notification;
 use App\Entity\Post;
 use App\Repository\EmployeRepository;
 use App\Repository\PostRepository;
+use App\Service\BadWordService;
+use App\Service\ReasonAssistantService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -23,6 +25,8 @@ class FeedController extends AbstractController
         private readonly PostRepository $postRepository,
         private readonly EmployeRepository $employeRepository,
         private readonly EntityManagerInterface $em,
+        private readonly ReasonAssistantService $reasonAssistantService,
+        private readonly BadWordService $badWordService,
     ) {
     }
 
@@ -214,6 +218,19 @@ class FeedController extends AbstractController
             'SELECT COUNT(*) FROM commentaire WHERE post_id = ?',
             [$postId]
         )->fetchOne();
+    }
+
+    private function normalizeCommentContent(string $content): string
+    {
+        $trimmedContent = trim($content);
+        if ($trimmedContent === '') {
+            return '';
+        }
+
+        $analysisResult = $this->reasonAssistantService->correctReason($trimmedContent);
+        $correctedContent = trim($analysisResult->correctedText);
+
+        return $correctedContent !== '' ? $correctedContent : $trimmedContent;
     }
 
     private function createPostNotification(Post $post, int $actorUserId, string $title, string $message): void
@@ -432,6 +449,19 @@ class FeedController extends AbstractController
             return new JsonResponse(['success' => false, 'message' => 'Comment cannot be empty'], Response::HTTP_BAD_REQUEST);
         }
 
+        // Check for bad words
+        $analysis = $this->badWordService->analyze($content);
+        if ($analysis['score'] >= 10) {
+            return new JsonResponse([
+                'success' => false,
+                'type' => 'bad_words',
+                'message' => 'Your comment contains inappropriate language.',
+                'bad_words_found' => $analysis['found'],
+                'censored_preview' => $analysis['censored'],
+                'suggestion' => 'Please review your comment and remove or rephrase the inappropriate content.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
         $parentId = $request->request->get('parent_id');
         $parentComment = null;
 
@@ -443,7 +473,7 @@ class FeedController extends AbstractController
         }
 
         $comment = new Commentaire();
-        $comment->setContenu($content);
+        $comment->setContenu($this->normalizeCommentContent($content));
         $comment->setUtilisateurId($userId);
         $comment->setDateCommentaire(new \DateTime());
         $comment->setPost($post);
@@ -494,7 +524,20 @@ class FeedController extends AbstractController
             return new JsonResponse(['success' => false, 'message' => 'Comment cannot be empty'], Response::HTTP_BAD_REQUEST);
         }
 
-        $comment->setContenu($content);
+        // Check for bad words
+        $analysis = $this->badWordService->analyze($content);
+        if ($analysis['score'] >= 10) {
+            return new JsonResponse([
+                'success' => false,
+                'type' => 'bad_words',
+                'message' => 'Your comment contains inappropriate language.',
+                'bad_words_found' => $analysis['found'],
+                'censored_preview' => $analysis['censored'],
+                'suggestion' => 'Please review your comment and remove or rephrase the inappropriate content.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $comment->setContenu($this->normalizeCommentContent($content));
         $comment->setEditedAt(new \DateTime());
         $this->em->flush();
 
@@ -609,11 +652,29 @@ class FeedController extends AbstractController
         )->fetchOne();
 
         $capacity = $post->getCapaciteMax();
+        $percentage = null;
+        $capacityStatus = null;
+
+        if ($capacity !== null && $capacity > 0) {
+            $percentage = (int) floor(($count / $capacity) * 100);
+
+            if ($percentage < 50) {
+                $capacityStatus = 'available';
+            } elseif ($percentage < 80) {
+                $capacityStatus = 'filling';
+            } elseif ($percentage < 100) {
+                $capacityStatus = 'almost_full';
+            } else {
+                $capacityStatus = 'full';
+            }
+        }
 
         return new JsonResponse([
             'success' => true,
             'participating' => $participating,
             'count' => $count,
+            'capacity_status' => $capacityStatus,
+            'capacity_percentage' => $percentage,
             'remaining_places' => $capacity !== null ? max(0, $capacity - $count) : null,
         ]);
     }
