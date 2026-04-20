@@ -19,6 +19,7 @@
         "build": "encore production --progress"
     },
     "dependencies": {
+        "@hotwired/stimulus": "^3.2.2",
         "@tabler/core": "^1.4.0"
     }
 }

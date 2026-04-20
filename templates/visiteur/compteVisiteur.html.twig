@@ -1,0 +1,84 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Compte visiteur | Momentum{% endblock %}
+
+{% block body %}
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#f0f0f8;">
+    <div style="width:95%; max-width:98vw; min-height:560px; border-radius:18px; overflow:hidden; display:flex; box-shadow:0 8px 40px rgba(0,0,0,0.15);">
+
+        <div style="flex:1; position:relative; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; padding:3rem;">
+            <img src="/images/building2.webp" alt="" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0;">
+            <div style="position:absolute; inset:0; background:linear-gradient(135deg, rgba(66,84,214,0.88) 0%, rgba(100,130,255,0.88) 100%); z-index:1;"></div>
+
+            <div style="position:relative; z-index:3;" class="text-white">
+                <h2 class="display-6 fw-bold mb-3">Créer votre compte visiteur</h2>
+                <p style="color:rgba(255,255,255,0.72);">
+                    Rejoignez Momentum pour postuler rapidement aux offres et suivre vos candidatures.
+                </p>
+            </div>
+        </div>
+
+        <div style="flex:1.15; background:#fff; display:flex; align-items:center; justify-content:center; padding:2rem;">
+            <div style="width:100%; max-width:500px;">
+                <div class="mb-4 text-center">
+                    <img src="/images/WKlogo.svg" height="2" width="350"alt="Logo">
+                </div>
+
+                <div class="text-muted mb-4 text-secondary">Complétez vos informations pour créer votre compte</div>
+
+                {{ include('components/controleSaisieAlert.html.twig') }}
+
+                {% for message in app.flashes('success') %}
+                    <div class="alert alert-success" role="alert">{{ message }}</div>
+                {% endfor %}
+
+                {% for message in app.flashes('error') %}
+                    <div class="alert alert-danger" role="alert">{{ message }}</div>
+                {% endfor %}
+
+                <div class="mb-3">
+                    <a href="{{ path('oauth_google_register_start') }}" class="btn btn-outline-secondary w-100 d-inline-flex align-items-center justify-content-center gap-2">
+                        <img src="/images/google.png" alt="Google" width="18" height="18">
+                        <span>Continuer avec Google</span>
+                    </a>
+                </div>
+
+                <div class="text-center small text-muted mb-3">ou</div>
+
+                {{ form_start(form, { attr: { novalidate: 'novalidate' } }) }}
+
+                    <div class="mb-3">
+                        {{ form_widget(form.nom, { attr: { class: 'form-control', placeholder: 'Nom' } }) }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form_widget(form.prenom, { attr: { class: 'form-control', placeholder: 'Prénom' } }) }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form_widget(form.e_mail, { attr: { class: 'form-control', placeholder: 'Email' } }) }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form_widget(form.telephone, { attr: { class: 'form-control', placeholder: 'Téléphone' } }) }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form_widget(form.mot_de_passe, { attr: { class: 'form-control', placeholder: 'Mot de passe' } }) }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form_widget(form.save, { attr: { class: 'btn w-100 fw-bold text-white', style: 'background:#4254D6; border:none; letter-spacing:0.5px;' } }) }}
+                    </div>
+
+                    <div class="text-center small text-muted">
+                        Vous avez déjà un compte ?
+                        <a href="{{ path('login') }}" class="fw-bold ms-1" style="color:#4254D6;">Se connecter</a>
+                    </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

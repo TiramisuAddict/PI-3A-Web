@@ -6,7 +6,7 @@
           <h2 class="h2 modal-title">Vérification à deux facteurs</h2>
           <small class="text-muted">Nous vous avons envoyé un code par SMS{% if destination is not empty %} à {{ destination }}{% endif %}.</small>
         </div>
-        <a href="{{ path('login', {'cancel_2fa': 1}) }}" class="btn-close" aria-label="Fermer"></a>
+        <a href="{{ otp_close_url|default(path('login', {'cancel_2fa': 1})) }}" class="btn-close" aria-label="Fermer"></a>
       </div>
 
       <div class="modal-body p-4">
@@ -33,21 +33,23 @@
           Si vous n'avez rien reçu, reconnectez-vous pour demander un nouveau code.
         </div>
 
-        <form method="post" action="{{ path('two_factor_resend') }}" class="mt-3" novalidate>
-          <input type="hidden" name="_token" value="{{ csrf_token('two_factor_resend') }}">
+        <form method="post" action="{{ path(otp_resend_route|default('two_factor_resend')) }}" class="mt-3" novalidate>
+          <input type="hidden" name="_token" value="{{ csrf_token(otp_resend_csrf_id|default('two_factor_resend')) }}">
+          {% set showCountdown = not (otp_simple_resend|default(false)) %}
+          {% set resendRemaining = otp_resend_remaining_seconds|default(two_factor_resend_remaining_seconds|default(30)) %}
 
           <div class="d-flex align-items-center justify-content-between w-100">
-            <small id="resendOtpCountdown" class="text-muted" data-remaining="{{ two_factor_resend_remaining_seconds|default(30) }}">
-              {% if (two_factor_resend_remaining_seconds|default(30)) > 0 %}
-                Renvoyer dans {{ two_factor_resend_remaining_seconds|default(30) }}s
+            <small id="resendOtpCountdown" class="text-muted" {% if showCountdown %}data-remaining="{{ resendRemaining }}"{% endif %}>
+              {% if showCountdown and resendRemaining > 0 %}
+                Renvoyer dans {{ resendRemaining }}s
               {% endif %}
             </small>
             <button
               type="submit"
               id="resendOtpButton"
-              class="btn btn-sm {{ (two_factor_resend_remaining_seconds|default(30)) > 0 ? 'btn-secondary' : 'btn-primary' }}"
-              style="{{ (two_factor_resend_remaining_seconds|default(30)) > 0 ? 'border:none;' : 'background:#4A5DEF; border:none;' }}"
-              {{ (two_factor_resend_remaining_seconds|default(30)) > 0 ? 'disabled' : '' }}
+              class="btn btn-sm {{ (showCountdown and resendRemaining > 0) ? 'btn-secondary' : 'btn-primary' }}"
+              style="{{ (showCountdown and resendRemaining > 0) ? 'border:none;' : 'background:#4A5DEF; border:none;' }}"
+              {{ (showCountdown and resendRemaining > 0) ? 'disabled' : '' }}
             >
               Renvoyer le code
             </button>
@@ -64,7 +66,7 @@
   var countdownEl = document.getElementById('resendOtpCountdown');
   var buttonEl = document.getElementById('resendOtpButton');
 
-  if (!countdownEl || !buttonEl) {
+  if (!countdownEl || !buttonEl || !countdownEl.hasAttribute('data-remaining')) {
     return;
   }
 

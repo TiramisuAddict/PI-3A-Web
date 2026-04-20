@@ -8,6 +8,43 @@ class TwilioVerifyService
 {
     private const OTP_COOLDOWN_SECONDS = 30;
 
+    public function getOtpSessionKeys(string $flow): array
+    {
+        return [
+            $flow . '_pending',
+            $flow . '_user_type',
+            $flow . '_user_id',
+            $flow . '_email',
+            $flow . '_role',
+            $flow . '_channel',
+            $flow . '_destination',
+            $flow . '_resend_available_at',
+            $flow . '_verified',
+        ];
+    }
+
+    public function buildOtpSessionData(
+        string $flow,
+        string $userType,
+        int $userId,
+        string $email,
+        string $destination,
+        ?string $role = null,
+        string $channel = 'sms'
+    ): array {
+        return [
+            $flow . '_pending' => true,
+            $flow . '_user_type' => $userType,
+            $flow . '_user_id' => $userId,
+            $flow . '_email' => $email,
+            $flow . '_role' => $role,
+            $flow . '_channel' => $channel,
+            $flow . '_destination' => $destination,
+            $flow . '_resend_available_at' => $this->nextResendAvailableAt(),
+            $flow . '_verified' => false,
+        ];
+    }
+
     public function sendCode(string $destination, string $channel): void
     {
         $response = $this->client()->request('POST', $this->endpoint('/Verifications'), [
@@ -38,17 +75,9 @@ class TwilioVerifyService
         return is_array($payload) && ($payload['status'] ?? null) === 'approved';
     }
 
-    public function buildTwoFactorSessionData( string $userType,int $userId,string $email,string $destination,?string $role = null,string $channel = 'sms'): array {
-        return [
-            'two_factor_pending' => true,
-            'two_factor_user_type' => $userType,
-            'two_factor_user_id' => $userId,
-            'two_factor_email' => $email,
-            'two_factor_role' => $role,
-            'two_factor_channel' => $channel,
-            'two_factor_destination' => $destination,
-            'two_factor_resend_available_at' => $this->nextResendAvailableAt(),
-        ];
+    public function buildTwoFactorSessionData(string $userType, int $userId, string $email, string $destination, ?string $role = null, string $channel = 'sms'): array
+    {
+        return $this->buildOtpSessionData('two_factor', $userType, $userId, $email, $destination, $role, $channel);
     }
 
     public function getResendRemainingSeconds(int $resendAvailableAt): int

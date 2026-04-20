@@ -15,14 +15,14 @@
     <ul class="list-unstyled d-flex flex-column gap-1 mb-0 flex-fill">
 
       <li>
-        <a href="{{ path('admin_dashboard') }}" class="d-flex align-items-center gap-2 px-3 py-2 rounded text-secondary text-decoration-none">
+        <a href="{{ path('admin_home') }}" class="d-flex align-items-center gap-2 px-3 py-2 rounded text-secondary text-decoration-none">
           <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="5 12 3 12 12 3 21 12 19 12"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
           <span style="font-size:0.875rem;">Accueil</span>
         </a>
       </li>
 
       <li>
-        <a href="{{ path('admin_dashboard') }}" class="d-flex align-items-center gap-2 px-3 py-2 rounded text-decoration-none fw-medium bg-blue-lt text-blue">
+          <a href="{{ path('admin_dashboard') }}" class="d-flex align-items-center gap-2 px-3 py-2 rounded text-decoration-none fw-medium bg-blue-lt text-blue">
           <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1-2-2v-14a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/></svg>
           <span style="font-size:0.875rem;">Demandes</span>
         </a>
@@ -64,13 +64,15 @@
   </div>
 
   {# ── Contenu principal ── #}
-  <div class="flex-fill overflow-y-auto p-4" style="background:#F6F7FF; min-width:0;">
+  <div class="flex-fill overflow-y-auto p-4 d-flex flex-column" style=" min-width:0;">
 
-    {% for label, messages in app.flashes %}
-      {% for message in messages %}
-        <div class="alert alert-{{ label == 'error' ? 'danger' : label }}" role="alert">{{ message }}</div>
+    <div class="flex-grow-1 d-flex flex-column">
+
+      {% for label, messages in app.flashes %}
+        {% for message in messages %}
+          <div class="alert alert-{{ label == 'error' ? 'danger' : label }}" role="alert">{{ message }}</div>
+        {% endfor %}
       {% endfor %}
-    {% endfor %}
 
     <div class="page-header mb-3">
       <div class="row align-items-center">
@@ -81,17 +83,12 @@
       </div>
     </div>
 
-    {% if entreprises is defined %}
+      {% if entreprises is defined %}
 
-      {% set total   = entreprises|length %}
-      {% set accepte = 0 %}
-      {% set refuse  = 0 %}
-      {% set attente = 0 %}
-      {% for e in entreprises %}
-        {% if e.statut == 'acceptée'   %}{% set accepte = accepte + 1 %}{% endif %}
-        {% if e.statut == 'refusée'    %}{% set refuse  = refuse  + 1 %}{% endif %}
-        {% if e.statut == 'en attente' %}{% set attente = attente + 1 %}{% endif %}
-      {% endfor %}
+      {% set total   = stats_total|default(entreprises|length) %}
+      {% set accepte = stats_accepte|default(0) %}
+      {% set refuse  = stats_refuse|default(0) %}
+      {% set attente = stats_attente|default(0) %}
 
       {# Stat cards #}
       <div class="row g-4 mb-4">
@@ -178,21 +175,23 @@
                   {% if entreprise.statut == 'en attente' %}
                     <form method="post" class="d-inline">
                       <input type="hidden" name="id_entreprise" value="{{ entreprise.id_entreprise }}">
-                      <button type="submit" name="action" value="accepter" class="btn btn-sm btn-success">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="20 6 9 17 4 12"/></svg>
-                        Accepter
+                      <button type="submit" name="action" value="accepter" class="btn btn-sm btn-outline-success p-2" title="Accepter" aria-label="Accepter">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="20 6 9 17 4 12"/></svg>
                       </button>
                     </form>
                     <form method="post" class="d-inline ms-1">
                       <input type="hidden" name="id_entreprise" value="{{ entreprise.id_entreprise }}">
-                      <button type="submit" name="action" value="refuser" class="btn btn-sm btn-danger">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        Refuser
+                      <button type="submit" name="action" value="refuser" class="btn btn-sm btn-outline-danger p-2" title="Refuser" aria-label="Refuser">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                       </button>
                     </form>
                   {% else %}
-                    <button class="btn btn-sm btn-success disabled" disabled>Accepter</button>
-                    <button class="btn btn-sm btn-danger disabled ms-1" disabled>Refuser</button>
+                    <button class="btn btn-sm btn-outline-secondary p-2" disabled title="Accepter indisponible" aria-label="Accepter indisponible">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary p-2 ms-1" disabled title="Refuser indisponible" aria-label="Refuser indisponible">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
                   {% endif %}
                 </td>
               </tr>
@@ -214,7 +213,15 @@
 
       </div>
 
-    {% endif %}
+      {% endif %}
+
+    </div>
+
+    <div class="mt-auto pt-4 d-flex justify-content-center">
+      {% if entreprises is defined %}
+        {{ knp_pagination_render(entreprises, 'components/pagination.html.twig') }}
+      {% endif %}
+    </div>
 
   </div>
 </div>

@@ -4,14 +4,14 @@
 
 {% block body %}
 <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#f0f0f8;">
-  <div style="width:900px; max-width:98vw; min-height:500px; border-radius:18px; overflow:hidden; display:flex; box-shadow:0 8px 40px rgba(0,0,0,0.15);">
+  <div style="width:70%; max-width:80vw; min-height:500px; border-radius:18px; overflow:hidden; display:flex; box-shadow:0 8px 40px rgba(0,0,0,0.15);">
 
     {# ── Colonne gauche : formulaire ── #}
     <div style="flex:1; background:#fff; display:flex; align-items:center; justify-content:center; padding:3rem;">
-      <div style="width:100%; max-width:300px;">
+      <div style="width:100%; max-width:350px;">
 
-        <div class="mb-4">
-          <img src="/images/WKlogo.svg" height="32" alt="Logo">
+        <div class="mb-4 text-center">
+          <img src="/images/WKlogo.svg" height="2" width="350" alt="Logo">
         </div>
 
         <div class="text-muted  mb-4 text-secondary">Accédez à votre espace entreprise</div>
@@ -67,6 +67,10 @@
             {{ form_errors(form.password) }}
           </div>
 
+          <div class="text-end mb-3">
+            <a href="{{ path('forgot_password') }}" class="small" style="color:#4254D6;">Mot de passe oublié ?</a>
+          </div>
+
           {# Bouton connexion #}
           <div class="mb-3">
             {{ form_widget(form.se_connecter, {
@@ -75,6 +79,13 @@
                 'style': 'background:#4254D6; border:none; letter-spacing:1px;'
               }
             }) }}
+          </div>
+
+          <div class="d-grid mb-3">
+            <a href="{{ path('oauth_google_start') }}" class="btn btn-outline-secondary w-100 d-inline-flex align-items-center justify-content-center gap-2">
+              <img src="/images/google.png" alt="Google" width="18" height="18">
+              <span>Continuer avec Google</span>
+            </a>
           </div>
 
           {# Lien inscription entreprise #}
@@ -87,9 +98,9 @@
           <div class="text-center small text-muted mt-1">
           <p>ou</p></div>
           <div class="text-center small text-muted">
-            Vous souhaitez postuler ou avez vous déja postuler ?
-            <a href="{{ path('app_offre_home') }}" class="fw-bold ms-1" style="color:#4254D6;">
-              Accédez à l'espace candidat
+            Vous souhaitez postule ?
+            <a href="{{ path('compte_visiteur') }}" class="fw-bold ms-1" style="color:#4254D6;">
+              Avoir un compte candidat
             </a>
           </div>
 
@@ -130,7 +141,23 @@ function togglePassword() {
 {% if two_factor_form is defined %}
   {{ include('auth/two_factor.html.twig', {
     otp_form: two_factor_form,
-    destination: two_factor_destination|default('')
+    destination: two_factor_destination|default(''),
+    otp_close_url: otp_close_url|default(path('login', {'cancel_2fa': 1})),
+    otp_resend_route: otp_resend_route|default('two_factor_resend'),
+    otp_resend_csrf_id: otp_resend_csrf_id|default('two_factor_resend'),
+    otp_resend_remaining_seconds: otp_resend_remaining_seconds|default(two_factor_resend_remaining_seconds|default(30))
+  }) }}
+{% endif %}
+
+{% if forgot_password_form is defined %}
+  {{ include('auth/forgot_password_component.html.twig', {
+    forgot_password_form: forgot_password_form
+  }) }}
+{% endif %}
+
+{% if reset_password_form is defined %}
+  {{ include('auth/reset_password_component.html.twig', {
+    reset_password_form: reset_password_form
   }) }}
 {% endif %}
 

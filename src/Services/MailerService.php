@@ -31,4 +31,21 @@ class MailerService
 
         $mailer->send($email);
     }
+
+    public function sendPasswordResetVerificationLink(
+        MailerInterface $mailer,
+        string $toEmail,
+        string $verificationLink
+    ): void {
+        $email = (new Email())
+            ->from($this->mailerFromAddress)
+            ->to($toEmail)
+            ->subject('Verification de reinitialisation du mot de passe')
+            ->html(sprintf(
+                '<p>Bonjour,</p><p>Vous avez demande une reinitialisation de mot de passe.</p><p><a href="%s" style="display:inline-block;padding:10px 16px;background:#4254D6;color:#fff;text-decoration:none;border-radius:6px;">Verifier</a></p><p>Si vous n\'etes pas a l\'origine de cette demande, ignorez ce message.</p>',
+                htmlspecialchars($verificationLink, ENT_QUOTES)
+            ));
+
+        $mailer->send($email);
+    }
 }

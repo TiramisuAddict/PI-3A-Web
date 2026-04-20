@@ -58,6 +58,12 @@ class EmployeType extends AbstractType
             ->add('date_embauche', DateType::class,['label'   => 'Date d\'embauche',
                 'widget'  => 'single_text',
                 'required' => false,
+                'constraints' => [
+                    new Assert\GreaterThan([
+                        'value' => 'today',
+                        'message' => 'La date doit etre superieure a la date d\'aujourd\'hui.',
+                    ]),
+                ],
             ])
             ->add('cv_data', FileType::class, [
                 'label' => 'CV (PDF)',

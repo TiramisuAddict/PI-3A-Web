@@ -21,6 +21,7 @@ use App\Entity\Compte;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Knp\Component\Pager\PaginatorInterface;
 
 
 
@@ -33,7 +34,7 @@ final class RHController extends AbstractController
     }
 
 #[Route('/RH/Home', name: 'RH_Home', methods: ['GET'])]
-public function dashboard(Request $request, SessionInterface $session, EmployeRepository $employeRepo, EntrepriseRepository $entrepriseRepo): Response
+public function dashboard(Request $request, SessionInterface $session, EmployeRepository $employeRepo, EntrepriseRepository $entrepriseRepo, PaginatorInterface $paginator): Response
 {
     if (!$this->isEmployeLoggedIn($session)) {
         return $this->redirectToRoute('login');
@@ -44,7 +45,11 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
 
     $search = $request->query->get('search');
     $role = $request->query->get('role');
-    $employes = $employeRepo->findByEntrepriseAndFilters($entreprise, $search, $role);
+    $employes = $paginator->paginate(
+        $employeRepo->createFilteredQueryBuilder($entreprise, $search, $role),
+        max(1, (int) $request->query->get('page', 1)),
+        8
+    );
 
     $formAjout = $this->createForm(EmployeType::class, new Employe());
 

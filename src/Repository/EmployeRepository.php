@@ -41,7 +41,7 @@ class EmployeRepository extends ServiceEntityRepository
     //            ->getOneOrNullResult()
     //        ;
     //    }
-    private function createFilteredQueryBuilder($entreprise, ?string $search, ?string $role)
+    public function createFilteredQueryBuilder($entreprise, ?string $search, ?string $role)
     {
         $qb = $this->createQueryBuilder('e')
             ->andWhere('e.entreprise = :entreprise')

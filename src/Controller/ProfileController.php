@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\CompetenceEmploye;
 use App\Form\EmployeType;
 use App\Repository\AdministrateurSystemeRepository;
 use App\Repository\EmployeRepository;
@@ -19,6 +20,24 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final class ProfileController extends AbstractController
 {
+    private function decodeSkills(?string $skillsJson): array
+    {
+        $decoded = json_decode((string) $skillsJson, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $skills = [];
+        foreach ($decoded as $skill) {
+            $value = trim((string) $skill);
+            if ($value !== '') {
+                $skills[] = $value;
+            }
+        }
+
+        return array_values(array_unique($skills));
+    }
+
     #[Route('/profil', name: 'profil', methods: ['GET', 'POST'])]
     public function index(Request $request,SessionInterface $session,EmployeRepository $employeRepository,EntityManagerInterface $entityManager,EntrepriseRepository $entrepriseRepository,AdministrateurSystemeRepository $administrateurSystemeRepository): Response {
     
@@ -58,12 +77,14 @@ final class ProfileController extends AbstractController
             }
 
             $entreprise = $employe->getEntreprise() ?? $entrepriseRepository->find($session->get('employe_id_entreprise'));
+            $skills = $this->decodeSkills($employe->getCompetenceEmploye()?->getSkills());
 
             return $this->render('profil/show.html.twig', [
                 'profile_type' => 'employee',
                 'role' => $session->get('employe_role'),
                 'email' => $session->get('employe_email'),
                 'employe' => $employe,
+                'skills' => $skills,
                 'profile_form' => $profileForm->createView(),
                 'entreprise' => $entreprise,
                 'back_route' => in_array($session->get('employe_role'), ['RH', 'administrateur entreprise'], true) ? 'RH_Home' : 'employe_Home',
@@ -72,6 +93,80 @@ final class ProfileController extends AbstractController
         }
 
         return $this->redirectToRoute('login');
+    }
+
+    #[Route('/profil/competence/add', name: 'profil_competence_add', methods: ['POST'])]
+    public function addSkill(Request $request, SessionInterface $session, EmployeRepository $employeRepository, EntityManagerInterface $entityManager): Response
+    {
+        if ($session->get('employe_logged_in') !== true) {
+            return $this->redirectToRoute('login');
+        }
+
+        if (!$this->isCsrfTokenValid('profil_competence_add', (string) $request->request->get('_token'))) {
+            return $this->redirectToRoute('profil');
+        }
+
+        $skill = trim((string) $request->request->get('skill', ''));
+        if ($skill === '') {
+            $this->addFlash('error', 'Veuillez saisir une compétence.');
+            return $this->redirectToRoute('profil');
+        }
+
+        $employeId = (int) $session->get('employe_id', 0);
+        $employe = $employeId > 0 ? $employeRepository->find($employeId) : null;
+        if (!$employe) {
+            return $this->redirectToRoute('login');
+        }
+
+        $competenceEmploye = $employe->getCompetenceEmploye();
+        if (!$competenceEmploye) {
+            $competenceEmploye = new CompetenceEmploye();
+            $competenceEmploye->setEmploye($employe);
+            $employe->setCompetenceEmploye($competenceEmploye);
+            $entityManager->persist($competenceEmploye);
+        }
+
+        $skills = $this->decodeSkills($competenceEmploye->getSkills());
+        if (!in_array($skill, $skills, true)) {
+            $skills[] = $skill;
+            $competenceEmploye->setSkills(json_encode(array_values($skills), JSON_UNESCAPED_UNICODE));
+            $entityManager->flush();
+            $this->addFlash('success', 'Compétence ajoutée.');
+        }
+
+        return $this->redirectToRoute('profil');
+    }
+
+    #[Route('/profil/competence/remove', name: 'profil_competence_remove', methods: ['POST'])]
+    public function removeSkill(Request $request, SessionInterface $session, EmployeRepository $employeRepository, EntityManagerInterface $entityManager): Response
+    {
+        if ($session->get('employe_logged_in') !== true) {
+            return $this->redirectToRoute('login');
+        }
+
+        if (!$this->isCsrfTokenValid('profil_competence_remove', (string) $request->request->get('_token'))) {
+            return $this->redirectToRoute('profil');
+        }
+
+        $skillToRemove = trim((string) $request->request->get('skill', ''));
+        if ($skillToRemove === '') {
+            return $this->redirectToRoute('profil');
+        }
+
+        $employeId = (int) $session->get('employe_id', 0);
+        $employe = $employeId > 0 ? $employeRepository->find($employeId) : null;
+        if (!$employe || !$employe->getCompetenceEmploye()) {
+            return $this->redirectToRoute('profil');
+        }
+
+        $competenceEmploye = $employe->getCompetenceEmploye();
+        $skills = $this->decodeSkills($competenceEmploye->getSkills());
+        $skills = array_values(array_filter($skills, static fn (string $value): bool => $value !== $skillToRemove));
+
+        $competenceEmploye->setSkills(json_encode($skills, JSON_UNESCAPED_UNICODE));
+        $entityManager->flush();
+
+        return $this->redirectToRoute('profil');
     }
 
     #[Route('/profil/upload-image', name: 'profil_upload_image', methods: ['POST'])]

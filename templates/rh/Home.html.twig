@@ -6,7 +6,9 @@
   {{ include('components/navbar.html.twig') }}
   <div class="d-flex overflow-hidden" style="height:calc(100vh - 56px);">
     {{ include('components/sidebar.html.twig', {'active_page': 'employes','sidebar_role': role}) }}
-    <div class="flex-fill overflow-y-auto p-4" style= min-width:0;">
+    <div class="flex-fill overflow-y-auto p-4 d-flex flex-column" style="min-width:0;">
+
+      <div class="d-flex flex-column flex-grow-1">
 
       <div class="d-flex align-items-center justify-content-between mb-3">
         <div>
@@ -72,7 +74,7 @@
 
 </div>
       {# Liste employés #}
-      <div class="d-flex gap-3 align-items-start">
+      <div class="d-flex gap-3 align-items-start flex-grow-1">
 
         {# Liste employés #}
         <div class="flex-fill" style="min-width:0;">
@@ -130,6 +132,12 @@
           </div>
           {% endfor %}
         </div>
+
+      </div>
+
+      <div class="mt-auto pt-4 d-flex justify-content-center">
+        {{ knp_pagination_render(employes, 'components/pagination.html.twig') }}
+      </div>
 
       </div>
     </div>
