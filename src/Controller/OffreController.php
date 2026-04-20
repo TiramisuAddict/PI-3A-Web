@@ -42,7 +42,7 @@ final class OffreController extends AbstractController
         $category = $request->query->get('category');
         $contract = $request->query->get('contract');
 
-        $offres = $offre_repository->findByFilters($q, $category, $contract, null);
+        $offres = $offre_repository->findByFilters($q, $category, $contract, 'OUVERT');
 
         return $this->render('offre/index.html.twig' , [ //page
             'offres' => $offres

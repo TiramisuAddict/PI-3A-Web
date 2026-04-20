@@ -27,6 +27,59 @@
             background: #fff;
         }
 
+        .offres-filter-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            margin-bottom: 1rem;
+            padding-bottom: .85rem;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .offres-filter-title {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .offres-filter-subtitle {
+            margin: .2rem 0 0;
+            color: #6b7280;
+            font-size: .84rem;
+        }
+
+        .offres-filter-layout {
+            row-gap: .75rem;
+        }
+
+        .offres-filter-label {
+            font-size: .78rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 700;
+            margin-bottom: .4rem;
+        }
+
+        .offres-filter-actions {
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-end;
+            gap: .5rem;
+        }
+
+        @media (max-width: 991.98px) {
+            .offres-filter-actions {
+                justify-content: stretch;
+            }
+
+            .offres-filter-actions .btn {
+                flex: 1;
+            }
+        }
+
         .offre-card {
             border-radius: 10px;
             border: 1px solid rgba(15, 23, 42, 0.08);
@@ -192,14 +245,22 @@
     <section class="container-xl mt-3">
         <div class="card offres-filter-bar">
             <div class="card-body">
-                <form method="get" action="{{ path('app_offre_list') }}" class="row g-3 align-items-end">
+                <div class="offres-filter-head">
+                    <div>
+                        <h3 class="offres-filter-title">Filtrer les offres</h3>
+                        <p class="offres-filter-subtitle">Affinez rapidement par poste, categorie et contrat.</p>
+                    </div>
+                    <a href="{{ path('app_offre_list') }}" class="btn btn-outline-secondary btn-sm">Reinitialiser</a>
+                </div>
+
+                <form method="get" action="{{ path('app_offre_list') }}" class="row offres-filter-layout align-items-end">
                     <div class="col-12 col-lg-5">
-                        <label class="form-label" for="q">Rechercher par nom de poste</label>
+                        <label class="offres-filter-label" for="q">Poste</label>
                         <input type="text" id="q" name="q" class="form-control" placeholder="Ex: Developpeur Full Stack" value="{{ queryName }}">
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <label class="form-label" for="category">Categorie</label>
+                        <label class="offres-filter-label" for="category">Categorie</label>
                         <select id="category" name="category" class="form-select">
                             <option value="">Toutes les categories</option>
                             {% for category in categories %}
@@ -209,7 +270,7 @@
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <label class="form-label" for="contract">Type de contrat</label>
+                        <label class="offres-filter-label" for="contract">Contrat</label>
                         <select id="contract" name="contract" class="form-select">
                             <option value="">Tous les contrats</option>
                             <option value="CDI" {{ queryContract == 'CDI' ? 'selected' : '' }}>CDI</option>
@@ -219,8 +280,8 @@
                         </select>
                     </div>
 
-                    <div class="col-12 col-lg-1 d-grid">
-                        <button type="submit" class="btn btn-primary">Chercher</button>
+                    <div class="col-12 col-lg-1 offres-filter-actions">
+                        <button type="submit" class="btn btn-primary w-100">Chercher</button>
                     </div>
                 </form>
             </div>

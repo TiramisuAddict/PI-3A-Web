@@ -16,6 +16,19 @@
         <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
           <a href="#" class="dropdown-item">Profil</a>
           <a href="#" class="dropdown-item">Paramètres</a>
+
+          <a href="{{ path('app_google_link_start') }}" class="dropdown-item" id="linkGoogleAccountBtn">
+            Lier mon compte Google
+            <span class="badge bg-azure-lt text-azure ms-2">Temp</span>
+          </a>
+
+          <form method="post" action="{{ path('app_google_unlink') }}" class="m-0 p-0">
+            <input type="hidden" name="_token" value="{{ csrf_token('google_unlink') }}">
+            <button type="submit" class="dropdown-item border-0 bg-transparent w-100 text-start" id="unlinkGoogleAccountBtn">
+              Délier mon compte Google
+            </button>
+          </form>
+          
           <div class="dropdown-divider"></div>
           <a href="#" class="dropdown-item text-danger"
             data-bs-toggle="modal" data-bs-target="#logoutModal">
