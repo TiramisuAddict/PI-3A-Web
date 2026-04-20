@@ -130,6 +130,20 @@
                     {% set participating = pid in user_participates_post_ids|default([]) %}
                     {% set author = author_labels[post.utilisateurId]|default('Employe') %}
                     {% set initials = author|slice(0, 2)|upper %}
+                    {% set capacity_percentage = null %}
+                    {% set capacity_status = null %}
+                    {% if is_event and post.capaciteMax is not null and post.capaciteMax > 0 %}
+                        {% set capacity_percentage = ((part_n / post.capaciteMax) * 100)|round(0, 'floor') %}
+                        {% if capacity_percentage < 50 %}
+                            {% set capacity_status = 'available' %}
+                        {% elseif capacity_percentage < 80 %}
+                            {% set capacity_status = 'filling' %}
+                        {% elseif capacity_percentage < 100 %}
+                            {% set capacity_status = 'almost_full' %}
+                        {% else %}
+                            {% set capacity_status = 'full' %}
+                        {% endif %}
+                    {% endif %}
 
                     <article class="feed-post-card" data-post-id="{{ pid }}" data-capacite-max="{{ post.capaciteMax is not null ? post.capaciteMax : '' }}">
                         <div class="feed-post-head">
@@ -235,7 +249,18 @@
                                     <span>{{ part_n }} participant{{ part_n > 1 ? 's' : '' }}</span>
                                 </span>
                                 {% if restantes is not null %}
-                                    <span class="feed-places-badge" id="places-restantes-{{ pid }}">{{ restantes }} places restantes</span>
+                                    <span class="feed-places-badge{% if capacity_status %} is-{{ capacity_status }}{% endif %}" id="places-restantes-{{ pid }}">
+                                        {% if capacity_status == 'available' %}
+                                            <i class="ti ti-circle-check"></i>
+                                        {% elseif capacity_status == 'filling' %}
+                                            <i class="ti ti-trending-up"></i>
+                                        {% elseif capacity_status == 'almost_full' %}
+                                            <i class="ti ti-alert-triangle"></i>
+                                        {% elseif capacity_status == 'full' %}
+                                            <i class="ti ti-lock"></i>
+                                        {% endif %}
+                                        <span>{{ restantes }} places restantes</span>
+                                    </span>
                                 {% endif %}
                             {% endif %}
                         </div>
@@ -518,12 +543,48 @@
         }
         .feed-places-badge {
             margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.42rem;
             padding: 0.42rem 0.75rem;
             border-radius: 999px;
             background: rgba(16, 185, 129, 0.12);
             color: #047857;
             font-size: 0.78rem;
             font-weight: 700;
+        }
+        .feed-places-badge.is-available {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+        }
+        .feed-places-badge.is-filling {
+            background: #ffedd5;
+            color: #c2410c;
+            border: 1px solid #fed7aa;
+        }
+        .feed-places-badge.is-almost_full {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+            font-weight: 800;
+            animation: pulse-red 2s infinite;
+        }
+        .feed-places-badge.is-full {
+            background: #450a0a;
+            color: #fef2f2;
+            border: none;
+        }
+        @keyframes pulse-red {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
         }
         .feed-actions-row {
             display: grid;
@@ -763,6 +824,55 @@
                 padding: 0.85rem;
             }
         }
+        
+        /* Bad Word Filter Styles */
+        @keyframes shake {
+            0%, 100% {
+                transform: translateX(0);
+            }
+            10%, 30%, 50%, 70%, 90% {
+                transform: translateX(-5px);
+            }
+            20%, 40%, 60%, 80% {
+                transform: translateX(5px);
+            }
+        }
+        
+        .bad-word-warning-box {
+            animation: slideInDown 0.3s ease-out;
+        }
+        
+        .bad-word-warning-box .alert {
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 8px rgba(255, 193, 7, 0.15);
+            margin-bottom: 0;
+            background: linear-gradient(135deg, #fff9e6 0%, #fffbf0 100%);
+            border: 1px solid rgba(255, 193, 7, 0.2) !important;
+        }
+        
+        .bad-word-warning-box .badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.4rem 0.65rem;
+            white-space: nowrap;
+        }
+        
+        .bad-word-warning-box .alert-heading {
+            color: #856404;
+            font-weight: 700;
+            margin-top: 0;
+        }
+        
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
     </style>
 
     <script>
@@ -884,8 +994,39 @@
             function updateRemainingPlaces(postId, remainingPlaces) {
                 var badge = document.getElementById('places-restantes-' + postId);
                 if (badge && remainingPlaces !== null && remainingPlaces !== undefined) {
-                    badge.textContent = remainingPlaces + ' places restantes';
+                    var textNode = badge.querySelector('span');
+                    if (textNode) {
+                        textNode.textContent = remainingPlaces + ' places restantes';
+                    } else {
+                        badge.innerHTML = '<span>' + remainingPlaces + ' places restantes</span>';
+                    }
                 }
+            }
+
+            function updateCapacityBadge(postId, capacityStatus) {
+                var badge = document.getElementById('places-restantes-' + postId);
+                if (!badge) return;
+
+                badge.classList.remove('is-available', 'is-filling', 'is-almost_full', 'is-full');
+                if (capacityStatus) {
+                    badge.classList.add('is-' + capacityStatus);
+                }
+
+                var remainingTextNode = badge.querySelector('span');
+                var remainingText = remainingTextNode ? remainingTextNode.textContent : badge.textContent;
+                var iconClass = '';
+
+                if (capacityStatus === 'available') {
+                    iconClass = 'ti ti-circle-check';
+                } else if (capacityStatus === 'filling') {
+                    iconClass = 'ti ti-trending-up';
+                } else if (capacityStatus === 'almost_full') {
+                    iconClass = 'ti ti-alert-triangle';
+                } else if (capacityStatus === 'full') {
+                    iconClass = 'ti ti-lock';
+                }
+
+                badge.innerHTML = (iconClass ? '<i class="' + iconClass + '"></i>' : '') + '<span>' + escapeHtml(remainingText || '') + '</span>';
             }
 
             function ensureCommentsList(postId) {
@@ -1003,6 +1144,73 @@
                 }
             }
 
+            function showBadWordWarning(errorData, form, textarea) {
+                // Remove existing warning
+                var existingWarning = form.querySelector('.bad-word-warning-box');
+                if (existingWarning) {
+                    existingWarning.remove();
+                }
+
+                // Create warning box
+                var warningBox = document.createElement('div');
+                warningBox.className = 'bad-word-warning-box mb-3';
+                
+                var badWordsHTML = (errorData.bad_words_found || [])
+                    .map(function(word) { 
+                        return '<span class="badge bg-danger ms-1">' + escapeHtml(word) + '</span>'; 
+                    })
+                    .join('');
+
+                warningBox.innerHTML = 
+                    '<div class="alert alert-warning alert-dismissible fade show d-flex gap-3" role="alert">' +
+                        '<i class="ti ti-alert-triangle-filled flex-shrink-0" style="font-size:20px; margin-top:2px;"></i>' +
+                        '<div class="flex-grow-1">' +
+                            '<h6 class="alert-heading mb-2">⚠️ Inappropriate Language Detected</h6>' +
+                            '<p class="mb-2 small">' +
+                                'Found ' + (errorData.bad_words_found || []).length + ' word(s): ' +
+                                badWordsHTML +
+                            '</p>' +
+                            '<div class="bg-white p-2 rounded mb-2" style="border-left: 3px solid #ffc107; font-size:0.85rem; word-break: break-word;">' +
+                                '<strong>Your comment contains these inappropriate words:</strong><br/>' +
+                                '<em class="text-muted">' + escapeHtml(errorData.censored_preview || '') + '</em>' +
+                            '</div>' +
+                            '<small class="text-muted">' + (errorData.suggestion || '') + '</small>' +
+                        '</div>' +
+                        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                    '</div>';
+
+                // Insert warning before form
+                form.parentElement.insertBefore(warningBox, form);
+
+                // Shake animation
+                textarea.style.animation = 'shake 0.4s ease-in-out';
+                setTimeout(function() {
+                    textarea.style.animation = '';
+                }, 400);
+
+                // Scroll into view
+                warningBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                // Auto-dismiss after 10 seconds
+                setTimeout(function() {
+                    var alert = warningBox.querySelector('.alert');
+                    if (alert) {
+                        alert.classList.remove('show');
+                        setTimeout(function() {
+                            if (warningBox.parentElement) {
+                                warningBox.remove();
+                            }
+                        }, 150);
+                    }
+                }, 13000);
+            }
+
+            function escapeHtml(text) {
+                var div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
             function ensureEmptyState(postId) {
                 var list = document.getElementById('comments-list-' + postId);
                 if (!list) return;
@@ -1110,6 +1318,7 @@
                             }
                             updateParticipationSummary(participatePostId, participateData.count);
                             updateRemainingPlaces(participatePostId, participateData.remaining_places);
+                            updateCapacityBadge(participatePostId, participateData.capacity_status);
                         } else {
                             alert(participateData.message || 'Erreur lors de la mise a jour de la participation');
                         }
@@ -1218,6 +1427,8 @@
                             updateCommentSummary(postId, commentData.count);
                             textarea.value = '';
                             document.getElementById('comments-section-' + postId).style.display = 'block';
+                        } else if (commentData.type === 'bad_words') {
+                            showBadWordWarning(commentData, form, textarea);
                         } else {
                             alert(commentData.message || 'Erreur lors de la publication du commentaire');
                         }
@@ -1253,6 +1464,8 @@
                             updateCommentSummary(replyPostId, replyData.count);
                             form.reset();
                             form.style.display = 'none';
+                        } else if (replyData.type === 'bad_words') {
+                            showBadWordWarning(replyData, form, replyTextareaField);
                         } else {
                             alert(replyData.message || 'Erreur lors de la publication de la reponse');
                         }
@@ -1296,6 +1509,8 @@
                                 var meta = commentCard.querySelector('.feed-comment-meta');
                                 if (meta) meta.appendChild(badge);
                             }
+                        } else if (editData.type === 'bad_words') {
+                            showBadWordWarning(editData, form, editTextareaField);
                         } else {
                             alert(editData.message || 'Erreur lors de la modification du commentaire');
                         }
