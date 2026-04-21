@@ -24,14 +24,16 @@ class DemandeApiController extends AbstractController
     #[Route('/demande-api/fields/{type}', name: 'demande_api_fields', methods: ['GET'])]
     public function getFields(string $type): JsonResponse
     {
-        $fields = $this->formHelper->getFieldsForType($type);
+        $resolvedType = $this->formHelper->resolveCanonicalType($type);
+        $fields = $this->formHelper->getFieldsForType((string) ($resolvedType ?? $type));
         return new JsonResponse($fields);
     }
 
     #[Route('/demande-api/types/{categorie}', name: 'demande_api_types', methods: ['GET'])]
     public function getTypesForCategory(string $categorie): JsonResponse
     {
-        $types = $this->formHelper->getTypesForCategory($categorie);
+        $resolvedCategory = $this->formHelper->resolveCanonicalCategory($categorie);
+        $types = $this->formHelper->getTypesForCategory((string) ($resolvedCategory ?? $categorie));
         return new JsonResponse($types);
     }
 

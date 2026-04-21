@@ -203,6 +203,22 @@ class DemandeController extends AbstractController
                             $demande->getCategorie(),
                             $employe->getId_employe()
                         );
+
+                        if ('Autre' === $demande->getTypeDemande()) {
+                            $this->demandeAiAssistant->recordAcceptedAutreFeedback(
+                                $submittedAiDescription,
+                                [
+                                    'titre' => (string) ($demande->getTitre() ?? ''),
+                                    'description' => (string) ($demande->getDescription() ?? ''),
+                                    'priorite' => (string) ($demande->getPriorite() ?? ''),
+                                    'categorie' => (string) ($demande->getCategorie() ?? ''),
+                                    'typeDemande' => (string) ($demande->getTypeDemande() ?? ''),
+                                ],
+                                $submittedDetails,
+                                $submittedAiFieldPlan,
+                                $employe->getId_employe()
+                            );
+                        }
                     }
 
                     $this->demandeMailer->notifyManagersDemandeCreated($demande);
@@ -538,6 +554,22 @@ class DemandeController extends AbstractController
 
         if ($demande->getStatus() === 'Annulee') {
             throw $this->createAccessDeniedException('Vous ne pouvez pas modifier une demande annulee par l\'employe.');
+        }
+
+        $resolvedType = $this->formHelper->resolveCanonicalType(
+            $demande->getTypeDemande(),
+            $demande->getCategorie()
+        );
+        $resolvedCategory = $this->formHelper->resolveCanonicalCategory(
+            $demande->getCategorie(),
+            $resolvedType
+        );
+
+        if (null !== $resolvedCategory) {
+            $demande->setCategorie($resolvedCategory);
+        }
+        if (null !== $resolvedType) {
+            $demande->setTypeDemande($resolvedType);
         }
 
         $statusChoices = $demande->getStatus() === 'Rejetee'

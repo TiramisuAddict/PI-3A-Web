@@ -91,6 +91,7 @@ class DemandeDecisionAssistant
         }
 
         $type = trim((string) $demande->getTypeDemande());
+        $normalizedType = $this->normalizeDecisionType($type);
         $title = trim((string) $demande->getTitre());
         $description = trim((string) $demande->getDescription());
         $descriptionLower = strtolower($description);
@@ -119,23 +120,23 @@ class DemandeDecisionAssistant
             }
         }
 
-        switch ($type) {
-            case 'Remboursement':
+        switch ($normalizedType) {
+            case 'remboursement':
                 $this->analyzeRemboursement($details, $recommendedStatus, $reasons, $warnings, $confidence);
                 break;
-            case 'Conge':
+            case 'conge':
                 $this->analyzeConge($details, $reasons, $warnings, $recommendedStatus, $confidence);
                 break;
-            case 'Acces systeme':
+            case 'acces systeme':
                 $this->analyzeAccesSysteme($details, $reasons, $warnings, $recommendedStatus, $confidence);
                 break;
-            case 'Avance sur salaire':
+            case 'avance sur salaire':
                 $this->analyzeAvanceSalaire($details, $reasons, $warnings, $recommendedStatus, $confidence);
                 break;
-            case 'Teletravail':
+            case 'teletravail':
                 $this->analyzeTeletravail($details, $reasons, $warnings, $recommendedStatus, $confidence);
                 break;
-            case 'Probleme technique':
+            case 'probleme technique':
                 $this->analyzeProblemeTechnique($details, $reasons, $warnings, $recommendedStatus, $confidence);
                 break;
             default:
@@ -147,7 +148,7 @@ class DemandeDecisionAssistant
                 break;
         }
 
-        if ('Autre' === $type && (strlen($description) < 15 || $this->isLowQualityValue($description, 'description', 'Description', 'textarea')) && ([] !== $missingRequired || [] !== $weakRequired)) {
+        if ('autre' === $normalizedType && (strlen($description) < 15 || $this->isLowQualityValue($description, 'description', 'Description', 'textarea')) && ([] !== $missingRequired || [] !== $weakRequired)) {
             $recommendedStatus = 'Rejetee';
             $reasons[] = 'La demande est trop vague pour etre traitee en l etat.';
             $confidence = max($confidence, 0.84);
@@ -227,6 +228,13 @@ class DemandeDecisionAssistant
             }
         }
 
+        $reasons = $this->finalizeReasons(
+            $reasons,
+            $recommendedStatus,
+            $missingRequired,
+            $weakRequired,
+            $repeatPenalty
+        );
         $spamLevel = $this->getSpamLevel($spamScore);
 
         return [
@@ -718,5 +726,64 @@ class DemandeDecisionAssistant
             'tone' => 'success',
             'description' => 'Le contenu ne presente pas de signal fort de test ou de spam.',
         ];
+    }
+
+    /**
+     * @param array<int, string> $reasons
+     * @param array<int, string> $missingRequired
+     * @param array<int, string> $weakRequired
+     * @param array{count:int,windowDays:int,confidencePenalty:float,spamPenalty:int} $repeatPenalty
+     * @return array<int, string>
+     */
+    private function finalizeReasons(
+        array $reasons,
+        string $recommendedStatus,
+        array $missingRequired,
+        array $weakRequired,
+        array $repeatPenalty
+    ): array {
+        $positiveReason = 'Les champs obligatoires principaux sont renseignes.';
+        $uniqueReasons = array_values(array_unique($reasons));
+
+        if (
+            in_array($recommendedStatus, ['En attente', 'Rejetee'], true)
+            || [] !== $missingRequired
+            || [] !== $weakRequired
+            || ($repeatPenalty['count'] ?? 0) > 0
+        ) {
+            $uniqueReasons = array_values(array_filter(
+                $uniqueReasons,
+                static fn(string $reason): bool => $reason !== $positiveReason
+            ));
+        }
+
+        if (count($uniqueReasons) > 1 && in_array($positiveReason, $uniqueReasons, true)) {
+            $uniqueReasons = array_values(array_filter(
+                $uniqueReasons,
+                static fn(string $reason): bool => $reason !== $positiveReason
+            ));
+        }
+
+        if ([] === $uniqueReasons && 'Resolue' === $recommendedStatus) {
+            $uniqueReasons[] = $positiveReason;
+        }
+
+        return $uniqueReasons;
+    }
+
+    private function normalizeDecisionType(string $value): string
+    {
+        $normalized = trim(mb_strtolower($value));
+        if (function_exists('iconv')) {
+            $ascii = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $normalized);
+            if (false !== $ascii) {
+                $normalized = strtolower($ascii);
+            }
+        }
+
+        $normalized = str_replace(['-', '_', '/'], ' ', $normalized);
+        $normalized = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
+
+        return $normalized;
     }
 }

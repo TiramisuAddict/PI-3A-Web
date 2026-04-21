@@ -69,7 +69,9 @@ class DemandeAiAssistant
         $parsed = [];
 
         try {
-            $rawText = $this->callHuggingFace($prompt);
+            $rawText = $this->canUsePythonRunner()
+                ? $this->callHuggingFaceViaPython($prompt)
+                : $this->callHuggingFace($prompt);
             $parsed = $this->parseJsonResponse($rawText);
         } catch (\RuntimeException $e) {
             $this->logger->warning('Autre IA: fallback local active (runner indisponible).', [
@@ -130,21 +132,8 @@ class DemandeAiAssistant
             throw new \RuntimeException('Ajoutez un titre avant de lancer la generation de description.');
         }
 
-        if ('' === trim($this->apiKey)) {
-            throw new \RuntimeException('La cle API Hugging Face est manquante pour la generation de description depuis le titre.');
-        }
-
-        $prompt = $this->buildDescriptionFromTitlePrompt($normalizedTitle, $typeDemande, $categorie, null);
-        // Keep this path dynamic: slight temperature variation reduces repetitive outputs.
-        $temperature = random_int(62, 85) / 100;
-        $rawResponse = $this->callHuggingFaceViaHttp($prompt, $temperature, 460);
-        $parsed = $this->parseJsonResponse($rawResponse);
-
-        $description = trim((string) ($parsed['description'] ?? ''));
-        $description = $this->normalizeGeneratedDescriptionFromTitle($description, $normalizedTitle);
-
         return [
-            'description' => $description,
+            'description' => $this->generateDescriptionFromTitleWithFallback($normalizedTitle, $typeDemande, $categorie, null),
             'model' => $this->model,
         ];
     }
@@ -163,20 +152,8 @@ class DemandeAiAssistant
             throw new \RuntimeException('Ajoutez un titre avant de lancer la generation de description.');
         }
 
-        if ('' === trim($this->apiKey)) {
-            throw new \RuntimeException('La cle API Hugging Face est manquante pour la generation de description depuis le titre.');
-        }
-
-        $prompt = $this->buildDescriptionFromTitlePrompt($normalizedTitle, $typeDemande, $categorie, $employeId);
-        $temperature = random_int(62, 88) / 100;
-        $rawResponse = $this->callHuggingFaceViaHttp($prompt, $temperature, 480);
-        $parsed = $this->parseJsonResponse($rawResponse);
-
-        $description = trim((string) ($parsed['description'] ?? ''));
-        $description = $this->normalizeGeneratedDescriptionFromTitle($description, $normalizedTitle);
-
         return [
-            'description' => $description,
+            'description' => $this->generateDescriptionFromTitleWithFallback($normalizedTitle, $typeDemande, $categorie, $employeId),
             'model' => $this->model,
         ];
     }
@@ -222,6 +199,61 @@ class DemandeAiAssistant
 
         file_put_contents($path, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
         $this->trimDescriptionFeedbackStore($path, 600);
+    }
+
+    /**
+     * @param array<string, mixed> $general
+     * @param array<string, mixed> $details
+     * @param array<string, mixed> $fieldPlan
+     */
+    public function recordAcceptedAutreFeedback(
+        string $prompt,
+        array $general,
+        array $details,
+        array $fieldPlan = [],
+        ?int $employeId = null
+    ): void {
+        $normalizedPrompt = trim((string) (preg_replace('/\s+/u', ' ', $prompt) ?? $prompt));
+        $generalTitle = trim((string) ($general['titre'] ?? ''));
+        $generalDescription = trim((string) ($general['description'] ?? ''));
+
+        if ('' === $normalizedPrompt && '' === $generalTitle && '' === $generalDescription) {
+            return;
+        }
+
+        $path = $this->getAutreFeedbackFilePath();
+        $dir = dirname($path);
+        if (!is_dir($dir) && !@mkdir($dir, 0777, true) && !is_dir($dir)) {
+            $this->logger->warning('Impossible de creer le dossier de feedback IA Autre.', ['path' => $dir]);
+            return;
+        }
+
+        $record = [
+            'createdAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
+            'employeId' => $employeId,
+            'prompt' => $normalizedPrompt,
+            'general' => [
+                'titre' => $generalTitle,
+                'description' => $generalDescription,
+                'priorite' => trim((string) ($general['priorite'] ?? '')),
+                'categorie' => trim((string) ($general['categorie'] ?? '')),
+                'typeDemande' => trim((string) ($general['typeDemande'] ?? 'Autre')),
+            ],
+            'details' => $this->sanitizeFeedbackMap($details),
+            'fieldPlan' => [
+                'add' => is_array($fieldPlan['add'] ?? null) ? array_values($fieldPlan['add']) : [],
+                'remove' => is_array($fieldPlan['remove'] ?? null) ? array_values(array_map('strval', $fieldPlan['remove'])) : [],
+                'replaceBase' => true === ($fieldPlan['replaceBase'] ?? false),
+            ],
+        ];
+
+        $line = json_encode($record, JSON_UNESCAPED_UNICODE);
+        if (false === $line) {
+            return;
+        }
+
+        file_put_contents($path, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+        $this->trimDescriptionFeedbackStore($path, 800);
     }
 
     /**
@@ -425,10 +457,10 @@ class DemandeAiAssistant
         ];
 
         $rootSchemaExample = [
-            'correctedText' => 'Je souhaite une avance sur salaire pour une depense imprvue ce mois-ci.',
+            'correctedText' => 'Je demande une avance sur salaire de 1200 TND pour couvrir une depense urgente ce mois-ci.',
             'general' => [
-                'titre' => 'Avance sur salaire exceptionnelle',
-                'description' => 'Le collaborateur demande une avance sur salaire pour couvrir une depense urgente.',
+                'titre' => 'Demande d avance sur salaire',
+                'description' => 'Le collaborateur demande une avance sur salaire pour couvrir une depense urgente ce mois-ci.',
                 'priorite' => 'NORMALE',
             ],
             'details' => $schemaExample,
@@ -460,7 +492,7 @@ class DemandeAiAssistant
             . "Cles details obligatoires: " . json_encode(array_values(array_filter($allowedKeys, fn($k) => !empty($requiredKeys[$k]))), JSON_UNESCAPED_UNICODE) . "\n"
             . "Cles details optionnelles supprimables: " . json_encode($optionalFieldKeys, JSON_UNESCAPED_UNICODE) . "\n"
             . "Contraintes:\n"
-            . "- correctedText: correction orthographique et grammaticale du userPromptAutre, ton professionnel, sens conserve.\n"
+            . "- correctedText: correction orthographique et grammaticale du userPromptAutre, ton professionnel, sens conserve. IMPORTANT: correctedText ne doit JAMAIS contenir de structure template comme 'Bonjour, je souhaite soumettre une demande liee a...'. Renvoie seulement le texte corrige.\n"
             . "- general.titre: phrase courte, professionnelle et precise.\n"
             . "- general.description: resume complet de la demande (2 a 5 lignes).\n"
             . "- general.priorite: uniquement HAUTE, NORMALE ou BASSE.\n"
@@ -472,6 +504,7 @@ class DemandeAiAssistant
             . "- remove_fields: tableau de cles optionnelles inutiles (jamais de champ obligatoire).\n"
             . "- custom_fields: 0 a 8 champs supplementaires utiles selon le texte employe.\n"
             . "- Evite les champs generiques vagues (ex: objet/details) si aucune valeur metier concrete n est detectable.\n"
+            . "- IMPORTANT mapping: ne confonds jamais 'information' avec 'formation'. Le contexte formation n est valide que si des indices explicites existent (formation, certification, cours, atelier, coaching).\n"
             . "- Chaque custom_field: key, label, type(text|textarea|select|number|date), required(boolean), value(string), options(array string pour select).\n"
             . "- replace_base: booleen. false par defaut. Mets true uniquement si custom_fields couvre mieux le besoin et contient au moins 2 champs metier solides.\n"
             . "Libelles metiers des champs: " . json_encode($fieldLabels, JSON_UNESCAPED_UNICODE) . "\n"
@@ -528,25 +561,26 @@ class DemandeAiAssistant
     private function buildDescriptionFromTitlePrompt(string $title, ?string $typeDemande, ?string $categorie, ?int $employeId): string
     {
         $example = [
-            'description' => 'Bonjour, je souhaite soumettre une demande de conge annuel pour raison de sante. Cette demande me permettra de gerer ma situation personnelle dans de bonnes conditions tout en restant organise vis-a-vis de l equipe. Je reste disponible pour fournir toute precision utile et je vous remercie par avance pour votre traitement.',
+            'description' => 'Je souhaite demander un changement de PC. Mon besoin concerne precisement ce changement de materiel pour mon travail. Je reste disponible pour fournir les informations complementaires necessaires.',
         ];
 
         $adaptiveContext = $this->buildAdaptiveDescriptionContext($typeDemande, $categorie, $employeId);
 
         return "Tu aides a rediger des descriptions professionnelles de demandes internes en francais.\n"
-            . "A partir d un titre, genere une description developpee, claire, naturelle, polie et exploitable directement dans un formulaire RH/IT.\n"
+            . "A partir d un titre, genere une description claire, precise, naturelle et exploitable directement dans un formulaire interne.\n"
             . "Renvoie STRICTEMENT un JSON valide avec une seule cle: description.\n"
             . "Contraintes:\n"
-            . "- 3 a 5 phrases.\n"
-            . "- 65 a 120 mots environ.\n"
+            . "- 2 ou 3 phrases.\n"
+            . "- 30 a 75 mots environ.\n"
             . "- Ecris a la premiere personne (je).\n"
-            . "- Commence par 'Bonjour,'.\n"
-            . "- Inclure explicitement le besoin principal mentionne dans le titre.\n"
-            . "- Inclure une phrase de contexte utile et une phrase de politesse/conclusion.\n"
+            . "- Decris uniquement le besoin principal exprime dans le titre.\n"
             . "- Ton professionnel, simple et courtois.\n"
             . "- Ne pas inventer de dates, montants ou details precis absents du titre.\n"
             . "- Eviter les formulations vagues (ex: demande concernant...).\n"
-            . "- Si le type ou la categorie sont fournis, reste coherent avec eux.\n"
+            . "- Ne pas ajouter de mots metier non presents ou non implies par le titre.\n"
+            . "- Ne jamais remplacer ou deduire un domaine voisin par erreur. Exemple: ne pas confondre information et formation.\n"
+            . "- Si le type ou la categorie sont fournis, reste coherent avec eux sans les recopier mecaniquement.\n"
+            . "- Priorite absolue au titre utilisateur: les mots du titre priment sur toute generalisation.\n"
             . "- Ne pas copier mot a mot les exemples de style; inspire-toi seulement de leur ton et structure.\n"
             . "Titre: " . json_encode($title, JSON_UNESCAPED_UNICODE) . "\n"
             . "Type de demande: " . json_encode((string) ($typeDemande ?? ''), JSON_UNESCAPED_UNICODE) . "\n"
@@ -691,6 +725,32 @@ class DemandeAiAssistant
         return dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'ai' . DIRECTORY_SEPARATOR . 'description_feedback.jsonl';
     }
 
+    private function getAutreFeedbackFilePath(): string
+    {
+        return dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'ai' . DIRECTORY_SEPARATOR . 'autre_generation_feedback.jsonl';
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return array<string, string>
+     */
+    private function sanitizeFeedbackMap(array $values): array
+    {
+        $sanitized = [];
+        foreach ($values as $key => $value) {
+            $normalizedKey = trim((string) $key);
+            if ('' === $normalizedKey) {
+                continue;
+            }
+
+            if (is_scalar($value)) {
+                $sanitized[$normalizedKey] = trim((string) (preg_replace('/\s+/u', ' ', (string) $value) ?? (string) $value));
+            }
+        }
+
+        return $sanitized;
+    }
+
     private function normalizeLooseLabel(string $value): string
     {
         $normalized = trim((string) (preg_replace('/\s+/u', ' ', $value) ?? $value));
@@ -719,7 +779,7 @@ class DemandeAiAssistant
         $clean = trim((string) (preg_replace('/\s+/u', ' ', $description) ?? $description));
 
         if ('' === $clean) {
-            return 'Bonjour, je souhaite soumettre une demande liee a "' . $title . '". Cette demande correspond a un besoin concret que je souhaite traiter de maniere claire et conforme aux procedures internes. Je reste disponible pour tout complement d information et je vous remercie par avance pour votre retour.';
+            return $this->buildDeterministicDescriptionFromTitle($title);
         }
 
         $lower = strtolower($clean);
@@ -731,20 +791,85 @@ class DemandeAiAssistant
             $clean .= '.';
         }
 
-        if (strlen($clean) < 120) {
-            $clean .= ' Cette demande est importante pour assurer une bonne organisation de mon activite et faciliter son traitement administratif. Je reste disponible pour fournir tout complement utile si necessaire.';
+        return $clean;
+    }
+
+    private function generateDescriptionFromTitleWithFallback(
+        string $title,
+        ?string $typeDemande,
+        ?string $categorie,
+        ?int $employeId
+    ): string {
+        $prompt = $this->buildDescriptionFromTitlePrompt($title, $typeDemande, $categorie, $employeId);
+
+        if ('' !== trim($this->apiKey)) {
+            try {
+                $temperature = random_int(58, 78) / 100;
+                $rawResponse = $this->callHuggingFaceViaHttp($prompt, $temperature, 320);
+                $parsed = $this->parseJsonResponse($rawResponse);
+                $description = trim((string) ($parsed['description'] ?? ''));
+                if ('' !== $description) {
+                    return $this->normalizeGeneratedDescriptionFromTitle($description, $title);
+                }
+            } catch (\RuntimeException $e) {
+                $this->logger->warning('Generation description via HTTP indisponible, tentative fallback local.', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
-        return $clean;
+        if ($this->canUsePythonRunner()) {
+            try {
+                $rawResponse = $this->callHuggingFace($prompt);
+                $parsed = $this->parseJsonResponse($rawResponse);
+                $description = trim((string) ($parsed['description'] ?? ''));
+                if ('' !== $description) {
+                    return $this->normalizeGeneratedDescriptionFromTitle($description, $title);
+                }
+            } catch (\RuntimeException $e) {
+                $this->logger->warning('Generation description via runner local indisponible, fallback deterministe.', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $this->buildDeterministicDescriptionFromTitle($title);
+    }
+
+    private function buildDeterministicDescriptionFromTitle(string $title): string
+    {
+        $cleanTitle = trim((string) (preg_replace('/\s+/u', ' ', $title) ?? $title));
+        if ('' === $cleanTitle) {
+            return 'Bonjour, je souhaite soumettre une demande. Je reste disponible pour fournir les informations complementaires necessaires.';
+        }
+
+        $core = preg_replace('/^(?:demande\s+de|besoin\s+de)\s+/iu', '', $cleanTitle) ?? $cleanTitle;
+        $core = trim($core);
+        $lowerCore = mb_strtolower($core, 'UTF-8');
+
+        return 'Bonjour, je souhaite demander ' . $lowerCore . '. '
+            . 'Mon besoin concerne precisement ce sujet dans le cadre de mon travail. '
+            . 'Je reste disponible pour fournir les informations complementaires necessaires.';
     }
 
     private function callHuggingFace(string $prompt): string
     {
-        if (!$this->canUsePythonRunner()) {
-            throw new \RuntimeException('Le modele IA local est indisponible: script Python introuvable.');
+        $apiKey = trim($this->apiKey);
+        if ('' !== $apiKey && '' !== trim($this->model)) {
+            try {
+                return $this->callHuggingFaceViaHttp($prompt, 0.2, 420);
+            } catch (\RuntimeException $e) {
+                $this->logger->warning('Generation IA via HTTP indisponible, fallback local Python.', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
-        return $this->callHuggingFaceViaPython($prompt);
+        if ($this->canUsePythonRunner()) {
+            return $this->callHuggingFaceViaPython($prompt);
+        }
+
+        throw new \RuntimeException('Le moteur IA est indisponible: configurez HUGGINGFACE_API_KEY + HUGGINGFACE_MODEL ou un script Python valide.');
     }
 
     private function canUsePythonRunner(): bool
@@ -761,6 +886,8 @@ class DemandeAiAssistant
             'temperature' => 0.2,
             'maxTokens' => 420,
             'trainingSamples' => $this->fetchClassificationTrainingSamples(),
+            'externalTrainingSources' => $this->fetchExternalTrainingSources(),
+            'acceptedAutreFeedback' => $this->loadAutreFeedbackSamples(),
         ];
 
         $lastError = '';
@@ -821,6 +948,10 @@ class DemandeAiAssistant
             $candidates[] = [$configured];
         }
 
+        foreach ($this->getCommonWindowsPythonExecutables() as $pythonPath) {
+            $candidates[] = [$pythonPath];
+        }
+
         if ('\\' === DIRECTORY_SEPARATOR) {
             $candidates[] = ['py', '-3'];
             $candidates[] = ['py'];
@@ -847,6 +978,31 @@ class DemandeAiAssistant
     }
 
     /**
+     * @return array<int, string>
+     */
+    private function getCommonWindowsPythonExecutables(): array
+    {
+        if ('\\' !== DIRECTORY_SEPARATOR) {
+            return [];
+        }
+
+        $candidates = [];
+        $localAppData = (string) getenv('LOCALAPPDATA');
+        if ('' !== $localAppData) {
+            $paths = glob($localAppData . DIRECTORY_SEPARATOR . 'Programs' . DIRECTORY_SEPARATOR . 'Python' . DIRECTORY_SEPARATOR . 'Python*' . DIRECTORY_SEPARATOR . 'python.exe');
+            if (is_array($paths)) {
+                foreach ($paths as $path) {
+                    if (is_string($path) && is_file($path)) {
+                        $candidates[] = $path;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($candidates));
+    }
+
+    /**
      * @return array<int, array<string, string>>
      */
     private function fetchClassificationTrainingSamples(): array
@@ -860,6 +1016,89 @@ class DemandeAiAssistant
 
             return [];
         }
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchExternalTrainingSources(): array
+    {
+        $path = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'ai' . DIRECTORY_SEPARATOR . 'curated_external_training_sources.json';
+        if (!is_file($path)) {
+            return [];
+        }
+
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || '' === trim($raw)) {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $sanitized = [];
+        foreach ($decoded as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $source = trim((string) ($entry['source'] ?? ''));
+            $samples = $entry['samples'] ?? null;
+            if ('' === $source || !is_array($samples)) {
+                continue;
+            }
+
+            $sanitized[] = [
+                'source' => $source,
+                'samples' => $samples,
+            ];
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadAutreFeedbackSamples(): array
+    {
+        $path = $this->getAutreFeedbackFilePath();
+        if (!is_file($path)) {
+            return [];
+        }
+
+        $raw = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (!is_array($raw) || [] === $raw) {
+            return [];
+        }
+
+        $samples = [];
+        foreach (array_slice($raw, -800) as $line) {
+            $decoded = json_decode((string) $line, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+
+            $prompt = trim((string) ($decoded['prompt'] ?? ''));
+            $general = is_array($decoded['general'] ?? null) ? $decoded['general'] : [];
+            $details = is_array($decoded['details'] ?? null) ? $decoded['details'] : [];
+            $fieldPlan = is_array($decoded['fieldPlan'] ?? null) ? $decoded['fieldPlan'] : [];
+
+            if ('' === $prompt && [] === $general && [] === $details) {
+                continue;
+            }
+
+            $samples[] = [
+                'prompt' => $prompt,
+                'general' => $general,
+                'details' => $details,
+                'fieldPlan' => $fieldPlan,
+            ];
+        }
+
+        return $samples;
     }
 
     private function callHuggingFaceViaHttp(string $prompt, float $temperature = 0.2, int $maxTokens = 420): string
@@ -1025,9 +1264,6 @@ class DemandeAiAssistant
                 trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
                 trim((string) ($generalContext['description'] ?? ''))
             );
-        } elseif ('' !== trim((string) ($generalContext['aiDescriptionPrompt'] ?? ''))) {
-            // When user rewrites the prompt and regenerates, prioritize latest prompt over stale previous detail text.
-            $generatedDescription = trim((string) ($generalContext['aiDescriptionPrompt'] ?? ''));
         }
 
         if ('' === trim((string) ($details['besoinPersonnalise'] ?? ''))) {
@@ -1093,10 +1329,13 @@ class DemandeAiAssistant
             }
         }
 
-        $customFields = $this->normalizeCustomFields($customPayload, array_merge($allowedKeys, array_keys($removeFields)));
+        $modelCustomFields = $this->normalizeCustomFields($customPayload, array_merge($allowedKeys, array_keys($removeFields)));
         $inferredCustomFields = $this->inferCustomFieldsFromDescription($generalContext, $details);
-        // Keep deterministic keyword-based inference first for Autre to avoid noisy LLM extras.
-        $customFields = $this->mergeCustomFields($inferredCustomFields, $customFields);
+        // Prefer the trained model plan when it produced usable fields, and only
+        // fall back to deterministic inference for the gaps that remain.
+        $customFields = [] !== $modelCustomFields
+            ? $modelCustomFields
+            : $inferredCustomFields;
 
         $inferredUrgence = $this->inferUrgenceFromDescription($generalContext);
         if (isset($selectOptions['niveauUrgenceAutre']) && in_array($inferredUrgence, $selectOptions['niveauUrgenceAutre'], true)) {
@@ -1192,7 +1431,8 @@ class DemandeAiAssistant
         $hasParkingContext = ($intentScores['parking'] ?? 0) >= 2;
         $hasWorkplaceContext = ($intentScores['workplace'] ?? 0) >= 2;
         $hasFormationContext = (($intentScores['formation'] ?? 0) >= 2 || '' !== $formationType || '' !== $formationName)
-            && 'parking' !== $dominantIntent;
+            && 'parking' !== $dominantIntent
+            && !$this->isFormationNoiseOnlyContext($rawText);
         $hasTransportContext = ($intentScores['transport'] ?? 0) >= 2
             && 'parking' !== $dominantIntent;
 
@@ -1392,16 +1632,6 @@ class DemandeAiAssistant
             ];
         }
 
-        if ('' !== $date) {
-            $customFields[] = [
-                'key' => 'ai_date_souhaitee',
-                'label' => 'Date souhaitee',
-                'type' => 'date',
-                'required' => false,
-                'value' => $date,
-            ];
-        }
-
         return $this->normalizeCustomFields($customFields, []);
     }
 
@@ -1476,7 +1706,15 @@ class DemandeAiAssistant
 
         foreach ($weightedKeywords as $intent => $keywords) {
             foreach ($keywords as $keyword => $weight) {
-                if ($this->containsWord($text, (string) $keyword) || $this->containsFragment($text, (string) $keyword)) {
+                $keywordText = (string) $keyword;
+                $matched = $this->containsWord($text, $keywordText);
+                if (!$matched && str_contains($keywordText, ' ')) {
+                    // Fragment matching is restricted to multi-word phrases to avoid
+                    // collisions like "information" triggering "formation".
+                    $matched = $this->containsFragment($text, $keywordText);
+                }
+
+                if ($matched) {
                     $scores[$intent] += (int) $weight;
                 }
             }
@@ -1826,6 +2064,10 @@ class DemandeAiAssistant
 
     private function inferFormationType(string $text): string
     {
+        if ($this->isFormationNoiseOnlyContext($text)) {
+            return '';
+        }
+
         $knownTopic = $this->extractKnownFormationKeywordTopic($text);
         if ('' !== $knownTopic) {
             return str_contains($this->normalizeForSearch($knownTopic), 'certif')
@@ -1855,6 +2097,10 @@ class DemandeAiAssistant
             preg_match('/formation\s+est\s+une\s+formation/iu', $text) === 1
         ) {
             return 'Autre';
+        }
+
+        if ($this->containsAnyWord($text, ['formation', 'cours', 'training'])) {
+            return 'Formation externe';
         }
 
         return '';
@@ -1967,7 +2213,7 @@ class DemandeAiAssistant
         }
 
         if (
-            preg_match('/(.{0,220}?)\bvers\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation|je\b|j\b|nous\b|on\b)\b|[\.,;"\'»”]|$)/iu', $rawText, $contextMatch) === 1
+            preg_match('/(.{0,220}?)\bvers\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|depuis|du|dés|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation|je\b|j\b|nous\b|on\b)\b|[\.,;"\'»”]|$)/iu', $rawText, $contextMatch) === 1
         ) {
             $leftContext = trim((string) ($contextMatch[1] ?? ''));
             $to = $this->sanitizeLikelyLocation((string) ($contextMatch[2] ?? ''));
@@ -1983,8 +2229,8 @@ class DemandeAiAssistant
         }
 
         $patterns = [
-            '/\b(?:(?:de|du|des)\s+|d[\'’]\s*)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)\s+(?:vers|a|à|jusqu(?:\'|e)?\s+a?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation|je\b|j\b|nous\b|on\b)\b|[\.,;"\'»”]|$)/iu',
-            '/\b(?:depuis|depart\s+de)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)\s+(?:vers|a|à|jusqu(?:\'|e)?\s+a?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation|je\b|j\b|nous\b|on\b)\b|[\.,;"\'»”]|$)/iu',
+            '/\b(?:(?:de|du|des)\s+|d[\'’]\s*)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)\s+(?:vers|a|à|jusqu(?:\'|e)?\s+a?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|depuis|du|dés|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation|je\b|j\b|nous\b|on\b)\b|[\.,;"\'»”]|$)/iu',
+            '/\b(?:depuis|depart\s+de)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)\s+(?:vers|a|à|jusqu(?:\'|e)?\s+a?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|depuis|du|dés|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation|je\b|j\b|nous\b|on\b)\b|[\.,;"\'»”]|$)/iu',
         ];
 
         foreach ($patterns as $pattern) {
@@ -2117,8 +2363,7 @@ class DemandeAiAssistant
             $candidate = trim((string) ($matches[1] ?? ''));
             $candidate = preg_replace('/\s+/', ' ', $candidate) ?? $candidate;
             $candidate = preg_replace('/[\.,;:]+$/', '', $candidate) ?? $candidate;
-            $candidate = preg_replace('/\b(?:dans|a|à|avec|pour|car|afin|de|du|des|d[\'’])\b.*$/iu', '', $candidate) ?? $candidate;
-            $candidate = trim($candidate);
+            $candidate = $this->cleanupTrainingNameCandidate($candidate);
 
             if (strlen($candidate) < 2) {
                 continue;
@@ -2359,6 +2604,42 @@ class DemandeAiAssistant
         }
 
         return false;
+    }
+
+    private function hasExplicitFormationSignal(string $text): bool
+    {
+        return $this->containsAnyWord($text, [
+            'formation',
+            'formation interne',
+            'formation externe',
+            'type de formation',
+            'certification',
+            'cours',
+            'atelier',
+            'coaching',
+            'training',
+            'organisme de formation',
+        ]);
+    }
+
+    private function isFormationNoiseOnlyContext(string $text): bool
+    {
+        if ($this->hasExplicitFormationSignal($text)) {
+            return false;
+        }
+
+        return $this->containsAnyWord($text, [
+            'information',
+            'informations',
+            'complement d information',
+            'complements d information',
+            'renseignement',
+            'renseignements',
+            'procedure',
+            'procedures',
+            'explication',
+            'explications',
+        ]);
     }
 
     private function normalizeForSearch(string $text): string
@@ -3240,6 +3521,10 @@ class DemandeAiAssistant
 
     private function extractKnownFormationKeywordTopic(string $text): string
     {
+        if ($this->isFormationNoiseOnlyContext($text)) {
+            return '';
+        }
+
         $normalized = $this->normalizeForSearch($text);
         if ('' === $normalized) {
             return '';
@@ -3361,16 +3646,34 @@ class DemandeAiAssistant
     {
         $clean = trim($value);
         $clean = preg_replace('/[\.,;:]+$/', '', $clean) ?? $clean;
+        $clean = preg_replace('/\b(?:le|du|au|a\s+partir\s+du|à\s+partir\s+du)\s+\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\b(?:le|du|au|a\s+partir\s+du|à\s+partir\s+du)?\s*\d{1,2}\s+(?:janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)(?:\s+\d{4})?\b/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\b(?:je\s+reste\s+disponible|je\s+vous\s+remercie|merci|cordialement|avance\s+pour\s+votre\s+retour)\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\b(?:bonjour|salut|slt|je\s+veux|je\s+souhaite|je\s+demande)\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/^(?:une|un|la|le|l[\'’])\s+(?:formation|certification)\s+(?:en|sur|de|d[\'’])\s+/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/^(?:formation|certification)\s+(?:en|sur|de|d[\'’])\s+/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\b(?:transport|moyen\s+de\s+transport|deplacement|déplacement)\b.*$/iu', '', $clean) ?? $clean;
-        $clean = preg_replace('/\b(?:pour|vers|de|du|des|d[\'’]|a|à|afin|car|avec)\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\b(?:de|du|des|d[\'’]|depuis)\s+[A-Za-zÀ-ÿ\'’\- ]{2,80}\s+(?:vers|a|à)\s+[A-Za-zÀ-ÿ\'’\- ]{2,80}\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\b(?:vers|pour|afin|car|avec)\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/^(?:une|un|la|le|l[\'’])\s+/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/^(?:formation|certification)\s+/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\s+/', ' ', $clean) ?? $clean;
         $clean = trim($clean);
 
-        if ('' === $clean || $this->isLikelyLocationCandidate($clean)) {
+        if ('' === $clean) {
+            return '';
+        }
+
+        $normalized = $this->normalizeForSearch($clean);
+        if ('' === $normalized) {
+            return '';
+        }
+
+        $looksLikeOnlyLocation = preg_match('/^[a-z\- ]{2,80}$/', $normalized) === 1
+            && preg_match('/\b(?:tunis|sfax|sousse|nabeul|ariana|ben arous|manouba|bizerte|gabes|gafsa|hammam lif|hammamlif)\b/iu', $normalized) === 1
+            && !$this->containsAnyWord($normalized, ['java', 'javascript', 'python', 'php', 'devops', 'ui', 'ux', 'excel', 'scrum', 'agile', 'cyber', 'data']);
+
+        if ($looksLikeOnlyLocation) {
             return '';
         }
 

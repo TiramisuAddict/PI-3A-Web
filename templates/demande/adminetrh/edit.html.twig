@@ -801,6 +801,12 @@
                 inp = document.createElement("input");
                 inp.type = "number"; inp.className = "form-control" + err;
                 inp.name = "details[" + f.key + "]"; inp.value = val; inp.min = "0";
+                inp.addEventListener("input", function () {
+                    autoFillNombreJours();
+                });
+                inp.addEventListener("change", function () {
+                    autoFillNombreJours();
+                });
                 applyInputConstraints(inp, f);
                 return inp;
             case "date":
@@ -882,19 +888,72 @@
 
         var startVal = startInput.value;
         var endVal   = endInput.value;
+        var joursVal = String(joursInput.value || "").trim();
 
-        if (!startVal || !endVal) return;
+        var startDate = parseIsoDate(startVal);
+        var endDate   = parseIsoDate(endVal);
+        var activeEl = document.activeElement;
+        var joursCount = parseInt(joursVal, 10);
 
-        var startDate = new Date(startVal);
-        var endDate   = new Date(endVal);
+        if (startDate && endDate && endDate >= startDate && (activeEl === endInput || !joursVal)) {
+            joursInput.value = diffInclusiveDays(startDate, endDate);
+            return;
+        }
 
-        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return;
-        if (endDate < startDate) return;
+        if (startDate && !isNaN(joursCount) && joursCount > 0) {
+            var computedEndDate = addDaysInclusive(startDate, joursCount);
+            var computedEndValue = formatIsoDate(computedEndDate);
+            if (!endVal || activeEl === joursInput || activeEl === startInput) {
+                endInput.value = computedEndValue;
+                return;
+            }
+        }
 
-        var diffMs   = endDate.getTime() - startDate.getTime();
-        var diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+        if (startDate && endDate && endDate >= startDate) {
+            joursInput.value = diffInclusiveDays(startDate, endDate);
+        }
+    }
 
-        joursInput.value = diffDays;
+    function parseIsoDate(value) {
+        var text = String(value || "").trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+
+        var parts = text.split("-");
+        var year = parseInt(parts[0], 10);
+        var month = parseInt(parts[1], 10) - 1;
+        var day = parseInt(parts[2], 10);
+        var date = new Date(year, month, day);
+        if (
+            isNaN(date.getTime()) ||
+            date.getFullYear() !== year ||
+            date.getMonth() !== month ||
+            date.getDate() !== day
+        ) {
+            return null;
+        }
+
+        return date;
+    }
+
+    function formatIsoDate(date) {
+        if (!date || isNaN(date.getTime())) return "";
+        var year = String(date.getFullYear());
+        var month = String(date.getMonth() + 1).padStart(2, "0");
+        var day = String(date.getDate()).padStart(2, "0");
+        return year + "-" + month + "-" + day;
+    }
+
+    function addDaysInclusive(startDate, numberOfDays) {
+        var date = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        date.setDate(date.getDate() + Math.max(0, numberOfDays - 1));
+        return date;
+    }
+
+    function diffInclusiveDays(startDate, endDate) {
+        var start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        var end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+        var diffMs = end.getTime() - start.getTime();
+        return Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
     }
 
     function buildLocationField(f, val, values) {

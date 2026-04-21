@@ -63,6 +63,32 @@ class DemandeFormHelper
         'Annulee'
     ];
 
+    private const CATEGORY_ALIASES = [
+        'financiere' => 'Administrative',
+        'financière' => 'Administrative',
+        'finance' => 'Administrative',
+        'technique' => 'Informatique',
+        'it' => 'Informatique',
+        'rh' => 'Ressources Humaines',
+        'ressources humaines' => 'Ressources Humaines',
+        'organisation travail' => 'Organisation du travail',
+    ];
+
+    private const TYPE_ALIASES = [
+        'badge d acces' => 'Badge acces',
+        'badge d\'accès' => 'Badge acces',
+        'badge acces' => 'Badge acces',
+        'conge' => 'Conge',
+        'congé' => 'Conge',
+        'conges' => 'Conge',
+        'teletravail' => 'Teletravail',
+        'télétravail' => 'Teletravail',
+        'heures supplementaires' => 'Heures supplementaires',
+        'heures supplémentaires' => 'Heures supplementaires',
+        'materiel informatique' => 'Materiel informatique',
+        'matériel informatique' => 'Materiel informatique',
+    ];
+
     public function getCategoryTypes(): array
     {
         return self::CATEGORY_TYPES;
@@ -86,6 +112,68 @@ class DemandeFormHelper
     public function getStatuses(): array
     {
         return self::STATUSES;
+    }
+
+    public function resolveCanonicalCategory(?string $category, ?string $typeDemande = null): ?string
+    {
+        $rawCategory = trim((string) ($category ?? ''));
+        $rawType = trim((string) ($typeDemande ?? ''));
+
+        if (isset(self::CATEGORY_TYPES[$rawCategory])) {
+            return $rawCategory;
+        }
+
+        $normalizedCategory = $this->normalizeTypeKey($rawCategory);
+        if ('' !== $normalizedCategory && isset(self::CATEGORY_ALIASES[$normalizedCategory])) {
+            return self::CATEGORY_ALIASES[$normalizedCategory];
+        }
+
+        foreach (array_keys(self::CATEGORY_TYPES) as $knownCategory) {
+            if ($this->normalizeTypeKey($knownCategory) === $normalizedCategory) {
+                return $knownCategory;
+            }
+        }
+
+        if ('' !== $rawType) {
+            $owner = $this->findOwningCategoryForType($rawType);
+            if (null !== $owner) {
+                return $owner;
+            }
+        }
+
+        return '' !== $rawCategory ? $rawCategory : null;
+    }
+
+    public function resolveCanonicalType(?string $typeDemande, ?string $category = null): ?string
+    {
+        $rawType = trim((string) ($typeDemande ?? ''));
+        if ('' === $rawType) {
+            return null;
+        }
+
+        $normalizedType = $this->normalizeTypeKey($rawType);
+        if (isset(self::TYPE_ALIASES[$normalizedType])) {
+            return self::TYPE_ALIASES[$normalizedType];
+        }
+
+        $resolvedCategory = $this->resolveCanonicalCategory($category, $rawType);
+        if (null !== $resolvedCategory && isset(self::CATEGORY_TYPES[$resolvedCategory])) {
+            foreach (self::CATEGORY_TYPES[$resolvedCategory] as $knownType) {
+                if ($this->normalizeTypeKey($knownType) === $normalizedType) {
+                    return $knownType;
+                }
+            }
+        }
+
+        foreach (self::CATEGORY_TYPES as $types) {
+            foreach ($types as $knownType) {
+                if ($this->normalizeTypeKey($knownType) === $normalizedType) {
+                    return $knownType;
+                }
+            }
+        }
+
+        return $rawType;
     }
 
     public function getFieldsForType(string $typeDemande): array
@@ -845,7 +933,8 @@ class DemandeFormHelper
             ]
         ];
 
-        $normalizedType = $this->normalizeTypeKey($typeDemande);
+        $resolvedType = $this->resolveCanonicalType($typeDemande);
+        $normalizedType = $this->normalizeTypeKey((string) ($resolvedType ?? $typeDemande));
         foreach ($fieldsMap as $knownType => $fields) {
             if ($this->normalizeTypeKey($knownType) === $normalizedType) {
                 return $fields;
@@ -866,6 +955,27 @@ class DemandeFormHelper
         }
 
         return $fieldKey;
+    }
+
+    private function findOwningCategoryForType(string $typeDemande): ?string
+    {
+        $rawType = trim($typeDemande);
+        if ('' === $rawType) {
+            return null;
+        }
+
+        $normalizedType = $this->normalizeTypeKey($rawType);
+        $resolvedType = self::TYPE_ALIASES[$normalizedType] ?? null;
+
+        foreach (self::CATEGORY_TYPES as $category => $types) {
+            foreach ($types as $knownType) {
+                if ($knownType === $resolvedType || $this->normalizeTypeKey($knownType) === $normalizedType) {
+                    return $category;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function normalizeTypeKey(string $value): string
