@@ -163,6 +163,87 @@ class DemandeRepository extends ServiceEntityRepository
         return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
+    /**
+     * @return array<int, array{text:string,categorie:string,typeDemande:string,priorite:string}>
+     */
+    public function fetchClassificationTrainingSamples(int $limit = 1200): array
+    {
+        $rows = $this->createQueryBuilder('d')
+            ->select('d.titre AS titre, d.description AS description, d.categorie AS categorie, d.type_demande AS typeDemande, d.priorite AS priorite')
+            ->andWhere('d.categorie IS NOT NULL')
+            ->andWhere('d.type_demande IS NOT NULL')
+            ->andWhere('d.priorite IS NOT NULL')
+            ->orderBy('d.date_creation', 'DESC')
+            ->setMaxResults(max(100, $limit))
+            ->getQuery()
+            ->getArrayResult();
+
+        $samples = [];
+        foreach ($rows as $row) {
+            $titre = trim((string) ($row['titre'] ?? ''));
+            $description = trim((string) ($row['description'] ?? ''));
+            $text = trim($titre . ' ' . $description);
+
+            if ('' === $text) {
+                continue;
+            }
+
+            $categorie = trim((string) ($row['categorie'] ?? ''));
+            $typeDemande = trim((string) ($row['typeDemande'] ?? ''));
+            $priorite = strtoupper(trim((string) ($row['priorite'] ?? 'NORMALE')));
+
+            if ('' === $categorie || '' === $typeDemande) {
+                continue;
+            }
+
+            if (!in_array($priorite, ['HAUTE', 'NORMALE', 'BASSE'], true)) {
+                $priorite = 'NORMALE';
+            }
+
+            $samples[] = [
+                'text' => $text,
+                'categorie' => $categorie,
+                'typeDemande' => $typeDemande,
+                'priorite' => $priorite,
+            ];
+        }
+
+        return $samples;
+    }
+
+    /**
+     * @return array<int, array{text:string,status:string,priorite:string,categorie:string,typeDemande:string}>
+     */
+    public function fetchDecisionTrainingSamples(int $limit = 1800): array
+    {
+        $rows = $this->createQueryBuilder('d')
+            ->select('d.titre AS titre, d.description AS description, d.status AS status, d.priorite AS priorite, d.categorie AS categorie, d.type_demande AS typeDemande')
+            ->andWhere('d.status IS NOT NULL')
+            ->orderBy('d.date_creation', 'DESC')
+            ->setMaxResults(max(100, $limit))
+            ->getQuery()
+            ->getArrayResult();
+
+        $samples = [];
+        foreach ($rows as $row) {
+            $text = trim(trim((string) ($row['titre'] ?? '')) . ' ' . trim((string) ($row['description'] ?? '')));
+            $status = trim((string) ($row['status'] ?? ''));
+            if ('' === $text || '' === $status) {
+                continue;
+            }
+
+            $samples[] = [
+                'text' => $text,
+                'status' => $status,
+                'priorite' => strtoupper(trim((string) ($row['priorite'] ?? 'NORMALE'))),
+                'categorie' => trim((string) ($row['categorie'] ?? '')),
+                'typeDemande' => trim((string) ($row['typeDemande'] ?? '')),
+            ];
+        }
+
+        return $samples;
+    }
+
     private function isResolvedStatus(string $status): bool
     {
         return in_array($status, self::RESOLVED_STATUS_VARIANTS, true);

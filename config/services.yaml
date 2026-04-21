@@ -7,6 +7,9 @@ parameters:
     huggingface.api_key: '%env(string:HUGGINGFACE_API_KEY)%'
     huggingface.model: '%env(string:HUGGINGFACE_MODEL)%'
     huggingface.timeout_seconds: 20
+    ml.python_executable: 'python'
+    ml.demande_ai_script: '%kernel.project_dir%/ml/demande_ai_model.py'
+    ml.demande_decision_script: '%kernel.project_dir%/ml/demande_decision_model.py'
 
 services:
     # default configuration for services in *this* file
@@ -28,6 +31,16 @@ services:
             $apiKey: '%huggingface.api_key%'
             $model: '%huggingface.model%'
             $timeoutSeconds: '%huggingface.timeout_seconds%'
+            $pythonExecutable: '%ml.python_executable%'
+            $pythonScriptPath: '%ml.demande_ai_script%'
+
+    App\Services\DemandeDecisionAssistant:
+        arguments:
+            $apiKey: '%huggingface.api_key%'
+            $model: '%huggingface.model%'
+            $timeoutSeconds: '%huggingface.timeout_seconds%'
+            $pythonExecutable: '%ml.python_executable%'
+            $pythonScriptPath: '%ml.demande_decision_script%'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

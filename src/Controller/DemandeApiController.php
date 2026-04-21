@@ -105,10 +105,11 @@ class DemandeApiController extends AbstractController
         }
 
         try {
-            $result = $this->aiAssistant->generateDescriptionFromTitle(
+            $result = $this->aiAssistant->generateDescriptionFromTitleAdaptive(
                 $title,
                 (string) ($payload['typeDemande'] ?? ''),
-                (string) ($payload['categorie'] ?? '')
+                (string) ($payload['categorie'] ?? ''),
+                $this->getLoggedInEmployeId($session)
             );
 
             return new JsonResponse([
@@ -178,5 +179,11 @@ class DemandeApiController extends AbstractController
     {
         return $this->isEmployeLoggedIn($session)
             && in_array((string) $session->get('employe_role'), ['RH', 'administrateur entreprise'], true);
+    }
+
+    private function getLoggedInEmployeId(SessionInterface $session): ?int
+    {
+        $employeId = $session->get('employe_id');
+        return is_numeric($employeId) ? (int) $employeId : null;
     }
 }

@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Repository\DemandeRepository;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Process\Process;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -11,9 +13,12 @@ class DemandeAiAssistant
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
+        private readonly DemandeRepository $demandeRepository,
         private readonly string $apiKey,
         private readonly string $model,
-        private readonly int $timeoutSeconds = 20
+        private readonly int $timeoutSeconds = 20,
+        private readonly string $pythonExecutable = 'python',
+        private readonly string $pythonScriptPath = ''
     ) {
     }
 
@@ -25,10 +30,6 @@ class DemandeAiAssistant
      */
     public function generateAutreSuggestions(array $generalContext, array $currentDetails, array $autreFields): array
     {
-        if ('' === trim($this->apiKey)) {
-            throw new \RuntimeException('La cle API Hugging Face est manquante. Configurez HUGGINGFACE_API_KEY.');
-        }
-
         $typeDemande = trim((string) ($generalContext['typeDemande'] ?? 'Autre'));
         if ('' !== $typeDemande && 'Autre' !== $typeDemande) {
             throw new \RuntimeException('L assistant de generation de champs est reserve au type Autre.');
@@ -65,8 +66,16 @@ class DemandeAiAssistant
         }
 
         $prompt = $this->buildPrompt($generalContext, $currentDetails, $allowedKeys, $requiredKeys, $fieldLabels, $selectOptions);
-        $rawText = $this->callHuggingFace($prompt);
-        $parsed = $this->parseJsonResponse($rawText);
+        $parsed = [];
+
+        try {
+            $rawText = $this->callHuggingFace($prompt);
+            $parsed = $this->parseJsonResponse($rawText);
+        } catch (\RuntimeException $e) {
+            $this->logger->warning('Autre IA: fallback local active (runner indisponible).', [
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         $normalized = $this->normalizeSuggestions($parsed, $allowedKeys, $requiredKeys, $selectOptions, $currentDetails, $generalContext);
 
@@ -88,18 +97,22 @@ class DemandeAiAssistant
      */
     public function generateClassificationSuggestion(string $rawText, array $categoryTypes, array $priorities): array
     {
-        if ('' === trim($this->apiKey)) {
-            throw new \RuntimeException('La cle API Hugging Face est manquante. Configurez HUGGINGFACE_API_KEY.');
-        }
-
         $normalizedText = trim($rawText);
         if ('' === $normalizedText) {
             throw new \RuntimeException('Ajoutez une description avant de lancer la suggestion intelligente.');
         }
 
         $prompt = $this->buildClassificationPrompt($normalizedText, $categoryTypes, $priorities);
-        $rawResponse = $this->callHuggingFace($prompt);
-        $parsed = $this->parseJsonResponse($rawResponse);
+        $parsed = [];
+
+        try {
+            $rawResponse = $this->callHuggingFace($prompt);
+            $parsed = $this->parseJsonResponse($rawResponse);
+        } catch (\RuntimeException $e) {
+            $this->logger->warning('Classification IA: fallback local active (runner indisponible).', [
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         $normalized = $this->normalizeClassificationSuggestion($parsed, $normalizedText, $categoryTypes, $priorities);
         $normalized['model'] = $this->model;
@@ -112,17 +125,19 @@ class DemandeAiAssistant
      */
     public function generateDescriptionFromTitle(string $title, ?string $typeDemande = null, ?string $categorie = null): array
     {
-        if ('' === trim($this->apiKey)) {
-            throw new \RuntimeException('La cle API Hugging Face est manquante. Configurez HUGGINGFACE_API_KEY.');
-        }
-
         $normalizedTitle = trim($title);
         if ('' === $normalizedTitle) {
             throw new \RuntimeException('Ajoutez un titre avant de lancer la generation de description.');
         }
 
-        $prompt = $this->buildDescriptionFromTitlePrompt($normalizedTitle, $typeDemande, $categorie);
-        $rawResponse = $this->callHuggingFace($prompt);
+        if ('' === trim($this->apiKey)) {
+            throw new \RuntimeException('La cle API Hugging Face est manquante pour la generation de description depuis le titre.');
+        }
+
+        $prompt = $this->buildDescriptionFromTitlePrompt($normalizedTitle, $typeDemande, $categorie, null);
+        // Keep this path dynamic: slight temperature variation reduces repetitive outputs.
+        $temperature = random_int(62, 85) / 100;
+        $rawResponse = $this->callHuggingFaceViaHttp($prompt, $temperature, 460);
         $parsed = $this->parseJsonResponse($rawResponse);
 
         $description = trim((string) ($parsed['description'] ?? ''));
@@ -132,6 +147,81 @@ class DemandeAiAssistant
             'description' => $description,
             'model' => $this->model,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function generateDescriptionFromTitleAdaptive(
+        string $title,
+        ?string $typeDemande = null,
+        ?string $categorie = null,
+        ?int $employeId = null
+    ): array {
+        $normalizedTitle = trim($title);
+        if ('' === $normalizedTitle) {
+            throw new \RuntimeException('Ajoutez un titre avant de lancer la generation de description.');
+        }
+
+        if ('' === trim($this->apiKey)) {
+            throw new \RuntimeException('La cle API Hugging Face est manquante pour la generation de description depuis le titre.');
+        }
+
+        $prompt = $this->buildDescriptionFromTitlePrompt($normalizedTitle, $typeDemande, $categorie, $employeId);
+        $temperature = random_int(62, 88) / 100;
+        $rawResponse = $this->callHuggingFaceViaHttp($prompt, $temperature, 480);
+        $parsed = $this->parseJsonResponse($rawResponse);
+
+        $description = trim((string) ($parsed['description'] ?? ''));
+        $description = $this->normalizeGeneratedDescriptionFromTitle($description, $normalizedTitle);
+
+        return [
+            'description' => $description,
+            'model' => $this->model,
+        ];
+    }
+
+    public function recordAcceptedDescriptionFeedback(
+        string $title,
+        string $description,
+        ?string $typeDemande = null,
+        ?string $categorie = null,
+        ?int $employeId = null
+    ): void {
+        $normalizedTitle = trim((string) (preg_replace('/\s+/u', ' ', $title) ?? $title));
+        $normalizedDescription = trim((string) (preg_replace('/\s+/u', ' ', $description) ?? $description));
+
+        if ('' === $normalizedTitle || '' === $normalizedDescription) {
+            return;
+        }
+
+        if (strlen($normalizedDescription) < 80) {
+            return;
+        }
+
+        $path = $this->getDescriptionFeedbackFilePath();
+        $dir = dirname($path);
+        if (!is_dir($dir) && !@mkdir($dir, 0777, true) && !is_dir($dir)) {
+            $this->logger->warning('Impossible de creer le dossier de feedback IA.', ['path' => $dir]);
+            return;
+        }
+
+        $record = [
+            'createdAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
+            'employeId' => $employeId,
+            'title' => $normalizedTitle,
+            'typeDemande' => trim((string) ($typeDemande ?? '')),
+            'categorie' => trim((string) ($categorie ?? '')),
+            'description' => $normalizedDescription,
+        ];
+
+        $line = json_encode($record, JSON_UNESCAPED_UNICODE);
+        if (false === $line) {
+            return;
+        }
+
+        file_put_contents($path, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+        $this->trimDescriptionFeedbackStore($path, 600);
     }
 
     /**
@@ -435,11 +525,13 @@ class DemandeAiAssistant
             . "Exemple attendu: " . json_encode($example, JSON_UNESCAPED_UNICODE);
     }
 
-    private function buildDescriptionFromTitlePrompt(string $title, ?string $typeDemande, ?string $categorie): string
+    private function buildDescriptionFromTitlePrompt(string $title, ?string $typeDemande, ?string $categorie, ?int $employeId): string
     {
         $example = [
             'description' => 'Bonjour, je souhaite soumettre une demande de conge annuel pour raison de sante. Cette demande me permettra de gerer ma situation personnelle dans de bonnes conditions tout en restant organise vis-a-vis de l equipe. Je reste disponible pour fournir toute precision utile et je vous remercie par avance pour votre traitement.',
         ];
+
+        $adaptiveContext = $this->buildAdaptiveDescriptionContext($typeDemande, $categorie, $employeId);
 
         return "Tu aides a rediger des descriptions professionnelles de demandes internes en francais.\n"
             . "A partir d un titre, genere une description developpee, claire, naturelle, polie et exploitable directement dans un formulaire RH/IT.\n"
@@ -455,10 +547,171 @@ class DemandeAiAssistant
             . "- Ne pas inventer de dates, montants ou details precis absents du titre.\n"
             . "- Eviter les formulations vagues (ex: demande concernant...).\n"
             . "- Si le type ou la categorie sont fournis, reste coherent avec eux.\n"
+            . "- Ne pas copier mot a mot les exemples de style; inspire-toi seulement de leur ton et structure.\n"
             . "Titre: " . json_encode($title, JSON_UNESCAPED_UNICODE) . "\n"
             . "Type de demande: " . json_encode((string) ($typeDemande ?? ''), JSON_UNESCAPED_UNICODE) . "\n"
             . "Categorie: " . json_encode((string) ($categorie ?? ''), JSON_UNESCAPED_UNICODE) . "\n"
+            . "Contexte adaptatif appris: " . json_encode($adaptiveContext, JSON_UNESCAPED_UNICODE) . "\n"
             . "Exemple attendu: " . json_encode($example, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildAdaptiveDescriptionContext(?string $typeDemande, ?string $categorie, ?int $employeId): array
+    {
+        $samples = $this->loadDescriptionFeedbackSamples();
+        if ([] === $samples) {
+            return [
+                'sampleCount' => 0,
+                'advice' => 'Aucun historique valide pour le moment. Utiliser un style professionnel standard.',
+            ];
+        }
+
+        $normalizedType = $this->normalizeLooseLabel((string) ($typeDemande ?? ''));
+        $normalizedCategorie = $this->normalizeLooseLabel((string) ($categorie ?? ''));
+
+        $ranked = [];
+        foreach ($samples as $sample) {
+            if (!is_array($sample)) {
+                continue;
+            }
+
+            $score = 0;
+            $sampleEmploye = isset($sample['employeId']) && is_numeric((string) $sample['employeId'])
+                ? (int) $sample['employeId']
+                : null;
+
+            if (null !== $employeId && null !== $sampleEmploye && $employeId === $sampleEmploye) {
+                $score += 5;
+            }
+
+            $sampleType = $this->normalizeLooseLabel((string) ($sample['typeDemande'] ?? ''));
+            if ('' !== $normalizedType && '' !== $sampleType && $normalizedType === $sampleType) {
+                $score += 3;
+            }
+
+            $sampleCategorie = $this->normalizeLooseLabel((string) ($sample['categorie'] ?? ''));
+            if ('' !== $normalizedCategorie && '' !== $sampleCategorie && $normalizedCategorie === $sampleCategorie) {
+                $score += 2;
+            }
+
+            $ranked[] = ['score' => $score, 'sample' => $sample];
+        }
+
+        usort($ranked, static fn(array $a, array $b): int => ($b['score'] <=> $a['score']));
+
+        $picked = [];
+        foreach ($ranked as $item) {
+            $description = trim((string) (($item['sample']['description'] ?? '')));
+            if ('' === $description) {
+                continue;
+            }
+
+            $picked[] = [
+                'score' => (int) ($item['score'] ?? 0),
+                'typeDemande' => (string) (($item['sample']['typeDemande'] ?? '')),
+                'categorie' => (string) (($item['sample']['categorie'] ?? '')),
+                'description' => $this->truncateText($description, 260),
+            ];
+
+            if (count($picked) >= 4) {
+                break;
+            }
+        }
+
+        $wordCounts = [];
+        foreach ($picked as $sample) {
+            $wordCounts[] = str_word_count((string) ($sample['description'] ?? ''));
+        }
+
+        $avgWords = [] !== $wordCounts ? (int) round(array_sum($wordCounts) / count($wordCounts)) : 0;
+
+        return [
+            'sampleCount' => count($samples),
+            'targetedSampleCount' => count($picked),
+            'avgWordsFromSamples' => $avgWords,
+            'styleExamples' => $picked,
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadDescriptionFeedbackSamples(): array
+    {
+        $path = $this->getDescriptionFeedbackFilePath();
+        if (!is_file($path)) {
+            return [];
+        }
+
+        $raw = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (!is_array($raw) || [] === $raw) {
+            return [];
+        }
+
+        $samples = [];
+        foreach (array_slice($raw, -600) as $line) {
+            $decoded = json_decode((string) $line, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+
+            $description = trim((string) ($decoded['description'] ?? ''));
+            $title = trim((string) ($decoded['title'] ?? ''));
+            if ('' === $description || '' === $title) {
+                continue;
+            }
+
+            $decoded['description'] = $description;
+            $decoded['title'] = $title;
+            $samples[] = $decoded;
+        }
+
+        return $samples;
+    }
+
+    private function trimDescriptionFeedbackStore(string $path, int $maxLines): void
+    {
+        if ($maxLines < 100 || !is_file($path)) {
+            return;
+        }
+
+        $lines = @file($path, FILE_IGNORE_NEW_LINES);
+        if (!is_array($lines) || count($lines) <= $maxLines) {
+            return;
+        }
+
+        $trimmed = array_slice($lines, -$maxLines);
+        @file_put_contents($path, implode(PHP_EOL, $trimmed) . PHP_EOL, LOCK_EX);
+    }
+
+    private function getDescriptionFeedbackFilePath(): string
+    {
+        return dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'ai' . DIRECTORY_SEPARATOR . 'description_feedback.jsonl';
+    }
+
+    private function normalizeLooseLabel(string $value): string
+    {
+        $normalized = trim((string) (preg_replace('/\s+/u', ' ', $value) ?? $value));
+        $normalized = strtolower($normalized);
+        if (!function_exists('iconv')) {
+            return $normalized;
+        }
+
+        $ascii = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $normalized);
+
+        return false === $ascii ? $normalized : strtolower($ascii);
+    }
+
+    private function truncateText(string $text, int $maxLength): string
+    {
+        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        if (strlen($clean) <= $maxLength) {
+            return $clean;
+        }
+
+        return rtrim(substr($clean, 0, max(0, $maxLength - 3))) . '...';
     }
 
     private function normalizeGeneratedDescriptionFromTitle(string $description, string $title): string
@@ -487,6 +740,130 @@ class DemandeAiAssistant
 
     private function callHuggingFace(string $prompt): string
     {
+        if (!$this->canUsePythonRunner()) {
+            throw new \RuntimeException('Le modele IA local est indisponible: script Python introuvable.');
+        }
+
+        return $this->callHuggingFaceViaPython($prompt);
+    }
+
+    private function canUsePythonRunner(): bool
+    {
+        $scriptPath = trim($this->pythonScriptPath);
+        return '' !== $scriptPath && is_file($scriptPath);
+    }
+
+    private function callHuggingFaceViaPython(string $prompt): string
+    {
+        $payload = [
+            'prompt' => $prompt,
+            'timeoutSeconds' => $this->timeoutSeconds,
+            'temperature' => 0.2,
+            'maxTokens' => 420,
+            'trainingSamples' => $this->fetchClassificationTrainingSamples(),
+        ];
+
+        $lastError = '';
+        foreach ($this->getPythonCommandCandidates() as $commandPrefix) {
+            try {
+                $process = new Process(array_merge($commandPrefix, [$this->pythonScriptPath]));
+                $process->setInput((string) json_encode($payload, JSON_UNESCAPED_UNICODE));
+                $process->setTimeout($this->timeoutSeconds + 5);
+                $process->run();
+
+                if (!$process->isSuccessful()) {
+                    $lastError = trim($process->getErrorOutput() ?: $process->getOutput());
+                    continue;
+                }
+
+                $stdout = trim($process->getOutput());
+                $decoded = json_decode($stdout, true);
+                if (!is_array($decoded)) {
+                    $lastError = 'Python AI runner returned invalid JSON.';
+                    continue;
+                }
+
+                if (!($decoded['ok'] ?? false)) {
+                    $lastError = (string) ($decoded['error'] ?? 'Unknown Python AI runner error.');
+                    continue;
+                }
+
+                $text = trim((string) ($decoded['text'] ?? ''));
+                if ('' === $text) {
+                    $lastError = 'Python AI runner returned an empty text response.';
+                    continue;
+                }
+
+                return $text;
+            } catch (\Throwable $e) {
+                $lastError = $e->getMessage();
+            }
+        }
+
+        $commands = array_map(static fn(array $cmd): string => implode(' ', $cmd), $this->getPythonCommandCandidates());
+        throw new \RuntimeException(
+            'Le moteur IA local est indisponible: aucune commande Python valide. ' .
+            'Commandes testees: ' . implode(', ', $commands) . '. ' .
+            'Configurez ml.python_executable ou installez Python dans le PATH. ' .
+            ('' !== $lastError ? ('Details: ' . $lastError) : '')
+        );
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    private function getPythonCommandCandidates(): array
+    {
+        $candidates = [];
+        $configured = trim($this->pythonExecutable);
+
+        if ('' !== $configured) {
+            $candidates[] = [$configured];
+        }
+
+        if ('\\' === DIRECTORY_SEPARATOR) {
+            $candidates[] = ['py', '-3'];
+            $candidates[] = ['py'];
+            $candidates[] = ['python3'];
+            $candidates[] = ['python'];
+        } else {
+            $candidates[] = ['python3'];
+            $candidates[] = ['python'];
+        }
+
+        $unique = [];
+        $seen = [];
+        foreach ($candidates as $candidate) {
+            $key = implode("\0", $candidate);
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $unique[] = $candidate;
+        }
+
+        return $unique;
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    private function fetchClassificationTrainingSamples(): array
+    {
+        try {
+            return $this->demandeRepository->fetchClassificationTrainingSamples(1200);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Impossible de charger les echantillons de training classification.', [
+                'exception' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    private function callHuggingFaceViaHttp(string $prompt, float $temperature = 0.2, int $maxTokens = 420): string
+    {
         try {
             $model = trim($this->model);
             if ('' === $model) {
@@ -507,8 +884,8 @@ class DemandeAiAssistant
                             'content' => $prompt,
                         ],
                     ],
-                    'temperature' => 0.2,
-                    'max_tokens' => 420,
+                    'temperature' => max(0.0, min(1.0, $temperature)),
+                    'max_tokens' => max(120, $maxTokens),
                     'stream' => false,
                 ],
                 'timeout' => $this->timeoutSeconds,
@@ -549,13 +926,13 @@ class DemandeAiAssistant
             return json_encode($payload, JSON_UNESCAPED_UNICODE) ?: '';
         } catch (\RuntimeException $e) {
             $rawMessage = $e->getMessage();
-            $this->logger->error('Erreur Hugging Face', ['exception' => $rawMessage]);
+            $this->logger->error('Erreur Hugging Face description', ['exception' => $rawMessage]);
             throw new \RuntimeException($this->toUserFriendlyMessage($rawMessage));
         } catch (TransportExceptionInterface $e) {
-            $this->logger->error('Erreur transport Hugging Face', ['exception' => $e->getMessage()]);
-            throw new \RuntimeException('Le service IA est temporairement indisponible.');
+            $this->logger->error('Erreur transport Hugging Face description', ['exception' => $e->getMessage()]);
+            throw new \RuntimeException('Le service IA de description est temporairement indisponible.');
         } catch (\Throwable $e) {
-            $this->logger->error('Erreur Hugging Face', ['exception' => $e->getMessage()]);
+            $this->logger->error('Erreur Hugging Face description', ['exception' => $e->getMessage()]);
             throw new \RuntimeException('Erreur IA Hugging Face: ' . $e->getMessage());
         }
     }
@@ -569,15 +946,11 @@ class DemandeAiAssistant
         }
 
         if (str_contains($normalized, 'unauthorized') || str_contains($normalized, '401')) {
-            return 'Token Hugging Face invalide ou non autorise. Verifiez HUGGINGFACE_API_KEY dans .env.local.';
+            return 'Token Hugging Face invalide ou non autorise. Verifiez HUGGINGFACE_API_KEY.';
         }
 
         if (str_contains($normalized, 'rate limit')) {
             return 'Limite Hugging Face atteinte. Patientez quelques instants puis reessayez.';
-        }
-
-        if (str_contains($normalized, 'model not supported by provider hf-inference')) {
-            return 'Le modele configure ne supporte pas hf-inference. Utilisez par exemple katanemo/Arch-Router-1.5B:hf-inference dans HUGGINGFACE_MODEL.';
         }
 
         return $rawMessage;
@@ -652,6 +1025,9 @@ class DemandeAiAssistant
                 trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
                 trim((string) ($generalContext['description'] ?? ''))
             );
+        } elseif ('' !== trim((string) ($generalContext['aiDescriptionPrompt'] ?? ''))) {
+            // When user rewrites the prompt and regenerates, prioritize latest prompt over stale previous detail text.
+            $generatedDescription = trim((string) ($generalContext['aiDescriptionPrompt'] ?? ''));
         }
 
         if ('' === trim((string) ($details['besoinPersonnalise'] ?? ''))) {
@@ -748,8 +1124,8 @@ class DemandeAiAssistant
         $correctedText = $this->firstNonEmpty(
             $correctedTextPayload,
             trim((string) ($generalPayload['description'] ?? '')),
-            trim((string) ($details['descriptionBesoin'] ?? '')),
-            trim((string) ($generalContext['aiDescriptionPrompt'] ?? ''))
+            trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+            trim((string) ($details['descriptionBesoin'] ?? ''))
         );
         $correctedText = trim((string) (preg_replace('/\s+/u', ' ', $correctedText) ?? $correctedText));
 
@@ -787,14 +1163,38 @@ class DemandeAiAssistant
         $text = strtolower($rawText);
         $customFields = [];
 
+        $intentScores = $this->computePromptIntentScores($rawText);
+        $dominantIntent = $this->resolveDominantIntent($intentScores);
+
         $amount = $this->extractAmountFromText($text);
         $date = $this->extractFrenchDate($generalContext);
+        $routeLocations = $this->extractRouteLocations($rawText);
+        $currentLocation = $this->firstNonEmpty($routeLocations['from'], $this->extractCurrentLocation($rawText));
+        $targetLocation = $this->firstNonEmpty($routeLocations['to'], $this->extractTargetLocation($rawText));
+
+        $hasClearTransportRoute = '' !== $currentLocation || '' !== $targetLocation;
+
         $formationType = $this->inferFormationType($rawText);
-        $currentLocation = $this->extractCurrentLocation($rawText);
-        $targetLocation = $this->extractTargetLocation($rawText);
-        $hasFormationContext = $this->containsAnyWord($rawText, ['formation', 'certification', 'cours', 'training']) || '' !== $formationType;
-        $hasTransportContext = $this->containsAnyWord($rawText, ['transport', 'deplacement', 'trajet', 'navette']);
-        $hasParkingContext = $this->containsAnyWord($rawText, ['parking', 'stationnement', 'place de parking', 'place reservee', 'place reserve', 'acces parking']);
+        $formationName = $this->firstNonEmpty(
+            $this->extractKnownFormationKeywordTopic($rawText),
+            $this->extractTrainingName($rawText),
+            $this->extractFormationTopic($rawText)
+        );
+
+        if ('' === $formationType && '' !== $formationName) {
+            $formationType = $this->inferDefaultFormationType($rawText, $formationName);
+        }
+
+        if ('' !== $formationName && $this->isLikelyLocationCandidate($formationName)) {
+            $formationName = '';
+        }
+
+        $hasParkingContext = ($intentScores['parking'] ?? 0) >= 2;
+        $hasWorkplaceContext = ($intentScores['workplace'] ?? 0) >= 2;
+        $hasFormationContext = (($intentScores['formation'] ?? 0) >= 2 || '' !== $formationType || '' !== $formationName)
+            && 'parking' !== $dominantIntent;
+        $hasTransportContext = ($intentScores['transport'] ?? 0) >= 2
+            && 'parking' !== $dominantIntent;
 
         if ($hasFormationContext || $hasTransportContext) {
             if ($hasFormationContext) {
@@ -805,6 +1205,14 @@ class DemandeAiAssistant
                     'required' => true,
                     'value' => '' !== $formationType ? $formationType : 'Autre',
                     'options' => ['Formation interne', 'Formation externe', 'Certification', 'Autre'],
+                ];
+
+                $customFields[] = [
+                    'key' => 'ai_nom_formation',
+                    'label' => 'Nom de la formation',
+                    'type' => 'text',
+                    'required' => true,
+                    'value' => $formationName,
                 ];
             }
 
@@ -905,6 +1313,75 @@ class DemandeAiAssistant
             ];
         }
 
+        if ($hasWorkplaceContext && !$hasFormationContext && !$hasTransportContext) {
+            $workplaceType = $this->inferWorkplaceNeedType($rawText);
+            $workplaceLocation = $this->extractWorkplaceLocationHint($rawText);
+            $workplacePriority = $this->inferWorkplacePriority($rawText);
+
+            $customFields[] = [
+                'key' => 'ai_type_besoin_workplace',
+                'label' => 'Type de besoin logistique',
+                'type' => 'select',
+                'required' => true,
+                'value' => $workplaceType,
+                'options' => ['Casier securise', 'Espace calme', 'Ajustement eclairage', 'Autorisation interne', 'Amenagement poste', 'Autre'],
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_objet_besoin_workplace',
+                'label' => 'Objet de la demande',
+                'type' => 'text',
+                'required' => true,
+                'value' => $this->firstNonEmpty(
+                    $this->extractPrimaryIntentFromPrompt((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                    trim((string) ($details['descriptionBesoin'] ?? '')),
+                    trim((string) ($generalContext['description'] ?? ''))
+                ),
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_justification_workplace',
+                'label' => 'Justification du besoin',
+                'type' => 'textarea',
+                'required' => true,
+                'value' => $this->firstNonEmpty(
+                    trim((string) ($details['descriptionBesoin'] ?? '')),
+                    trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                    trim((string) ($generalContext['description'] ?? ''))
+                ),
+            ];
+
+            if ('' !== $workplaceLocation) {
+                $customFields[] = [
+                    'key' => 'ai_zone_impactee_workplace',
+                    'label' => 'Zone ou poste concerne',
+                    'type' => 'text',
+                    'required' => false,
+                    'value' => $workplaceLocation,
+                ];
+            }
+
+            $customFields[] = [
+                'key' => 'ai_priorite_recommandee_workplace',
+                'label' => 'Priorite recommandee',
+                'type' => 'select',
+                'required' => false,
+                'value' => $workplacePriority,
+                'options' => ['Normale', 'Haute', 'Critique'],
+            ];
+
+            if ($this->containsAnyWord($rawText, ['confidentiel', 'confidentielle', 'securise', 'securisee', 'secure'])) {
+                $customFields[] = [
+                    'key' => 'ai_niveau_confidentialite',
+                    'label' => 'Niveau de confidentialite',
+                    'type' => 'select',
+                    'required' => false,
+                    'value' => 'Eleve',
+                    'options' => ['Standard', 'Eleve', 'Critique'],
+                ];
+            }
+        }
+
         if (null !== $amount) {
             $customFields[] = [
                 'key' => 'ai_montant_souhaite',
@@ -926,6 +1403,163 @@ class DemandeAiAssistant
         }
 
         return $this->normalizeCustomFields($customFields, []);
+    }
+
+    /**
+     * @return array{parking:int,formation:int,transport:int,finance:int,workplace:int}
+     */
+    private function computePromptIntentScores(string $text): array
+    {
+        $scores = [
+            'parking' => 0,
+            'formation' => 0,
+            'transport' => 0,
+            'finance' => 0,
+            'workplace' => 0,
+        ];
+
+        $weightedKeywords = [
+            'parking' => [
+                'parking' => 3,
+                'stationnement' => 3,
+                'place de parking' => 3,
+                'place reservee' => 3,
+                'place reserve' => 3,
+                'acces parking' => 2,
+                'badge parking' => 2,
+                'entree' => 1,
+                'barriere' => 1,
+            ],
+            'formation' => [
+                'formation' => 3,
+                'certification' => 3,
+                'cours' => 2,
+                'training' => 2,
+                'type de formation' => 2,
+                'organisme de formation' => 2,
+            ],
+            'transport' => [
+                'deplacement' => 3,
+                'déplacement' => 3,
+                'transport' => 2,
+                'moyen de transport' => 3,
+                'trajet' => 2,
+                'navette' => 2,
+                'vers' => 1,
+            ],
+            'finance' => [
+                'salaire' => 3,
+                'avance sur salaire' => 4,
+                'remboursement' => 3,
+                'facture' => 2,
+                'montant' => 2,
+            ],
+            'workplace' => [
+                'casier' => 3,
+                'casiers' => 3,
+                'espace calme' => 3,
+                'appel confidentiel' => 3,
+                'appels confidentiels' => 3,
+                'confidentiel' => 2,
+                'securise' => 2,
+                'autorisation interne' => 3,
+                'journee benevolat' => 3,
+                'benevolat' => 2,
+                'eclairage' => 3,
+                'lumiere' => 2,
+                'fatigue visuelle' => 3,
+                'poste de travail' => 2,
+                'bureau' => 2,
+                'open space' => 2,
+            ],
+        ];
+
+        foreach ($weightedKeywords as $intent => $keywords) {
+            foreach ($keywords as $keyword => $weight) {
+                if ($this->containsWord($text, (string) $keyword) || $this->containsFragment($text, (string) $keyword)) {
+                    $scores[$intent] += (int) $weight;
+                }
+            }
+        }
+
+        return $scores;
+    }
+
+    /**
+    * @param array{parking:int,formation:int,transport:int,finance:int,workplace:int} $scores
+     */
+    private function resolveDominantIntent(array $scores): string
+    {
+        $dominant = '';
+        $maxScore = 0;
+
+        foreach ($scores as $intent => $score) {
+            if ($score > $maxScore) {
+                $maxScore = $score;
+                $dominant = (string) $intent;
+            }
+        }
+
+        return $maxScore > 0 ? $dominant : '';
+    }
+
+    private function inferWorkplaceNeedType(string $text): string
+    {
+        if ($this->containsAnyWord($text, ['casier', 'casiers'])) {
+            return 'Casier securise';
+        }
+
+        if ($this->containsAnyWord($text, ['eclairage', 'lumiere', 'fatigue visuelle'])) {
+            return 'Ajustement eclairage';
+        }
+
+        if ($this->containsAnyWord($text, ['espace calme', 'appel confidentiel', 'appels confidentiels', 'confidentiel'])) {
+            return 'Espace calme';
+        }
+
+        if ($this->containsAnyWord($text, ['autorisation interne', 'journee benevolat', 'benevolat', 'benevole'])) {
+            return 'Autorisation interne';
+        }
+
+        if ($this->containsAnyWord($text, ['poste de travail', 'bureau', 'open space', 'amenagement'])) {
+            return 'Amenagement poste';
+        }
+
+        return 'Autre';
+    }
+
+    private function extractWorkplaceLocationHint(string $text): string
+    {
+        if (preg_match('/\b(?:au|dans|sur)\s+(?:mon|ma|le|la|l[\'’]|un|une)?\s*([A-Za-zÀ-ÿ0-9\'’\- ]{2,60})(?=\s+(?:car|pour|avec|afin|et|je\b|j\b|nous\b|on\b)|[\.,;:"\'»”]|$)/iu', $text, $matches) === 1) {
+            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
+        }
+
+        if ($this->containsWord($text, 'open space')) {
+            return 'Open space';
+        }
+
+        if ($this->containsWord($text, 'bureau')) {
+            return 'Bureau';
+        }
+
+        if ($this->containsWord($text, 'poste')) {
+            return 'Poste de travail';
+        }
+
+        return '';
+    }
+
+    private function inferWorkplacePriority(string $text): string
+    {
+        if ($this->containsAnyWord($text, ['confidentiel', 'confidentielle', 'securise', 'securisee', 'fatigue visuelle'])) {
+            return 'Haute';
+        }
+
+        if ($this->containsAnyWord($text, ['urgent', 'urgence', 'immediat', 'immédiat', 'bloquant'])) {
+            return 'Critique';
+        }
+
+        return 'Normale';
     }
 
     /**
@@ -1192,6 +1826,13 @@ class DemandeAiAssistant
 
     private function inferFormationType(string $text): string
     {
+        $knownTopic = $this->extractKnownFormationKeywordTopic($text);
+        if ('' !== $knownTopic) {
+            return str_contains($this->normalizeForSearch($knownTopic), 'certif')
+                ? 'Certification'
+                : 'Formation externe';
+        }
+
         $explicitType = $this->extractExplicitFormationType($text);
         if ('' !== $explicitType) {
             return $explicitType;
@@ -1217,6 +1858,27 @@ class DemandeAiAssistant
         }
 
         return '';
+    }
+
+    private function inferDefaultFormationType(string $text, string $formationName): string
+    {
+        $normalizedName = $this->normalizeForSearch($formationName);
+        if ('' !== $normalizedName) {
+            if (
+                str_contains($normalizedName, 'certif') ||
+                str_contains($normalizedName, 'certification') ||
+                str_contains($normalizedName, 'iso')
+            ) {
+                return 'Certification';
+            }
+
+            // For named topics like Java/UI/UX, default to external training.
+            return 'Formation externe';
+        }
+
+        return $this->containsAnyWord($text, ['formation', 'cours', 'training'])
+            ? 'Formation externe'
+            : '';
     }
 
     private function extractExplicitFormationType(string $text): string
@@ -1246,12 +1908,17 @@ class DemandeAiAssistant
             return $routeLocations['from'];
         }
 
+        $location = $this->extractLocationFromDeparturePhrase($rawText);
+        if ('' !== $location) {
+            return $location;
+        }
+
         if (preg_match('/(?:lieu\s+de\s+d[ée]part(?:\s+actuel)?|depart\s+actuel|d[ée]part\s+de)\s*[:\-]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:vers|a|à|pour|la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
-            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
         }
 
         if (preg_match('/(?:actuellement|je\s+suis\s+actuellement|je\s+suis|situee?|située?)\s+(?:a|à|dans)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80})/iu', $rawText, $matches) === 1) {
-            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
         }
 
         return '';
@@ -1264,20 +1931,20 @@ class DemandeAiAssistant
             return $routeLocations['to'];
         }
 
-        if (preg_match('/(?:lieu\s+de\s+d[ée]part(?:\s+actuel)?\s*[:\-]?\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?\s+vers\s+|\bvers\s+)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
-            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
+        if (preg_match('/(?:lieu\s+de\s+d[ée]part(?:\s+actuel)?\s*[:\-]?\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?\s+vers\s+|\bvers\s+)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est|je\b|j\b|nous\b|on\b)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
+            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
         }
 
         if (preg_match('/formation\s+(?:a|à|dans)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
-            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
         }
 
         if (preg_match('/(?:vers|destination\s*:?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
-            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
         }
 
         if (preg_match('/\bdans\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
-            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
         }
 
         return '';
@@ -1288,16 +1955,27 @@ class DemandeAiAssistant
      */
     private function extractRouteLocations(string $rawText): array
     {
+        $compactText = $this->normalizeForSearch($rawText);
+
+        if (preg_match('/\bvers\s+([a-z0-9\- ]{2,60}?)(?=\b(?:pour|afin|car|avec|la|le|je|j|nous|on|formation|certification|transport)\b|$)/iu', $compactText, $toMatch) === 1) {
+            $to = $this->sanitizeLikelyLocation((string) ($toMatch[1] ?? ''));
+            $from = $this->extractLocationFromDeparturePhrase($rawText);
+
+            if ('' !== $from && '' !== $to) {
+                return ['from' => $from, 'to' => $to];
+            }
+        }
+
         if (
-            preg_match('/(.{0,220}?)\bvers\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation)\b|[\.,;"\'»”]|$)/iu', $rawText, $contextMatch) === 1
+            preg_match('/(.{0,220}?)\bvers\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation|je\b|j\b|nous\b|on\b)\b|[\.,;"\'»”]|$)/iu', $rawText, $contextMatch) === 1
         ) {
             $leftContext = trim((string) ($contextMatch[1] ?? ''));
-            $to = $this->cleanupLocationCandidate((string) ($contextMatch[2] ?? ''));
+            $to = $this->sanitizeLikelyLocation((string) ($contextMatch[2] ?? ''));
 
             if (
                 preg_match('/(?:de|du|des|d[\'’]|depuis)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80})$/iu', $leftContext, $fromMatch) === 1
             ) {
-                $from = $this->cleanupLocationCandidate((string) ($fromMatch[1] ?? ''));
+                $from = $this->sanitizeLikelyLocation((string) ($fromMatch[1] ?? ''));
                 if ('' !== $from && '' !== $to) {
                     return ['from' => $from, 'to' => $to];
                 }
@@ -1305,19 +1983,51 @@ class DemandeAiAssistant
         }
 
         $patterns = [
-            '/\b(?:(?:de|du|des)\s+|d[\'’]\s*)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)\s+(?:vers|a|à|jusqu(?:\'|e)?\s+a?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation)\b|[\.,;"\'»”]|$)/iu',
-            '/\b(?:depuis|depart\s+de)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)\s+(?:vers|a|à|jusqu(?:\'|e)?\s+a?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation)\b|[\.,;"\'»”]|$)/iu',
+            '/\b(?:(?:de|du|des)\s+|d[\'’]\s*)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)\s+(?:vers|a|à|jusqu(?:\'|e)?\s+a?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation|je\b|j\b|nous\b|on\b)\b|[\.,;"\'»”]|$)/iu',
+            '/\b(?:depuis|depart\s+de)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)\s+(?:vers|a|à|jusqu(?:\'|e)?\s+a?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation|je\b|j\b|nous\b|on\b)\b|[\.,;"\'»”]|$)/iu',
         ];
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $rawText, $matches) === 1) {
-                $from = $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
-                $to = $this->cleanupLocationCandidate((string) ($matches[2] ?? ''));
+                $from = $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
+                $to = $this->sanitizeLikelyLocation((string) ($matches[2] ?? ''));
+
+                if ('' === $from || '' === $to) {
+                    continue;
+                }
+
                 return ['from' => $from, 'to' => $to];
             }
         }
 
         return ['from' => '', 'to' => ''];
+    }
+
+    private function extractLocationFromDeparturePhrase(string $rawText): string
+    {
+        $compactText = $this->normalizeForSearch($rawText);
+        if ('' === $compactText) {
+            return '';
+        }
+
+        $matchCount = preg_match_all('/\b(?:de|du|des|d|depuis|partant de)\s+([a-z0-9\- ]{2,60}?)(?=\s+(?:vers|pour|afin|car|avec|la|le|je|j|nous|on|formation|certification|transport)\b|$)/iu', $compactText, $matches);
+        if (false === $matchCount || 0 === $matchCount) {
+            return '';
+        }
+
+        $candidates = $matches[1] ?? [];
+        if (!is_array($candidates) || [] === $candidates) {
+            return '';
+        }
+
+        for ($index = count($candidates) - 1; $index >= 0; --$index) {
+            $candidate = $this->sanitizeLikelyLocation((string) ($candidates[$index] ?? ''));
+            if ('' !== $candidate) {
+                return $candidate;
+            }
+        }
+
+        return '';
     }
 
     private function cleanupLocationCandidate(string $value): string
@@ -1326,10 +2036,21 @@ class DemandeAiAssistant
         $clean = preg_replace('/[\.,;:]+$/', '', $clean) ?? $clean;
         $clean = preg_replace('/\s+/', ' ', $clean) ?? $clean;
 
+        $clean = preg_replace('/^(?:bonjour|salut|slt|je\s+veux|je\s+souhaite|je\s+demande|un|une|moyen\s+de\s+transport)\s+/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/^(?:transport|deplacement|déplacement|voyage|trajet)\s+/iu', '', $clean) ?? $clean;
+
+        if (preg_match('/\bvers\s+(.+)$/iu', $clean, $routeMatch) === 1) {
+            $clean = trim((string) ($routeMatch[1] ?? ''));
+        }
+
+        $clean = preg_replace('/^(?:de|du|des|d[\'’])\s+/iu', '', $clean) ?? $clean;
+
         $clean = preg_replace('/\s+(?:la|le|les)\s+formation\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\s+type\s+de\s+formation\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\s+formation\s+est\b.*$/iu', '', $clean) ?? $clean;
-        $clean = preg_replace('/\s+vers\s+.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s+moyen\s+de\s+transport\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s+(?:je|j|nous|on)\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s+(?:depuis|depart\s+de)\s+.*$/iu', '', $clean) ?? $clean;
 
         $parts = preg_split('/\s+(?:et|mais|car|pour|puis|avec|qui|que)\s+/iu', $clean);
         if (is_array($parts) && isset($parts[0])) {
@@ -1339,6 +2060,81 @@ class DemandeAiAssistant
         return substr($clean, 0, 80);
     }
 
+    private function sanitizeLikelyLocation(string $value): string
+    {
+        $candidate = $this->cleanupLocationCandidate($value);
+        return $this->isLikelyLocationCandidate($candidate) ? $candidate : '';
+    }
+
+    private function isLikelyLocationCandidate(string $value): bool
+    {
+        $candidate = trim($value);
+        if ('' === $candidate) {
+            return false;
+        }
+
+        $normalized = $this->normalizeForSearch($candidate);
+        if ('' === $normalized) {
+            return false;
+        }
+
+        if (preg_match('/\d/', $normalized) === 1) {
+            return false;
+        }
+
+        if (preg_match('/\b(de|vers|a|à|depuis)\b/iu', $normalized) === 1 && preg_match('/\s/', $normalized) === 1) {
+            return false;
+        }
+
+        $forbiddenTokens = [
+            'maniere', 'claire', 'conforme', 'procedure', 'procedures', 'interne', 'internes',
+            'demande', 'besoin', 'souhaite', 'soumettre', 'traiter', 'complement', 'information',
+            'retour', 'merci', 'avance', 'bonjour', 'cette', 'correspond', 'utile', 'moyen', 'transport',
+            'type', 'formation', 'ui', 'ux', 'deplacement', 'trajet', 'destination', 'souhaitee', 'souhaitee',
+        ];
+
+        foreach ($forbiddenTokens as $token) {
+            if ($this->containsWord($normalized, $token)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function extractFormationTopic(string $text): string
+    {
+        $patterns = [
+            '/(?:formation|certification)\s+(?:en|sur|de|d[\'’])\s*([A-Za-z0-9+\/().\-\s]{2,80})/iu',
+            '/\bformation\s+([A-Za-z0-9+\/().\-\s]{2,80})/iu',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $text, $matches) !== 1) {
+                continue;
+            }
+
+            $candidate = trim((string) ($matches[1] ?? ''));
+            $candidate = preg_replace('/\s+/', ' ', $candidate) ?? $candidate;
+            $candidate = preg_replace('/[\.,;:]+$/', '', $candidate) ?? $candidate;
+            $candidate = preg_replace('/\b(?:dans|a|à|avec|pour|car|afin|de|du|des|d[\'’])\b.*$/iu', '', $candidate) ?? $candidate;
+            $candidate = trim($candidate);
+
+            if (strlen($candidate) < 2) {
+                continue;
+            }
+
+            $normalized = $this->normalizeForSearch($candidate);
+            if (in_array($normalized, ['interne', 'externe', 'certification', 'autre'], true)) {
+                continue;
+            }
+
+            return substr($candidate, 0, 80);
+        }
+
+        return '';
+    }
+
     /**
      * @param array<string, mixed> $generalContext
      */
@@ -1346,6 +2142,15 @@ class DemandeAiAssistant
     {
         $prompt = (string) ($generalContext['aiDescriptionPrompt'] ?? '');
         $primaryIntent = $this->extractPrimaryIntentFromPrompt($prompt);
+
+        // For Autre AI generation, prioritize the fresh prompt to avoid leaking stale
+        // context from previous title/description runs when user regenerates.
+        if ('' !== trim($prompt)) {
+            return trim(implode(' ', [
+                $primaryIntent,
+                $prompt,
+            ]));
+        }
 
         return trim(implode(' ', [
             $primaryIntent,
@@ -1413,33 +2218,96 @@ class DemandeAiAssistant
      */
     private function inferCategoryFromDescription(array $generalContext): string
     {
-        $text = strtolower($this->buildInferenceText($generalContext));
+        $text = $this->buildInferenceText($generalContext);
+        $scores = $this->scoreCategoryCandidates($text, []);
 
-        $hasFinanceContext = $this->containsAny($text, ['finance', 'financier', 'financiere', 'salaire', 'remboursement', 'budget', 'paye', 'paie', 'montant', 'facture', 'tnd', 'dt'])
-            || $this->containsFragment($text, 'avance sur salaire')
-            || ($this->containsFragment($text, 'avance') && $this->containsAny($text, ['salaire', 'paie', 'paye']));
-
-        if ($hasFinanceContext) {
-            return 'Administrative';
+        $bestCategory = '';
+        $bestScore = 0;
+        foreach ($scores as $category => $score) {
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestCategory = (string) $category;
+            }
         }
 
-        if ($this->containsAny($text, ['conge', 'attestation', 'certificat', 'mutation', 'demission', 'rh'])) {
-            return 'Ressources Humaines';
+        return $bestScore > 0 ? $bestCategory : '';
+    }
+
+    /**
+     * @param array<string, array<int, string>> $categoryTypes
+     * @return array<string, int>
+     */
+    private function scoreCategoryCandidates(string $text, array $categoryTypes): array
+    {
+        $weights = [
+            'Ressources Humaines' => [
+                'conge' => 3,
+                'attestation' => 3,
+                'certificat' => 3,
+                'mutation' => 3,
+                'demission' => 3,
+                'rh' => 2,
+                'ressources humaines' => 3,
+            ],
+            'Administrative' => [
+                'avance sur salaire' => 4,
+                'salaire' => 3,
+                'remboursement' => 3,
+                'facture' => 2,
+                'montant' => 2,
+                'badge' => 2,
+                'carte de visite' => 2,
+                'materiel de bureau' => 2,
+            ],
+            'Informatique' => [
+                'informatique' => 3,
+                'acces systeme' => 4,
+                'acces application' => 3,
+                'compte' => 2,
+                'logiciel' => 3,
+                'bug' => 3,
+                'panne' => 3,
+                'ordinateur' => 2,
+                'reseau' => 2,
+                'wifi' => 2,
+                'email' => 2,
+                'imprimante' => 2,
+            ],
+            'Formation' => [
+                'formation' => 3,
+                'certification' => 3,
+                'cours' => 2,
+                'training' => 2,
+                'examen' => 2,
+                'ui ux' => 2,
+                'java' => 2,
+            ],
+            'Organisation du travail' => [
+                'teletravail' => 4,
+                'travail a distance' => 3,
+                'changement horaires' => 3,
+                'horaire' => 2,
+                'heures supplementaires' => 4,
+                'heure sup' => 3,
+                'overtime' => 3,
+            ],
+        ];
+
+        $scores = [];
+        foreach ($weights as $category => $keywords) {
+            if ([] !== $categoryTypes && !isset($categoryTypes[$category])) {
+                continue;
+            }
+
+            $scores[$category] = 0;
+            foreach ($keywords as $keyword => $weight) {
+                if ($this->containsWord($text, $keyword) || $this->containsFragment($text, $keyword)) {
+                    $scores[$category] += (int) $weight;
+                }
+            }
         }
 
-        if ($this->containsAny($text, ['ordinateur', 'pc', 'laptop', 'logiciel', 'systeme', 'reseau', 'email', 'bug', 'informatique', 'acces'])) {
-            return 'Informatique';
-        }
-
-        if ($this->containsAnyWord($text, ['formation', 'certification', 'cours', 'training'])) {
-            return 'Formation';
-        }
-
-        if ($this->containsAny($text, ['teletravail', 'horaire', 'heures supplementaires', 'organisation'])) {
-            return 'Organisation du travail';
-        }
-
-        return '';
+        return $scores;
     }
 
     private function containsAny(string $text, array $keywords): bool
@@ -1661,8 +2529,9 @@ class DemandeAiAssistant
     {
         $correctedText = trim((string) ($parsed['correctedText'] ?? ''));
         if ('' === $correctedText) {
-            $correctedText = preg_replace('/\s+/', ' ', $rawText) ?? $rawText;
-            $correctedText = trim($correctedText);
+            $correctedText = $this->autoCorrectSuggestionText($rawText);
+        } else {
+            $correctedText = $this->autoCorrectSuggestionText($correctedText);
         }
 
         $categorie = trim((string) ($parsed['categorie'] ?? ''));
@@ -1731,8 +2600,13 @@ class DemandeAiAssistant
             $description = $correctedText;
         }
 
-        if ($confidence < 0 || $confidence > 1) {
-            $confidence = 0.0;
+        if ($confidence <= 0 || $confidence > 1) {
+            $confidence = $this->estimateClassificationConfidence($correctedText, $categorie, $typeDemande, $categoryTypes);
+        } elseif ($confidence < 0.2) {
+            $confidence = max(
+                $confidence,
+                $this->estimateClassificationConfidence($correctedText, $categorie, $typeDemande, $categoryTypes) * 0.85
+            );
         }
 
         return [
@@ -1746,47 +2620,110 @@ class DemandeAiAssistant
         ];
     }
 
+    private function autoCorrectSuggestionText(string $text): string
+    {
+        $clean = trim((string) (preg_replace('/\s+/u', ' ', str_replace([',', ';'], ' ', $text)) ?? $text));
+        if ('' === $clean) {
+            return '';
+        }
+
+        $normalized = mb_strtolower($clean, 'UTF-8');
+
+        $directReplacements = [
+            '/\b(?:bjr|slt|salu+t?)\b/u' => 'bonjour',
+            '/\b(?:jvux|jveux|j veu|j veu[x]?|jvx|j vu[x]?)\b/u' => 'je veux',
+            '/\b(?:dqnde|deqnde|demde|dmande|demnde)\b/u' => 'demande',
+            '/\b(?:conhe|conh[eé]|conje|congee|congéé|congee)\b/u' => 'conge',
+            '/\b(?:qnnuel|qnuel|anuel)\b/u' => 'annuel',
+            '/\b(?:tele travail|télé travail)\b/u' => 'teletravail',
+            '/\b(?:remboursemnt|remboursemnt)\b/u' => 'remboursement',
+            '/\b(?:acces syteme|acces system|acess systeme)\b/u' => 'acces systeme',
+        ];
+
+        foreach ($directReplacements as $pattern => $replacement) {
+            $normalized = preg_replace($pattern, $replacement, $normalized) ?? $normalized;
+        }
+
+        $knownTerms = [
+            'bonjour', 'demande', 'conge', 'annuel', 'maladie', 'sans', 'solde', 'attestation', 'certificat', 'mutation', 'demission',
+            'avance', 'salaire', 'remboursement', 'materiel', 'bureau', 'badge', 'acces', 'carte', 'visite',
+            'informatique', 'logiciel', 'probleme', 'technique', 'formation', 'interne', 'externe', 'certification',
+            'teletravail', 'horaire', 'heures', 'supplementaires', 'parking', 'stationnement', 'transport', 'deplacement',
+        ];
+
+        $knownMap = [];
+        foreach ($knownTerms as $term) {
+            $knownMap[$this->normalizeForSearch($term)] = $term;
+        }
+
+        $parts = preg_split('/(\s+)/u', $normalized, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if (!is_array($parts)) {
+            $parts = [$normalized];
+        }
+
+        foreach ($parts as $idx => $part) {
+            if ($part === '' || preg_match('/^\s+$/u', $part) === 1) {
+                continue;
+            }
+
+            $token = trim($part);
+            $normalizedToken = $this->normalizeForSearch($token);
+            if (strlen($normalizedToken) < 4 || isset($knownMap[$normalizedToken])) {
+                continue;
+            }
+
+            $best = '';
+            $bestDistance = PHP_INT_MAX;
+
+            foreach ($knownMap as $normalizedKnown => $knownOriginal) {
+                if (abs(strlen($normalizedKnown) - strlen($normalizedToken)) > 2) {
+                    continue;
+                }
+
+                $distance = levenshtein($normalizedToken, $normalizedKnown);
+                $threshold = max(1, (int) floor(strlen($normalizedKnown) / 4));
+                if ($distance <= $threshold && $distance < $bestDistance) {
+                    $bestDistance = $distance;
+                    $best = $knownOriginal;
+                }
+            }
+
+            if ('' !== $best) {
+                $parts[$idx] = $best;
+            }
+        }
+
+        $corrected = trim((string) (preg_replace('/\s+/u', ' ', implode('', $parts)) ?? implode('', $parts)));
+
+        // Keep phrase-level readability after token correction.
+        $corrected = preg_replace('/\bje\s+veux\s+un\s+de\b/u', 'je veux une', $corrected) ?? $corrected;
+
+        return $corrected;
+    }
+
     /**
      * @param array<string, array<int, string>> $categoryTypes
      */
     private function inferTypeFromDescription(string $text, string $categorie, array $categoryTypes, bool $allowFallback = true): string
     {
-        $normalized = $text;
-
-        $keywordMap = [
-            'Conge' => ['conge', 'vacance', 'repos', 'absence', 'maladie'],
-            'Attestation de travail' => ['attestation de travail', 'attestation travail'],
-            'Attestation de salaire' => ['attestation de salaire', 'salaire attestation', 'fiche de salaire'],
-            'Certificat de travail' => ['certificat de travail'],
-            'Mutation' => ['mutation', 'changement de departement', 'transfert'],
-            'Demission' => ['demission', 'demissionner', 'depart de l entreprise'],
-            'Avance sur salaire' => ['avance sur salaire', 'avance salaire', 'salaire avance'],
-            'Remboursement' => ['remboursement', 'rembourser', 'frais', 'facture'],
-            'Materiel de bureau' => ['stylo', 'papier', 'fourniture', 'materiel de bureau', 'mobilier'],
-            'Badge acces' => ['badge', 'acces badge', 'badge perdu'],
-            'Carte de visite' => ['carte de visite', 'business card'],
-            'Materiel informatique' => ['ordinateur', 'pc', 'laptop', 'ecran', 'clavier', 'souris', 'webcam', 'casque'],
-            'Acces systeme' => ['acces systeme', 'acces application', 'compte', 'permission', 'salesforce', 'erp', 'crm'],
-            'Logiciel' => ['logiciel', 'licence', 'software', 'application a installer'],
-            'Probleme technique' => ['bug', 'probleme', 'panne', 'imprimante', 'wifi', 'reseau', 'email'],
-            'Formation interne' => ['formation interne'],
-            'Formation externe' => ['formation externe', 'formation'],
-            'Certification' => ['certification', 'certif', 'examen'],
-            'Teletravail' => ['teletravail', 'travail a distance', 'remote'],
-            'Changement horaires' => ['horaire', 'changement d horaire', 'emploi du temps'],
-            'Heures supplementaires' => ['heures supplementaires', 'heure sup', 'overtime'],
-            'Autre' => ['autre'],
-        ];
-
         $availableTypes = $categoryTypes[$categorie] ?? [];
-        foreach ($availableTypes as $type) {
-            $keywords = $keywordMap[$type] ?? [];
-            foreach ($keywords as $keyword) {
-                $isExactSensitiveKeyword = in_array($keyword, ['formation'], true);
-                if (($isExactSensitiveKeyword && $this->containsWord($normalized, $keyword)) || (!$isExactSensitiveKeyword && $this->containsFragment($normalized, $keyword))) {
-                    return $type;
-                }
+        $scores = $this->scoreTypeCandidates($text, $categorie, $categoryTypes);
+
+        $bestType = '';
+        $bestScore = 0;
+        foreach ($scores as $type => $score) {
+            if ('Autre' === $type) {
+                continue;
             }
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestType = (string) $type;
+            }
+        }
+
+        if ('' !== $bestType && $bestScore > 0 && in_array($bestType, $availableTypes, true)) {
+            return $bestType;
         }
 
         if (!$allowFallback) {
@@ -1802,21 +2739,132 @@ class DemandeAiAssistant
 
     /**
      * @param array<string, array<int, string>> $categoryTypes
+     * @return array<string, int>
+     */
+    private function scoreTypeCandidates(string $text, string $categorie, array $categoryTypes): array
+    {
+        $availableTypes = $categoryTypes[$categorie] ?? [];
+        $keywordMap = $this->getTypeKeywordMap();
+        $scores = [];
+
+        foreach ($availableTypes as $type) {
+            $typeLabel = (string) $type;
+            $scores[$typeLabel] = 0;
+
+            $normalizedType = $this->normalizeForSearch($typeLabel);
+            if ('' !== $normalizedType && $this->containsFragment($text, $normalizedType)) {
+                $scores[$typeLabel] += 6;
+            }
+
+            $tokens = preg_split('/\s+/', $normalizedType) ?: [];
+            foreach ($tokens as $token) {
+                $token = trim((string) $token);
+                if (strlen($token) < 3 || in_array($token, ['de', 'du', 'des', 'sur'], true)) {
+                    continue;
+                }
+
+                if ($this->containsWord($text, $token)) {
+                    $scores[$typeLabel] += 1;
+                }
+            }
+
+            $keywords = $keywordMap[$typeLabel] ?? [];
+            foreach ($keywords as $keyword => $weight) {
+                if ($this->containsWord($text, (string) $keyword) || $this->containsFragment($text, (string) $keyword)) {
+                    $scores[$typeLabel] += (int) $weight;
+                }
+            }
+        }
+
+        return $scores;
+    }
+
+    /**
+     * @return array<string, array<string, int>>
+     */
+    private function getTypeKeywordMap(): array
+    {
+        return [
+            'Conge' => ['conge' => 3, 'vacance' => 2, 'repos' => 2, 'absence' => 2, 'maladie' => 2],
+            'Attestation de travail' => ['attestation de travail' => 4, 'attestation travail' => 3],
+            'Attestation de salaire' => ['attestation de salaire' => 4, 'fiche de salaire' => 3, 'salaire' => 2],
+            'Certificat de travail' => ['certificat de travail' => 4],
+            'Mutation' => ['mutation' => 4, 'changement de departement' => 3, 'transfert' => 3],
+            'Demission' => ['demission' => 4, 'demissionner' => 3, 'depart de l entreprise' => 3],
+            'Avance sur salaire' => ['avance sur salaire' => 5, 'avance salaire' => 4, 'salaire avance' => 3],
+            'Remboursement' => ['remboursement' => 4, 'rembourser' => 3, 'frais' => 2, 'facture' => 2],
+            'Materiel de bureau' => ['materiel de bureau' => 4, 'fourniture' => 3, 'stylo' => 2, 'papier' => 2, 'mobilier' => 2],
+            'Badge acces' => ['badge' => 4, 'badge perdu' => 4, 'acces badge' => 3],
+            'Carte de visite' => ['carte de visite' => 4, 'business card' => 3],
+            'Materiel informatique' => ['materiel informatique' => 4, 'ordinateur' => 3, 'pc' => 2, 'laptop' => 2, 'ecran' => 2, 'clavier' => 2, 'souris' => 2],
+            'Acces systeme' => ['acces systeme' => 5, 'acces application' => 4, 'permission' => 3, 'compte' => 2, 'erp' => 2, 'crm' => 2, 'salesforce' => 3],
+            'Logiciel' => ['logiciel' => 4, 'licence' => 3, 'software' => 3, 'installer' => 2],
+            'Probleme technique' => ['probleme technique' => 5, 'bug' => 4, 'panne' => 4, 'imprimante' => 3, 'wifi' => 3, 'reseau' => 3, 'email' => 2],
+            'Formation interne' => ['formation interne' => 5, 'interne' => 2],
+            'Formation externe' => ['formation externe' => 5, 'formation' => 2, 'cours' => 2, 'training' => 2],
+            'Certification' => ['certification' => 5, 'certif' => 4, 'examen' => 3],
+            'Teletravail' => ['teletravail' => 5, 'travail a distance' => 4, 'remote' => 3],
+            'Changement horaires' => ['changement horaires' => 5, 'horaire' => 3, 'emploi du temps' => 2],
+            'Heures supplementaires' => ['heures supplementaires' => 5, 'heure sup' => 4, 'overtime' => 3],
+            'Autre' => ['autre' => 1],
+        ];
+    }
+
+    /**
+     * @param array<string, array<int, string>> $categoryTypes
      * @return array{categorie:string,typeDemande:string}|null
      */
     private function findExplicitTypeMatch(string $text, array $categoryTypes): ?array
     {
+        $bestCategory = '';
+        $bestType = '';
+        $bestScore = 0;
+
         foreach ($categoryTypes as $category => $types) {
-            $matchedType = $this->inferTypeFromDescription($text, (string) $category, $categoryTypes, false);
-            if ('' !== $matchedType && 'Autre' !== $matchedType && in_array($matchedType, $types, true)) {
-                return [
-                    'categorie' => (string) $category,
-                    'typeDemande' => (string) $matchedType,
-                ];
+            $scores = $this->scoreTypeCandidates($text, (string) $category, $categoryTypes);
+            foreach ($scores as $type => $score) {
+                if ('Autre' === $type || !in_array($type, $types, true)) {
+                    continue;
+                }
+
+                if ($score > $bestScore) {
+                    $bestScore = (int) $score;
+                    $bestCategory = (string) $category;
+                    $bestType = (string) $type;
+                }
             }
         }
 
+        if ($bestScore >= 3 && '' !== $bestCategory && '' !== $bestType) {
+            return [
+                'categorie' => $bestCategory,
+                'typeDemande' => $bestType,
+            ];
+        }
+
         return null;
+    }
+
+    /**
+     * @param array<string, array<int, string>> $categoryTypes
+     */
+    private function estimateClassificationConfidence(string $text, string $categorie, string $typeDemande, array $categoryTypes): float
+    {
+        $categoryScores = $this->scoreCategoryCandidates($text, $categoryTypes);
+        $categoryScore = (int) ($categoryScores[$categorie] ?? 0);
+
+        $typeScores = $this->scoreTypeCandidates($text, $categorie, $categoryTypes);
+        $typeScore = (int) ($typeScores[$typeDemande] ?? 0);
+
+        $categoryStrength = min(1.0, $categoryScore / 8);
+        $typeStrength = min(1.0, $typeScore / 10);
+        $confidence = 0.30 + (0.30 * $categoryStrength) + (0.40 * $typeStrength);
+
+        if ('Autre' === $typeDemande) {
+            $confidence = min($confidence, 0.62);
+        }
+
+        return max(0.18, min(0.95, $confidence));
     }
 
     /**
@@ -2166,11 +3214,178 @@ class DemandeAiAssistant
 
     private function extractTrainingName(string $text): string
     {
-        if (preg_match('/(?:formation|certification)\s*[:\-]?\s*([A-Za-z0-9À-ÿ\'\-\s]{3,80})/iu', $text, $matches) === 1) {
-            return trim((string) ($matches[1] ?? ''));
+        $knownTopic = $this->extractKnownFormationKeywordTopic($text);
+        if ('' !== $knownTopic) {
+            return $knownTopic;
+        }
+
+        $patterns = [
+            "/(?:nom(?:\\s+de)?\\s+la\\s+formation|intitule\\s+de\\s+formation|formation\\s+intitulee|formation\\s+intitulée|nom\\s+formation)\\s*[:\\-]?\\s*([A-Za-z0-9À-ÿ\\/+().'’\\-\\s]{2,120}?)(?=\\s+(?:pour|de|du|des|d['’]|vers|dans|sur|en|avec|car|afin|transport|deplacement|déplacement|bonjour|salut|slt|je\\b|j\\b|nous\\b|on\\b|type\\b|lieu\\b|date\\b)|[\\.,;:\"'»”]|$)/iu",
+            "/(?:formation|certification)\\s*(?:en|sur|de|d['’])?\\s*([A-Za-z0-9À-ÿ\\/+().'’\\-\\s]{2,120}?)(?=\\s+(?:pour|de|du|des|d['’]|vers|dans|sur|en|avec|car|afin|transport|deplacement|déplacement|bonjour|salut|slt|je\\b|j\\b|nous\\b|on\\b|type\\b|lieu\\b|date\\b)|[\\.,;:\"'»”]|$)/iu",
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $text, $matches) !== 1) {
+                continue;
+            }
+
+            $candidate = $this->cleanupTrainingNameCandidate((string) ($matches[1] ?? ''));
+            if ('' !== $candidate) {
+                return $candidate;
+            }
         }
 
         return '';
+    }
+
+    private function extractKnownFormationKeywordTopic(string $text): string
+    {
+        $normalized = $this->normalizeForSearch($text);
+        if ('' === $normalized) {
+            return '';
+        }
+
+        $topicMap = $this->loadFormationKeywordTopicMap();
+        if ([] === $topicMap) {
+            return '';
+        }
+
+        $bestLabel = '';
+        $bestScore = 0;
+
+        foreach ($topicMap as $label => $keywords) {
+            $score = 0;
+            foreach ($keywords as $keyword) {
+                $candidate = trim((string) $keyword);
+                if ('' === $candidate) {
+                    continue;
+                }
+
+                $normalizedKeyword = $this->normalizeForSearch($candidate);
+                if ('' === $normalizedKeyword) {
+                    continue;
+                }
+
+                // Only allow exact word matching for short terms to avoid noisy false positives.
+                if ($this->containsWord($normalized, $normalizedKeyword)) {
+                    $score += strlen($normalizedKeyword) >= 8 ? 2 : 1;
+                    continue;
+                }
+
+                // Fragment matching is restricted to longer keywords/phrases.
+                if (strlen($normalizedKeyword) >= 6 && str_contains($normalized, $normalizedKeyword)) {
+                    $score += 1;
+                }
+            }
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestLabel = (string) $label;
+            }
+        }
+
+        return $bestScore > 0 ? $bestLabel : '';
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function loadFormationKeywordTopicMap(): array
+    {
+        $path = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'ai' . DIRECTORY_SEPARATOR . 'formation_keywords.json';
+        if (!is_file($path)) {
+            return $this->getDefaultFormationKeywordTopicMap();
+        }
+
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || '' === trim($raw)) {
+            return $this->getDefaultFormationKeywordTopicMap();
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return $this->getDefaultFormationKeywordTopicMap();
+        }
+
+        $normalizedMap = [];
+        foreach ($decoded as $topic => $keywords) {
+            $label = trim((string) $topic);
+            if ('' === $label || !is_array($keywords)) {
+                continue;
+            }
+
+            $cleanKeywords = [];
+            foreach ($keywords as $keyword) {
+                $value = trim((string) $keyword);
+                if ('' === $value) {
+                    continue;
+                }
+
+                $cleanKeywords[] = $value;
+                if (count($cleanKeywords) >= 40) {
+                    break;
+                }
+            }
+
+            if ([] !== $cleanKeywords) {
+                $normalizedMap[$label] = $cleanKeywords;
+            }
+        }
+
+        return [] !== $normalizedMap ? $normalizedMap : $this->getDefaultFormationKeywordTopicMap();
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function getDefaultFormationKeywordTopicMap(): array
+    {
+        return [
+            'UI/UX' => ['ui ux', 'ux ui', 'design ui', 'design ux', 'user experience', 'experience utilisateur'],
+            'Developpement Web' => ['dev web', 'developpement web', 'frontend', 'backend', 'full stack'],
+            'Developpement Python' => ['python', 'django', 'flask', 'fastapi'],
+            'Developpement Java' => ['java', 'spring', 'spring boot'],
+            'DevOps' => ['devops', 'docker', 'kubernetes', 'ci cd', 'jenkins'],
+            'Data Science' => ['data science', 'machine learning', 'deep learning', 'intelligence artificielle', 'ai'],
+            'Marketing Digital' => ['marketing', 'marketing digital', 'seo', 'sea', 'social media'],
+            'Ressources Humaines' => ['rh', 'ressources humaines', 'gestion rh', 'paie'],
+            'Gestion de Projet' => ['gestion de projet', 'project management', 'scrum', 'agile', 'kanban'],
+            'Salesforce' => ['salesforce', 'crm salesforce'],
+            'Excel Avance' => ['excel', 'excel avance', 'tableau croise dynamique', 'vba'],
+            'Cybersecurite' => ['cybersecurite', 'securite informatique', 'security', 'pentest'],
+            'Certification' => ['certification', 'certif', 'iso 27001', 'pmp', 'itil', 'aws certified'],
+        ];
+    }
+
+    private function cleanupTrainingNameCandidate(string $value): string
+    {
+        $clean = trim($value);
+        $clean = preg_replace('/[\.,;:]+$/', '', $clean) ?? $clean;
+        $clean = preg_replace('/\b(?:je\s+reste\s+disponible|je\s+vous\s+remercie|merci|cordialement|avance\s+pour\s+votre\s+retour)\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\b(?:bonjour|salut|slt|je\s+veux|je\s+souhaite|je\s+demande)\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\b(?:transport|moyen\s+de\s+transport|deplacement|déplacement)\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\b(?:pour|vers|de|du|des|d[\'’]|a|à|afin|car|avec)\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/^(?:une|un|la|le|l[\'’])\s+/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/^(?:formation|certification)\s+/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s+/', ' ', $clean) ?? $clean;
+        $clean = trim($clean);
+
+        if ('' === $clean || $this->isLikelyLocationCandidate($clean)) {
+            return '';
+        }
+
+        if (preg_match('/^(?:de|du|des|d[\'’])\s+[A-Za-zÀ-ÿ\'’\- ]{1,80}\s+vers\s+[A-Za-zÀ-ÿ\'’\- ]{1,80}$/iu', $clean) === 1) {
+            return '';
+        }
+
+        $clean = preg_replace('/\s+(?:de|du|des|d[\'’])\s+[A-Za-zÀ-ÿ\'’\- ]{1,80}\s+vers\s+[A-Za-zÀ-ÿ\'’\- ]{1,80}\b.*$/iu', '', $clean) ?? $clean;
+        $clean = trim($clean);
+
+        if (strlen($clean) < 3) {
+            return '';
+        }
+
+        return substr($clean, 0, 120);
     }
 
     private function extractOrganization(string $text): string

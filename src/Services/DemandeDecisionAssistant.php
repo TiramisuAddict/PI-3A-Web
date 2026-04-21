@@ -4,10 +4,20 @@ namespace App\Services;
 
 use App\Entity\Demande;
 use App\Repository\DemandeRepository;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Process\Process;
 
 class DemandeDecisionAssistant
 {
-    public function __construct(private readonly DemandeRepository $demandeRepository)
+    public function __construct(
+        private readonly DemandeRepository $demandeRepository,
+        private readonly LoggerInterface $logger,
+        private readonly string $apiKey = '',
+        private readonly string $model = '',
+        private readonly int $timeoutSeconds = 20,
+        private readonly string $pythonExecutable = 'python',
+        private readonly string $pythonScriptPath = ''
+    )
     {
     }
 
@@ -206,6 +216,17 @@ class DemandeDecisionAssistant
             }
         }
 
+        $mlSignals = $this->fetchDecisionModelSignals($demande, $details, $fieldDefinitions);
+        if (null !== $mlSignals) {
+            // Keep legacy rule-based behavior as primary and blend in ML signals lightly.
+            $confidence = round(($confidence * 0.85) + ($mlSignals['confidence'] * 0.15), 2);
+            $spamScore = (int) round(min(100, max(0, ($spamScore * 0.85) + ($mlSignals['spamScore'] * 0.15))));
+
+            if ('' !== $mlSignals['note']) {
+                $warnings[] = 'Signal ML: ' . $mlSignals['note'];
+            }
+        }
+
         $spamLevel = $this->getSpamLevel($spamScore);
 
         return [
@@ -220,6 +241,7 @@ class DemandeDecisionAssistant
             'warnings' => array_values(array_unique($warnings)),
             'summary' => $this->buildSummary($recommendedStatus, $missingRequired, $weakRequired, $warnings),
             'repeatTypePenalty' => $repeatPenalty,
+            'mlSignals' => $mlSignals,
         ];
     }
 
@@ -279,6 +301,132 @@ class DemandeDecisionAssistant
             'confidencePenalty' => round($confidencePenalty, 2),
             'spamPenalty' => $spamPenalty,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @param array<int, array<string, mixed>> $fieldDefinitions
+     * @return array{confidence:float,spamScore:int,risk:string,note:string}|null
+     */
+    private function fetchDecisionModelSignals(Demande $demande, array $details, array $fieldDefinitions): ?array
+    {
+        if ('' === trim($this->pythonScriptPath) || !is_file($this->pythonScriptPath)) {
+            return null;
+        }
+
+        $payload = [
+            'demande' => [
+                'id' => $demande->getIdDemande(),
+                'categorie' => (string) $demande->getCategorie(),
+                'typeDemande' => (string) $demande->getTypeDemande(),
+                'titre' => (string) $demande->getTitre(),
+                'description' => (string) $demande->getDescription(),
+                'priorite' => (string) $demande->getPriorite(),
+                'status' => (string) $demande->getStatus(),
+                'dateCreation' => $demande->getDateCreation()?->format('Y-m-d'),
+            ],
+            'details' => $details,
+            'fieldDefinitions' => $fieldDefinitions,
+            'trainingSamples' => $this->fetchDecisionTrainingSamples(),
+        ];
+
+        $lastError = '';
+        foreach ($this->getPythonCommandCandidates() as $commandPrefix) {
+            try {
+                $process = new Process(array_merge($commandPrefix, [$this->pythonScriptPath]));
+                $process->setInput((string) json_encode($payload, JSON_UNESCAPED_UNICODE));
+                $process->setTimeout($this->timeoutSeconds + 5);
+                $process->run();
+
+                if (!$process->isSuccessful()) {
+                    $lastError = trim($process->getErrorOutput() ?: $process->getOutput());
+                    continue;
+                }
+
+                $decoded = json_decode(trim($process->getOutput()), true);
+                if (!is_array($decoded) || !($decoded['ok'] ?? false)) {
+                    $lastError = 'Decision ML Python runner returned invalid payload.';
+                    continue;
+                }
+
+                $signals = $decoded['signals'] ?? null;
+                if (!is_array($signals)) {
+                    $lastError = 'Decision ML Python runner returned missing signals.';
+                    continue;
+                }
+
+                $confidence = (float) ($signals['confidence'] ?? 0);
+                $spamScore = (int) ($signals['spamScore'] ?? 0);
+                $risk = trim((string) ($signals['risk'] ?? ''));
+                $note = trim((string) ($signals['note'] ?? ''));
+
+                return [
+                    'confidence' => max(0.0, min(1.0, $confidence)),
+                    'spamScore' => max(0, min(100, $spamScore)),
+                    'risk' => $risk,
+                    'note' => $note,
+                ];
+            } catch (\Throwable $e) {
+                $lastError = $e->getMessage();
+            }
+        }
+
+        $this->logger->warning('Decision ML Python runner unavailable.', [
+            'commands' => array_map(static fn(array $cmd): string => implode(' ', $cmd), $this->getPythonCommandCandidates()),
+            'error' => $lastError,
+        ]);
+
+        return null;
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    private function fetchDecisionTrainingSamples(): array
+    {
+        try {
+            return $this->demandeRepository->fetchDecisionTrainingSamples(1800);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Decision ML training samples unavailable.', ['exception' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    private function getPythonCommandCandidates(): array
+    {
+        $candidates = [];
+        $configured = trim($this->pythonExecutable);
+
+        if ('' !== $configured) {
+            $candidates[] = [$configured];
+        }
+
+        if ('\\' === DIRECTORY_SEPARATOR) {
+            $candidates[] = ['py', '-3'];
+            $candidates[] = ['py'];
+            $candidates[] = ['python3'];
+            $candidates[] = ['python'];
+        } else {
+            $candidates[] = ['python3'];
+            $candidates[] = ['python'];
+        }
+
+        $unique = [];
+        $seen = [];
+        foreach ($candidates as $candidate) {
+            $key = implode("\0", $candidate);
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $unique[] = $candidate;
+        }
+
+        return $unique;
     }
 
     /**

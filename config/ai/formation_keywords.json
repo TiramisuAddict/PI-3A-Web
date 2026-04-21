@@ -1,0 +1,85 @@
+{
+  "UI/UX": [
+    "ui ux",
+    "ux ui",
+    "design ui",
+    "design ux",
+    "user experience",
+    "experience utilisateur"
+  ],
+  "Developpement Web": [
+    "dev web",
+    "developpement web",
+    "frontend",
+    "backend",
+    "full stack"
+  ],
+  "Developpement Python": [
+    "python",
+    "django",
+    "flask",
+    "fastapi"
+  ],
+  "Developpement Java": [
+    "java",
+    "spring",
+    "spring boot"
+  ],
+  "DevOps": [
+    "devops",
+    "docker",
+    "kubernetes",
+    "ci cd",
+    "jenkins"
+  ],
+  "Data Science": [
+    "data science",
+    "machine learning",
+    "deep learning",
+    "intelligence artificielle"
+  ],
+  "Marketing Digital": [
+    "marketing",
+    "marketing digital",
+    "seo",
+    "sea",
+    "social media"
+  ],
+  "Ressources Humaines": [
+    "rh",
+    "ressources humaines",
+    "gestion rh",
+    "paie"
+  ],
+  "Gestion de Projet": [
+    "gestion de projet",
+    "project management",
+    "scrum",
+    "agile",
+    "kanban"
+  ],
+  "Salesforce": [
+    "salesforce",
+    "crm salesforce"
+  ],
+  "Excel Avance": [
+    "excel",
+    "excel avance",
+    "tableau croise dynamique",
+    "vba"
+  ],
+  "Cybersecurite": [
+    "cybersecurite",
+    "securite informatique",
+    "security",
+    "pentest"
+  ],
+  "Certification": [
+    "certification",
+    "certif",
+    "iso 27001",
+    "pmp",
+    "itil",
+    "aws certified"
+  ]
+}

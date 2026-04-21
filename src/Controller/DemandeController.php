@@ -9,6 +9,7 @@ use App\Entity\HistoriqueDemande;
 use App\Form\DemandeType;
 use App\Repository\DemandeRepository;
 use App\Services\DemandeMailer;
+use App\Services\DemandeAiAssistant;
 use App\Services\DemandeDecisionAssistant;
 use App\Services\DemandeFormHelper;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,19 +28,22 @@ class DemandeController extends AbstractController
     private DemandeRepository $demandeRepository;
     private DemandeMailer $demandeMailer;
     private DemandeDecisionAssistant $demandeDecisionAssistant;
+    private DemandeAiAssistant $demandeAiAssistant;
 
     public function __construct(
         DemandeFormHelper $formHelper,
         EntityManagerInterface $em,
         DemandeRepository $demandeRepository,
         DemandeMailer $demandeMailer,
-        DemandeDecisionAssistant $demandeDecisionAssistant
+        DemandeDecisionAssistant $demandeDecisionAssistant,
+        DemandeAiAssistant $demandeAiAssistant
     ) {
         $this->formHelper = $formHelper;
         $this->em = $em;
         $this->demandeRepository = $demandeRepository;
         $this->demandeMailer = $demandeMailer;
         $this->demandeDecisionAssistant = $demandeDecisionAssistant;
+        $this->demandeAiAssistant = $demandeAiAssistant;
     }
 
     #[Route('/demande', name: 'demande_index', methods: ['GET'])]
@@ -190,6 +194,16 @@ class DemandeController extends AbstractController
                     $historique->setDateAction(new \DateTime());
                     $this->em->persist($historique);
                     $this->em->flush();
+
+                    if ($aiGenerated && $aiConfirmed) {
+                        $this->demandeAiAssistant->recordAcceptedDescriptionFeedback(
+                            (string) ($demande->getTitre() ?? ''),
+                            (string) ($demande->getDescription() ?? ''),
+                            $demande->getTypeDemande(),
+                            $demande->getCategorie(),
+                            $employe->getId_employe()
+                        );
+                    }
 
                     $this->demandeMailer->notifyManagersDemandeCreated($demande);
 
