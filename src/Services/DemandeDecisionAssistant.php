@@ -342,7 +342,11 @@ class DemandeDecisionAssistant
         foreach ($this->getPythonCommandCandidates() as $commandPrefix) {
             try {
                 $process = new Process(array_merge($commandPrefix, [$this->pythonScriptPath]));
-                $process->setInput((string) json_encode($payload, JSON_UNESCAPED_UNICODE));
+                $encodedPayload = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                if (false === $encodedPayload) {
+                    throw new \RuntimeException('Unable to encode JSON payload for Python decision runner.');
+                }
+                $process->setInput($encodedPayload);
                 $process->setTimeout($this->timeoutSeconds + 5);
                 $process->run();
 
@@ -412,6 +416,10 @@ class DemandeDecisionAssistant
             $candidates[] = [$configured];
         }
 
+        foreach ($this->getLocalProjectPythonExecutables() as $pythonPath) {
+            $candidates[] = [$pythonPath];
+        }
+
         if ('\\' === DIRECTORY_SEPARATOR) {
             $candidates[] = ['py', '-3'];
             $candidates[] = ['py'];
@@ -435,6 +443,27 @@ class DemandeDecisionAssistant
         }
 
         return $unique;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function getLocalProjectPythonExecutables(): array
+    {
+        $root = dirname(__DIR__, 2);
+        $candidates = [];
+
+        if ('\\' === DIRECTORY_SEPARATOR) {
+            $candidates[] = $root . DIRECTORY_SEPARATOR . '.venv' . DIRECTORY_SEPARATOR . 'Scripts' . DIRECTORY_SEPARATOR . 'python.exe';
+            $candidates[] = $root . DIRECTORY_SEPARATOR . 'venv' . DIRECTORY_SEPARATOR . 'Scripts' . DIRECTORY_SEPARATOR . 'python.exe';
+        } else {
+            $candidates[] = $root . DIRECTORY_SEPARATOR . '.venv' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python3';
+            $candidates[] = $root . DIRECTORY_SEPARATOR . '.venv' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python';
+            $candidates[] = $root . DIRECTORY_SEPARATOR . 'venv' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python3';
+            $candidates[] = $root . DIRECTORY_SEPARATOR . 'venv' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python';
+        }
+
+        return array_values(array_filter(array_unique($candidates), static fn (string $path): bool => is_file($path)));
     }
 
     /**

@@ -142,8 +142,14 @@ class DemandeApiController extends AbstractController
             return new JsonResponse(['success' => false, 'message' => 'Payload JSON invalide.'], 400);
         }
 
+        error_log('AUTRE BODY: ' . (json_encode($payload, JSON_UNESCAPED_UNICODE) ?: '{}'));
+
         $general = is_array($payload['general'] ?? null) ? $payload['general'] : [];
         $details = is_array($payload['details'] ?? null) ? $payload['details'] : [];
+        $userPromptAutre = trim((string) ($payload['userPromptAutre'] ?? ''));
+        if ('' !== $userPromptAutre) {
+            $general['aiDescriptionPrompt'] = $userPromptAutre;
+        }
 
         $typeDemande = (string) ($general['typeDemande'] ?? '');
         if ('Autre' !== $typeDemande) {

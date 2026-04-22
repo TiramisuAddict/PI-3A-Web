@@ -244,6 +244,101 @@ class DemandeRepository extends ServiceEntityRepository
         return $samples;
     }
 
+    /**
+     * @return array<int, array{prompt:string,general:array<string,mixed>,details:array<string,mixed>,fieldPlan:array<string,mixed>}>
+     */
+    public function fetchAutreFeedbackSamplesFromDatabase(int $limit = 800): array
+    {
+        $rows = $this->createQueryBuilder('d')
+            ->select('d.titre AS titre, d.description AS description, d.priorite AS priorite, d.categorie AS categorie, d.type_demande AS typeDemande, d.date_creation AS createdAt, dd.details AS detailsJson')
+            ->leftJoin('d.demandeDetails', 'dd')
+            ->andWhere('d.type_demande = :typeDemande')
+            ->setParameter('typeDemande', 'Autre')
+            ->orderBy('d.date_creation', 'DESC')
+            ->setMaxResults(max(100, $limit))
+            ->getQuery()
+            ->getArrayResult();
+
+        $samples = [];
+        foreach ($rows as $row) {
+            $detailsRaw = $row['detailsJson'] ?? null;
+            $details = [];
+            if (is_string($detailsRaw) && '' !== trim($detailsRaw)) {
+                $decoded = json_decode($detailsRaw, true);
+                if (is_array($decoded)) {
+                    $details = $decoded;
+                }
+            } elseif (is_array($detailsRaw)) {
+                $details = $detailsRaw;
+            }
+
+            $description = trim((string) ($row['description'] ?? ''));
+            $prompt = trim((string) ($details['descriptionBesoin'] ?? ''));
+            if ('' === $prompt) {
+                $prompt = $description;
+            }
+
+            $general = [
+                'titre' => trim((string) ($row['titre'] ?? '')),
+                'description' => $description,
+                'priorite' => trim((string) ($row['priorite'] ?? '')),
+                'categorie' => trim((string) ($row['categorie'] ?? '')),
+                'typeDemande' => trim((string) ($row['typeDemande'] ?? 'Autre')),
+            ];
+
+            $planAdd = [];
+            foreach ($details as $detailKey => $detailValue) {
+                $key = trim((string) $detailKey);
+                if ('' === $key || 0 !== strpos($key, 'ai_')) {
+                    continue;
+                }
+
+                $value = is_scalar($detailValue) ? trim((string) $detailValue) : '';
+                if ('' === $value) {
+                    continue;
+                }
+
+                $type = 'text';
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 || str_contains($key, 'date')) {
+                    $type = 'date';
+                } elseif (is_numeric($value)) {
+                    $type = 'number';
+                } elseif (mb_strlen($value) > 80 || str_contains($key, 'justification') || str_contains($key, 'description')) {
+                    $type = 'textarea';
+                }
+
+                $label = trim((string) preg_replace('/\s+/', ' ', str_replace('_', ' ', preg_replace('/^ai_/', '', $key) ?? $key)));
+                $label = '' !== $label ? ucfirst($label) : $key;
+
+                $planAdd[] = [
+                    'key' => $key,
+                    'label' => $label,
+                    'type' => $type,
+                    'required' => in_array($key, ['ai_nom_formation', 'ai_lieu_depart_actuel', 'ai_lieu_souhaite'], true),
+                    'value' => $value,
+                ];
+            }
+
+            $hasSignal = '' !== $prompt || [] !== $details || '' !== $general['description'] || '' !== $general['titre'];
+            if (!$hasSignal) {
+                continue;
+            }
+
+            $samples[] = [
+                'prompt' => $prompt,
+                'general' => $general,
+                'details' => is_array($details) ? $details : [],
+                'fieldPlan' => [
+                    'add' => $planAdd,
+                    'remove' => [],
+                    'replaceBase' => false,
+                ],
+            ];
+        }
+
+        return $samples;
+    }
+
     private function isResolvedStatus(string $status): bool
     {
         return in_array($status, self::RESOLVED_STATUS_VARIANTS, true);

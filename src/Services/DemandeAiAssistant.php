@@ -26,6 +26,8 @@ class DemandeAiAssistant
      * @param array<string, mixed> $generalContext
      * @param array<string, mixed> $currentDetails
      * @param array<int, array<string, mixed>> $autreFields
+     * Returns the Autre payload from the local ML model with no PHP post-processing
+     * beyond the minimal response shaping required by the frontend contract.
      * @return array<string, mixed>
      */
     public function generateAutreSuggestions(array $generalContext, array $currentDetails, array $autreFields): array
@@ -66,29 +68,107 @@ class DemandeAiAssistant
         }
 
         $prompt = $this->buildPrompt($generalContext, $currentDetails, $allowedKeys, $requiredKeys, $fieldLabels, $selectOptions);
-        $parsed = [];
+        $parsed = $this->callMlModel($prompt);
+        error_log('ML_RAW: ' . (json_encode($parsed, JSON_UNESCAPED_UNICODE) ?: '{}'));
 
-        try {
-            $rawText = $this->canUsePythonRunner()
-                ? $this->callHuggingFaceViaPython($prompt)
-                : $this->callHuggingFace($prompt);
-            $parsed = $this->parseJsonResponse($rawText);
-        } catch (\RuntimeException $e) {
-            $this->logger->warning('Autre IA: fallback local active (runner indisponible).', [
-                'error' => $e->getMessage(),
-            ]);
+        $generalPayload = isset($parsed['general']) && is_array($parsed['general']) ? $parsed['general'] : [];
+        $detailsPayload = isset($parsed['details']) && is_array($parsed['details']) ? $parsed['details'] : [];
+        $customPayload = isset($parsed['custom_fields']) && is_array($parsed['custom_fields']) ? $parsed['custom_fields'] : [];
+        $removePayload = isset($parsed['remove_fields']) && is_array($parsed['remove_fields']) ? $parsed['remove_fields'] : [];
+        $replaceBase = $this->toBooleanFlag($parsed['replace_base'] ?? false);
+
+        $suggestedDetails = [];
+        foreach ($allowedKeys as $key) {
+            if (isset($detailsPayload[$key]) && is_scalar($detailsPayload[$key])) {
+                $suggestedDetails[$key] = trim((string) $detailsPayload[$key]);
+            }
         }
 
-        $normalized = $this->normalizeSuggestions($parsed, $allowedKeys, $requiredKeys, $selectOptions, $currentDetails, $generalContext);
+        $customFields = [];
+        foreach ($customPayload as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $customFields[] = $field;
+            if (count($customFields) >= 8) {
+                break;
+            }
+        }
+
+        $removeFields = [];
+        foreach ($removePayload as $removeKeyRaw) {
+            $removeKey = trim((string) $removeKeyRaw);
+            if ('' === $removeKey) {
+                continue;
+            }
+
+            $removeFields[] = $removeKey;
+        }
+
+        $correctedText = $this->firstNonEmpty(
+            trim((string) ($parsed['correctedText'] ?? '')),
+            trim((string) ($generalPayload['description'] ?? '')),
+            trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+            trim((string) ($suggestedDetails['descriptionBesoin'] ?? ''))
+        );
+        $correctedText = trim((string) (preg_replace('/\s+/u', ' ', $correctedText) ?? $correctedText));
+
+        $generatedDescription = $this->firstNonEmpty(
+            trim((string) ($suggestedDetails['descriptionBesoin'] ?? '')),
+            trim((string) ($generalPayload['description'] ?? '')),
+            trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+            trim((string) ($generalContext['description'] ?? ''))
+        );
+
+        $result = [
+            'correctedText' => $correctedText,
+            'generatedDescription' => $generatedDescription,
+            'suggestedGeneral' => [
+                'titre' => $this->firstNonEmpty(
+                    trim((string) ($generalPayload['titre'] ?? '')),
+                    trim((string) ($suggestedDetails['besoinPersonnalise'] ?? '')),
+                    'Demande personnalisee'
+                ),
+                'description' => $this->firstNonEmpty(
+                    trim((string) ($generalPayload['description'] ?? '')),
+                    trim((string) ($suggestedDetails['descriptionBesoin'] ?? '')),
+                    trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                    trim((string) ($generalContext['description'] ?? ''))
+                ),
+                'priorite' => in_array(strtoupper(trim((string) ($generalPayload['priorite'] ?? ''))), ['HAUTE', 'NORMALE', 'BASSE'], true)
+                    ? strtoupper(trim((string) ($generalPayload['priorite'] ?? '')))
+                    : 'NORMALE',
+                'categorie' => $this->firstNonEmpty(
+                    trim((string) ($generalPayload['categorie'] ?? '')),
+                    trim((string) ($generalContext['categorie'] ?? '')),
+                    'Autre'
+                ),
+            ],
+            'suggestedDetails' => $suggestedDetails,
+            'dynamicFieldPlan' => [
+                'add' => $customFields,
+                'remove' => $removeFields,
+                'replaceBase' => $replaceBase,
+            ],
+            'dynamicFieldConfidence' => $this->buildAutrePlanConfidence(
+                $customFields,
+                $removeFields,
+                $replaceBase,
+                $correctedText,
+                $generatedDescription
+            ),
+        ];
+        error_log('FINAL_OUTPUT: ' . (json_encode($result, JSON_UNESCAPED_UNICODE) ?: '{}'));
 
         return [
-            'correctedText' => $normalized['correctedText'],
-            'generatedDescription' => $normalized['generatedDescription'],
-            'suggestedGeneral' => $normalized['suggestedGeneral'],
-            'suggestedDetails' => $normalized['suggestedDetails'],
-            'dynamicFieldPlan' => $normalized['dynamicFieldPlan'],
-            'dynamicFieldConfidence' => $normalized['dynamicFieldConfidence'],
-            'model' => $this->model,
+            'correctedText' => $result['correctedText'],
+            'generatedDescription' => $result['generatedDescription'],
+            'suggestedGeneral' => $result['suggestedGeneral'],
+            'suggestedDetails' => $result['suggestedDetails'],
+            'dynamicFieldPlan' => $result['dynamicFieldPlan'],
+            'dynamicFieldConfidence' => $result['dynamicFieldConfidence'],
+            'model' => 'local-ml:demande_ai_model.py',
         ];
     }
 
@@ -894,7 +974,11 @@ class DemandeAiAssistant
         foreach ($this->getPythonCommandCandidates() as $commandPrefix) {
             try {
                 $process = new Process(array_merge($commandPrefix, [$this->pythonScriptPath]));
-                $process->setInput((string) json_encode($payload, JSON_UNESCAPED_UNICODE));
+                $encodedPayload = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                if (false === $encodedPayload) {
+                    throw new \RuntimeException('Impossible d encoder le payload JSON pour le runner Python.');
+                }
+                $process->setInput($encodedPayload);
                 $process->setTimeout($this->timeoutSeconds + 5);
                 $process->run();
 
@@ -937,6 +1021,25 @@ class DemandeAiAssistant
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function callMlModel(string $prompt): array
+    {
+        if (!$this->canUsePythonRunner()) {
+            throw new \RuntimeException('Le modele ML local est indisponible: script Python introuvable.');
+        }
+
+        $rawText = $this->callHuggingFaceViaPython($prompt);
+        $parsed = $this->parseJsonResponse($rawText);
+
+        if ([] === $parsed) {
+            throw new \RuntimeException('Le modele ML local a retourne une reponse JSON vide ou invalide.');
+        }
+
+        return $parsed;
+    }
+
+    /**
      * @return array<int, array<int, string>>
      */
     private function getPythonCommandCandidates(): array
@@ -946,6 +1049,10 @@ class DemandeAiAssistant
 
         if ('' !== $configured) {
             $candidates[] = [$configured];
+        }
+
+        foreach ($this->getLocalProjectPythonExecutables() as $pythonPath) {
+            $candidates[] = [$pythonPath];
         }
 
         foreach ($this->getCommonWindowsPythonExecutables() as $pythonPath) {
@@ -975,6 +1082,27 @@ class DemandeAiAssistant
         }
 
         return $unique;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function getLocalProjectPythonExecutables(): array
+    {
+        $root = dirname(__DIR__, 2);
+        $candidates = [];
+
+        if ('\\' === DIRECTORY_SEPARATOR) {
+            $candidates[] = $root . DIRECTORY_SEPARATOR . '.venv' . DIRECTORY_SEPARATOR . 'Scripts' . DIRECTORY_SEPARATOR . 'python.exe';
+            $candidates[] = $root . DIRECTORY_SEPARATOR . 'venv' . DIRECTORY_SEPARATOR . 'Scripts' . DIRECTORY_SEPARATOR . 'python.exe';
+        } else {
+            $candidates[] = $root . DIRECTORY_SEPARATOR . '.venv' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python3';
+            $candidates[] = $root . DIRECTORY_SEPARATOR . '.venv' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python';
+            $candidates[] = $root . DIRECTORY_SEPARATOR . 'venv' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python3';
+            $candidates[] = $root . DIRECTORY_SEPARATOR . 'venv' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python';
+        }
+
+        return array_values(array_filter(array_unique($candidates), static fn (string $path): bool => is_file($path)));
     }
 
     /**
@@ -1064,6 +1192,69 @@ class DemandeAiAssistant
      */
     private function loadAutreFeedbackSamples(): array
     {
+        $fileSamples = $this->loadAutreFeedbackSamplesFromFile();
+        $dbSamples = $this->loadAutreFeedbackSamplesFromDatabase();
+        $merged = array_merge($dbSamples, $fileSamples);
+
+        $deduped = [];
+        $seen = [];
+        foreach ($merged as $sample) {
+            if (!is_array($sample)) {
+                continue;
+            }
+
+            $prompt = trim((string) ($sample['prompt'] ?? ''));
+            $general = is_array($sample['general'] ?? null) ? $sample['general'] : [];
+            $details = is_array($sample['details'] ?? null) ? $sample['details'] : [];
+            $fieldPlan = is_array($sample['fieldPlan'] ?? null) ? $sample['fieldPlan'] : [];
+
+            if ('' === $prompt && [] === $general && [] === $details) {
+                continue;
+            }
+
+            $signature = md5(json_encode([
+                'prompt' => $prompt,
+                'general' => $general,
+                'details' => $details,
+            ], JSON_UNESCAPED_UNICODE) ?: $prompt);
+
+            if (isset($seen[$signature])) {
+                continue;
+            }
+
+            $seen[$signature] = true;
+            $deduped[] = [
+                'prompt' => $prompt,
+                'general' => $general,
+                'details' => $details,
+                'fieldPlan' => $fieldPlan,
+            ];
+        }
+
+        return array_slice($deduped, -1200);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadAutreFeedbackSamplesFromDatabase(): array
+    {
+        try {
+            return $this->demandeRepository->fetchAutreFeedbackSamplesFromDatabase(900);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Impossible de charger les echantillons Autre depuis la base.', [
+                'exception' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadAutreFeedbackSamplesFromFile(): array
+    {
         $path = $this->getAutreFeedbackFilePath();
         if (!is_file($path)) {
             return [];
@@ -1081,21 +1272,7 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $prompt = trim((string) ($decoded['prompt'] ?? ''));
-            $general = is_array($decoded['general'] ?? null) ? $decoded['general'] : [];
-            $details = is_array($decoded['details'] ?? null) ? $decoded['details'] : [];
-            $fieldPlan = is_array($decoded['fieldPlan'] ?? null) ? $decoded['fieldPlan'] : [];
-
-            if ('' === $prompt && [] === $general && [] === $details) {
-                continue;
-            }
-
-            $samples[] = [
-                'prompt' => $prompt,
-                'general' => $general,
-                'details' => $details,
-                'fieldPlan' => $fieldPlan,
-            ];
+            $samples[] = $decoded;
         }
 
         return $samples;
@@ -1219,587 +1396,6 @@ class DemandeAiAssistant
 
         return [];
     }
-
-    /**
-     * @param array<string, mixed> $parsed
-     * @param array<int, string> $allowedKeys
-     * @param array<string, array<int, string>> $selectOptions
-     * @param array<string, mixed> $currentDetails
-     * @param array<string, mixed> $generalContext
-     * @return array<string, mixed>
-     */
-    private function normalizeSuggestions(
-        array $parsed,
-        array $allowedKeys,
-        array $requiredKeys,
-        array $selectOptions,
-        array $currentDetails,
-        array $generalContext
-    ): array {
-        $generalPayload = isset($parsed['general']) && is_array($parsed['general']) ? $parsed['general'] : [];
-        $detailsPayload = isset($parsed['details']) && is_array($parsed['details']) ? $parsed['details'] : $parsed;
-        $removePayload = isset($parsed['remove_fields']) && is_array($parsed['remove_fields']) ? $parsed['remove_fields'] : [];
-        $customPayload = isset($parsed['custom_fields']) && is_array($parsed['custom_fields']) ? $parsed['custom_fields'] : [];
-        $replaceBasePayload = $this->toBooleanFlag($parsed['replace_base'] ?? false);
-        $correctedTextPayload = trim((string) ($parsed['correctedText'] ?? ''));
-
-        $details = [];
-
-        foreach ($allowedKeys as $key) {
-            if (isset($detailsPayload[$key])) {
-                $details[$key] = $this->normalizeValue((string) $key, $detailsPayload[$key], $selectOptions[$key] ?? []);
-            }
-        }
-
-        foreach ($allowedKeys as $key) {
-            if (!isset($details[$key]) && isset($currentDetails[$key]) && '' !== trim((string) $currentDetails[$key])) {
-                $details[$key] = (string) $currentDetails[$key];
-            }
-        }
-
-        $generatedDescription = trim((string) ($details['descriptionBesoin'] ?? ''));
-        if ('' === $generatedDescription) {
-            $generatedDescription = $this->firstNonEmpty(
-                trim((string) ($generalPayload['description'] ?? '')),
-                trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-                trim((string) ($generalContext['description'] ?? ''))
-            );
-        }
-
-        if ('' === trim((string) ($details['besoinPersonnalise'] ?? ''))) {
-            $details['besoinPersonnalise'] = trim((string) ($generalContext['titre'] ?? 'Demande personnalisee'));
-        }
-
-        if (isset($details['niveauUrgenceAutre']) && isset($selectOptions['niveauUrgenceAutre'])) {
-            if (!in_array($details['niveauUrgenceAutre'], $selectOptions['niveauUrgenceAutre'], true)) {
-                $details['niveauUrgenceAutre'] = $selectOptions['niveauUrgenceAutre'][1] ?? $selectOptions['niveauUrgenceAutre'][0] ?? 'Normale';
-            }
-        }
-
-        if (isset($details['dateSouhaiteeAutre']) && '' !== $details['dateSouhaiteeAutre']) {
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $details['dateSouhaiteeAutre'])) {
-                $details['dateSouhaiteeAutre'] = '';
-            }
-        }
-
-        if (!isset($details['descriptionBesoin']) || '' === trim((string) $details['descriptionBesoin'])) {
-            $details['descriptionBesoin'] = $generatedDescription;
-        }
-
-        $details['pieceOuContexte'] = '';
-
-        $priorite = strtoupper(trim((string) ($generalPayload['priorite'] ?? $generalContext['priorite'] ?? 'NORMALE')));
-        if (!in_array($priorite, ['HAUTE', 'NORMALE', 'BASSE'], true)) {
-            $priorite = 'NORMALE';
-        }
-
-        $suggestedGeneral = [
-            'titre' => $this->firstNonEmpty(
-                trim((string) ($generalPayload['titre'] ?? '')),
-                trim((string) ($details['besoinPersonnalise'] ?? '')),
-                trim((string) ($generalContext['titre'] ?? '')),
-                'Demande personnalisee'
-            ),
-            'description' => $this->firstNonEmpty(
-                trim((string) ($generalPayload['description'] ?? '')),
-                trim((string) ($details['descriptionBesoin'] ?? '')),
-                trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-                trim((string) ($generalContext['description'] ?? ''))
-            ),
-            'priorite' => $priorite,
-            'categorie' => $this->firstNonEmpty(
-                $this->inferCategoryFromDescription($generalContext),
-                trim((string) ($generalContext['categorie'] ?? '')),
-                'Autre'
-            ),
-        ];
-
-        $optionalAllowedToRemove = [];
-        foreach ($allowedKeys as $baseKey) {
-            if (empty($requiredKeys[$baseKey])) {
-                $optionalAllowedToRemove[] = $baseKey;
-            }
-        }
-
-        $removeFields = [];
-        foreach ($removePayload as $removeKeyRaw) {
-            $removeKey = trim((string) $removeKeyRaw);
-            if (in_array($removeKey, $optionalAllowedToRemove, true)) {
-                $removeFields[$removeKey] = true;
-            }
-        }
-
-        $modelCustomFields = $this->normalizeCustomFields($customPayload, array_merge($allowedKeys, array_keys($removeFields)));
-        $inferredCustomFields = $this->inferCustomFieldsFromDescription($generalContext, $details);
-        // Prefer the trained model plan when it produced usable fields, and only
-        // fall back to deterministic inference for the gaps that remain.
-        $customFields = [] !== $modelCustomFields
-            ? $modelCustomFields
-            : $inferredCustomFields;
-
-        $inferredUrgence = $this->inferUrgenceFromDescription($generalContext);
-        if (isset($selectOptions['niveauUrgenceAutre']) && in_array($inferredUrgence, $selectOptions['niveauUrgenceAutre'], true)) {
-            $details['niveauUrgenceAutre'] = $inferredUrgence;
-        }
-
-        $inferredDate = $this->extractFrenchDate($generalContext);
-        if ('' !== $inferredDate) {
-            $details['dateSouhaiteeAutre'] = $inferredDate;
-        }
-
-        $defaultTitle = $this->inferDefaultTitle($generalContext);
-        if ('' === trim((string) ($details['besoinPersonnalise'] ?? ''))) {
-            $details['besoinPersonnalise'] = $defaultTitle;
-        }
-
-        if ('' === trim((string) ($details['descriptionBesoin'] ?? ''))) {
-            $details['descriptionBesoin'] = $this->firstNonEmpty(
-                trim((string) ($generalPayload['description'] ?? '')),
-                trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-                trim((string) ($generalContext['description'] ?? ''))
-            );
-        }
-
-        $correctedText = $this->firstNonEmpty(
-            $correctedTextPayload,
-            trim((string) ($generalPayload['description'] ?? '')),
-            trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-            trim((string) ($details['descriptionBesoin'] ?? ''))
-        );
-        $correctedText = trim((string) (preg_replace('/\s+/u', ' ', $correctedText) ?? $correctedText));
-
-        $replaceBase = $this->shouldReplaceBaseFields($replaceBasePayload, $customFields);
-        $dynamicFieldConfidence = $this->buildAutrePlanConfidence(
-            $customFields,
-            array_values(array_keys($removeFields)),
-            $replaceBase,
-            $correctedText,
-            $generatedDescription
-        );
-
-        return [
-            'correctedText' => $correctedText,
-            'generatedDescription' => $generatedDescription,
-            'suggestedGeneral' => $suggestedGeneral,
-            'suggestedDetails' => $details,
-            'dynamicFieldPlan' => [
-                'add' => $customFields,
-                'remove' => array_values(array_keys($removeFields)),
-                'replaceBase' => $replaceBase,
-            ],
-            'dynamicFieldConfidence' => $dynamicFieldConfidence,
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $generalContext
-     * @param array<string, string> $details
-     * @return array<int, array<string, mixed>>
-     */
-    private function inferCustomFieldsFromDescription(array $generalContext, array $details): array
-    {
-        $rawText = $this->buildInferenceText($generalContext);
-        $text = strtolower($rawText);
-        $customFields = [];
-
-        $intentScores = $this->computePromptIntentScores($rawText);
-        $dominantIntent = $this->resolveDominantIntent($intentScores);
-
-        $amount = $this->extractAmountFromText($text);
-        $date = $this->extractFrenchDate($generalContext);
-        $routeLocations = $this->extractRouteLocations($rawText);
-        $currentLocation = $this->firstNonEmpty($routeLocations['from'], $this->extractCurrentLocation($rawText));
-        $targetLocation = $this->firstNonEmpty($routeLocations['to'], $this->extractTargetLocation($rawText));
-
-        $hasClearTransportRoute = '' !== $currentLocation || '' !== $targetLocation;
-
-        $formationType = $this->inferFormationType($rawText);
-        $formationName = $this->firstNonEmpty(
-            $this->extractKnownFormationKeywordTopic($rawText),
-            $this->extractTrainingName($rawText),
-            $this->extractFormationTopic($rawText)
-        );
-
-        if ('' === $formationType && '' !== $formationName) {
-            $formationType = $this->inferDefaultFormationType($rawText, $formationName);
-        }
-
-        if ('' !== $formationName && $this->isLikelyLocationCandidate($formationName)) {
-            $formationName = '';
-        }
-
-        $hasParkingContext = ($intentScores['parking'] ?? 0) >= 2;
-        $hasWorkplaceContext = ($intentScores['workplace'] ?? 0) >= 2;
-        $hasFormationContext = (($intentScores['formation'] ?? 0) >= 2 || '' !== $formationType || '' !== $formationName)
-            && 'parking' !== $dominantIntent
-            && !$this->isFormationNoiseOnlyContext($rawText);
-        $hasTransportContext = ($intentScores['transport'] ?? 0) >= 2
-            && 'parking' !== $dominantIntent;
-
-        if ($hasFormationContext || $hasTransportContext) {
-            if ($hasFormationContext) {
-                $customFields[] = [
-                    'key' => 'ai_type_formation',
-                    'label' => 'Type de formation',
-                    'type' => 'select',
-                    'required' => true,
-                    'value' => '' !== $formationType ? $formationType : 'Autre',
-                    'options' => ['Formation interne', 'Formation externe', 'Certification', 'Autre'],
-                ];
-
-                $customFields[] = [
-                    'key' => 'ai_nom_formation',
-                    'label' => 'Nom de la formation',
-                    'type' => 'text',
-                    'required' => true,
-                    'value' => $formationName,
-                ];
-            }
-
-            $customFields[] = [
-                'key' => 'ai_lieu_depart_actuel',
-                'label' => 'Lieu de depart actuel',
-                'type' => 'text',
-                'required' => true,
-                'value' => $currentLocation,
-            ];
-
-            $customFields[] = [
-                'key' => 'ai_lieu_souhaite',
-                'label' => 'Lieu souhaite',
-                'type' => 'text',
-                'required' => true,
-                'value' => $targetLocation,
-            ];
-
-            if ($hasTransportContext || $this->containsWord($rawText, 'moyen de transport')) {
-                $customFields[] = [
-                    'key' => 'ai_type_transport',
-                    'label' => 'Type de transport souhaite',
-                    'type' => 'select',
-                    'required' => false,
-                    'value' => 'A definir',
-                    'options' => ['A definir', 'Bus', 'Train', 'Voiture de service', 'Taxi'],
-                ];
-            }
-        }
-
-        if (str_contains($text, 'avance') && str_contains($text, 'salaire')) {
-            $customFields[] = [
-                'key' => 'ai_type_besoin',
-                'label' => 'Type de besoin financier',
-                'type' => 'select',
-                'required' => true,
-                'value' => 'Avance sur salaire',
-                'options' => ['Avance sur salaire', 'Aide exceptionnelle', 'Pret interne'],
-            ];
-
-            $customFields[] = [
-                'key' => 'ai_motif_financier',
-                'label' => 'Motif financier',
-                'type' => 'textarea',
-                'required' => true,
-                'value' => $this->firstNonEmpty(
-                    trim((string) ($details['descriptionBesoin'] ?? '')),
-                    trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-                    trim((string) ($generalContext['description'] ?? ''))
-                ),
-            ];
-        }
-
-        if ($hasParkingContext) {
-            $parkingType = 'Place reservee';
-            if ($this->containsAnyWord($rawText, ['autorisation temporaire', 'temporaire'])) {
-                $parkingType = 'Autorisation temporaire';
-            } elseif ($this->containsAnyWord($rawText, ['acces parking', 'badge parking', 'acces'])) {
-                $parkingType = 'Acces parking';
-            }
-
-            $customFields[] = [
-                'key' => 'ai_type_stationnement',
-                'label' => 'Type de demande parking',
-                'type' => 'select',
-                'required' => true,
-                'value' => $parkingType,
-                'options' => ['Place reservee', 'Acces parking', 'Autorisation temporaire', 'Autre'],
-            ];
-
-            $customFields[] = [
-                'key' => 'ai_zone_souhaitee',
-                'label' => 'Zone ou emplacement souhaite',
-                'type' => 'text',
-                'required' => true,
-                'value' => $this->extractParkingZone($rawText),
-            ];
-
-            $customFields[] = [
-                'key' => 'ai_horaire_arrivee',
-                'label' => 'Horaire habituel d arrivee',
-                'type' => 'text',
-                'required' => false,
-                'value' => $this->extractPreferredArrivalTime($rawText),
-            ];
-
-            $customFields[] = [
-                'key' => 'ai_justification_stationnement',
-                'label' => 'Justification du besoin parking',
-                'type' => 'textarea',
-                'required' => true,
-                'value' => $this->firstNonEmpty(
-                    trim((string) ($details['descriptionBesoin'] ?? '')),
-                    $this->extractPrimaryIntentFromPrompt((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-                    trim((string) ($generalContext['description'] ?? ''))
-                ),
-            ];
-        }
-
-        if ($hasWorkplaceContext && !$hasFormationContext && !$hasTransportContext) {
-            $workplaceType = $this->inferWorkplaceNeedType($rawText);
-            $workplaceLocation = $this->extractWorkplaceLocationHint($rawText);
-            $workplacePriority = $this->inferWorkplacePriority($rawText);
-
-            $customFields[] = [
-                'key' => 'ai_type_besoin_workplace',
-                'label' => 'Type de besoin logistique',
-                'type' => 'select',
-                'required' => true,
-                'value' => $workplaceType,
-                'options' => ['Casier securise', 'Espace calme', 'Ajustement eclairage', 'Autorisation interne', 'Amenagement poste', 'Autre'],
-            ];
-
-            $customFields[] = [
-                'key' => 'ai_objet_besoin_workplace',
-                'label' => 'Objet de la demande',
-                'type' => 'text',
-                'required' => true,
-                'value' => $this->firstNonEmpty(
-                    $this->extractPrimaryIntentFromPrompt((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-                    trim((string) ($details['descriptionBesoin'] ?? '')),
-                    trim((string) ($generalContext['description'] ?? ''))
-                ),
-            ];
-
-            $customFields[] = [
-                'key' => 'ai_justification_workplace',
-                'label' => 'Justification du besoin',
-                'type' => 'textarea',
-                'required' => true,
-                'value' => $this->firstNonEmpty(
-                    trim((string) ($details['descriptionBesoin'] ?? '')),
-                    trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-                    trim((string) ($generalContext['description'] ?? ''))
-                ),
-            ];
-
-            if ('' !== $workplaceLocation) {
-                $customFields[] = [
-                    'key' => 'ai_zone_impactee_workplace',
-                    'label' => 'Zone ou poste concerne',
-                    'type' => 'text',
-                    'required' => false,
-                    'value' => $workplaceLocation,
-                ];
-            }
-
-            $customFields[] = [
-                'key' => 'ai_priorite_recommandee_workplace',
-                'label' => 'Priorite recommandee',
-                'type' => 'select',
-                'required' => false,
-                'value' => $workplacePriority,
-                'options' => ['Normale', 'Haute', 'Critique'],
-            ];
-
-            if ($this->containsAnyWord($rawText, ['confidentiel', 'confidentielle', 'securise', 'securisee', 'secure'])) {
-                $customFields[] = [
-                    'key' => 'ai_niveau_confidentialite',
-                    'label' => 'Niveau de confidentialite',
-                    'type' => 'select',
-                    'required' => false,
-                    'value' => 'Eleve',
-                    'options' => ['Standard', 'Eleve', 'Critique'],
-                ];
-            }
-        }
-
-        if (null !== $amount) {
-            $customFields[] = [
-                'key' => 'ai_montant_souhaite',
-                'label' => 'Montant souhaite (TND)',
-                'type' => 'number',
-                'required' => true,
-                'value' => (string) $amount,
-            ];
-        }
-
-        return $this->normalizeCustomFields($customFields, []);
-    }
-
-    /**
-     * @return array{parking:int,formation:int,transport:int,finance:int,workplace:int}
-     */
-    private function computePromptIntentScores(string $text): array
-    {
-        $scores = [
-            'parking' => 0,
-            'formation' => 0,
-            'transport' => 0,
-            'finance' => 0,
-            'workplace' => 0,
-        ];
-
-        $weightedKeywords = [
-            'parking' => [
-                'parking' => 3,
-                'stationnement' => 3,
-                'place de parking' => 3,
-                'place reservee' => 3,
-                'place reserve' => 3,
-                'acces parking' => 2,
-                'badge parking' => 2,
-                'entree' => 1,
-                'barriere' => 1,
-            ],
-            'formation' => [
-                'formation' => 3,
-                'certification' => 3,
-                'cours' => 2,
-                'training' => 2,
-                'type de formation' => 2,
-                'organisme de formation' => 2,
-            ],
-            'transport' => [
-                'deplacement' => 3,
-                'déplacement' => 3,
-                'transport' => 2,
-                'moyen de transport' => 3,
-                'trajet' => 2,
-                'navette' => 2,
-                'vers' => 1,
-            ],
-            'finance' => [
-                'salaire' => 3,
-                'avance sur salaire' => 4,
-                'remboursement' => 3,
-                'facture' => 2,
-                'montant' => 2,
-            ],
-            'workplace' => [
-                'casier' => 3,
-                'casiers' => 3,
-                'espace calme' => 3,
-                'appel confidentiel' => 3,
-                'appels confidentiels' => 3,
-                'confidentiel' => 2,
-                'securise' => 2,
-                'autorisation interne' => 3,
-                'journee benevolat' => 3,
-                'benevolat' => 2,
-                'eclairage' => 3,
-                'lumiere' => 2,
-                'fatigue visuelle' => 3,
-                'poste de travail' => 2,
-                'bureau' => 2,
-                'open space' => 2,
-            ],
-        ];
-
-        foreach ($weightedKeywords as $intent => $keywords) {
-            foreach ($keywords as $keyword => $weight) {
-                $keywordText = (string) $keyword;
-                $matched = $this->containsWord($text, $keywordText);
-                if (!$matched && str_contains($keywordText, ' ')) {
-                    // Fragment matching is restricted to multi-word phrases to avoid
-                    // collisions like "information" triggering "formation".
-                    $matched = $this->containsFragment($text, $keywordText);
-                }
-
-                if ($matched) {
-                    $scores[$intent] += (int) $weight;
-                }
-            }
-        }
-
-        return $scores;
-    }
-
-    /**
-    * @param array{parking:int,formation:int,transport:int,finance:int,workplace:int} $scores
-     */
-    private function resolveDominantIntent(array $scores): string
-    {
-        $dominant = '';
-        $maxScore = 0;
-
-        foreach ($scores as $intent => $score) {
-            if ($score > $maxScore) {
-                $maxScore = $score;
-                $dominant = (string) $intent;
-            }
-        }
-
-        return $maxScore > 0 ? $dominant : '';
-    }
-
-    private function inferWorkplaceNeedType(string $text): string
-    {
-        if ($this->containsAnyWord($text, ['casier', 'casiers'])) {
-            return 'Casier securise';
-        }
-
-        if ($this->containsAnyWord($text, ['eclairage', 'lumiere', 'fatigue visuelle'])) {
-            return 'Ajustement eclairage';
-        }
-
-        if ($this->containsAnyWord($text, ['espace calme', 'appel confidentiel', 'appels confidentiels', 'confidentiel'])) {
-            return 'Espace calme';
-        }
-
-        if ($this->containsAnyWord($text, ['autorisation interne', 'journee benevolat', 'benevolat', 'benevole'])) {
-            return 'Autorisation interne';
-        }
-
-        if ($this->containsAnyWord($text, ['poste de travail', 'bureau', 'open space', 'amenagement'])) {
-            return 'Amenagement poste';
-        }
-
-        return 'Autre';
-    }
-
-    private function extractWorkplaceLocationHint(string $text): string
-    {
-        if (preg_match('/\b(?:au|dans|sur)\s+(?:mon|ma|le|la|l[\'’]|un|une)?\s*([A-Za-zÀ-ÿ0-9\'’\- ]{2,60})(?=\s+(?:car|pour|avec|afin|et|je\b|j\b|nous\b|on\b)|[\.,;:"\'»”]|$)/iu', $text, $matches) === 1) {
-            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
-        }
-
-        if ($this->containsWord($text, 'open space')) {
-            return 'Open space';
-        }
-
-        if ($this->containsWord($text, 'bureau')) {
-            return 'Bureau';
-        }
-
-        if ($this->containsWord($text, 'poste')) {
-            return 'Poste de travail';
-        }
-
-        return '';
-    }
-
-    private function inferWorkplacePriority(string $text): string
-    {
-        if ($this->containsAnyWord($text, ['confidentiel', 'confidentielle', 'securise', 'securisee', 'fatigue visuelle'])) {
-            return 'Haute';
-        }
-
-        if ($this->containsAnyWord($text, ['urgent', 'urgence', 'immediat', 'immédiat', 'bloquant'])) {
-            return 'Critique';
-        }
-
-        return 'Normale';
-    }
-
     /**
      * @param mixed $value
      */
@@ -1819,30 +1415,6 @@ class DemandeAiAssistant
 
         return false;
     }
-
-    /**
-     * @param array<int, array<string, mixed>> $customFields
-     */
-    private function shouldReplaceBaseFields(bool $replaceBaseRequested, array $customFields): bool
-    {
-        if (!$replaceBaseRequested || count($customFields) < 2) {
-            return false;
-        }
-
-        $requiredCount = 0;
-        foreach ($customFields as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            if (true === ($field['required'] ?? false)) {
-                ++$requiredCount;
-            }
-        }
-
-        return $requiredCount >= 1;
-    }
-
     /**
      * @param array<int, array<string, mixed>> $customFields
      * @param array<int, string> $removeFields
@@ -1925,131 +1497,6 @@ class DemandeAiAssistant
             'message' => 'Le plan est prudent, completez manuellement si besoin.',
         ];
     }
-
-    /**
-     * @param array<int, array<string, mixed>> $primary
-     * @param array<int, array<string, mixed>> $secondary
-     * @return array<int, array<string, mixed>>
-     */
-    private function mergeCustomFields(array $primary, array $secondary): array
-    {
-        $merged = [];
-        $used = [];
-
-        foreach ([$primary, $secondary] as $group) {
-            foreach ($group as $field) {
-                if (!is_array($field)) {
-                    continue;
-                }
-
-                $key = trim((string) ($field['key'] ?? ''));
-                if ('' === $key || isset($used[$key])) {
-                    continue;
-                }
-
-                $used[$key] = true;
-                $merged[] = $field;
-
-                if (count($merged) >= 8) {
-                    return $merged;
-                }
-            }
-        }
-
-        return $merged;
-    }
-
-    /**
-     * @param array<string, mixed> $generalContext
-     */
-    private function inferDefaultTitle(array $generalContext): string
-    {
-        $text = strtolower($this->buildInferenceText($generalContext));
-
-        if (str_contains($text, 'avance') && str_contains($text, 'salaire')) {
-            return 'Avance sur salaire';
-        }
-
-        if (str_contains($text, 'remboursement')) {
-            return 'Demande de remboursement';
-        }
-
-        if (str_contains($text, 'attestation')) {
-            return 'Demande d attestation';
-        }
-
-        return $this->firstNonEmpty(
-            trim((string) ($generalContext['titre'] ?? '')),
-            'Demande personnalisee'
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $generalContext
-     */
-    private function inferUrgenceFromDescription(array $generalContext): string
-    {
-        $text = strtolower($this->buildInferenceText($generalContext));
-
-        if (
-            str_contains($text, 'urgent') ||
-            str_contains($text, 'urgence') ||
-            str_contains($text, 'immediat') ||
-            str_contains($text, 'au plus vite')
-        ) {
-            return 'Urgente';
-        }
-
-        return 'Normale';
-    }
-
-    /**
-     * @param array<string, mixed> $generalContext
-     */
-    private function extractFrenchDate(array $generalContext): string
-    {
-        $text = strtolower($this->buildInferenceText($generalContext));
-
-        if (preg_match('/\b(\d{1,2})\s+(janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)(?:\s+(\d{4}))?\b/u', $text, $matches) !== 1) {
-            return '';
-        }
-
-        $day = (int) ($matches[1] ?? 0);
-        $monthRaw = (string) ($matches[2] ?? '');
-        $year = isset($matches[3]) && '' !== $matches[3]
-            ? (int) $matches[3]
-            : (int) (new \DateTimeImmutable())->format('Y');
-
-        if ($day < 1 || $day > 31) {
-            return '';
-        }
-
-        $months = [
-            'janvier' => 1,
-            'fevrier' => 2,
-            'février' => 2,
-            'mars' => 3,
-            'avril' => 4,
-            'mai' => 5,
-            'juin' => 6,
-            'juillet' => 7,
-            'aout' => 8,
-            'août' => 8,
-            'septembre' => 9,
-            'octobre' => 10,
-            'novembre' => 11,
-            'decembre' => 12,
-            'décembre' => 12,
-        ];
-
-        $month = $months[$monthRaw] ?? 0;
-        if ($month < 1 || !checkdate($month, $day, $year)) {
-            return '';
-        }
-
-        return sprintf('%04d-%02d-%02d', $year, $month, $day);
-    }
-
     private function extractAmountFromText(string $text): ?float
     {
         if (preg_match('/\b(\d+(?:[\.,]\d{1,2})?)\s*(dt|tnd|dinar|dinars)\b/i', $text, $matches) === 1) {
@@ -3842,3 +3289,5 @@ class DemandeAiAssistant
         return '';
     }
 }
+
+

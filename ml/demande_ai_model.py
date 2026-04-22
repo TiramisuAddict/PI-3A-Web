@@ -7,6 +7,7 @@ import unicodedata
 from difflib import get_close_matches
 from collections import Counter, defaultdict
 from datetime import datetime
+from pathlib import Path
 
 import demande_dynamic_extractors as dyn_extract
 
@@ -39,6 +40,354 @@ def _sentence_case(text):
             continue
         chunks.append(part[:1].upper() + part[1:])
     return "".join(chunks).strip()
+
+
+# ═══════════════════════════════════════════════════════════════
+# AUTRE PATTERN MINER SUPPORT
+# ═══════════════════════════════════════════════════════════════
+
+_AUTRE_MINER_CACHE = {"path": "", "mtime": None, "miner": None}
+
+
+def _workspace_root():
+    return Path(__file__).resolve().parents[1]
+
+
+def _autre_data_dir():
+    return _workspace_root() / "var" / "ai"
+
+
+def _autre_db_training_path():
+    return _autre_data_dir() / "db_demandes_with_details.json"
+
+
+def _autre_feedback_path():
+    return _autre_data_dir() / "autre_generation_feedback.jsonl"
+
+
+def _autre_pattern_miner_path():
+    return _autre_data_dir() / "autre_pattern_miner.json"
+
+
+def _read_json_file(path):
+    source = Path(path)
+    if not source.exists():
+        return None
+    try:
+        return json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _read_jsonl_file(path):
+    source = Path(path)
+    if not source.exists():
+        return []
+    rows = []
+    try:
+        with source.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        return []
+    return rows
+
+
+def _normalize_autre_detail_items(details):
+    if isinstance(details, dict):
+        return [
+            {
+                "fieldKey": str(key),
+                "fieldValue": value,
+                "fieldType": "text",
+            }
+            for key, value in details.items()
+        ]
+    if isinstance(details, list):
+        return [item for item in details if isinstance(item, dict)]
+    return []
+
+
+def _normalize_autre_training_record(record):
+    if not isinstance(record, dict):
+        return None
+
+    general = record.get("general") if isinstance(record.get("general"), dict) else {}
+    prompt = _normalize_ws(
+        record.get("prompt")
+        or record.get("text")
+        or record.get("rawText")
+        or record.get("userPromptAutre")
+        or general.get("description")
+        or record.get("description")
+        or record.get("titre")
+        or general.get("titre")
+        or ""
+    )
+
+    details = _normalize_autre_detail_items(record.get("details"))
+    if not prompt and not details:
+        return None
+
+    return {
+        "prompt": prompt,
+        "text": prompt,
+        "titre": _normalize_ws(record.get("titre") or record.get("title") or general.get("titre") or ""),
+        "description": _normalize_ws(record.get("description") or general.get("description") or ""),
+        "priorite": _normalize_ws(record.get("priorite") or record.get("priority") or general.get("priorite") or "NORMALE").upper() or "NORMALE",
+        "categorie": _normalize_ws(record.get("categorie") or general.get("categorie") or "Autre") or "Autre",
+        "typeDemande": _normalize_ws(record.get("typeDemande") or general.get("typeDemande") or "Autre") or "Autre",
+        "general": {
+            "titre": _normalize_ws(general.get("titre") or record.get("titre") or record.get("title") or ""),
+            "description": _normalize_ws(general.get("description") or record.get("description") or ""),
+            "priorite": _normalize_ws(general.get("priorite") or record.get("priorite") or "NORMALE").upper() or "NORMALE",
+            "categorie": _normalize_ws(general.get("categorie") or record.get("categorie") or "Autre") or "Autre",
+            "typeDemande": _normalize_ws(general.get("typeDemande") or record.get("typeDemande") or "Autre") or "Autre",
+        },
+        "details": details,
+    }
+
+
+def _load_autre_training_samples():
+    samples = []
+
+    db_rows = _read_json_file(_autre_db_training_path())
+    if isinstance(db_rows, list):
+        for row in db_rows:
+            sample = _normalize_autre_training_record(row)
+            if sample:
+                samples.append(sample)
+
+    feedback_rows = _read_jsonl_file(_autre_feedback_path())
+    for row in feedback_rows:
+        sample = _normalize_autre_training_record(row)
+        if sample:
+            samples.append(sample)
+
+    return samples
+
+
+def _build_autre_pattern_miner():
+    miner = dyn_extract.PatternMiner()
+    miner.fit(_load_autre_training_samples())
+    return miner
+
+
+def _load_autre_pattern_miner(force_refresh=False):
+    path = _autre_pattern_miner_path()
+    cache_key = str(path)
+    try:
+        mtime = path.stat().st_mtime if path.exists() else None
+    except OSError:
+        mtime = None
+
+    cached = _AUTRE_MINER_CACHE.get("miner")
+    if not force_refresh and cached is not None and _AUTRE_MINER_CACHE.get("path") == cache_key and _AUTRE_MINER_CACHE.get("mtime") == mtime:
+        return cached
+
+    miner = dyn_extract.PatternMiner.load(path) if path.exists() else dyn_extract.PatternMiner()
+    if not getattr(miner, "total_samples", 0) or not getattr(miner, "value_counts", {}):
+        miner = _build_autre_pattern_miner()
+        if getattr(miner, "total_samples", 0) > 0:
+            miner.save(path)
+            try:
+                mtime = path.stat().st_mtime
+            except OSError:
+                mtime = None
+
+    _AUTRE_MINER_CACHE["path"] = cache_key
+    _AUTRE_MINER_CACHE["mtime"] = mtime
+    _AUTRE_MINER_CACHE["miner"] = miner
+    return miner
+
+
+def _autre_priority_to_base_label(label, confidence=0.0):
+    label = _normalize_ws(label).upper()
+    if label == "HAUTE":
+        return "Tres urgente" if confidence >= 0.75 else "Urgente"
+    if label == "BASSE":
+        return "Faible"
+    return "Normale"
+
+
+def _autre_base_priority(label):
+    label = _normalize_ws(label).upper()
+    if label == "HAUTE":
+        return "HAUTE"
+    if label == "BASSE":
+        return "BASSE"
+    return "NORMALE"
+
+
+def _autre_detect_explicit_urgency(source):
+    normalized = _norm(source)
+    if not normalized:
+        return None
+
+    critical_patterns = [
+        r"\btres\s+urgent\b",
+        r"\bextremement\s+urgent\b",
+        r"\bimmediatement\b",
+        r"\bdes\s+maintenant\b",
+        r"\bbloquant\b",
+        r"\bbloque\b",
+        r"\bincident\s+critique\b",
+        r"\bserveur\s+down\b",
+        r"\baccident\b",
+        r"\bhospitalisation\b",
+    ]
+    high_patterns = [
+        r"\burgent\b",
+        r"\burgence\b",
+        r"\bau\s+plus\s+vite\b",
+        r"\basap\b",
+        r"\bdes\s+aujourd\s*hui\b",
+    ]
+    low_patterns = [
+        r"\bpas\s+urgent\b",
+        r"\bquand\s+possible\b",
+        r"\bnon\s+urgent\b",
+        r"\bbasse\s+priorite\b",
+        r"\bconfort\b",
+    ]
+
+    if any(re.search(pattern, normalized, flags=re.IGNORECASE) for pattern in critical_patterns):
+        return {
+            "priority": "HAUTE",
+            "urgency": "Tres urgente",
+            "detected": True,
+            "level": "critical",
+        }
+
+    if any(re.search(pattern, normalized, flags=re.IGNORECASE) for pattern in high_patterns):
+        return {
+            "priority": "HAUTE",
+            "urgency": "Urgente",
+            "detected": True,
+            "level": "high",
+        }
+
+    if any(re.search(pattern, normalized, flags=re.IGNORECASE) for pattern in low_patterns):
+        return {
+            "priority": "BASSE",
+            "urgency": "Faible",
+            "detected": True,
+            "level": "low",
+        }
+
+    return None
+
+
+def _autre_clean_field_value(field_key, field_value, prompt, extractor):
+    key = _normalize_ws(field_key)
+    value = _normalize_ws(field_value)
+    if not value:
+        return ""
+
+    lowered = _norm(prompt)
+    if key in {"ai_lieu_depart_actuel", "ai_lieu_souhaite"}:
+        depart, destination = extractor.extract_location_pair(prompt)
+        return depart if key == "ai_lieu_depart_actuel" else destination
+    if key == "ai_nom_formation":
+        return extractor.extract_subject_name(prompt, "formation") or extractor.extract_subject_name(prompt, "certification")
+    if key == "ai_type_formation":
+        if "certification" in lowered:
+            return "Certification"
+        return "Formation externe" if extractor.extract_subject_name(prompt, "formation") else value
+    if key in {"ai_date_souhaitee_metier", "ai_date_reservation", "ai_date_debut_conge", "dateSouhaiteeAutre"}:
+        return extractor.extract_date(prompt) or value
+    if key == "ai_date_fin_conge":
+        _, end = extractor.extract_date_range(prompt)
+        return end or value
+    if key in {"ai_montant", "ai_quantite"}:
+        extracted = extractor.extract_amount(prompt)
+        return extracted or value
+    if key == "ai_systeme_concerne":
+        return extractor.extract_subject_name(prompt, "acces") or value
+    if key == "ai_type_acces":
+        return value if value else "Autre"
+    if key == "ai_type_transport":
+        extracted = extractor._infer_transport_type(prompt)
+        return extracted or value
+    if key == "ai_type_conge":
+        return extractor._infer_leave_type(prompt)
+    if key in {"ai_salle_souhaitee", "ai_zone_souhaitee", "ai_localisation_souhaitee", "ai_poste_souhaite", "ai_materiel_concerne", "ai_type_contrat", "ai_equipement_concerne"}:
+        cleaned = dyn_extract.clean_entity_text(value)
+        return cleaned or value
+    if key in {"ai_justification_metier", "ai_description_probleme", "descriptionBesoin"}:
+        return _normalize_ws(value)
+    return dyn_extract.clean_entity_text(value) or value
+
+
+def _autre_build_title(prompt, details, intents):
+    source = _normalize_ws(prompt)
+    details = details if isinstance(details, dict) else {}
+    intent_names = [intent for intent, confidence in (intents or []) if confidence > 0.1]
+    lowered = _norm(source)
+
+    if details.get("ai_lieu_depart_actuel") and details.get("ai_lieu_souhaite"):
+        if details.get("ai_nom_formation"):
+            return _sentence_case(
+                f"Transport de {details['ai_lieu_depart_actuel']} vers {details['ai_lieu_souhaite']} pour formation {details['ai_nom_formation']}"
+            )
+        return _sentence_case(f"Transport de {details['ai_lieu_depart_actuel']} vers {details['ai_lieu_souhaite']}")
+
+    if details.get("ai_nom_formation"):
+        prefix = "Demande de certification" if details.get("ai_type_formation") == "Certification" or "certification" in lowered else "Demande de formation"
+        return _sentence_case(f"{prefix} {details['ai_nom_formation']}")
+
+    if details.get("ai_montant"):
+        return _sentence_case(f"Demande financiere de {details['ai_montant']}")
+
+    if details.get("ai_systeme_concerne"):
+        return _sentence_case(f"Demande d acces {details['ai_systeme_concerne']}")
+
+    if details.get("ai_salle_souhaitee"):
+        return _sentence_case(f"Reservation de salle {details['ai_salle_souhaitee']}")
+
+    if details.get("ai_zone_souhaitee"):
+        return _sentence_case(f"Demande de parking {details['ai_zone_souhaitee']}")
+
+    if details.get("ai_type_contrat"):
+        return _sentence_case(f"Demande de {details['ai_type_contrat']}")
+
+    if details.get("ai_poste_souhaite"):
+        return _sentence_case(f"Demande de changement de poste vers {details['ai_poste_souhaite']}")
+
+    if details.get("ai_materiel_concerne"):
+        return _sentence_case(f"Demande de materiel {details['ai_materiel_concerne']}")
+
+    if details.get("ai_type_conge"):
+        return _sentence_case(f"Demande de {details['ai_type_conge']}")
+
+    if intent_names:
+        if "transport" in intent_names:
+            return _sentence_case("Demande de transport")
+        if "formation" in intent_names:
+            return _sentence_case("Demande de formation")
+        if "finance" in intent_names:
+            return _sentence_case("Demande financiere")
+        if "access" in intent_names:
+            return _sentence_case("Demande d acces")
+        if "room" in intent_names:
+            return _sentence_case("Reservation de salle")
+
+    tokens = [token for token in re.split(r"\s+", source) if token]
+    content = [token for token in tokens if _norm(token) not in {"je", "veux", "voudrais", "souhaite", "demande", "une", "un", "de", "du", "des", "la", "le", "les", "pour", "afin", "car", "avec", "et", "ou", "qui", "que"}]
+    return _sentence_case(" ".join(content[:7])) if content else _sentence_case(source)
+
+
+def _autre_build_description(prompt, title):
+    description = _sentence_case(_normalize_ws(prompt))
+    if description:
+        return description
+    return _sentence_case(title)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -197,10 +546,40 @@ def _apply_dynamic_token_corrections(text, domain_terms=None):
     return re.sub(r"\b[A-Za-z][A-Za-z0-9/+#\.-]{3,}\b", replace_token, text)
 
 
+def _protect_autocorrected_date_prefixes(text):
+    protected_phrases = [
+        "des le",
+        "a partir du",
+        "a partir de",
+        "des demain",
+        "des aujourd hui",
+        "jusqu au",
+        "jusqu a",
+    ]
+
+    protected = _normalize_ws(str(text or ""))
+    placeholders = {}
+    for index, phrase in enumerate(protected_phrases):
+        token = f"__DATE_PREFIX_{index}__"
+        pattern = rf"\b{re.escape(phrase)}\b"
+        if re.search(pattern, protected, flags=re.IGNORECASE):
+            protected = re.sub(pattern, token, protected, flags=re.IGNORECASE)
+            placeholders[token] = phrase
+    return protected, placeholders
+
+
+def _restore_autocorrected_date_prefixes(text, placeholders):
+    restored = str(text or "")
+    for token, phrase in (placeholders or {}).items():
+        restored = restored.replace(token, phrase)
+    return restored
+
+
 def _auto_correct_text(text, domain_terms=None):
     cleaned = _normalize_ws(str(text or ""))
     if not cleaned:
         return ""
+    cleaned, placeholders = _protect_autocorrected_date_prefixes(cleaned)
     normalized = _norm(cleaned)
     for pattern, replacement in CORRECTION_MAP.items():
         normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
@@ -211,6 +590,7 @@ def _auto_correct_text(text, domain_terms=None):
         normalized,
     )
     normalized = re.sub(r"\b(\w+)\s+\1\b", r"\1", normalized)
+    normalized = _restore_autocorrected_date_prefixes(normalized, placeholders)
     return _sentence_case(normalized)
 
 
@@ -854,6 +1234,84 @@ def _extract_justification(text):
     return None
 
 
+def _extract_parking_zone(text):
+    normalized = _norm(_normalize_ws(text))
+    if not normalized:
+        return ""
+
+    d_connector = r"(?:d['’]?\s*|de\s+|du\s+|des\s+|de\s+la\s+|de\s+l['’]?\s*)"
+    patterns = [
+        rf"\b(?:pres\s+{d_connector}|proche\s+{d_connector}|a\s+cote\s+{d_connector}|devant|au\s+niveau\s+{d_connector}|dans\s+la\s+zone\s+{d_connector}|zone\s+{d_connector})(.{{2,90}}?)(?:[.,;]|$)",
+        rf"\bparking\s+(?:pres\s+{d_connector}|proche\s+{d_connector}|a\s+cote\s+{d_connector}|devant)\s*(.{{2,90}}?)(?:[.,;]|$)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, normalized, flags=re.IGNORECASE)
+        if not match:
+            continue
+
+        candidate = _normalize_ws(match.group(1))
+        candidate = re.sub(r"\b(?:tot|t[oô]t)\s+le\s+matin\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+        candidate = re.sub(r"\b(?:matin|apres\s*midi|soir|nuit)\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+        candidate = re.sub(r"\b(?:a|a\s+partir\s+de)\s+\d{1,2}(?:h|:\d{2})?(?:\s*(?:am|pm|du\s+matin|du\s+soir))?\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+        candidate = re.sub(r"\b(?:le|des|d[èe]s)\s+\d{1,2}(?:er)?(?:\s+[a-z]+)?\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+        candidate = re.sub(r"\b(?:car|parce\s+que|afin\s+de|pour)\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+        candidate = re.sub(r"^(?:l\s+|le\s+|la\s+|les\s+|un\s+|une\s+)", "", candidate, flags=re.IGNORECASE).strip()
+
+        if len(candidate) >= 2:
+            return _capitalize_entity(_clean_entity_text(candidate))
+
+    if "entree" in normalized:
+        return "Entree principale"
+
+    return ""
+
+
+def _extract_arrival_time(text):
+    normalized = _norm(_normalize_ws(text))
+    if not normalized:
+        return ""
+
+    patterns = [
+        r"\b(\d{1,2}(?:[:h]\d{2})?\s*(?:am|pm|du\s+matin|du\s+soir))\b",
+        r"\b((?:tot|t[oô]t)\s+le\s+matin)\b",
+        r"\b(a\s+partir\s+de\s+\d{1,2}(?:[:h]\d{2})?)\b",
+        r"\b(\d{1,2}\s*du\s+matin)\b",
+        r"\b(le\s+matin|matin|apres\s*midi|soir|nuit)\b",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, normalized, flags=re.IGNORECASE)
+        if not match:
+            continue
+        value = _normalize_ws(match.group(1))
+        if value:
+            return value[:1].upper() + value[1:]
+
+    return ""
+
+
+def _clean_subject_like_name(value):
+    candidate = _normalize_ws(str(value or ""))
+    if not candidate:
+        return ""
+
+    normalized = _norm(candidate)
+    if not normalized:
+        return ""
+
+    candidate = re.sub(r"\b(?:du|de|depuis)\s+[a-zà-ÿ\s]{2,40}\s+(?:vers|a|à)\s+[a-zà-ÿ\s]{2,40}\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+    candidate = re.sub(r"\b(?:debut|debute|a partir de|des|d[èe]s|le)\s+\d{1,2}(?:er)?(?:\s+[a-z]+)?\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+    candidate = re.sub(r"\b(?:car|parce\s+que|afin\s+de|pour)\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+    candidate = re.sub(r"\s{2,}", " ", candidate).strip(" ,;:-")
+
+    words = candidate.split()
+    if len(words) > 6:
+        candidate = " ".join(words[:6])
+
+    return candidate
+
+
 def _extract_keywords(text, limit=8):
     tokens = _tokenize(text, use_bigrams=False)
     filtered = [t for t in tokens if t not in STOPWORDS and len(t) >= 3]
@@ -1204,6 +1662,335 @@ def _extract_autre_feedback_samples(request_data):
         })
 
     return samples
+
+
+def _feedback_similarity_score(source_text, sample):
+    if not isinstance(sample, dict):
+        return 0.0
+
+    source_tokens = set(_tokenize(source_text, use_bigrams=False))
+    if not source_tokens:
+        return 0.0
+
+    prompt = _normalize_ws(sample.get("prompt", ""))
+    general = sample.get("general") if isinstance(sample.get("general"), dict) else {}
+    details = sample.get("details") if isinstance(sample.get("details"), dict) else {}
+
+    sample_chunks = [prompt]
+    if general:
+        sample_chunks.extend(str(v) for v in general.values() if isinstance(v, str) and v.strip())
+    if details:
+        sample_chunks.extend(str(v) for v in details.values() if isinstance(v, str) and v.strip())
+    sample_text = _normalize_ws(" ".join(sample_chunks))
+    sample_tokens = set(_tokenize(sample_text, use_bigrams=False))
+    if not sample_tokens:
+        return 0.0
+
+    overlap = len(source_tokens & sample_tokens)
+    if overlap <= 0:
+        return 0.0
+
+    jaccard = overlap / float(max(1, len(source_tokens | sample_tokens)))
+    source_coverage = overlap / float(max(1, len(source_tokens)))
+    return (0.65 * jaccard) + (0.35 * source_coverage)
+
+
+def _pick_similar_autre_feedback(source_text, feedback_samples, top_k=4, min_score=0.20):
+    ranked = []
+    all_samples = [s for s in (feedback_samples or []) if isinstance(s, dict)]
+    total = len(all_samples)
+    for index, sample in enumerate(all_samples):
+        score = _feedback_similarity_score(source_text, sample)
+        recency_bonus = 0.0
+        if total > 1:
+            recency_bonus = 0.06 * (index / float(total - 1))
+        final_score = score + recency_bonus
+        if final_score < min_score:
+            continue
+        ranked.append((final_score, sample))
+
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return ranked[:max(1, int(top_k))]
+
+
+def _get_feedback_detail_value(details, target_key):
+    if not isinstance(details, dict) or not target_key:
+        return ""
+
+    direct = details.get(target_key)
+    if isinstance(direct, (str, int, float)):
+        normalized_direct = _normalize_ws(str(direct))
+        if normalized_direct:
+            return normalized_direct
+
+    target_canonical = _canonical_field_key(target_key)
+    for raw_key, raw_value in details.items():
+        if _canonical_field_key(str(raw_key)) != target_canonical:
+            continue
+        if isinstance(raw_value, (str, int, float)):
+            normalized_value = _normalize_ws(str(raw_value))
+            if normalized_value:
+                return normalized_value
+
+    return ""
+
+
+def _is_generic_detail_value(key, value, source):
+    normalized_value = _norm(_normalize_ws(value))
+    if not normalized_value:
+        return True
+
+    if len(normalized_value) <= 3:
+        return True
+
+    if normalized_value in {"a definir", "autre", "na", "n a", "none", "null"}:
+        return True
+
+    nk = _norm(key)
+    if "description" in nk and normalized_value == _norm(source):
+        return True
+
+    return False
+
+
+def _field_semantic_bucket(key):
+    nk = _norm(str(key or ""))
+    if any(token in nk for token in ["date"]):
+        return "date"
+    if any(token in nk for token in ["horaire", "heure"]):
+        return "time"
+    if any(token in nk for token in ["zone", "lieu", "destination", "depart", "emplacement", "localisation"]):
+        return "location"
+    if any(token in nk for token in ["description", "justification", "contexte", "motif", "besoin"]):
+        return "long_text"
+    if any(token in nk for token in ["type", "niveau", "priorite"]):
+        return "label"
+    return "text"
+
+
+def _sanitize_value_for_field(key, value, source=""):
+    raw_value = _normalize_ws(value)
+    if not raw_value:
+        return ""
+
+    bucket = _field_semantic_bucket(key)
+    normalized = _norm(raw_value)
+
+    if bucket == "date":
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", raw_value):
+            return raw_value
+        date_value, _ = _extract_date_range(raw_value)
+        return date_value or ""
+
+    if bucket == "time":
+        return _extract_arrival_time(raw_value)
+
+    if bucket == "location":
+        candidate = dyn_extract.extract_descriptive_location(source or raw_value) or dyn_extract.extract_descriptive_location(raw_value)
+        if not candidate:
+            candidate = _extract_parking_zone(raw_value)
+        if not candidate:
+            candidate = _capitalize_entity(_clean_entity_text(raw_value))
+        candidate = _normalize_ws(candidate)
+        if not candidate:
+            return ""
+        if len(candidate) > 52:
+            return ""
+        if len(candidate.split()) > 10:
+            return ""
+        if any(tok in _norm(candidate) for tok in ["demande", "souhaite", "veux", "besoin", "justification"]):
+            return ""
+        return candidate
+
+    if bucket == "label":
+        if len(raw_value.split()) > 5:
+            return ""
+        return raw_value
+
+    if bucket == "long_text":
+        if source and _norm(raw_value) == _norm(source):
+            return raw_value
+        return raw_value[:320]
+
+    if len(normalized) <= 2:
+        return ""
+    if len(raw_value) > 120:
+        return ""
+    return raw_value
+
+
+def _source_supports_field_override(source, key):
+    source_text = _normalize_ws(str(source or ""))
+    if not source_text:
+        return False
+
+    bucket = _field_semantic_bucket(key)
+    normalized_source = _norm(source_text)
+
+    if bucket == "date":
+        date_start, date_end = _extract_date_range(source_text)
+        if date_start or date_end:
+            return True
+        return bool(re.search(r"\b(?:le|des|d[èe]s|a\s+partir\s+de)\s+\d{1,2}\b", normalized_source))
+
+    if bucket == "time":
+        return "" != _extract_arrival_time(source_text)
+
+    if bucket == "location":
+        if _extract_parking_zone(source_text):
+            return True
+        return bool(re.search(r"\b(?:de|depuis)\s+.+\s+(?:vers|a|à)\s+.+", normalized_source))
+
+    return True
+
+
+def _feedback_detail_overrides(source, allowed_keys, ranked_feedback, regenerate_count=0):
+    overrides = {}
+    if not allowed_keys or not ranked_feedback:
+        return overrides
+
+    for raw_key in allowed_keys:
+        key = str(raw_key)
+        if _field_semantic_bucket(key) == "long_text":
+            continue
+        if not _source_supports_field_override(source, key):
+            continue
+        weighted_values = {}
+        for score, sample in ranked_feedback:
+            details = sample.get("details") if isinstance(sample.get("details"), dict) else {}
+            candidate = _get_feedback_detail_value(details, key)
+            if not candidate:
+                continue
+            candidate = _sanitize_value_for_field(key, candidate, source)
+            if not candidate:
+                continue
+            weighted_values[candidate] = weighted_values.get(candidate, 0.0) + float(score)
+
+        if not weighted_values:
+            continue
+
+        ranked_values = sorted(weighted_values.items(), key=lambda item: item[1], reverse=True)
+        pick_index = min(max(0, int(regenerate_count or 0)), len(ranked_values) - 1)
+        best_value, best_weight = ranked_values[pick_index]
+        if best_weight >= 0.26:
+            overrides[key] = best_value
+
+    return overrides
+
+
+def _feedback_context_overrides(ranked_feedback, source=""):
+    context = {}
+    if not ranked_feedback:
+        return context
+
+    for score, sample in ranked_feedback:
+        if score < 0.40:
+            continue
+        details = sample.get("details") if isinstance(sample.get("details"), dict) else {}
+        if not details:
+            continue
+
+        for raw_key, raw_value in details.items():
+            if not isinstance(raw_value, (str, int, float)):
+                continue
+            value = _normalize_ws(str(raw_value))
+            if not value:
+                continue
+
+            nkey = _norm(str(raw_key))
+            if "type_transport" in nkey and "type_transport_souhaite" not in context:
+                candidate = _sanitize_value_for_field("type_transport_souhaite", value)
+                if candidate and _source_supports_field_override(source, "type_transport_souhaite"):
+                    context["type_transport_souhaite"] = candidate
+            elif ("lieu_depart" in nkey or "depart" == nkey) and "lieu_depart_actuel" not in context:
+                candidate = _sanitize_value_for_field("lieu_depart_actuel", value)
+                if candidate and _source_supports_field_override(source, "lieu_depart_actuel"):
+                    context["lieu_depart_actuel"] = candidate
+            elif ("lieu_souhaite" in nkey or "destination" in nkey or "zone" in nkey or "emplacement" in nkey) and "lieu_souhaite" not in context:
+                candidate = _sanitize_value_for_field("lieu_souhaite", value)
+                if candidate and _source_supports_field_override(source, "lieu_souhaite"):
+                    context["lieu_souhaite"] = candidate
+            elif ("horaire" in nkey or "heure" in nkey) and "horaire_arrivee_parking" not in context:
+                candidate = _sanitize_value_for_field("horaire_arrivee_parking", value)
+                if candidate and _source_supports_field_override(source, "horaire_arrivee_parking"):
+                    context["horaire_arrivee_parking"] = candidate
+            elif "type_formation" in nkey and "type_formation" not in context:
+                candidate = _sanitize_value_for_field("type_formation", value)
+                if candidate:
+                    context["type_formation"] = candidate
+            elif "nom_formation" in nkey and "nom_formation" not in context:
+                candidate = _sanitize_value_for_field("nom_formation", value)
+                if candidate:
+                    context["nom_formation"] = candidate
+            elif "date" in nkey and "date_souhaitee" not in context and re.match(r"^\d{4}-\d{2}-\d{2}$", value):
+                candidate = _sanitize_value_for_field("date_souhaitee", value)
+                if candidate and _source_supports_field_override(source, "date_souhaitee"):
+                    context["date_souhaitee"] = candidate
+
+    return context
+
+
+def _feedback_custom_field_overrides(ranked_feedback, source="", regenerate_count=0):
+    overrides = {}
+    if not ranked_feedback:
+        return overrides
+
+    weighted = {}
+    for score, sample in ranked_feedback:
+        if score < 0.20:
+            continue
+
+        details = sample.get("details") if isinstance(sample.get("details"), dict) else {}
+        for raw_key, raw_value in details.items():
+            key = _normalize_ws(str(raw_key))
+            if not key.startswith("ai_"):
+                continue
+            if _field_semantic_bucket(key) == "long_text":
+                continue
+            if not _source_supports_field_override(source, key):
+                continue
+            if not isinstance(raw_value, (str, int, float)):
+                continue
+            value = _normalize_ws(str(raw_value))
+            if not value:
+                continue
+            value = _sanitize_value_for_field(key, value)
+            if not value:
+                continue
+            weighted.setdefault(key, {})
+            weighted[key][value] = weighted[key].get(value, 0.0) + float(score)
+
+        field_plan = sample.get("fieldPlan") if isinstance(sample.get("fieldPlan"), dict) else {}
+        add_fields = field_plan.get("add") if isinstance(field_plan.get("add"), list) else []
+        for field in add_fields:
+            if not isinstance(field, dict):
+                continue
+            key = _normalize_ws(str(field.get("key", "")))
+            if not key.startswith("ai_"):
+                continue
+            if _field_semantic_bucket(key) == "long_text":
+                continue
+            if not _source_supports_field_override(source, key):
+                continue
+            value = _normalize_ws(str(field.get("value", "")))
+            if not value:
+                continue
+            value = _sanitize_value_for_field(key, value)
+            if not value:
+                continue
+            weighted.setdefault(key, {})
+            weighted[key][value] = weighted[key].get(value, 0.0) + float(score)
+
+    for key, value_weights in weighted.items():
+        if not value_weights:
+            continue
+        ranked_values = sorted(value_weights.items(), key=lambda item: item[1], reverse=True)
+        pick_index = min(max(0, int(regenerate_count or 0)), len(ranked_values) - 1)
+        best_value, best_weight = ranked_values[pick_index]
+        if best_weight >= 0.22:
+            overrides[key] = best_value
+
+    return overrides
 
 
 def _normalize_training_samples(raw):
@@ -1595,6 +2382,7 @@ def _build_context_fields(corrected_text, intents):
         nom = dyn_extract.extract_subject_name(corrected_text, "formation", STOPWORDS, MONTH_ALIASES)
         if not nom and "certification" in normalized:
             nom = dyn_extract.extract_subject_name(corrected_text, "certification", STOPWORDS, MONTH_ALIASES)
+        nom = _clean_subject_like_name(nom)
         if nom:
             fields["nom_formation"] = nom
 
@@ -1623,6 +2411,18 @@ def _build_context_fields(corrected_text, intents):
                 detected_transport = label
                 break
         fields["type_transport_souhaite"] = detected_transport or "A definir"
+
+    if "parking" in intent_names or any(
+        marker in normalized
+        for marker in ["parking", "stationnement", "place reservee", "place reserve", "acces parking", "badge parking"]
+    ):
+        zone = _extract_parking_zone(corrected_text)
+        if zone:
+            fields["zone_souhaitee_parking"] = zone
+
+        horaire = _extract_arrival_time(corrected_text)
+        if horaire:
+            fields["horaire_arrivee_parking"] = horaire
 
     # Build description from intents
     desc_parts = ["Demande"]
@@ -1915,16 +2715,62 @@ def _detail_default_value(key, corrected, priorite, urgency_options, title):
 
 
 def _append_custom_field(custom_fields, key, label, field_type, required, value="", options=None):
+    sanitized_value = _sanitize_value_for_field(key, value)
+    if field_type in ["textarea", "text"] and not sanitized_value and _normalize_ws(value):
+        sanitized_value = _normalize_ws(value)
+
     field = {
         "key": key,
         "label": label,
         "type": field_type,
         "required": bool(required),
-        "value": _normalize_ws(value),
+        "value": sanitized_value,
     }
     if field_type == "select":
         field["options"] = [str(opt) for opt in (options or []) if str(opt).strip()]
     custom_fields.append(field)
+
+
+def _rotate_regenerate_select_value(field, regenerate_count):
+    if not isinstance(field, dict):
+        return
+    if str(field.get("type", "")).strip().lower() != "select":
+        return
+
+    options = [str(opt).strip() for opt in (field.get("options") or []) if str(opt).strip()]
+    if len(options) <= 1:
+        return
+
+    current = _normalize_ws(field.get("value", ""))
+    try:
+        current_index = options.index(current)
+    except ValueError:
+        current_index = 0
+
+    shift = max(1, int(regenerate_count or 1))
+    field["value"] = options[(current_index + shift) % len(options)]
+
+
+def _apply_regenerate_variation(custom_fields, regenerate_count, context_fields=None):
+    if int(regenerate_count or 0) <= 0:
+        return
+
+    context_fields = context_fields or {}
+    transport_signal = _normalize_ws(context_fields.get("type_transport_souhaite", ""))
+    explicit_transport = bool(transport_signal) and _norm(transport_signal) not in {"a definir", "a_definir", "indefini"}
+    explicit_formation = bool(_normalize_ws(context_fields.get("type_formation", "")))
+
+    for field in custom_fields or []:
+        key = _normalize_ws(str((field or {}).get("key", "")))
+        if not key:
+            continue
+
+        if key == "ai_type_transport" and not explicit_transport:
+            _rotate_regenerate_select_value(field, regenerate_count)
+        elif key == "ai_type_formation" and not explicit_formation:
+            _rotate_regenerate_select_value(field, regenerate_count)
+        elif key == "ai_type_stationnement":
+            _rotate_regenerate_select_value(field, regenerate_count)
 
 
 def _build_autre_custom_fields(source, details, context_fields, intents):
@@ -1939,8 +2785,10 @@ def _build_autre_custom_fields(source, details, context_fields, intents):
 
     has_parking_context = (
         "parking" in intent_names
-        or "parking" in normalized
-        or "stationnement" in normalized
+        or any(
+            marker in normalized
+            for marker in ["parking", "stationnement", "place reservee", "place reserve", "acces parking", "badge parking"]
+        )
     )
 
     has_transport_context = _has_transport_context(source, intent_names, context_fields)
@@ -1952,6 +2800,17 @@ def _build_autre_custom_fields(source, details, context_fields, intents):
         or context_fields.get("type_formation")
         )
     )
+    has_workspace_context = (
+        not has_parking_context
+        and (
+            "workplace" in intent_names
+            or "espace travail" in intent_names
+            or any(
+                token in normalized
+                for token in ["bureau", "espace de travail", "espace travail", "poste de travail", "fenetre", "fenetre", "porte", "salle de pause"]
+            )
+        )
+    )
 
     if has_parking_context:
         parking_type = "Place reservee"
@@ -1960,17 +2819,17 @@ def _build_autre_custom_fields(source, details, context_fields, intents):
         elif "acces parking" in normalized or "badge parking" in normalized:
             parking_type = "Acces parking"
 
-        zone = ""
-        zone_match = re.search(
-            r"\b(?:devant|pres de|proche de|a cote de|vers)\s+(.{3,60}?)(?:[.,;]|$)",
-            normalized,
-            flags=re.IGNORECASE,
-        )
-        if zone_match:
-            zone = _capitalize_entity(_clean_entity_text(zone_match.group(1)))
-            zone = re.sub(r"^(?:L\s+|Le\s+|La\s+|Les\s+|Un\s+|Une\s+)", "", zone, flags=re.IGNORECASE).strip()
+        zone = _normalize_ws(context_fields.get("zone_souhaitee_parking", ""))
+        if not zone and has_parking_context:
+            zone = _normalize_ws(dyn_extract.extract_descriptive_location(source, "parking"))
         if not zone:
-            zone = "Entree principale" if "entree" in normalized else ""
+            zone = _extract_parking_zone(source)
+        if not zone:
+            if "entree" in normalized or "principale" in normalized:
+                zone = "Entree principale"
+            else:
+                zone = ""
+        horaire_arrivee = _normalize_ws(context_fields.get("horaire_arrivee_parking", "")) or _extract_arrival_time(source)
 
         _append_custom_field(
             custom_fields,
@@ -1995,7 +2854,7 @@ def _build_autre_custom_fields(source, details, context_fields, intents):
             "Horaire habituel d arrivee",
             "text",
             False,
-            "",
+            horaire_arrivee,
         )
         _append_custom_field(
             custom_fields,
@@ -2005,6 +2864,18 @@ def _build_autre_custom_fields(source, details, context_fields, intents):
             True,
             description_value,
         )
+
+    if has_workspace_context:
+        localisation = _normalize_ws(dyn_extract.extract_descriptive_location(source, "espace"))
+        if localisation:
+            _append_custom_field(
+                custom_fields,
+                "ai_localisation_souhaitee",
+                "Localisation souhaitee",
+                "text",
+                False,
+                localisation,
+            )
 
     if has_formation_context:
         _append_custom_field(
@@ -2160,12 +3031,6 @@ def _generic_custom_field_definition(key, value):
             "key": "ai_nom_formation",
             "label": "Nom de la formation",
             "type": "text",
-            "required": True,
-        },
-        "description_detaillee_besoin": {
-            "key": "ai_description_detaillee",
-            "label": "Description detaillee du besoin",
-            "type": "textarea",
             "required": True,
         },
     }
@@ -2379,88 +3244,111 @@ def _build_autre_response(request_data, prompt):
     context = _extract_json_value(prompt, "Contexte utilisateur: ")
     if not isinstance(context, dict):
         context = {}
-    allowed_keys = _extract_json_value(prompt, "Les cles details autorisees sont: ")
-    required_keys = _extract_json_value(prompt, "Cles details obligatoires: ")
-    urgency_options = _extract_json_value(prompt, "- niveauUrgenceAutre: une valeur parmi ")
-    if not isinstance(allowed_keys, list):
-        allowed_keys = ["besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre"]
-    if not isinstance(required_keys, list):
-        required_keys = []
-    if not isinstance(urgency_options, list):
-        urgency_options = ["Faible", "Normale", "Urgente", "Tres urgente"]
 
-    autre_feedback = _extract_autre_feedback_samples(request_data)
-    dynamic_vocabulary = _collect_dynamic_vocabulary(autre_feedback)
     raw_source = (
-        context.get("userPromptAutre") or context.get("descriptionGenerale")
-        or context.get("titre") or _extract_text_from_payload(request_data, prompt) or ""
+        context.get("userPromptAutre")
+        or context.get("descriptionGenerale")
+        or context.get("titre")
+        or _extract_text_from_payload(request_data, prompt)
+        or ""
     )
-    source = _auto_correct_text(raw_source, dynamic_vocabulary)
+    source = _normalize_ws(raw_source)
+    if not source:
+        source = _normalize_ws(prompt)
 
-    training_raw = _extract_training_samples(request_data, prompt)
-    models = _train_all_models(_augment_training_samples(training_raw))
+    explicit_urgency = _autre_detect_explicit_urgency(source)
 
-    # Use decision matrix for priority
-    intents = _detect_intents(source)
-    it, ist = _infer_general_type_and_subtype(source)
-    date_debut, _ = _extract_date_range(source)
-    amt = _extract_amount(source)
-    ctx = {
-        "raw_text": source, "inferred_type": it, "inferred_subtype": ist,
-        "days_until_deadline": _days_until(date_debut),
-        "amount": float(amt) if amt else None,
+    miner = _load_autre_pattern_miner()
+    extractor = dyn_extract.BoundaryAwareExtractor()
+    generator = dyn_extract.DynamicFieldGenerator()
+    intents = generator.analyze_intent(source)
+    rule_fields = extractor.extract_all_fields(source, intents)
+    if explicit_urgency:
+        base_priority_label = explicit_urgency["priority"]
+        priority_confidence = 1.0
+    else:
+        base_priority_label, priority_confidence = miner.suggest_priority(source)
+
+    title = _autre_build_title(source, rule_fields, intents)
+    description = _autre_build_description(source, title)
+
+    generated_plan = generator.generate_field_plan(source, intents, miner)
+    custom_fields = []
+    base_keys = {"besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre", "dateSouhaiteeAutre"}
+    seen_custom_keys = set()
+    for field in generated_plan:
+        if not isinstance(field, dict):
+            continue
+        key = _normalize_ws(field.get("key", ""))
+        if not key or key in base_keys or key.endswith("_extra"):
+            continue
+        if generator._field_semantic_bucket(key) == "long_text" and _normalize_ws(field.get("source", "")) == "inferred":
+            continue
+        if key in seen_custom_keys:
+            continue
+        seen_custom_keys.add(key)
+        raw_value = _normalize_ws(field.get("value", ""))
+        cleaned_value = _autre_clean_field_value(key, raw_value, source, extractor)
+        if not cleaned_value:
+            if generator._field_semantic_bucket(key) != "long_text":
+                predicted_value, predicted_confidence = miner.predict_field(key, source)
+                if predicted_value and predicted_confidence >= 0.25:
+                    cleaned_value = _autre_clean_field_value(key, predicted_value, source, extractor)
+        if not cleaned_value and key in rule_fields:
+            cleaned_value = _autre_clean_field_value(key, rule_fields.get(key, ""), source, extractor)
+        field["value"] = cleaned_value
+        if "options" in field and not isinstance(field.get("options"), list):
+            field["options"] = []
+        custom_fields.append(field)
+
+    # Miner corrections are applied after the rule-based extraction so the final
+    # values stay boundary-safe even if the prompt is noisy.
+    for field in custom_fields:
+        key = _normalize_ws(field.get("key", ""))
+        if not key:
+            continue
+        if generator._field_semantic_bucket(key) == "long_text":
+            continue
+        predicted_value, predicted_confidence = miner.predict_field(key, source)
+        current_value = _normalize_ws(field.get("value", ""))
+        cleaned_prediction = _autre_clean_field_value(key, predicted_value, source, extractor)
+        if cleaned_prediction and (
+            not current_value
+            or predicted_confidence >= 0.8
+            or any(token in current_value.lower() for token in ["pour", "le", "du", "des", "vers"])
+        ):
+            field["value"] = cleaned_prediction
+
+    details = {
+        "besoinPersonnalise": title,
+        "descriptionBesoin": rule_fields.get("descriptionBesoin") or description,
+        "niveauUrgenceAutre": explicit_urgency["urgency"] if explicit_urgency else _autre_priority_to_base_label(base_priority_label, priority_confidence),
+        "dateSouhaiteeAutre": rule_fields.get("dateSouhaiteeAutre") or rule_fields.get("ai_date_souhaitee_metier") or extractor.extract_date(source) or "",
     }
-    matrix_pri, _, _ = _compute_priority_via_matrix(source, ctx)
-    priorite = _map_priority_to_allowed(matrix_pri, ["HAUTE", "NORMALE", "BASSE"])
-    if models:
-        ml_pri, ml_pri_conf = _predict_with_ensemble(models, source, ["HAUTE", "NORMALE", "BASSE"], "priority")
-        if ml_pri and ml_pri_conf >= 0.55:
-            priorite = ml_pri
 
-    intents = _detect_intents(source)
-    context_fields = _build_context_fields(source, intents)
-    gen_title = _normalize_ws(str(context.get("titre") or "")) or _build_autre_title(source, context_fields, intents)
-    gen_desc = source or gen_title
+    if not details["besoinPersonnalise"]:
+        details["besoinPersonnalise"] = _autre_build_title(source, rule_fields, intents)
 
-    details_current = context.get("detailsActuels")
-    if not isinstance(details_current, dict):
-        details_current = {}
+    if not details["descriptionBesoin"]:
+        details["descriptionBesoin"] = description
 
-    details = {}
-    for k in allowed_keys:
-        key = str(k)
-        raw = details_current.get(key)
-        val = _normalize_ws(raw) if isinstance(raw, (str, int, float)) else ""
-        if val == "":
-            val = _detail_default_value(key, source, priorite, urgency_options, gen_title)
-        if val == "":
-            if key == "descriptionBesoin":
-                val = _normalize_ws(context_fields.get("description_detaillee_besoin", ""))
-            elif key == "dateSouhaiteeAutre":
-                val = _normalize_ws(context_fields.get("date_souhaitee", ""))
-        if val != "" or key in required_keys:
-            details[key] = val
-    for k in required_keys:
-        rk = str(k)
-        if rk not in details:
-            details[rk] = _detail_default_value(rk, source, priorite, urgency_options, gen_title)
+    general = {
+        "titre": title,
+        "description": description,
+        "priorite": explicit_urgency["priority"] if explicit_urgency else _autre_base_priority(base_priority_label),
+    }
 
-    if context_fields.get("description_detaillee_besoin"):
-        details["descriptionBesoin"] = _normalize_ws(context_fields["description_detaillee_besoin"])
-        gen_desc = details["descriptionBesoin"]
-
-    if context_fields.get("date_souhaitee") and "dateSouhaiteeAutre" in allowed_keys:
-        details["dateSouhaiteeAutre"] = _normalize_ws(context_fields["date_souhaitee"])
-
-    custom_fields = _build_autre_custom_fields(source, details, context_fields, intents)
+    if explicit_urgency:
+        details["niveauUrgenceAutre"] = explicit_urgency["urgency"]
+        general["priorite"] = explicit_urgency["priority"]
 
     return {
         "correctedText": source,
-        "general": {"titre": gen_title, "description": gen_desc, "priorite": priorite},
+        "general": general,
         "details": details,
-        "remove_fields": [],
+        "remove_fields": ["ALL"],
         "custom_fields": custom_fields,
-        "replace_base": False,
+        "replace_base": True,
     }
 
 

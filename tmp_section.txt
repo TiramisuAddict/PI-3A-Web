@@ -1,0 +1,560 @@
+                'timeout' => $this->timeoutSeconds,
+            ]);
+
+            /** @var mixed $payload */
+            $payload = $response->toArray(false);
+
+            if (isset($payload['error']) && is_string($payload['error'])) {
+                throw new \RuntimeException('Hugging Face API error: ' . $payload['error']);
+            }
+
+            if (isset($payload['message']) && is_string($payload['message'])) {
+                throw new \RuntimeException('Hugging Face API error: ' . $payload['message']);
+            }
+
+            if (isset($payload['detail']) && is_string($payload['detail'])) {
+                throw new \RuntimeException('Hugging Face API error: ' . $payload['detail']);
+            }
+
+            if (isset($payload['generated_text']) && is_string($payload['generated_text'])) {
+                return $payload['generated_text'];
+            }
+
+            if (is_array($payload) && isset($payload[0]['generated_text']) && is_string($payload[0]['generated_text'])) {
+                return $payload[0]['generated_text'];
+            }
+
+            if (
+                isset($payload['choices']) &&
+                is_array($payload['choices']) &&
+                isset($payload['choices'][0]['message']['content']) &&
+                is_string($payload['choices'][0]['message']['content'])
+            ) {
+                return $payload['choices'][0]['message']['content'];
+            }
+
+            return json_encode($payload, JSON_UNESCAPED_UNICODE) ?: '';
+        } catch (\RuntimeException $e) {
+            $rawMessage = $e->getMessage();
+            $this->logger->error('Erreur Hugging Face description', ['exception' => $rawMessage]);
+            throw new \RuntimeException($this->toUserFriendlyMessage($rawMessage));
+        } catch (TransportExceptionInterface $e) {
+            $this->logger->error('Erreur transport Hugging Face description', ['exception' => $e->getMessage()]);
+            throw new \RuntimeException('Le service IA de description est temporairement indisponible.');
+        } catch (\Throwable $e) {
+            $this->logger->error('Erreur Hugging Face description', ['exception' => $e->getMessage()]);
+            throw new \RuntimeException('Erreur IA Hugging Face: ' . $e->getMessage());
+        }
+    }
+
+    private function toUserFriendlyMessage(string $rawMessage): string
+    {
+        $normalized = strtolower($rawMessage);
+
+        if (str_contains($normalized, 'sufficient permissions to call inference providers')) {
+            return 'Votre token Hugging Face n a pas la permission Inference Providers. Activez cette permission dans les parametres du token puis reessayez.';
+        }
+
+        if (str_contains($normalized, 'unauthorized') || str_contains($normalized, '401')) {
+            return 'Token Hugging Face invalide ou non autorise. Verifiez HUGGINGFACE_API_KEY.';
+        }
+
+        if (str_contains($normalized, 'rate limit')) {
+            return 'Limite Hugging Face atteinte. Patientez quelques instants puis reessayez.';
+        }
+
+        return $rawMessage;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function parseJsonResponse(string $rawText): array
+    {
+        $clean = trim($rawText);
+        if (str_starts_with($clean, '```')) {
+            $clean = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', $clean) ?? $clean;
+        }
+
+        $decoded = json_decode($clean, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        if (preg_match('/\{(?:[^{}]|(?R))*\}/s', $clean, $matches) === 1) {
+            $decoded = json_decode($matches[0], true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * @param array<string, mixed> $parsed
+     * @param array<int, string> $allowedKeys
+     * @param array<string, array<int, string>> $selectOptions
+     * @param array<string, mixed> $currentDetails
+     * @param array<string, mixed> $generalContext
+     * @return array<string, mixed>
+     */
+    private function normalizeSuggestions(
+        array $parsed,
+        array $allowedKeys,
+        array $requiredKeys,
+        array $selectOptions,
+        array $currentDetails,
+        array $generalContext
+    ): array {
+        $generalPayload = isset($parsed['general']) && is_array($parsed['general']) ? $parsed['general'] : [];
+        $detailsPayload = isset($parsed['details']) && is_array($parsed['details']) ? $parsed['details'] : $parsed;
+        $removePayload = isset($parsed['remove_fields']) && is_array($parsed['remove_fields']) ? $parsed['remove_fields'] : [];
+        $customPayload = isset($parsed['custom_fields']) && is_array($parsed['custom_fields']) ? $parsed['custom_fields'] : [];
+        $replaceBasePayload = $this->toBooleanFlag($parsed['replace_base'] ?? false);
+        $correctedTextPayload = trim((string) ($parsed['correctedText'] ?? ''));
+
+        $details = [];
+
+        foreach ($allowedKeys as $key) {
+            if (isset($detailsPayload[$key])) {
+                $details[$key] = is_scalar($detailsPayload[$key]) ? trim((string) $detailsPayload[$key]) : '';
+            }
+        }
+
+        $generatedDescription = trim((string) ($details['descriptionBesoin'] ?? ''));
+        if ('' === $generatedDescription) {
+            $generatedDescription = $this->firstNonEmpty(
+                trim((string) ($generalPayload['description'] ?? '')),
+                trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                trim((string) ($generalContext['description'] ?? ''))
+            );
+        }
+
+        $priorite = strtoupper(trim((string) ($generalPayload['priorite'] ?? $generalContext['priorite'] ?? 'NORMALE')));
+        if (!in_array($priorite, ['HAUTE', 'NORMALE', 'BASSE'], true)) {
+            $priorite = 'NORMALE';
+        }
+
+        $suggestedGeneral = [
+            'titre' => $this->firstNonEmpty(
+                trim((string) ($generalPayload['titre'] ?? '')),
+                trim((string) ($details['besoinPersonnalise'] ?? '')),
+                trim((string) ($generalContext['titre'] ?? '')),
+                'Demande personnalisee'
+            ),
+            'description' => $this->firstNonEmpty(
+                trim((string) ($generalPayload['description'] ?? '')),
+                trim((string) ($details['descriptionBesoin'] ?? '')),
+                trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                trim((string) ($generalContext['description'] ?? ''))
+            ),
+            'priorite' => $priorite,
+            'categorie' => $this->firstNonEmpty(
+                trim((string) ($generalPayload['categorie'] ?? '')),
+                trim((string) ($generalContext['categorie'] ?? '')),
+                'Autre'
+            ),
+        ];
+
+        $removeFields = [];
+        foreach ($removePayload as $removeKeyRaw) {
+            $removeKey = trim((string) $removeKeyRaw);
+            if ('' === $removeKey) {
+                continue;
+            }
+
+            $removeFields[$removeKey] = true;
+        }
+
+        $customFields = [];
+        foreach ($customPayload as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $customFields[] = $field;
+            if (count($customFields) >= 8) {
+                break;
+            }
+        }
+
+        $correctedText = $this->firstNonEmpty(
+            $correctedTextPayload,
+            trim((string) ($generalPayload['description'] ?? '')),
+            trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+            trim((string) ($details['descriptionBesoin'] ?? ''))
+        );
+        $correctedText = trim((string) (preg_replace('/\s+/u', ' ', $correctedText) ?? $correctedText));
+
+        $replaceBase = $replaceBasePayload;
+        $dynamicFieldConfidence = $this->buildAutrePlanConfidence(
+            $customFields,
+            array_values(array_keys($removeFields)),
+            $replaceBase,
+            $correctedText,
+            $generatedDescription
+        );
+
+        return [
+            'correctedText' => $correctedText,
+            'generatedDescription' => $generatedDescription,
+            'suggestedGeneral' => $suggestedGeneral,
+            'suggestedDetails' => $details,
+            'dynamicFieldPlan' => [
+                'add' => $customFields,
+                'remove' => array_values(array_keys($removeFields)),
+                'replaceBase' => $replaceBase,
+            ],
+            'dynamicFieldConfidence' => $dynamicFieldConfidence,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $generalContext
+     * @param array<string, string> $details
+     * @return array<int, array<string, mixed>>
+     */
+    private function inferCustomFieldsFromDescription(array $generalContext, array $details): array
+    {
+        $rawText = $this->buildInferenceText($generalContext);
+        $text = strtolower($rawText);
+        $customFields = [];
+
+        $intentScores = $this->computePromptIntentScores($rawText);
+        $dominantIntent = $this->resolveDominantIntent($intentScores);
+
+        $amount = $this->extractAmountFromText($text);
+        $date = $this->extractFrenchDate($generalContext);
+        $routeLocations = $this->extractRouteLocations($rawText);
+        $currentLocation = $this->firstNonEmpty($routeLocations['from'], $this->extractCurrentLocation($rawText));
+        $targetLocation = $this->firstNonEmpty($routeLocations['to'], $this->extractTargetLocation($rawText));
+
+        $hasClearTransportRoute = '' !== $currentLocation || '' !== $targetLocation;
+
+        $formationType = $this->inferFormationType($rawText);
+        $formationName = $this->firstNonEmpty(
+            $this->extractKnownFormationKeywordTopic($rawText),
+            $this->extractTrainingName($rawText),
+            $this->extractFormationTopic($rawText)
+        );
+
+        if ('' === $formationType && '' !== $formationName) {
+            $formationType = $this->inferDefaultFormationType($rawText, $formationName);
+        }
+
+        if ('' !== $formationName && $this->isLikelyLocationCandidate($formationName)) {
+            $formationName = '';
+        }
+
+        $hasParkingContext = ($intentScores['parking'] ?? 0) >= 2;
+        $hasWorkplaceContext = ($intentScores['workplace'] ?? 0) >= 2;
+        $hasFormationContext = (($intentScores['formation'] ?? 0) >= 2 || '' !== $formationType || '' !== $formationName)
+            && 'parking' !== $dominantIntent
+            && !$this->isFormationNoiseOnlyContext($rawText);
+        $hasTransportContext = ($intentScores['transport'] ?? 0) >= 2
+            && $this->containsAnyWord($rawText, ['transport', 'moyen de transport', 'trajet', 'navette', 'voyage'])
+            && 'parking' !== $dominantIntent;
+
+        if ($hasFormationContext || $hasTransportContext) {
+            if ($hasFormationContext) {
+                $customFields[] = [
+                    'key' => 'ai_type_formation',
+                    'label' => 'Type de formation',
+                    'type' => 'select',
+                    'required' => true,
+                    'value' => '' !== $formationType ? $formationType : 'Autre',
+                    'options' => ['Formation interne', 'Formation externe', 'Certification', 'Autre'],
+                ];
+
+                $customFields[] = [
+                    'key' => 'ai_nom_formation',
+                    'label' => 'Nom de la formation',
+                    'type' => 'text',
+                    'required' => true,
+                    'value' => $formationName,
+                ];
+            }
+
+            $customFields[] = [
+                'key' => 'ai_lieu_depart_actuel',
+                'label' => 'Lieu de depart actuel',
+                'type' => 'text',
+                'required' => true,
+                'value' => $currentLocation,
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_lieu_souhaite',
+                'label' => 'Lieu souhaite',
+                'type' => 'text',
+                'required' => true,
+                'value' => $targetLocation,
+            ];
+
+            if ($hasTransportContext || $this->containsWord($rawText, 'moyen de transport')) {
+                $customFields[] = [
+                    'key' => 'ai_type_transport',
+                    'label' => 'Type de transport souhaite',
+                    'type' => 'select',
+                    'required' => false,
+                    'value' => 'A definir',
+                    'options' => ['A definir', 'Bus', 'Train', 'Voiture de service', 'Taxi'],
+                ];
+            }
+        }
+
+        if (str_contains($text, 'avance') && str_contains($text, 'salaire')) {
+            $customFields[] = [
+                'key' => 'ai_type_besoin',
+                'label' => 'Type de besoin financier',
+                'type' => 'select',
+                'required' => true,
+                'value' => 'Avance sur salaire',
+                'options' => ['Avance sur salaire', 'Aide exceptionnelle', 'Pret interne'],
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_motif_financier',
+                'label' => 'Motif financier',
+                'type' => 'textarea',
+                'required' => true,
+                'value' => $this->firstNonEmpty(
+                    trim((string) ($details['descriptionBesoin'] ?? '')),
+                    trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                    trim((string) ($generalContext['description'] ?? ''))
+                ),
+            ];
+        }
+
+        if ($hasParkingContext) {
+            $parkingType = 'Place reservee';
+            if ($this->containsAnyWord($rawText, ['autorisation temporaire', 'temporaire'])) {
+                $parkingType = 'Autorisation temporaire';
+            } elseif ($this->containsAnyWord($rawText, ['acces parking', 'badge parking', 'acces'])) {
+                $parkingType = 'Acces parking';
+            }
+
+            $customFields[] = [
+                'key' => 'ai_type_stationnement',
+                'label' => 'Type de demande parking',
+                'type' => 'select',
+                'required' => true,
+                'value' => $parkingType,
+                'options' => ['Place reservee', 'Acces parking', 'Autorisation temporaire', 'Autre'],
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_zone_souhaitee',
+                'label' => 'Zone ou emplacement souhaite',
+                'type' => 'text',
+                'required' => true,
+                'value' => $this->extractParkingZone($rawText),
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_horaire_arrivee',
+                'label' => 'Horaire habituel d arrivee',
+                'type' => 'text',
+                'required' => false,
+                'value' => $this->extractPreferredArrivalTime($rawText),
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_justification_stationnement',
+                'label' => 'Justification du besoin parking',
+                'type' => 'textarea',
+                'required' => true,
+                'value' => $this->firstNonEmpty(
+                    trim((string) ($details['descriptionBesoin'] ?? '')),
+                    $this->extractPrimaryIntentFromPrompt((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                    trim((string) ($generalContext['description'] ?? ''))
+                ),
+            ];
+        }
+
+        if ($hasWorkplaceContext && !$hasFormationContext && !$hasTransportContext) {
+            $workplaceType = $this->inferWorkplaceNeedType($rawText);
+            $workplaceLocation = $this->extractWorkplaceLocationHint($rawText);
+            $workplacePriority = $this->inferWorkplacePriority($rawText);
+
+            $customFields[] = [
+                'key' => 'ai_type_besoin_workplace',
+                'label' => 'Type de besoin logistique',
+                'type' => 'select',
+                'required' => true,
+                'value' => $workplaceType,
+                'options' => ['Casier securise', 'Espace calme', 'Ajustement eclairage', 'Autorisation interne', 'Amenagement poste', 'Autre'],
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_objet_besoin_workplace',
+                'label' => 'Objet de la demande',
+                'type' => 'text',
+                'required' => true,
+                'value' => $this->firstNonEmpty(
+                    $this->extractPrimaryIntentFromPrompt((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                    trim((string) ($details['descriptionBesoin'] ?? '')),
+                    trim((string) ($generalContext['description'] ?? ''))
+                ),
+            ];
+
+            $customFields[] = [
+                'key' => 'ai_justification_workplace',
+                'label' => 'Justification du besoin',
+                'type' => 'textarea',
+                'required' => true,
+                'value' => $this->firstNonEmpty(
+                    trim((string) ($details['descriptionBesoin'] ?? '')),
+                    trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                    trim((string) ($generalContext['description'] ?? ''))
+                ),
+            ];
+
+            if ('' !== $workplaceLocation) {
+                $customFields[] = [
+                    'key' => 'ai_zone_impactee_workplace',
+                    'label' => 'Zone ou poste concerne',
+                    'type' => 'text',
+                    'required' => false,
+                    'value' => $workplaceLocation,
+                ];
+            }
+
+            $customFields[] = [
+                'key' => 'ai_priorite_recommandee_workplace',
+                'label' => 'Priorite recommandee',
+                'type' => 'select',
+                'required' => false,
+                'value' => $workplacePriority,
+                'options' => ['Normale', 'Haute', 'Critique'],
+            ];
+
+            if ($this->containsAnyWord($rawText, ['confidentiel', 'confidentielle', 'securise', 'securisee', 'secure'])) {
+                $customFields[] = [
+                    'key' => 'ai_niveau_confidentialite',
+                    'label' => 'Niveau de confidentialite',
+                    'type' => 'select',
+                    'required' => false,
+                    'value' => 'Eleve',
+                    'options' => ['Standard', 'Eleve', 'Critique'],
+                ];
+            }
+        }
+
+        if (null !== $amount) {
+            $customFields[] = [
+                'key' => 'ai_montant_souhaite',
+                'label' => 'Montant souhaite (TND)',
+                'type' => 'number',
+                'required' => true,
+                'value' => (string) $amount,
+            ];
+        }
+
+        return $this->normalizeCustomFields($customFields, []);
+    }
+
+    /**
+     * @return array{parking:int,formation:int,transport:int,finance:int,workplace:int}
+     */
+    private function computePromptIntentScores(string $text): array
+    {
+        $scores = [
+            'parking' => 0,
+            'formation' => 0,
+            'transport' => 0,
+            'finance' => 0,
+            'workplace' => 0,
+        ];
+
+        $weightedKeywords = [
+            'parking' => [
+                'parking' => 3,
+                'stationnement' => 3,
+                'place de parking' => 3,
+                'place reservee' => 3,
+                'place reserve' => 3,
+                'acces parking' => 2,
+                'badge parking' => 2,
+                'entree' => 1,
+                'barriere' => 1,
+            ],
+            'formation' => [
+                'formation' => 3,
+                'certification' => 3,
+                'cours' => 2,
+                'training' => 2,
+                'type de formation' => 2,
+                'organisme de formation' => 2,
+            ],
+            'transport' => [
+                'deplacement' => 3,
+                'déplacement' => 3,
+                'transport' => 2,
+                'moyen de transport' => 3,
+                'trajet' => 2,
+                'navette' => 2,
+                'vers' => 1,
+            ],
+            'finance' => [
+                'salaire' => 3,
+                'avance sur salaire' => 4,
+                'remboursement' => 3,
+                'facture' => 2,
+                'montant' => 2,
+            ],
+            'workplace' => [
+                'casier' => 3,
+                'casiers' => 3,
+                'espace calme' => 3,
+                'appel confidentiel' => 3,
+                'appels confidentiels' => 3,
+                'confidentiel' => 2,
+                'securise' => 2,
+                'autorisation interne' => 3,
+                'journee benevolat' => 3,
+                'benevolat' => 2,
+                'eclairage' => 3,
+                'lumiere' => 2,
+                'fatigue visuelle' => 3,
+                'poste de travail' => 2,
+                'bureau' => 2,
+                'open space' => 2,
+            ],
+        ];
+
+        foreach ($weightedKeywords as $intent => $keywords) {
+            foreach ($keywords as $keyword => $weight) {
+                $keywordText = (string) $keyword;
+                $matched = $this->containsWord($text, $keywordText);
+                if (!$matched && str_contains($keywordText, ' ')) {
+                    // Fragment matching is restricted to multi-word phrases to avoid
+                    // collisions like "information" triggering "formation".
+                    $matched = $this->containsFragment($text, $keywordText);
+                }
+
+                if ($matched) {
+                    $scores[$intent] += (int) $weight;
+                }
+            }
+        }
+
+        return $scores;
+    }
+
+    /**
+    * @param array{parking:int,formation:int,transport:int,finance:int,workplace:int} $scores
+     */
+    private function resolveDominantIntent(array $scores): string
+    {
+        $dominant = '';
+        $maxScore = 0;
+
+        foreach ($scores as $intent => $score) {
+            if ($score > $maxScore) {
+                $maxScore = $score;
+                $dominant = (string) $intent;
+            }
+        }
+
