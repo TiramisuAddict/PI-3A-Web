@@ -104,14 +104,60 @@ def _normalize_autre_detail_items(details):
         return [
             {
                 "fieldKey": str(key),
-                "fieldValue": value,
+                "fieldValue": _sanitize_autre_training_value(str(key), value),
                 "fieldType": "text",
             }
             for key, value in details.items()
         ]
     if isinstance(details, list):
-        return [item for item in details if isinstance(item, dict)]
+        normalized_items = []
+        for item in details:
+            if not isinstance(item, dict):
+                continue
+            field_key = str(item.get("fieldKey") or item.get("key") or "")
+            normalized_items.append({
+                **item,
+                "fieldKey": field_key,
+                "fieldValue": _sanitize_autre_training_value(field_key, item.get("fieldValue") if "fieldValue" in item else item.get("value")),
+            })
+        return normalized_items
     return []
+
+
+def _sanitize_autre_training_value(field_key, value):
+    key = _normalize_ws(field_key)
+    if not key:
+        return _normalize_ws(value)
+
+    text = _normalize_ws(value)
+    if not text:
+        return ""
+
+    if key in {"dateSouhaiteeAutre", "ai_date_souhaitee_metier", "ai_date_fin_conge", "ai_date_souhaitee_extra"}:
+        return text if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text) else ""
+
+    if key == "ai_zone_souhaitee":
+        text = re.sub(r"\b(?:le|la|les|du|de|des)\s+\d{1,2}(?:er)?(?:\s+[a-zà-ÿ]+)?\b.*$", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\b(?:car|parce\s+que|afin\s+de|pour)\b.*$", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\b(?:tot|t[oô]t)\s+le\s+matin\b.*$", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\b(?:matin|apres\s*midi|soir|nuit)\b.*$", "", text, flags=re.IGNORECASE)
+        text = _normalize_ws(text).strip(" ,;:-")
+        if text:
+            text = text[:1].upper() + text[1:]
+        return text
+
+    if key == "ai_horaire_arrivee":
+        return text
+
+    if key in {"ai_nom_formation", "ai_lieu_depart_actuel", "ai_lieu_souhaite", "ai_systeme_concerne", "ai_localisation_souhaitee"}:
+        cleaned = dyn_extract.clean_entity_text(text)
+        return cleaned[:1].upper() + cleaned[1:] if cleaned else ""
+
+    if key.startswith("ai_") and ("justification" not in key and "description" not in key):
+        cleaned = dyn_extract.clean_entity_text(text)
+        return cleaned or text
+
+    return text
 
 
 def _normalize_autre_training_record(record):
@@ -315,9 +361,15 @@ def _autre_clean_field_value(field_key, field_value, prompt, extractor):
     if key == "ai_type_transport":
         extracted = extractor._infer_transport_type(prompt)
         return extracted or value
+    if key == "ai_zone_souhaitee":
+        extracted_zone = dyn_extract.extract_descriptive_location(prompt, "parking") or _extract_parking_zone(prompt)
+        return extracted_zone or value
+    if key == "ai_type_stationnement":
+        extracted_type = _infer_parking_type(prompt)
+        return extracted_type or value or "Place reservee"
     if key == "ai_type_conge":
         return extractor._infer_leave_type(prompt)
-    if key in {"ai_salle_souhaitee", "ai_zone_souhaitee", "ai_localisation_souhaitee", "ai_poste_souhaite", "ai_materiel_concerne", "ai_type_contrat", "ai_equipement_concerne"}:
+    if key in {"ai_salle_souhaitee", "ai_localisation_souhaitee", "ai_poste_souhaite", "ai_materiel_concerne", "ai_type_contrat", "ai_equipement_concerne"}:
         cleaned = dyn_extract.clean_entity_text(value)
         return cleaned or value
     if key in {"ai_justification_metier", "ai_description_probleme", "descriptionBesoin"}:
@@ -1043,7 +1095,6 @@ def _extract_location_pair(corrected_text):
     patterns = [
         r"\bde\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\b",
         r"\bdepuis\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\b",
-        r"\bde\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+(?:a|à|jusqu)\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\b",
         r"\bdepart\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b.*?\b(?:destination|arrivee)\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b",
     ]
 
@@ -1095,6 +1146,7 @@ def _parse_date_candidate(day, month, year):
 def _extract_date_range(text):
     normalized_text = str(text or "")
     extracted = []
+    current_dt = datetime.now()
 
     for m in re.finditer(r"\b(\d{4})-(\d{2})-(\d{2})\b", normalized_text):
         p = _parse_date_candidate(m.group(3), m.group(2), m.group(1))
@@ -1120,6 +1172,25 @@ def _extract_date_range(text):
             p = _parse_date_candidate(day, month_num, year)
             if p:
                 extracted.append(p)
+
+    for m in re.finditer(
+        rf"\b(\d{{1,2}})\s+{MONTH_PATTERN}\b",
+        lowered,
+        flags=re.IGNORECASE,
+    ):
+        if re.match(r"^\d{4}$", lowered[m.end():].strip()[:4]):
+            continue
+        day = int(m.group(1))
+        month_tok = _normalize_month_token(m.group(2))
+        month_num = MONTH_ALIASES.get(month_tok)
+        if not month_num:
+            continue
+        year = current_dt.year
+        if (month_num, day) < (current_dt.month, current_dt.day):
+            year += 1
+        p = _parse_date_candidate(day, month_num, year)
+        if p:
+            extracted.append(p)
 
     if not extracted:
         return None, None
@@ -1257,6 +1328,11 @@ def _extract_parking_zone(text):
         candidate = re.sub(r"\b(?:le|des|d[èe]s)\s+\d{1,2}(?:er)?(?:\s+[a-z]+)?\b.*$", "", candidate, flags=re.IGNORECASE).strip()
         candidate = re.sub(r"\b(?:car|parce\s+que|afin\s+de|pour)\b.*$", "", candidate, flags=re.IGNORECASE).strip()
         candidate = re.sub(r"^(?:l\s+|le\s+|la\s+|les\s+|un\s+|une\s+)", "", candidate, flags=re.IGNORECASE).strip()
+        candidate = re.sub(r"\bl\s+([a-zà-ÿ])", r"l'\1", candidate, flags=re.IGNORECASE)
+        candidate = re.sub(r"\bd\s+([a-zà-ÿ])", r"d'\1", candidate, flags=re.IGNORECASE)
+        candidate = re.sub(r"\bentrer\b", "entree", candidate, flags=re.IGNORECASE)
+        candidate = re.sub(r"\bsorti\b", "sortie", candidate, flags=re.IGNORECASE)
+        candidate = _normalize_ws(candidate).strip(" ,;:-")
 
         if len(candidate) >= 2:
             return _capitalize_entity(_clean_entity_text(candidate))
@@ -1264,6 +1340,19 @@ def _extract_parking_zone(text):
     if "entree" in normalized:
         return "Entree principale"
 
+    return ""
+
+
+def _infer_parking_type(text):
+    normalized = _norm(_normalize_ws(text))
+    if not normalized:
+        return ""
+    if "temporaire" in normalized:
+        return "Autorisation temporaire"
+    if "acces parking" in normalized or "badge parking" in normalized:
+        return "Acces parking"
+    if "parking" in normalized or "stationnement" in normalized or "place reservee" in normalized or "place reserve" in normalized:
+        return "Place reservee"
     return ""
 
 
@@ -2328,9 +2417,35 @@ def _has_transport_context(corrected_text, intent_names=None, context_fields=Non
 def _detect_route_pattern(corrected_text):
     """Detects if text contains a travel route pattern (de X vers Y)."""
     return bool(re.search(
-        r"\b(?:de|depuis)\s+[a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?\s+(?:vers|a|à|jusqu)\s+[a-zà-ÿ]{2,}",
+        r"\b(?:de|depuis)\s+[a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?\s+vers\s+[a-zà-ÿ]{2,}",
         _norm(corrected_text),
     ))
+
+
+def _detect_semantic_roles(text):
+    normalized = _norm(text)
+
+    finance_indicators = ["remboursement", "frais", "facture", "avance", "note"]
+    formation_indicators = ["formation", "certification", "atelier"]
+    parking_indicators = ["parking", "stationnement", "place"]
+    workspace_indicators = ["bureau", "salle", "espace"]
+    transport_indicators = ["transport", "deplacement", "trajet", "aller", "navette", "mission", "train", "bus", "taxi", "voiture", "vehicule", "avion", "vol"]
+
+    has_route = bool(
+        re.search(
+            r"\b(?:de|depuis)\s+[a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?\s+vers\s+[a-zà-ÿ]{2,}",
+            normalized,
+        )
+    )
+
+    return {
+        "has_route": has_route,
+        "has_finance": any(re.search(r"\b" + re.escape(indicator) + r"\b", normalized) for indicator in finance_indicators),
+        "has_formation": any(re.search(r"\b" + re.escape(indicator) + r"\b", normalized) for indicator in formation_indicators),
+        "has_parking": any(re.search(r"\b" + re.escape(indicator) + r"\b", normalized) for indicator in parking_indicators),
+        "has_workspace": any(re.search(r"\b" + re.escape(indicator) + r"\b", normalized) for indicator in workspace_indicators),
+        "has_transport_context": any(re.search(r"\b" + re.escape(indicator) + r"\b", normalized) for indicator in transport_indicators),
+    }
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -2344,8 +2459,8 @@ def _build_context_fields(corrected_text, intents):
     """
     fields = {}
     normalized = _norm(corrected_text)
-    intent_names = [i[0] for i in intents]
-    strong_transport = _has_transport_context(corrected_text, intent_names)
+    roles = _detect_semantic_roles(corrected_text)
+    strong_transport = bool(roles["has_transport_context"] or roles["has_route"])
 
     # Always extract dates if present
     date_debut, date_fin = _extract_date_range(corrected_text)
@@ -2369,19 +2484,25 @@ def _build_context_fields(corrected_text, intents):
     if justification:
         fields["justification"] = justification
 
-    # Location pair — only if route pattern detected (not forced)
-    if _detect_route_pattern(corrected_text):
-        dep, dest = dyn_extract.extract_location_pair(corrected_text, STOPWORDS, MONTH_ALIASES)
+    # Route extraction is gated by semantic role, not regex alone.
+    if roles["has_route"]:
+        dep, dest = _extract_location_pair(corrected_text)
         if dep:
             fields["lieu_depart_actuel"] = dep
         if dest:
             fields["lieu_souhaite"] = dest
 
-    # Formation name — only if formation intent detected
-    if "formation" in intent_names:
-        nom = dyn_extract.extract_subject_name(corrected_text, "formation", STOPWORDS, MONTH_ALIASES)
+    # Mission destination extraction is finance-gated when no route exists.
+    if roles["has_finance"] and not roles["has_route"]:
+        mission_destination = _infer_autre_mission_location(corrected_text)
+        if mission_destination:
+            fields["lieu_souhaite"] = mission_destination
+
+    # Formation extraction is gated by semantic role.
+    if roles["has_formation"]:
+        nom = _extract_subject_name(corrected_text, "formation")
         if not nom and "certification" in normalized:
-            nom = dyn_extract.extract_subject_name(corrected_text, "certification", STOPWORDS, MONTH_ALIASES)
+            nom = _extract_subject_name(corrected_text, "certification")
         nom = _clean_subject_like_name(nom)
         if nom:
             fields["nom_formation"] = nom
@@ -2397,7 +2518,7 @@ def _build_context_fields(corrected_text, intents):
             # If they need transport for it, it's likely external
             fields["type_formation"] = "Formation externe"
 
-    # Transport type — only if transport intent detected
+    # Transport type remains available whenever transport semantics exist.
     if strong_transport:
         transport_types = {
             "vehicule": "Vehicule", "voiture": "Voiture",
@@ -2412,11 +2533,8 @@ def _build_context_fields(corrected_text, intents):
                 break
         fields["type_transport_souhaite"] = detected_transport or "A definir"
 
-    if "parking" in intent_names or any(
-        marker in normalized
-        for marker in ["parking", "stationnement", "place reservee", "place reserve", "acces parking", "badge parking"]
-    ):
-        zone = _extract_parking_zone(corrected_text)
+    if roles["has_parking"]:
+        zone = dyn_extract.extract_descriptive_location(corrected_text, "parking") or _extract_parking_zone(corrected_text)
         if zone:
             fields["zone_souhaitee_parking"] = zone
 
@@ -2424,11 +2542,16 @@ def _build_context_fields(corrected_text, intents):
         if horaire:
             fields["horaire_arrivee_parking"] = horaire
 
+    if roles["has_workspace"]:
+        localisation = dyn_extract.extract_descriptive_location(corrected_text, "espace")
+        if localisation:
+            fields["localisation_souhaitee"] = localisation
+
     # Build description from intents
     desc_parts = ["Demande"]
     if strong_transport:
         desc_parts.append("de transport")
-    if "formation" in intent_names:
+    if roles["has_formation"]:
         nom = fields.get("nom_formation")
         if nom:
             desc_parts.append(f"pour une formation {nom}")
@@ -2438,6 +2561,8 @@ def _build_context_fields(corrected_text, intents):
     dest = fields.get("lieu_souhaite")
     if dep and dest:
         desc_parts.append(f"de {dep} vers {dest}")
+    elif dest and roles["has_finance"] and not roles["has_route"]:
+        desc_parts.append(f"pour mission a {dest}")
     date = fields.get("date_souhaitee")
     if date:
         desc_parts.append(f"le {date}")
@@ -2451,6 +2576,111 @@ def _build_context_fields(corrected_text, intents):
     fields["mots_cles"] = _extract_keywords(corrected_text)
 
     return _dedupe_fields(fields)
+
+
+def _infer_autre_mission_location(text):
+    source = _normalize_ws(text)
+    if not source:
+        return ""
+
+    lowered = _norm(source)
+    patterns = [
+        r"\bmission\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,}){0,2})(?=\s+(?:du|le|en|pour|avec|sur)\b|$)",
+        r"\ba\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,}){0,2})(?=\s+(?:du|le|en|pour|avec|sur)\b|$)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, lowered, flags=re.IGNORECASE)
+        if not match:
+            continue
+        candidate = _clean_entity_text(match.group(1))
+        if candidate and any(_is_likely_proper_noun(token) for token in candidate.split()):
+            return _capitalize_entity(candidate)
+
+    return ""
+
+
+def _extract_structured_date_range(text):
+    source = _normalize_ws(text)
+    if not source:
+        return "", ""
+
+    compact_range = re.search(
+        rf"\bdu\s+(\d{{1,2}})\s+au\s+(\d{{1,2}})\s+{MONTH_PATTERN}\s+(\d{{4}})\b",
+        _norm(source),
+        flags=re.IGNORECASE,
+    )
+    if compact_range:
+        month_num = MONTH_ALIASES.get(_normalize_month_token(compact_range.group(3)))
+        year = compact_range.group(4)
+        if month_num:
+            start = _parse_date_candidate(compact_range.group(1), month_num, year)
+            end = _parse_date_candidate(compact_range.group(2), month_num, year)
+            if start:
+                return start, end or ""
+
+    start, end = _extract_date_range(source)
+    return start or "", end or ""
+
+
+def _build_autre_structured_context(source, rule_fields, intents):
+    context_fields = _build_context_fields(source, intents)
+
+    date_debut, date_fin = _extract_structured_date_range(source)
+    if date_debut:
+        context_fields["date_debut"] = date_debut
+        context_fields["date_souhaitee"] = date_debut
+    if date_fin:
+        context_fields["date_fin"] = date_fin
+
+    transport_type = _normalize_ws(
+        rule_fields.get("ai_type_transport")
+        or context_fields.get("type_transport")
+        or context_fields.get("type_transport_souhaite")
+    )
+    if transport_type:
+        context_fields["type_transport"] = transport_type
+
+    if not context_fields.get("lieu_souhaite"):
+        mission_location = _infer_autre_mission_location(source)
+        if mission_location:
+            context_fields["lieu_souhaite"] = mission_location
+
+    context_fields["hebergement"] = bool(re.search(r"\b(?:hebergement|hotel)\b", _norm(source)))
+
+    if re.search(r"\b(?:remboursement|rembourse|note de frais|frais)\b", _norm(source)):
+        context_fields["type_demande"] = "remboursement"
+
+    return context_fields
+
+
+def _build_structured_justification(context_fields, corrected_text):
+    parts = []
+
+    if _norm(context_fields.get("type_demande", "")) == "remboursement":
+        parts.append("Remboursement de frais")
+
+    transport_type = _normalize_ws(context_fields.get("type_transport") or context_fields.get("type_transport_souhaite"))
+    if transport_type and _norm(transport_type) != "a definir":
+        parts.append(f"de {transport_type.lower()}")
+
+    if context_fields.get("hebergement"):
+        parts.append("et hebergement")
+
+    if context_fields.get("lieu_souhaite"):
+        parts.append(f"pour mission a {context_fields['lieu_souhaite']}")
+
+    date_debut = _normalize_ws(context_fields.get("date_debut") or context_fields.get("date_souhaitee"))
+    date_fin = _normalize_ws(context_fields.get("date_fin"))
+    if date_debut and date_fin:
+        parts.append(f"du {date_debut} au {date_fin}")
+    elif date_debut:
+        parts.append(f"le {date_debut}")
+
+    justification = _normalize_ws(" ".join(parts))
+    if justification:
+        return justification + "."
+    return _normalize_ws(corrected_text)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -3074,7 +3304,6 @@ def _extract_location_pair(corrected_text):
     patterns = [
         r"\bde\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)(?=\s+(?:pour|afin|car|avec|le|la|une|un)\b|$)",
         r"\bdepuis\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)(?=\s+(?:pour|afin|car|avec|le|la|une|un)\b|$)",
-        r"\bde\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+(?:a|à|jusqu)\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)(?=\s+(?:pour|afin|car|avec|le|la|une|un)\b|$)",
         r"\bdepart\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b.*?\b(?:destination|arrivee)\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b",
     ]
     for pattern in patterns:
@@ -3263,6 +3492,8 @@ def _build_autre_response(request_data, prompt):
     generator = dyn_extract.DynamicFieldGenerator()
     intents = generator.analyze_intent(source)
     rule_fields = extractor.extract_all_fields(source, intents)
+    context_fields = _build_autre_structured_context(source, rule_fields, intents)
+    structured_description = _build_structured_justification(context_fields, source)
     if explicit_urgency:
         base_priority_label = explicit_urgency["priority"]
         priority_confidence = 1.0
@@ -3296,6 +3527,8 @@ def _build_autre_response(request_data, prompt):
                     cleaned_value = _autre_clean_field_value(key, predicted_value, source, extractor)
         if not cleaned_value and key in rule_fields:
             cleaned_value = _autre_clean_field_value(key, rule_fields.get(key, ""), source, extractor)
+        if key == "ai_justification_metier" and len(_normalize_ws(structured_description)) > 20:
+            cleaned_value = structured_description
         field["value"] = cleaned_value
         if "options" in field and not isinstance(field.get("options"), list):
             field["options"] = []
@@ -3319,11 +3552,94 @@ def _build_autre_response(request_data, prompt):
         ):
             field["value"] = cleaned_prediction
 
+    def _upsert_custom_field(key, label, field_type, required, value, options=None):
+        cleaned = _normalize_ws(value)
+        for field in custom_fields:
+            if _normalize_ws(field.get("key", "")) != key:
+                continue
+            field["value"] = cleaned
+            if options is not None:
+                field["options"] = list(options)
+            return
+        custom_fields.append({
+            "key": key,
+            "label": label,
+            "type": field_type,
+            "required": required,
+            "value": cleaned,
+            "options": list(options or []),
+        })
+
+    custom_fields = [
+        field for field in custom_fields
+        if not (
+            _normalize_ws(field.get("key", "")) == "ai_lieu_depart_actuel"
+            and not _normalize_ws(context_fields.get("lieu_depart_actuel", ""))
+        )
+    ]
+
+    if _normalize_ws(context_fields.get("lieu_souhaite", "")):
+        _upsert_custom_field(
+            "ai_lieu_souhaite",
+            "Lieu souhaite",
+            "text",
+            False,
+            context_fields.get("lieu_souhaite", ""),
+        )
+
+    if _normalize_ws(context_fields.get("date_debut", "")):
+        _upsert_custom_field(
+            "ai_date_souhaitee_metier",
+            "Date demandee",
+            "date",
+            False,
+            context_fields.get("date_debut", ""),
+        )
+
+    if _normalize_ws(context_fields.get("date_fin", "")):
+        _upsert_custom_field(
+            "ai_date_fin_extra",
+            "Date fin",
+            "date",
+            False,
+            context_fields.get("date_fin", ""),
+        )
+
+    if len(_normalize_ws(structured_description)) > 20:
+        _upsert_custom_field(
+            "ai_justification_metier",
+            "Justification",
+            "textarea",
+            False,
+            structured_description,
+        )
+
+    normalized_source = _norm(source)
+    if any(marker in normalized_source for marker in ["parking", "stationnement", "place reservee", "place reserve", "acces parking", "badge parking"]):
+        parking_zone = dyn_extract.extract_descriptive_location(source, "parking") or _extract_parking_zone(source)
+        parking_type = _infer_parking_type(source) or "Place reservee"
+        if parking_zone:
+            _upsert_custom_field(
+                "ai_zone_souhaitee",
+                "Zone souhaitee",
+                "text",
+                True,
+                parking_zone,
+            )
+        _upsert_custom_field(
+            "ai_type_stationnement",
+            "Type de stationnement",
+            "select",
+            True,
+            parking_type,
+            ["Place reservee", "Acces parking", "Autorisation temporaire", "Autre"],
+        )
+
     details = {
         "besoinPersonnalise": title,
         "descriptionBesoin": rule_fields.get("descriptionBesoin") or description,
         "niveauUrgenceAutre": explicit_urgency["urgency"] if explicit_urgency else _autre_priority_to_base_label(base_priority_label, priority_confidence),
-        "dateSouhaiteeAutre": rule_fields.get("dateSouhaiteeAutre") or rule_fields.get("ai_date_souhaitee_metier") or extractor.extract_date(source) or "",
+        "dateSouhaiteeAutre": context_fields.get("date_debut") or rule_fields.get("dateSouhaiteeAutre") or rule_fields.get("ai_date_souhaitee_metier") or extractor.extract_date(source) or "",
     }
 
     if not details["besoinPersonnalise"]:
@@ -3456,7 +3772,6 @@ def _extract_location_pair(corrected_text):
     patterns = [
         r"\bde\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)(?=\s+(?:pour|afin|car|avec|le|la|une|un)\b|$)",
         r"\bdepuis\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)(?=\s+(?:pour|afin|car|avec|le|la|une|un)\b|$)",
-        r"\bde\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+(?:a|à|jusqu)\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)(?=\s+(?:pour|afin|car|avec|le|la|une|un)\b|$)",
         r"\bdepart\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b.*?\b(?:destination|arrivee)\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b",
     ]
     for pattern in patterns:
@@ -3496,7 +3811,6 @@ def _extract_location_pair(corrected_text):
     patterns = [
         r"\bde\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)",
         r"\bdepuis\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)",
-        r"\bde\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+(?:a|à|jusqu)\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)",
         r"\bdepart\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b.*?\b(?:destination|arrivee)\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b",
     ]
     trailing_noise = re.compile(r"\b(?:pour|afin|car|avec|le|la|une|un)\b.*$", re.IGNORECASE)

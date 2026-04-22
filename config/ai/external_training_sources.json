@@ -1,26 +1,127 @@
 [
   {
-    "source": "bea2019_wi_locness",
-    "samples": []
-  },
-  {
-    "source": "fce_v21",
-    "samples": []
-  },
-  {
-    "source": "lang8",
-    "samples": []
-  },
-  {
-    "source": "nucle",
-    "samples": []
-  },
-  {
     "source": "c4_multilingual_curated",
-    "samples": []
-  },
-  {
-    "source": "mc4_curated",
-    "samples": []
+    "samples": [
+      {
+        "text": "Je souhaite un acces VPN pour travailler a distance des demain matin.",
+        "categorie": "Informatique",
+        "typeDemande": "Autre",
+        "priorite": "HAUTE"
+      },
+      {
+        "text": "Besoin d'un acces a l'application SAP pour le service comptabilite.",
+        "categorie": "Informatique",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Demande d'activation de compte Microsoft Teams pour un nouveau collaborateur.",
+        "categorie": "Informatique",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Je signale une panne de l'imprimante du 2eme etage a corriger rapidement.",
+        "categorie": "Informatique",
+        "typeDemande": "Autre",
+        "priorite": "HAUTE"
+      },
+      {
+        "text": "Demande de maintenance pour la climatisation de la salle de reunion principale.",
+        "categorie": "Administrative",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Je souhaite une intervention sur la serrure du bureau RH qui ne ferme plus.",
+        "categorie": "Administrative",
+        "typeDemande": "Autre",
+        "priorite": "HAUTE"
+      },
+      {
+        "text": "Besoin d'une chaise ergonomique pour mon poste de travail au bureau 204.",
+        "categorie": "Administrative",
+        "typeDemande": "Autre",
+        "priorite": "BASSE"
+      },
+      {
+        "text": "Je demande un parking devant l'entree principale car j'arrive tot le matin.",
+        "categorie": "Administrative",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Demande de place de stationnement a cote de l'entree principale pour acces quotidien.",
+        "categorie": "Administrative",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Je souhaite une autorisation temporaire de parking pour la semaine prochaine.",
+        "categorie": "Administrative",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Demande de transport de Tunis vers Rades le 21 mai avec une voiture de service pour une formation professionnelle de UI/IX.",
+        "categorie": "Formation",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Besoin d'un transport de Sousse vers Tunis en train pour participer a une certification AWS.",
+        "categorie": "Formation",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Je souhaite participer a une certification Scrum Master le 14 juillet 2027.",
+        "categorie": "Formation",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Demande d'inscription a une formation externe en Excel avance pour l'equipe finance.",
+        "categorie": "Formation",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Je demande le remboursement de 250 tnd pour transport et hebergement lors d'une mission a Sousse.",
+        "categorie": "Administrative",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Besoin d'une avance sur salaire de 1200 tnd pour une depense urgente ce mois-ci.",
+        "categorie": "Administrative",
+        "typeDemande": "Autre",
+        "priorite": "HAUTE"
+      },
+      {
+        "text": "Je souhaite reserver une salle de reunion pour un atelier client jeudi apres-midi.",
+        "categorie": "Administrative",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Demande d'espace de travail dans le batiment B etage 2 pres de l'equipe support.",
+        "categorie": "Administrative",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Je souhaite un badge parking pour acceder au sous-sol de l'immeuble.",
+        "categorie": "Administrative",
+        "typeDemande": "Autre",
+        "priorite": "NORMALE"
+      },
+      {
+        "text": "Besoin d'un acces administrateur temporaire sur le serveur de test pour une intervention urgente.",
+        "categorie": "Informatique",
+        "typeDemande": "Autre",
+        "priorite": "HAUTE"
+      }
+    ]
   }
 ]

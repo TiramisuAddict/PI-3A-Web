@@ -131,6 +131,19 @@ def _smart_capitalize_location(value: Any) -> str:
     return " ".join(formatted).strip()
 
 
+def _normalize_spatial_phrase(value: Any) -> str:
+    text = normalize_ws(value)
+    if not text:
+        return ""
+
+    text = re.sub(r"\bl\s+([a-zà-ÿ])", r"l'\1", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bd\s+([a-zà-ÿ])", r"d'\1", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bentrer\b", "entree", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bsorti\b", "sortie", text, flags=re.IGNORECASE)
+    text = normalize_ws(text).strip(" ,;:-")
+    return text
+
+
 def extract_descriptive_location(text: Any, intent_keyword: str | None = None) -> str | None:
     """
     Extract freeform location descriptions for parking/workspace requests.
@@ -186,11 +199,11 @@ def extract_descriptive_location(text: Any, intent_keyword: str | None = None) -
             continue
 
         location = re.sub(r"\b(?:ou|et)\b.*$", "", location, flags=re.IGNORECASE)
-        location = normalize_ws(location).strip(" ,;:-")
+        location = _normalize_spatial_phrase(location)
         if len(location) < 3:
             continue
 
-        return _smart_capitalize_location(f"{prefix} {location}")
+        return _smart_capitalize_location(_normalize_spatial_phrase(f"{prefix} {location}"))
 
     building_pattern = (
         r"\b(batiment|building|tour|bloc)\s+([a-z0-9]{1,3})\b"
@@ -205,7 +218,7 @@ def extract_descriptive_location(text: Any, intent_keyword: str | None = None) -
         if match.group(3) and match.group(4):
             parts.append(normalize_ws(match.group(3)))
             parts.append(normalize_ws(match.group(4)))
-        return _smart_capitalize_location(" ".join(part for part in parts if part))
+        return _smart_capitalize_location(_normalize_spatial_phrase(" ".join(part for part in parts if part)))
 
     return None
 
@@ -302,7 +315,6 @@ def _is_time_sensitive(text: str) -> bool:
 class BoundaryAwareExtractor:
     def extract_location_pair(self, text: str) -> tuple[str, str]:
         source = normalize_ws(text)
-        normalized_source = norm(source)
         if not source:
             return "", ""
 
@@ -322,7 +334,6 @@ class BoundaryAwareExtractor:
 
         route_patterns = [
             r"\bdepart\s*[:\-]?\s*(.+?)\s+(?:destination|arrivee|arrivée)\s*[:\-]?\s*(.+?)(?=\s+(?:des|debut|début|pour|afin|car|avec|le|la|un|une|du|de|vers|a partir|depuis|jusqu|et|ou|qui|que)\b|\s+\d|\b\d{4}\b|\b\d{1,2}[/-]\d{1,2}\b|$)",
-            r"\b(?:de|du|depuis)\s+(.+?)\s+(?:a|à|jusqu(?:'|e)?\s+a)\s+(.+?)(?=\s+(?:des|debut|début|pour|afin|car|avec|le|la|un|une|du|de|vers|a partir|depuis|jusqu|et|ou|qui|que)\b|\s+\d|\b\d{4}\b|\b\d{1,2}[/-]\d{1,2}\b|$)",
         ]
 
         for pattern in route_patterns:
@@ -333,6 +344,8 @@ class BoundaryAwareExtractor:
             destination = self._clean_location(match.group(2), destination=True)
             if depart and destination and norm(depart) != norm(destination):
                 return capitalize_entity(depart), capitalize_entity(destination)
+
+        return "", ""
 
         return "", ""
 
@@ -422,6 +435,18 @@ class BoundaryAwareExtractor:
             return "", ""
 
         protected_source, placeholders = _protect_date_prefixes(source)
+
+        compact_range = re.search(
+            r"\bdu\s+(\d{1,2})\s+au\s+(\d{1,2})\s+(janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)\s+(\d{4})\b",
+            norm(source),
+            flags=re.IGNORECASE,
+        )
+        if compact_range:
+            year = int(compact_range.group(4))
+            first = self._parse_date_token(f"{compact_range.group(1)} {compact_range.group(3)} {year}")
+            second = self._parse_date_token(f"{compact_range.group(2)} {compact_range.group(3)} {year}")
+            if first:
+                return first, second
 
         patterns = [
             r"\bdu\s+(\d{1,2}(?:er)?[/-]\d{1,2}(?:[/-]\d{2,4})?)\s+au\s+(\d{1,2}(?:er)?[/-]\d{1,2}(?:[/-]\d{2,4})?)",

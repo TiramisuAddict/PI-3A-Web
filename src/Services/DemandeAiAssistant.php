@@ -68,8 +68,16 @@ class DemandeAiAssistant
         }
 
         $prompt = $this->buildPrompt($generalContext, $currentDetails, $allowedKeys, $requiredKeys, $fieldLabels, $selectOptions);
-        $parsed = $this->callMlModel($prompt);
-        error_log('ML_RAW: ' . (json_encode($parsed, JSON_UNESCAPED_UNICODE) ?: '{}'));
+        try {
+            $parsed = $this->callMlModel($prompt);
+            error_log('ML_RAW: ' . (json_encode($parsed, JSON_UNESCAPED_UNICODE) ?: '{}'));
+        } catch (\RuntimeException $e) {
+            $this->logger->warning('Autre IA: fallback local deterministic payload.', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->buildAutreSuggestionsFallback($generalContext, $currentDetails, $allowedKeys);
+        }
 
         $generalPayload = isset($parsed['general']) && is_array($parsed['general']) ? $parsed['general'] : [];
         $detailsPayload = isset($parsed['details']) && is_array($parsed['details']) ? $parsed['details'] : [];
@@ -170,6 +178,95 @@ class DemandeAiAssistant
             'dynamicFieldConfidence' => $result['dynamicFieldConfidence'],
             'model' => 'local-ml:demande_ai_model.py',
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $generalContext
+     * @param array<string, mixed> $currentDetails
+     * @param array<int, string> $allowedKeys
+     * @return array<string, mixed>
+     */
+    private function buildAutreSuggestionsFallback(array $generalContext, array $currentDetails, array $allowedKeys): array
+    {
+        $sourceText = $this->firstNonEmpty(
+            trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+            trim((string) ($generalContext['description'] ?? '')),
+            trim((string) ($generalContext['titre'] ?? ''))
+        );
+
+        $correctedText = $this->autoCorrectSuggestionText($sourceText);
+        if ('' === $correctedText) {
+            $correctedText = trim((string) ($sourceText ?: 'Demande personnalisee.'));
+        }
+
+        $suggestedDetails = [];
+        foreach ($allowedKeys as $key) {
+            if (isset($currentDetails[$key]) && is_scalar($currentDetails[$key])) {
+                $value = trim((string) $currentDetails[$key]);
+                if ('' !== $value) {
+                    $suggestedDetails[$key] = $value;
+                }
+            }
+        }
+
+        if (!isset($suggestedDetails['descriptionBesoin']) || '' === trim((string) $suggestedDetails['descriptionBesoin'])) {
+            $suggestedDetails['descriptionBesoin'] = $correctedText;
+        }
+
+        if (!isset($suggestedDetails['besoinPersonnalise']) || '' === trim((string) $suggestedDetails['besoinPersonnalise'])) {
+            $suggestedDetails['besoinPersonnalise'] = $this->firstNonEmpty(
+                trim((string) ($generalContext['titre'] ?? '')),
+                'Demande personnalisee'
+            );
+        }
+
+        $generatedDescription = $this->firstNonEmpty(
+            trim((string) ($suggestedDetails['descriptionBesoin'] ?? '')),
+            trim((string) ($generalContext['description'] ?? '')),
+            $correctedText
+        );
+
+        $result = [
+            'correctedText' => $correctedText,
+            'generatedDescription' => $generatedDescription,
+            'suggestedGeneral' => [
+                'titre' => $this->firstNonEmpty(
+                    trim((string) ($generalContext['titre'] ?? '')),
+                    trim((string) ($suggestedDetails['besoinPersonnalise'] ?? '')),
+                    'Demande personnalisee'
+                ),
+                'description' => $this->firstNonEmpty(
+                    trim((string) ($generalContext['description'] ?? '')),
+                    $generatedDescription,
+                    $correctedText
+                ),
+                'priorite' => in_array(strtoupper(trim((string) ($generalContext['priorite'] ?? ''))), ['HAUTE', 'NORMALE', 'BASSE'], true)
+                    ? strtoupper(trim((string) ($generalContext['priorite'] ?? '')))
+                    : 'NORMALE',
+                'categorie' => $this->firstNonEmpty(
+                    trim((string) ($generalContext['categorie'] ?? '')),
+                    'Autre'
+                ),
+            ],
+            'suggestedDetails' => $suggestedDetails,
+            'dynamicFieldPlan' => [
+                'add' => [],
+                'remove' => [],
+                'replaceBase' => false,
+            ],
+            'dynamicFieldConfidence' => $this->buildAutrePlanConfidence(
+                [],
+                [],
+                false,
+                $correctedText,
+                $generatedDescription
+            ),
+            'model' => 'local-fallback:demande_ai_assistant',
+        ];
+
+        error_log('FINAL_OUTPUT_FALLBACK: ' . (json_encode($result, JSON_UNESCAPED_UNICODE) ?: '{}'));
+
+        return $result;
     }
 
     /**
@@ -824,7 +921,31 @@ class DemandeAiAssistant
             }
 
             if (is_scalar($value)) {
-                $sanitized[$normalizedKey] = trim((string) (preg_replace('/\s+/u', ' ', (string) $value) ?? (string) $value));
+                $clean = trim((string) (preg_replace('/\s+/u', ' ', (string) $value) ?? (string) $value));
+                if ('' === $clean) {
+                    continue;
+                }
+
+                if (in_array($normalizedKey, ['dateSouhaiteeAutre', 'ai_date_souhaitee_metier', 'ai_date_fin_conge', 'ai_date_souhaitee_extra'], true)) {
+                    if (1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', $clean)) {
+                        continue;
+                    }
+                } elseif ('ai_zone_souhaitee' === $normalizedKey) {
+                    $clean = preg_replace('/\b(?:le|la|les|du|de|des)\s+\d{1,2}(?:er)?(?:\s+[[:alpha:]]+)?\b.*$/u', '', $clean) ?? $clean;
+                    $clean = preg_replace('/\b(?:car|parce\s+que|afin\s+de|pour)\b.*$/u', '', $clean) ?? $clean;
+                    $clean = preg_replace('/\b(?:tot|t[oô]t)\s+le\s+matin\b.*$/u', '', $clean) ?? $clean;
+                    $clean = preg_replace('/\b(?:matin|apres\s*midi|soir|nuit)\b.*$/u', '', $clean) ?? $clean;
+                    $clean = trim((string) (preg_replace('/\s+/u', ' ', $clean) ?? $clean), " ,;:-");
+                    if ('' !== $clean) {
+                        $clean = mb_strtoupper(mb_substr($clean, 0, 1, 'UTF-8'), 'UTF-8') . mb_substr($clean, 1, null, 'UTF-8');
+                    }
+                } elseif ('ai_horaire_arrivee' === $normalizedKey) {
+                    $clean = trim((string) (preg_replace('/\s+/u', ' ', $clean) ?? $clean));
+                }
+
+                if ('' !== $clean) {
+                    $sanitized[$normalizedKey] = $clean;
+                }
             }
         }
 
