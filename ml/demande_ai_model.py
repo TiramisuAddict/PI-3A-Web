@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 import demande_dynamic_extractors as dyn_extract
+from text_match_utils import _has_any_phrase, _has_any_word, _has_phrase, _has_word
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -343,7 +344,7 @@ def _autre_clean_field_value(field_key, field_value, prompt, extractor):
     if key == "ai_nom_formation":
         return extractor.extract_subject_name(prompt, "formation") or extractor.extract_subject_name(prompt, "certification")
     if key == "ai_type_formation":
-        if "certification" in lowered:
+        if _has_word(lowered, "certification"):
             return "Certification"
         return "Formation externe" if extractor.extract_subject_name(prompt, "formation") else value
     if key in {"ai_date_souhaitee_metier", "ai_date_reservation", "ai_date_debut_conge", "dateSouhaiteeAutre"}:
@@ -391,7 +392,7 @@ def _autre_build_title(prompt, details, intents):
         return _sentence_case(f"Transport de {details['ai_lieu_depart_actuel']} vers {details['ai_lieu_souhaite']}")
 
     if details.get("ai_nom_formation"):
-        prefix = "Demande de certification" if details.get("ai_type_formation") == "Certification" or "certification" in lowered else "Demande de formation"
+        prefix = "Demande de certification" if details.get("ai_type_formation") == "Certification" or _has_word(lowered, "certification") else "Demande de formation"
         return _sentence_case(f"{prefix} {details['ai_nom_formation']}")
 
     if details.get("ai_montant"):
@@ -1017,7 +1018,7 @@ def _compute_priority_via_matrix(corrected_text, context):
         # Keyword-based activation
         if "keywords" in signal:
             for kw in signal["keywords"]:
-                if kw in normalized:
+                if _has_phrase(normalized, kw):
                     activated = True
                     break
 
@@ -1337,7 +1338,7 @@ def _extract_parking_zone(text):
         if len(candidate) >= 2:
             return _capitalize_entity(_clean_entity_text(candidate))
 
-    if "entree" in normalized:
+    if _has_word(normalized, "entree"):
         return "Entree principale"
 
     return ""
@@ -1347,11 +1348,11 @@ def _infer_parking_type(text):
     normalized = _norm(_normalize_ws(text))
     if not normalized:
         return ""
-    if "temporaire" in normalized:
+    if _has_word(normalized, "temporaire"):
         return "Autorisation temporaire"
-    if "acces parking" in normalized or "badge parking" in normalized:
+    if _has_any_phrase(normalized, ["acces parking", "badge parking"]):
         return "Acces parking"
-    if "parking" in normalized or "stationnement" in normalized or "place reservee" in normalized or "place reserve" in normalized:
+    if _has_any_phrase(normalized, ["parking", "stationnement", "place reservee", "place reserve"]):
         return "Place reservee"
     return ""
 
@@ -2305,21 +2306,18 @@ def _score_keyword_hits(normalized_text, keywords):
         if not kw:
             continue
         nkw = _norm(kw)
-        if " " in nkw:
-            if nkw in normalized_text:
-                count += 2
-        elif re.search(r"\b" + re.escape(nkw) + r"\b", normalized_text):
-            count += 1
+        if _has_phrase(normalized_text, kw):
+            count += 2 if " " in nkw else 1
     return count
 
 
 def _score_type_rule(type_label, normalized_text):
     nt = _norm(type_label)
     score = 0
-    if nt in normalized_text:
+    if _has_phrase(normalized_text, type_label):
         score += 6
     for tok in nt.split():
-        if len(tok) >= 3 and re.search(r"\b" + re.escape(tok) + r"\b", normalized_text):
+        if len(tok) >= 3 and _has_word(normalized_text, tok):
             score += 1
     for c, kws in TYPE_KEYWORDS.items():
         if c in nt:
@@ -2407,9 +2405,9 @@ def _has_transport_context(corrected_text, intent_names=None, context_fields=Non
         return True
     if context_fields.get("lieu_depart_actuel") and context_fields.get("lieu_souhaite"):
         return True
-    if re.search(r"\b(?:transport|vehicule|voiture|navette|taxi|bus|train|avion|vol|billet|mission)\b", normalized):
+    if _has_any_word(normalized, ["transport", "vehicule", "voiture", "navette", "taxi", "bus", "train", "avion", "vol", "billet", "mission"]):
         return True
-    if intent_names and "transport" in intent_names and re.search(r"\b(?:aller|retour|trajet|vers|depuis)\b", normalized):
+    if intent_names and "transport" in intent_names and _has_any_word(normalized, ["aller", "retour", "trajet", "vers", "depuis"]):
         return True
     return False
 
@@ -2440,11 +2438,11 @@ def _detect_semantic_roles(text):
 
     return {
         "has_route": has_route,
-        "has_finance": any(re.search(r"\b" + re.escape(indicator) + r"\b", normalized) for indicator in finance_indicators),
-        "has_formation": any(re.search(r"\b" + re.escape(indicator) + r"\b", normalized) for indicator in formation_indicators),
-        "has_parking": any(re.search(r"\b" + re.escape(indicator) + r"\b", normalized) for indicator in parking_indicators),
-        "has_workspace": any(re.search(r"\b" + re.escape(indicator) + r"\b", normalized) for indicator in workspace_indicators),
-        "has_transport_context": any(re.search(r"\b" + re.escape(indicator) + r"\b", normalized) for indicator in transport_indicators),
+        "has_finance": _has_any_word(normalized, finance_indicators),
+        "has_formation": _has_any_word(normalized, formation_indicators),
+        "has_parking": _has_any_word(normalized, parking_indicators),
+        "has_workspace": _has_any_word(normalized, workspace_indicators),
+        "has_transport_context": _has_any_word(normalized, transport_indicators),
     }
 
 
@@ -2477,7 +2475,7 @@ def _build_context_fields(corrected_text, intents):
     # Amount
     amount = _extract_amount(corrected_text)
     if amount:
-        fields["montant"] = amount
+        fields["montant"] = int(amount) if re.fullmatch(r"\d+", amount) else float(amount)
 
     # Justification
     justification = _extract_justification(corrected_text)
@@ -2501,18 +2499,18 @@ def _build_context_fields(corrected_text, intents):
     # Formation extraction is gated by semantic role.
     if roles["has_formation"]:
         nom = _extract_subject_name(corrected_text, "formation")
-        if not nom and "certification" in normalized:
+        if not nom and _has_word(normalized, "certification"):
             nom = _extract_subject_name(corrected_text, "certification")
         nom = _clean_subject_like_name(nom)
         if nom:
             fields["nom_formation"] = nom
 
         # Formation type: infer from context, not hardcode
-        if "certification" in normalized:
+        if _has_word(normalized, "certification"):
             fields["type_formation"] = "Certification"
-        elif "formation interne" in normalized:
+        elif _has_phrase(normalized, "formation interne"):
             fields["type_formation"] = "Formation interne"
-        elif "formation externe" in normalized:
+        elif _has_phrase(normalized, "formation externe"):
             fields["type_formation"] = "Formation externe"
         elif strong_transport:
             # If they need transport for it, it's likely external
@@ -2528,7 +2526,7 @@ def _build_context_fields(corrected_text, intents):
         }
         detected_transport = None
         for kw, label in transport_types.items():
-            if re.search(r"\b" + re.escape(kw) + r"\b", normalized):
+            if _has_word(normalized, kw):
                 detected_transport = label
                 break
         fields["type_transport_souhaite"] = detected_transport or "A definir"
@@ -3015,10 +3013,7 @@ def _build_autre_custom_fields(source, details, context_fields, intents):
 
     has_parking_context = (
         "parking" in intent_names
-        or any(
-            marker in normalized
-            for marker in ["parking", "stationnement", "place reservee", "place reserve", "acces parking", "badge parking"]
-        )
+        or _has_any_phrase(normalized, ["parking", "stationnement", "place reservee", "place reserve", "acces parking", "badge parking"])
     )
 
     has_transport_context = _has_transport_context(source, intent_names, context_fields)
@@ -3035,18 +3030,15 @@ def _build_autre_custom_fields(source, details, context_fields, intents):
         and (
             "workplace" in intent_names
             or "espace travail" in intent_names
-            or any(
-                token in normalized
-                for token in ["bureau", "espace de travail", "espace travail", "poste de travail", "fenetre", "fenetre", "porte", "salle de pause"]
-            )
+            or _has_any_phrase(normalized, ["bureau", "espace de travail", "espace travail", "poste de travail", "fenetre", "porte", "salle de pause"])
         )
     )
 
     if has_parking_context:
         parking_type = "Place reservee"
-        if "temporaire" in normalized:
+        if _has_word(normalized, "temporaire"):
             parking_type = "Autorisation temporaire"
-        elif "acces parking" in normalized or "badge parking" in normalized:
+        elif _has_any_phrase(normalized, ["acces parking", "badge parking"]):
             parking_type = "Acces parking"
 
         zone = _normalize_ws(context_fields.get("zone_souhaitee_parking", ""))
@@ -3055,7 +3047,7 @@ def _build_autre_custom_fields(source, details, context_fields, intents):
         if not zone:
             zone = _extract_parking_zone(source)
         if not zone:
-            if "entree" in normalized or "principale" in normalized:
+            if _has_any_word(normalized, ["entree", "principale"]):
                 zone = "Entree principale"
             else:
                 zone = ""
@@ -3615,7 +3607,7 @@ def _build_autre_response(request_data, prompt):
         )
 
     normalized_source = _norm(source)
-    if any(marker in normalized_source for marker in ["parking", "stationnement", "place reservee", "place reserve", "acces parking", "badge parking"]):
+    if _has_any_phrase(normalized_source, ["parking", "stationnement", "place reservee", "place reserve", "acces parking", "badge parking"]):
         parking_zone = dyn_extract.extract_descriptive_location(source, "parking") or _extract_parking_zone(source)
         parking_type = _infer_parking_type(source) or "Place reservee"
         if parking_zone:

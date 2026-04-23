@@ -9,6 +9,8 @@ import re
 import unicodedata
 from typing import Any, Iterable
 
+from text_match_utils import _has_phrase
+
 
 STOP_MARKERS = (
     "des",
@@ -1219,7 +1221,7 @@ class DynamicFieldGenerator:
                 keyword_norm = norm(keyword)
                 if not keyword_norm:
                     continue
-                if keyword_norm in lowered:
+                if _has_phrase(lowered, keyword_norm):
                     scores[intent] += 1.0 + max(0.0, min(0.75, len(keyword_norm.split()) * 0.15))
         if _is_time_sensitive(source):
             scores.setdefault("time_sensitive", 0.0)
@@ -1249,7 +1251,7 @@ class DynamicFieldGenerator:
 
         def infer_candidate_source(value: str, fallback: str = "inferred") -> str:
             normalized_value = norm(value)
-            if normalized_value and normalized_value in normalized_source:
+            if normalized_value and _has_phrase(normalized_source, normalized_value):
                 return "explicit"
             return fallback
 
