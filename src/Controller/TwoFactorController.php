@@ -17,6 +17,7 @@ final class TwoFactorController extends AbstractController
 {
     private function clearOtpFlow(SessionInterface $session, TwilioVerifyService $twilioVerifyService, string $flow): void
     {
+        // Nettoie toutes les cles de session OTP du flow (ex: two_factor) apres validation/annulation.
         foreach ($twilioVerifyService->getOtpSessionKeys($flow) as $key) {
             $session->remove($key);
         }
@@ -31,6 +32,7 @@ final class TwoFactorController extends AbstractController
         };
     }
 
+    /*
     #[Route('/two-factor', name: 'two_factor_verify', methods: ['GET', 'POST'])]
     public function twoFactor(Request $request, SessionInterface $session, EmployeRepository $employeRepo, AdministrateurSystemeRepository $adminRepo, TwilioVerifyService $twilioVerifyService): Response
     {
@@ -118,4 +120,5 @@ final class TwoFactorController extends AbstractController
 
         return $this->redirectToRoute('two_factor_verify');
     }
+    */
 }

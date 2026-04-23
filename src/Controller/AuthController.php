@@ -51,9 +51,11 @@ final class AuthController extends AbstractController
             return $this->redirectToRoute('app_offre_home');
         }
 
+        /*
         if ($session->get('two_factor_pending') === true && !$cancelTwoFactor && $request->isMethod('GET')) {
             return $this->redirectToRoute('two_factor_verify');
         }
+        */
 
         $form = $this->createForm(LoginType::class);
         $form->handleRequest($request);
@@ -66,6 +68,7 @@ final class AuthController extends AbstractController
             // Vérification admin système
             $admin = $adminRepo->findOneBy(['e_mail' => $email]);
             if ($admin && $admin->getMot_de_passe() === $password) {
+                /*
                 $destination = $admin->getTelephone();
                 if ($destination === '') {
                     $this->addFlash('error', 'Numéro de téléphone invalide.');
@@ -80,6 +83,13 @@ final class AuthController extends AbstractController
 
                 $this->addFlash('success', 'Code OTP envoyé par SMS.');
                 return $this->redirectToRoute('two_factor_verify');
+                */
+
+                $this->clearOtpFlow($session, $twilioVerifyService, 'two_factor');
+                $session->set('admin_logged_in', true);
+                $session->set('admin_email', $admin->getE_mail());
+
+                return $this->redirectToRoute('admin_home');
             }
 
             $employe = $employeRepo->findOneBy(['e_mail' => $email]);
@@ -93,6 +103,7 @@ final class AuthController extends AbstractController
                 }
 
                 if ($compte) {
+                    /*
                     $destination =$employe->getTelephone();
                     if ($destination === '') {
                         $this->addFlash('error', 'Numéro de téléphone invalide.');
@@ -107,6 +118,16 @@ final class AuthController extends AbstractController
 
                     $this->addFlash('success', 'Nous vous avons envoyé un code par SMS.');
                     return $this->redirectToRoute('two_factor_verify');
+                    */
+
+                    $this->clearOtpFlow($session, $twilioVerifyService, 'two_factor');
+                    $session->set('employe_logged_in', true);
+                    $session->set('employe_id', $employe->getId_employe());
+                    $session->set('employe_email', $employe->getEmail());
+                    $session->set('employe_role', $employe->getRole());
+                    $session->set('employe_id_entreprise', $employe->getEntreprise()->getId_entreprise());
+
+                    return $this->redirectByRole($employe->getRole());
                 }
             }
 

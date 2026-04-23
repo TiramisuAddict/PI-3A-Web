@@ -12,13 +12,27 @@ final class CvExtractionService
 {
     public function extractAndPersistForEmploye(Employe $employe, EntityManagerInterface $entityManager): array
     {
-        $groqApiUrl = (string) ($_ENV['GROQ_API_URL'] ?? getenv('GROQ_API_URL') ?: '');
-        $groqApiKey = (string) ($_ENV['GROQ_API_KEY'] ?? getenv('GROQ_API_KEY') ?: '');
-        $groqModel = (string) ($_ENV['GROQ_MODEL'] ?? getenv('GROQ_MODEL') ?: '');
+        $groqApiUrl = $this->readEnv('GROQ_API_URL');
+        $groqApiKey = $this->readEnv('GROQ_API_KEY');
+        $groqModel = $this->readEnv('GROQ_MODEL');
+
+        if ($groqApiUrl === '' || $groqApiKey === '' || $groqModel === '') {
+            return [
+                'success' => false,
+                'error' => 'Configuration Groq manquante (GROQ_API_URL, GROQ_API_KEY ou GROQ_MODEL).',
+            ];
+        }
 
         $cvBinary = $employe->getCvData();
         $cvText = $this->extractTextFromCvBinary($cvBinary);
         $extracted = $this->extractWithGroq($cvText, $groqApiUrl, $groqApiKey, $groqModel);
+        if (isset($extracted['error'])) {
+            return [
+                'success' => false,
+                'error' => (string) $extracted['error'],
+            ];
+        }
+
         $skills = is_array($extracted['skills'] ?? null) ? $extracted['skills'] : [];
         $formations = is_array($extracted['formations'] ?? null) ? $extracted['formations'] : [];
         $experience = is_array($extracted['experience'] ?? null) ? $extracted['experience'] : [];
@@ -161,6 +175,17 @@ final class CvExtractionService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function readEnv(string $name): string
+    {
+        $value = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
+
+        if (!is_string($value)) {
+            return '';
+        }
+
+        return trim($value);
     }
 
 }
