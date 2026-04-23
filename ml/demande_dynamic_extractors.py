@@ -9,7 +9,7 @@ import re
 import unicodedata
 from typing import Any, Iterable
 
-from text_match_utils import _has_phrase
+from text_match_utils import _has_any_phrase, _has_phrase
 
 
 STOP_MARKERS = (
@@ -59,6 +59,41 @@ PRIORITY_SIGNALS = {
     "NORMALE": ["des que possible", "bientot", "formation", "certification", "deplacement"],
     "BASSE": ["quand possible", "pas urgent", "confort"],
 }
+
+LEAVE_REQUEST_TERMS = ["conge", "congé", "arret", "arrêt", "absence", "repos"]
+LEAVE_TYPE_HINTS = {
+    "Conge maladie": ["maladie", "medical", "médical", "hospitalisation"],
+    "Conge maternite": ["maternite", "maternité"],
+    "Conge paternite": ["paternite", "paternité"],
+    "Conge sans solde": ["sans solde"],
+}
+EXPENSE_TYPE_EVIDENCE = {
+    "Hotel": ["hotel", "hebergement", "hébergement", "nuit", "nuitee", "nuitée"],
+    "Restaurant": ["restaurant", "repas"],
+    "Transport": ["taxi", "bus", "train", "avion", "vol"],
+}
+
+NON_LOCATION_NOISE_WORDS = {
+    "client",
+    "clients",
+    "fournisseur",
+    "fournisseurs",
+    "societe",
+    "entreprise",
+    "partenaire",
+}
+
+BENEFICIARY_BLOCKLIST = {
+    "taxi",
+    "train",
+    "bus",
+    "avion",
+    "vol",
+    "voiture",
+    "vehicule",
+    "transport",
+    "mission",
+} | NON_LOCATION_NOISE_WORDS
 
 
 def normalize_ws(text: Any) -> str:
@@ -290,7 +325,7 @@ def clean_entity_text(value: Any) -> str:
 
 
 def is_likely_proper_noun(word: Any, stopwords: set[str] | None = None, month_aliases: dict[str, int] | None = None) -> bool:
-    stopwords = stopwords or set()
+    stopwords = set(stopwords or set()) | NON_LOCATION_NOISE_WORDS
     month_aliases = month_aliases or MONTHS
     token = norm(word)
     if not token or token in stopwords or token in month_aliases:
@@ -320,6 +355,31 @@ class BoundaryAwareExtractor:
         if not source:
             return "", ""
 
+        stop_markers = (
+            "uniquement",
+            "seulement",
+            "exclusivement",
+            "en",
+            "pour",
+            "afin",
+            "car",
+            "avec",
+            "le",
+            "la",
+            "les",
+            "un",
+            "une",
+            "du",
+            "de",
+            "des",
+        )
+        stop_pattern = "|".join(map(re.escape, stop_markers))
+        destination_span = re.compile(
+            rf"^\s*([a-zà-ÿ]{{2,}}(?:\s+[a-zà-ÿ]{{2,}})?)"
+            rf"(?=\s+(?:{stop_pattern})\b|\s+\d|$)",
+            flags=re.IGNORECASE,
+        )
+
         vers_matches = list(re.finditer(r"\bvers\b", source, flags=re.IGNORECASE))
         for match in vers_matches:
             left = source[:match.start()]
@@ -330,12 +390,15 @@ class BoundaryAwareExtractor:
 
             depart_raw = left[left_markers[-1].end():]
             depart = self._clean_location(depart_raw)
-            destination = self._clean_location(right, destination=True)
+            right_match = destination_span.search(right)
+            destination_raw = right_match.group(1) if right_match else right
+            destination = self._clean_location(destination_raw, destination=True)
             if depart and destination and norm(depart) != norm(destination):
                 return capitalize_entity(depart), capitalize_entity(destination)
 
         route_patterns = [
-            r"\bdepart\s*[:\-]?\s*(.+?)\s+(?:destination|arrivee|arrivée)\s*[:\-]?\s*(.+?)(?=\s+(?:des|debut|début|pour|afin|car|avec|le|la|un|une|du|de|vers|a partir|depuis|jusqu|et|ou|qui|que)\b|\s+\d|\b\d{4}\b|\b\d{1,2}[/-]\d{1,2}\b|$)",
+            rf"\bdepart\s*[:\-]?\s*(.+?)\s+(?:destination|arrivee|arrivée)\s*[:\-]?\s*(.+?)"
+            rf"(?=\s+(?:{stop_pattern}|debut|début|vers|a partir|depuis|jusqu|et|ou|qui|que)\b|\s+\d|\b\d{{4}}\b|\b\d{{1,2}}[/-]\d{{1,2}}\b|$)",
         ]
 
         for pattern in route_patterns:
@@ -358,6 +421,7 @@ class BoundaryAwareExtractor:
 
         keyword_pattern = re.escape(keyword.strip())
         stop_pattern = "|".join(map(re.escape, STOP_MARKERS))
+        generic_stop_tail = r"\s+(?:des|le|du|de|vers|pour|afin|a partir|depuis|jusqu|a|à|dans|qui|que|debut|debute|commence)\b"
 
         if norm(keyword) == "formation":
             qualifier_pattern = r"[a-zA-ZÀ-ÿ]+"
@@ -391,7 +455,7 @@ class BoundaryAwareExtractor:
                     return f"{capitalize_entity(qualifier)} {connector} {capitalize_entity(subject)}"
 
             direct_subject_match = re.search(
-                rf"\b{keyword_pattern}\b\s+de\s+({subject_pattern})(?=\s+(?:de|vers|le|du|pour)\b|\s+\d|$)",
+                rf"\b{keyword_pattern}\b\s+de\s+({subject_pattern})(?={generic_stop_tail}|\s+\d|$)",
                 source,
                 flags=re.IGNORECASE,
             )
@@ -402,7 +466,7 @@ class BoundaryAwareExtractor:
 
             qualifier_subject_match = re.search(
                 rf"\b{keyword_pattern}\b\s+({qualifier_pattern})\s+([a-zA-ZÀ-ÿ0-9][a-zA-ZÀ-ÿ0-9\s\-\./+#]*?)"
-                rf"(?=\s+(?:de|vers|le|du|pour)\b|\s+\d|$)",
+                rf"(?={generic_stop_tail}|\s+\d|$)",
                 source,
                 flags=re.IGNORECASE,
             )
@@ -413,8 +477,8 @@ class BoundaryAwareExtractor:
                     return capitalize_entity(f"{qualifier} {subject}")
 
         patterns = [
-            rf"\b{keyword_pattern}\b(?:\s+(?:en|sur|de|d['’]))?\s+([a-z][a-z0-9\s\-\./+#]*?)(?=\s+(?:des|le|du|de|vers|pour|afin|a partir)\b|\s+\d|\b\d{{4}}\b|$)",
-            rf"\bpour\s+(?:une?\s+)?{keyword_pattern}\b(?:\s+(?:en|sur|de|d['’]))?\s+([a-z][a-z0-9\s\-\./+#]*?)(?=\s+(?:des|le|du|de|vers|pour|afin|a partir)\b|\s+\d|\b\d{{4}}\b|$)",
+            rf"\b{keyword_pattern}\b(?:\s+(?:en|sur|de|d['’]))?\s+([a-z][a-z0-9\s\-\./+#]*?)(?={generic_stop_tail}|\s+\d|\b\d{{4}}\b|$)",
+            rf"\bpour\s+(?:une?\s+)?{keyword_pattern}\b(?:\s+(?:en|sur|de|d['’]))?\s+([a-z][a-z0-9\s\-\./+#]*?)(?={generic_stop_tail}|\s+\d|\b\d{{4}}\b|$)",
         ]
 
         for pattern in patterns:
@@ -447,6 +511,18 @@ class BoundaryAwareExtractor:
             year = int(compact_range.group(4))
             first = self._parse_date_token(f"{compact_range.group(1)} {compact_range.group(3)} {year}")
             second = self._parse_date_token(f"{compact_range.group(2)} {compact_range.group(3)} {year}")
+            if first:
+                return first, second
+
+        compact_range_without_year = re.search(
+            r"\b(?:du\s+)?(\d{1,2})\s+au\s+(\d{1,2})\s+(janvier|fevrier|fÃ©vrier|mars|avril|mai|juin|juillet|aout|aoÃ»t|septembre|octobre|novembre|decembre|dÃ©cembre)\b",
+            norm(source),
+            flags=re.IGNORECASE,
+        )
+        if compact_range_without_year:
+            year = datetime.now().year
+            first = self._parse_date_token(f"{compact_range_without_year.group(1)} {compact_range_without_year.group(3)} {year}")
+            second = self._parse_date_token(f"{compact_range_without_year.group(2)} {compact_range_without_year.group(3)} {year}")
             if first:
                 return first, second
 
@@ -557,7 +633,7 @@ class BoundaryAwareExtractor:
             if transport_type:
                 details["ai_type_transport"] = transport_type
 
-        if self._contains_any(lowered, ["conge", "absence", "repos", "maladie"]):
+        if _has_leave_request_evidence(source):
             conge_type = self._infer_leave_type(source)
             if conge_type:
                 details["ai_type_conge"] = conge_type
@@ -565,6 +641,10 @@ class BoundaryAwareExtractor:
                 details["ai_date_debut_conge"] = date_start
             if date_end:
                 details["ai_date_fin_conge"] = date_end
+
+        expense_type = _detect_expense_type_from_text(source)
+        if expense_type:
+            details["ai_type_depense"] = expense_type
 
         if self._contains_any(lowered, ["materiel", "equipement", "chaise", "ecran", "clavier", "souris"]):
             material = self._extract_after_any(source, ["materiel", "matériel", "equipement", "équipement", "chaise", "ecran", "écran", "clavier", "souris"])
@@ -586,7 +666,8 @@ class BoundaryAwareExtractor:
         candidate = clean_entity_text(value)
         candidate = re.sub(r"\b(?:pour|afin|car|avec|des|le|du|de|vers|a partir|depuis|jusqu|et|ou|qui|que)\b.*$", "", candidate, flags=re.IGNORECASE)
         if destination:
-            candidate = re.sub(r"\b(?:des|debut|début|pour|afin|car|avec|le|la|un|une)\b.*$", "", candidate, flags=re.IGNORECASE)
+            candidate = re.sub(r"\b(?:uniquement|seulement|exclusivement|en|des|debut|début|pour|afin|car|avec|le|la|les|un|une|du|de)\b.*$", "", candidate, flags=re.IGNORECASE)
+            candidate = re.sub(r"\s+(?:en|uniquement|seulement|exclusivement)$", "", candidate, flags=re.IGNORECASE)
         candidate = normalize_ws(candidate)
         words = candidate.split()
         if len(words) > 3:
@@ -602,6 +683,8 @@ class BoundaryAwareExtractor:
     def _clean_subject(self, value: Any) -> str:
         candidate = clean_entity_text(value)
         candidate = re.sub(r"\b(?:pour|afin|car|avec|des|le|du|de|vers|a partir|depuis|jusqu|et|ou|qui|que)\b.*$", "", candidate, flags=re.IGNORECASE)
+        candidate = re.sub(r"\b(?:qui|que|dont)\b.*$", "", candidate, flags=re.IGNORECASE)
+        candidate = re.sub(r"\s+(?:a|à|au|aux|dans)\s+(?!distance\b|distanciel\b|domicile\b)[a-zà-ÿ][a-zà-ÿ'\-]*(?:\s+[a-zà-ÿ][a-zà-ÿ'\-]*){0,2}(?=\s+(?:qui|que|le|du|de|pour|afin|car|avec|des|a partir|depuis|jusqu|debut|debute|commence)\b|$)", "", candidate, flags=re.IGNORECASE)
         candidate = re.sub(r"\b\d{4}\b.*$", "", candidate)
         candidate = re.sub(r"\b\d{1,2}[/-]\d{1,2}\b.*$", "", candidate)
         candidate = normalize_ws(candidate)
@@ -647,6 +730,8 @@ class BoundaryAwareExtractor:
 
     def _infer_leave_type(self, text: str) -> str:
         lowered = norm(text)
+        if not _has_leave_request_evidence(text):
+            return ""
         if self._contains_any(lowered, ["maladie", "medical", "médical", "hospitalisation"]):
             return "Conge maladie"
         if self._contains_any(lowered, ["maternite", "maternité"]):
@@ -659,7 +744,7 @@ class BoundaryAwareExtractor:
 
     def _contains_any(self, text: str, keywords: Iterable[str]) -> bool:
         haystack = norm(text)
-        return any(norm(keyword) in haystack for keyword in keywords)
+        return _has_any_phrase(haystack, [norm(keyword) for keyword in keywords])
 
     def _suggest_priority(self, text: str) -> str:
         lowered = norm(text)
@@ -853,7 +938,7 @@ class PatternMiner:
                 continue
 
             score = count / total
-            if value in prompt_norm:
+            if _has_phrase(prompt_norm, value):
                 score += 0.65
 
             value_tokens = set(value.split())
@@ -889,7 +974,7 @@ class PatternMiner:
                 signal_norm = norm(signal)
                 if not signal_norm:
                     continue
-                if signal_norm in prompt_norm:
+                if _has_phrase(prompt_norm, signal_norm):
                     scores[label] += 1.0
                     if len(signal_norm.split()) > 1:
                         scores[label] += 0.35
@@ -1155,6 +1240,97 @@ ALLOWED_CUSTOM_FIELD_KEYS = {
 }
 
 
+def _is_allowed_custom_field_key(field_key: str) -> bool:
+    key = normalize_ws(field_key)
+    return bool(key) and (key in ALLOWED_CUSTOM_FIELD_KEYS or key.startswith("ai_custom_"))
+
+
+def _has_leave_request_evidence(text: str) -> bool:
+    return _has_any_phrase(norm(text), [norm(word) for word in LEAVE_REQUEST_TERMS])
+
+
+def _detect_expense_type_from_text(text: str) -> str:
+    lowered = norm(text)
+    for label, keywords in EXPENSE_TYPE_EVIDENCE.items():
+        if _has_any_phrase(lowered, [norm(keyword) for keyword in keywords]):
+            return label
+    return ""
+
+
+CONSTRAINT_MARKERS = [
+    "contrainte",
+    "condition",
+    "exige",
+    "obligatoire",
+    "uniquement",
+    "seulement",
+    "sans",
+    "avec obligation",
+    "a condition",
+    "je prefere",
+    "interdit",
+    "pas de",
+]
+
+
+def _is_constraint_field_key(field_key: str) -> bool:
+    normalized = norm(field_key).replace("_", " ")
+    return bool(re.search(r"\b(contrainte|condition|preference|preference)\b", normalized))
+
+
+def _has_constraint_evidence(text: str) -> bool:
+    lowered = norm(text)
+    if not lowered:
+        return False
+    return _has_any_phrase(lowered, [norm(marker) for marker in CONSTRAINT_MARKERS])
+
+
+def _field_has_minimal_evidence(field_key: str, text: str, value: str = "", source_kind: str = "inferred") -> bool:
+    key = normalize_ws(field_key)
+    lowered = norm(text)
+    normalized_value = norm(value)
+
+    if source_kind == "explicit":
+        if _is_constraint_field_key(key):
+            return _has_constraint_evidence(text)
+        if key == "ai_type_conge":
+            return _has_leave_request_evidence(text)
+        if key in {"ai_date_debut_conge", "ai_date_fin_conge"}:
+            return _has_leave_request_evidence(text)
+        if key == "ai_type_depense":
+            return bool(_detect_expense_type_from_text(text))
+        return True
+
+    if key == "ai_type_conge":
+        return _has_leave_request_evidence(text)
+
+    if _is_constraint_field_key(key):
+        return _has_constraint_evidence(text)
+
+    if key in {"ai_date_debut_conge", "ai_date_fin_conge"}:
+        return _has_leave_request_evidence(text)
+
+    if key == "ai_type_depense":
+        detected = _detect_expense_type_from_text(text)
+        if not detected:
+            return False
+        return not normalized_value or norm(detected) == normalized_value
+
+    if key == "ai_type_stationnement":
+        return _has_any_phrase(lowered, ["parking", "stationnement", "place reservee", "place reserve", "acces parking", "badge parking", "autorisation temporaire"])
+
+    if key == "ai_type_formation":
+        return _has_any_phrase(lowered, ["formation", "certification"])
+
+    if key == "ai_nom_formation":
+        return _has_any_phrase(lowered, ["formation", "certification"])
+
+    if key == "ai_zone_souhaitee":
+        return _has_any_phrase(lowered, ["parking", "stationnement"])
+
+    return True
+
+
 FIELD_INTENT_AFFINITY = {
     "ai_lieu_depart_actuel": {"transport", "mission"},
     "ai_lieu_souhaite": {"transport", "mission"},
@@ -1238,6 +1414,7 @@ class DynamicFieldGenerator:
         normalized_source = norm(source)
         intents = intents or self.analyze_intent(source)
         extractor = BoundaryAwareExtractor()
+        has_constraint_evidence = _has_constraint_evidence(source)
         intent_names = [intent for intent, confidence in intents if confidence > 0.05]
         if not intent_names:
             intent_names = ["unknown"]
@@ -1260,6 +1437,14 @@ class DynamicFieldGenerator:
             if not key:
                 return
             source_kind = source_kind if source_kind in {"explicit", "inferred", "default"} else "inferred"
+            if _is_constraint_field_key(key) and not has_constraint_evidence:
+                return
+            if _is_constraint_field_key(key) and source_kind != "explicit" and normalize_ws(value) and not _has_phrase(normalized_source, norm(value)):
+                return
+            if normalize_ws(definition.get("type") or "") == "select" and key.startswith("ai_custom_") and source_kind != "explicit":
+                value = ""
+            if source_kind != "explicit" and not _field_has_minimal_evidence(key, source, value, source_kind):
+                return
             current = candidate_map.get(key)
             if current:
                 current_rank = get_source_rank(current.source)
@@ -1306,9 +1491,11 @@ class DynamicFieldGenerator:
                 specific_field_added = True
                 add_candidate(blueprint, value, confidence, infer_candidate_source(value, "inferred"))
 
-        if not any(intent in FIELD_BLUEPRINTS for intent in intent_names):
+        has_known_blueprint_intent = any(intent in FIELD_BLUEPRINTS for intent in intent_names)
+
+        if not has_known_blueprint_intent:
             for field_key, value, confidence in learned_scores:
-                if field_key not in ALLOWED_CUSTOM_FIELD_KEYS:
+                if not field_key.startswith("ai_custom_"):
                     continue
                 if self._field_semantic_bucket(field_key) == "long_text":
                     continue
@@ -1320,7 +1507,9 @@ class DynamicFieldGenerator:
                     specific_field_added = True
 
         for field_key, value, confidence in learned_scores:
-            if field_key not in ALLOWED_CUSTOM_FIELD_KEYS:
+            if not _is_allowed_custom_field_key(field_key):
+                continue
+            if not has_known_blueprint_intent and not field_key.startswith("ai_custom_"):
                 continue
             if self._field_semantic_bucket(field_key) == "long_text":
                 continue
@@ -1332,6 +1521,10 @@ class DynamicFieldGenerator:
                 continue
             if field_key in candidate_map:
                 existing = candidate_map[field_key]
+                if _is_constraint_field_key(field_key) and not has_constraint_evidence:
+                    continue
+                if _is_constraint_field_key(field_key) and not _has_phrase(normalized_source, norm(value)):
+                    continue
                 if existing.source == "explicit":
                     continue
                 if confidence > existing.confidence and value:
@@ -1346,9 +1539,9 @@ class DynamicFieldGenerator:
             if value:
                 specific_field_added = True
 
-        cooccurring_keys = self._expand_from_cooccurrence(candidate_map.keys(), miner)
+        cooccurring_keys = self._expand_from_cooccurrence(candidate_map.keys(), miner) if has_known_blueprint_intent else []
         for key in cooccurring_keys:
-            if key not in ALLOWED_CUSTOM_FIELD_KEYS:
+            if not _is_allowed_custom_field_key(key):
                 continue
             if self._field_semantic_bucket(key) == "long_text":
                 continue
@@ -1363,11 +1556,27 @@ class DynamicFieldGenerator:
                 add_candidate({"key": key, "label": self._label_from_field_key(key), "type": self._guess_type(key), "required": False}, learned_value, learned_confidence, "inferred")
                 specific_field_added = True
 
-        if not specific_field_added and not any(intent in FIELD_BLUEPRINTS for intent in intent_names):
+        if not specific_field_added and not has_known_blueprint_intent:
             for definition in GENERIC_FALLBACK_FIELDS:
                 value = self._extract_generic_fallback_value(source, definition["key"], extractor, miner)
                 confidence = 0.45 if value else 0.15
                 add_candidate(definition, value, confidence, "default")
+
+        dynamic_custom_fields = self._extract_dynamic_custom_fields(source, extractor)
+        for dynamic_field in dynamic_custom_fields:
+            add_candidate(
+                {
+                    "key": dynamic_field["key"],
+                    "label": dynamic_field["label"],
+                    "type": dynamic_field["type"],
+                    "required": dynamic_field.get("required", False),
+                },
+                dynamic_field["value"],
+                float(dynamic_field.get("confidence", 0.6)),
+                str(dynamic_field.get("source", "explicit")),
+            )
+            if normalize_ws(dynamic_field.get("value", "")):
+                specific_field_added = True
 
         ordered = sorted(
             candidate_map.values(),
@@ -1433,12 +1642,16 @@ class DynamicFieldGenerator:
             match = re.search(r"\b(\d+)\b", text)
             return match.group(1) if match else ""
         if key == "ai_type_conge":
-            return extractor._infer_leave_type(text)
+            return extractor._infer_leave_type(text) if _has_leave_request_evidence(text) else ""
         if key == "ai_date_debut_conge":
-            return extractor.extract_date(text)
+            return extractor.extract_date(text) if _has_leave_request_evidence(text) else ""
         if key == "ai_date_fin_conge":
+            if not _has_leave_request_evidence(text):
+                return ""
             _, end = extractor.extract_date_range(text)
             return end
+        if key == "ai_type_depense":
+            return _detect_expense_type_from_text(text)
         if key == "ai_equipement_concerne":
             return self._extract_after_any(text, ["maintenance", "reparation", "réparation", "climatisation", "panne", "incident"])
         if key == "ai_description_probleme":
@@ -1446,10 +1659,6 @@ class DynamicFieldGenerator:
         if key == "ai_type_transport":
             return extractor._infer_transport_type(text)
 
-        if miner:
-            learned_value, _ = miner.predict_field(key, text)
-            if learned_value:
-                return learned_value
         return ""
 
     def _estimate_blueprint_confidence(self, blueprint: dict[str, Any], value: str, text: str, miner: PatternMiner | None) -> float:
@@ -1460,7 +1669,7 @@ class DynamicFieldGenerator:
             confidence += 0.15
         if len(value.split()) == 1:
             confidence += 0.1
-        if norm(value) in norm(text):
+        if _has_phrase(norm(text), norm(value)):
             confidence += 0.2
         if miner:
             learned_value, learned_confidence = miner.predict_field(str(blueprint.get("key") or ""), text)
@@ -1519,11 +1728,11 @@ class DynamicFieldGenerator:
 
     def _infer_access_type(self, text: str) -> str:
         lowered = norm(text)
-        if "administrateur" in lowered or "admin" in lowered:
+        if _has_any_phrase(lowered, ["administrateur", "admin"]):
             return "Administrateur"
-        if "lecture/ecriture" in lowered or "ecriture" in lowered or "écriture" in lowered:
+        if _has_any_phrase(lowered, ["lecture ecriture", "ecriture"]):
             return "Lecture/Ecriture"
-        if "lecture seule" in lowered or "consultation" in lowered or "voir" in lowered:
+        if _has_any_phrase(lowered, ["lecture seule", "consultation", "voir"]):
             return "Lecture seule"
         return "Autre"
 
@@ -1532,6 +1741,10 @@ class DynamicFieldGenerator:
         if key == "ai_service_actuel":
             return self._extract_after_any(source, ["service", "departement", "département", "equipe", "équipe"])
         return self._extract_after_any(source, ["vers", "pour", "service", "departement", "département", "equipe", "équipe"])
+
+    def _contains_any(self, text: str, keywords: Iterable[str]) -> bool:
+        haystack = norm(text)
+        return _has_any_phrase(haystack, [norm(keyword) for keyword in keywords])
 
     def _extract_generic_fallback_value(self, text: str, field_key: str, extractor: BoundaryAwareExtractor, miner: PatternMiner | None) -> str:
         source = normalize_ws(text)
@@ -1554,10 +1767,6 @@ class DynamicFieldGenerator:
             return self._extract_justification(source)
 
         if field_key == "ai_contexte":
-            if miner:
-                learned_value, _ = miner.predict_field(field_key, source)
-                if learned_value:
-                    return learned_value
             return source[:240]
 
         return ""
@@ -1586,6 +1795,181 @@ class DynamicFieldGenerator:
         if "type_" in key or key.endswith("_type") or "urgence" in key:
             return "select"
         return "text"
+
+    def _extract_dynamic_custom_fields(self, text: str, extractor: BoundaryAwareExtractor) -> list[dict[str, Any]]:
+        source = normalize_ws(text)
+        if not source:
+            return []
+
+        fields: list[dict[str, Any]] = []
+        seen_keys: set[str] = set()
+
+        for label, value in self._extract_labeled_pairs(source):
+            field_key = self._make_dynamic_field_key(label)
+            if not field_key or field_key in seen_keys:
+                continue
+            field_type = self._guess_dynamic_field_type(value)
+            normalized_value = self._normalize_dynamic_field_value(value, field_type, extractor)
+            if not normalized_value:
+                continue
+            fields.append({
+                "key": field_key,
+                "label": normalize_ws(label)[:48],
+                "type": field_type,
+                "required": False,
+                "value": normalized_value,
+                "confidence": 0.82,
+                "source": "explicit",
+            })
+            seen_keys.add(field_key)
+            if len(fields) >= 4:
+                return fields
+
+        clause_candidates = [
+            ("Objet", self._extract_after_connectors(source, ["concernant", "au sujet de", "a propos de", "pour"])),
+            ("Contrainte", self._extract_constraint_clause(source)),
+            ("Beneficiaire", self._extract_explicit_beneficiary(source)),
+        ]
+        for label, value in clause_candidates:
+            if not value:
+                continue
+            field_key = self._make_dynamic_field_key(label)
+            if field_key in seen_keys:
+                continue
+            fields.append({
+                "key": field_key,
+                "label": label,
+                "type": "text" if len(value) <= 80 else "textarea",
+                "required": False,
+                "value": value,
+                "confidence": 0.58,
+                "source": "inferred",
+            })
+            seen_keys.add(field_key)
+            if len(fields) >= 4:
+                break
+
+        return fields[:4]
+
+    def _extract_labeled_pairs(self, text: str) -> list[tuple[str, str]]:
+        pairs: list[tuple[str, str]] = []
+        pattern = re.compile(
+            r"(?:^|[\n;,]\s*)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 '/_-]{2,32})\s*[:=-]\s*([^;\n,]{2,120})",
+            flags=re.IGNORECASE,
+        )
+        for match in pattern.finditer(text):
+            label = normalize_ws(match.group(1))
+            value = normalize_ws(match.group(2)).strip(" .")
+            if not label or not value:
+                continue
+            pairs.append((label, value))
+        return pairs
+
+    def _make_dynamic_field_key(self, label: str) -> str:
+        slug = norm(label).replace(" ", "_")
+        slug = re.sub(r"[^a-z0-9_]+", "_", slug)
+        slug = re.sub(r"_+", "_", slug).strip("_")
+        if not slug:
+            return ""
+        return f"ai_custom_{slug[:28]}"
+
+    def _guess_dynamic_field_type(self, value: str) -> str:
+        cleaned = normalize_ws(value)
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", cleaned):
+            return "date"
+        if re.fullmatch(r"\d+(?:[.,]\d+)?", cleaned):
+            return "number"
+        if len(cleaned) > 80:
+            return "textarea"
+        return "text"
+
+    def _normalize_dynamic_field_value(self, value: str, field_type: str, extractor: BoundaryAwareExtractor) -> str:
+        cleaned = normalize_ws(value)
+        if not cleaned:
+            return ""
+        if field_type == "date":
+            return extractor.extract_date(cleaned) or cleaned
+        if field_type == "number":
+            return cleaned.replace(",", ".")
+        if field_type == "textarea":
+            return cleaned[:220]
+        return clean_entity_text(cleaned) or cleaned[:120]
+
+    def _extract_after_connectors(self, text: str, connectors: Iterable[str]) -> str:
+        source = normalize_ws(text)
+        for connector in connectors:
+            pattern = rf"\b{re.escape(connector)}\b\s+(.+?)(?=\s+(?:avec|sans|pour|afin|car|le|la|les|du|de|des)\b|[\.,;]|$)"
+            match = re.search(pattern, source, flags=re.IGNORECASE)
+            if not match:
+                continue
+            candidate = clean_entity_text(match.group(1))
+            if candidate and len(candidate) >= 3:
+                return candidate[:120]
+        return ""
+
+    def _extract_explicit_beneficiary(self, text: str) -> str:
+        source = normalize_ws(text)
+        if not source:
+            return ""
+
+        patterns = [
+            r"\bbeneficiaire\s*[:\-]\s*([a-zà-ÿ][a-zà-ÿ'\-]*(?:\s+[a-zà-ÿ][a-zà-ÿ'\-]*){1,3})\b",
+            r"\bau\s+nom\s+de\s+([a-zà-ÿ][a-zà-ÿ'\-]*(?:\s+[a-zà-ÿ][a-zà-ÿ'\-]*){1,3})\b",
+            r"\bpour\s+([a-zà-ÿ][a-zà-ÿ'\-]*(?:\s+[a-zà-ÿ][a-zà-ÿ'\-]*){1,3})\b",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, source, flags=re.IGNORECASE)
+            if not match:
+                continue
+
+            candidate = clean_entity_text(match.group(1))
+            if not candidate:
+                continue
+
+            words = [part for part in re.split(r"\s+", candidate) if part]
+            if len(words) < 2:
+                continue
+            if len(words) > 4:
+                words = words[:4]
+
+            valid = True
+            for word in words:
+                token = norm(word)
+                if not token or token in BENEFICIARY_BLOCKLIST or not is_likely_proper_noun(token):
+                    valid = False
+                    break
+
+            if valid:
+                return capitalize_entity(" ".join(words))
+
+        return ""
+
+    def _extract_constraint_clause(self, text: str) -> str:
+        source = normalize_ws(text)
+        if not source or not _has_constraint_evidence(source):
+            return ""
+
+        patterns = [
+            (r"\b(sans\s+[a-zà-ÿ][a-zà-ÿ'\-]*(?:\s+[a-zà-ÿ][a-zà-ÿ'\-]*){0,2})\b", None),
+            (r"\b(pas\s+de\s+[a-zà-ÿ][a-zà-ÿ'\-]*(?:\s+[a-zà-ÿ][a-zà-ÿ'\-]*){0,2})\b", None),
+            (r"\b(?:uniquement|seulement)\s+(?:en\s+)?([a-zà-ÿ][a-zà-ÿ'\-]*(?:\s+[a-zà-ÿ][a-zà-ÿ'\-]*){0,2})\b", "Uniquement"),
+            (r"\b(?:je\s+prefere|je\s+préfère)\s+([a-zà-ÿ][a-zà-ÿ'\-]*(?:\s+[a-zà-ÿ][a-zà-ÿ'\-]*){0,3})\b", "Je prefere"),
+            (r"\b(?:a\s+condition\s+de|à\s+condition\s+de|avec\s+obligation\s+de)\s+([a-zà-ÿ][a-zà-ÿ'\-]*(?:\s+[a-zà-ÿ][a-zà-ÿ'\-]*){0,4})\b", "A condition de"),
+        ]
+
+        for pattern, prefix in patterns:
+            match = re.search(pattern, source, flags=re.IGNORECASE)
+            if not match:
+                continue
+            captured = clean_entity_text(match.group(1))
+            if not captured:
+                continue
+            if prefix:
+                return capitalize_entity(f"{prefix} {captured}")
+            return capitalize_entity(captured)
+
+        return "Contrainte explicite"
 
     def _first_meaningful_span(self, text: str) -> str:
         tokens = [token for token in re.split(r"\s+", normalize_ws(text)) if token]

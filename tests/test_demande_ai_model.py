@@ -15,6 +15,8 @@ NEGATIVE_PROMPTS = [
     "demande de transformation de contrat",
     "je veux une information sur mon salaire",
     "besoin d informations generales",
+    "la deformation du badge bloque mon acces",
+    "merci pour la reformation du document administratif",
 ]
 
 POSITIVE_PROMPTS = [
@@ -25,6 +27,13 @@ POSITIVE_PROMPTS = [
 
 
 class DemandeFormationBoundaryTests(unittest.TestCase):
+    def _find_objet_value(self, custom_fields):
+        for field in custom_fields or []:
+            key = model._norm((field or {}).get("key", "")).replace("_", " ")
+            if "objet" in key:
+                return str((field or {}).get("value", "")).strip()
+        return ""
+
     def test_negative_prompts_do_not_trigger_formation(self):
         for prompt in NEGATIVE_PROMPTS:
             with self.subTest(prompt=prompt):
@@ -70,6 +79,321 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
         custom_keys = {field.get("key") for field in response.get("custom_fields", [])}
         self.assertNotIn("ai_nom_formation", custom_keys)
         self.assertNotIn("ai_type_formation", custom_keys)
+
+    def test_varied_transport_formation_prompt_extracts_core_context(self):
+        prompt = "je souhaite demande un transport en bus pour une formation professionnelle en ui/ix a hammam-lif qui debute le 12 decembre"
+        intents = model._detect_intents(prompt)
+        fields = model._build_context_fields(prompt, intents)
+
+        self.assertTrue(any(intent == "transport" for intent, _ in intents))
+        self.assertTrue(any(intent == "formation" for intent, _ in intents))
+        self.assertEqual(fields.get("type_transport_souhaite"), "Bus")
+        self.assertEqual(fields.get("type_formation"), "Formation externe")
+        self.assertEqual(fields.get("date_souhaitee"), "2026-12-12")
+        self.assertEqual(fields.get("lieu_souhaite"), "Hammam-lif")
+
+        formation_name = fields.get("nom_formation", "")
+        self.assertIn("Ui/ix", formation_name)
+        self.assertNotIn("Qui", formation_name)
+        self.assertNotIn("Hammam-lif", formation_name)
+
+    def test_date_location_and_keywords_are_prompt_agnostic(self):
+        prompts = [
+            "transport bus pour formation ui/ux a tunis le 12/12",
+            "j ai besoin d un trajet en train vers hammam lif demain pour certification devops",
+            "mission a sfax apres demain avec deplacement en taxi",
+        ]
+
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                intents = model._detect_intents(prompt)
+                fields = model._build_context_fields(prompt, intents)
+
+                self.assertTrue(fields.get("date_souhaitee"))
+                if "vers" in prompt or " a " in prompt:
+                    self.assertTrue(fields.get("lieu_souhaite"))
+
+                keywords = fields.get("mots_cles") or []
+                self.assertTrue(len(keywords) >= 3)
+
+        # short/slash technical tokens should be preserved in keyword extraction
+        intents = model._detect_intents("formation ui/ux et acces api")
+        fields = model._build_context_fields("formation ui/ux et acces api", intents)
+        keywords = [k.lower() for k in (fields.get("mots_cles") or [])]
+        self.assertTrue(any("ui/ux" == k or "ui" == k for k in keywords))
+        self.assertIn("api", keywords)
+
+    def test_autre_response_is_model_driven_and_self_contained(self):
+        payload = {
+            "text": "je souhaite demande un transport en bus pour une formation professionnelle en ui/ix a hammam-lif qui debute le 12 decembre",
+            "general": {
+                "typeDemande": "Autre",
+                "categorie": "Autre",
+            },
+            "details": {},
+        }
+
+        response = model._build_autre_response(payload, "")
+
+        self.assertEqual(response.get("remove_fields"), ["ALL"])
+        self.assertTrue(response.get("replace_base"))
+
+        general = response.get("general", {})
+        self.assertEqual(general.get("priorite"), "NORMALE")
+        self.assertTrue(general.get("titre"))
+
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        self.assertEqual(custom_fields["ai_type_transport"]["value"], "Bus")
+        self.assertEqual(custom_fields["ai_lieu_souhaite"]["value"], "Hammam-lif")
+        self.assertEqual(custom_fields["ai_date_souhaitee_metier"]["value"], "2026-12-12")
+        self.assertIn("Ui/ix", custom_fields["ai_nom_formation"]["value"])
+
+    def test_transport_type_stays_undecided_when_prompt_does_not_specify_it(self):
+        payload = {
+            "text": "bonjour je veux une demande de transport pour une formation professionelle de java",
+            "general": {
+                "typeDemande": "Autre",
+                "categorie": "Autre",
+            },
+            "details": {},
+        }
+
+        response = model._build_autre_response(payload, "")
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertIn("ai_type_transport", custom_fields)
+        self.assertEqual(custom_fields["ai_type_transport"]["value"], "A definir")
+        self.assertIn("Bus", custom_fields["ai_type_transport"].get("options", []))
+        self.assertIn("Taxi", custom_fields["ai_type_transport"].get("options", []))
+        self.assertIn("A definir", custom_fields["ai_type_transport"].get("options", []))
+
+    def test_seed_samples_are_loaded_for_autre_learning(self):
+        samples = model._load_autre_training_samples()
+        prompts = {sample.get("prompt") for sample in samples}
+
+        self.assertIn(
+            "Je souhaite un acces VPN en lecture ecriture pour travailler a distance des demain.",
+            prompts,
+        )
+        self.assertIn(
+            "Je demande une place reservee au parking pres de l entree principale.",
+            prompts,
+        )
+
+    def test_unknown_demande_generates_dynamic_custom_fields_and_title(self):
+        payload = {
+            "text": "demande speciale; projet: atlas; livrable: maquette finale; contrainte: validation client avant 2026-09-01",
+            "general": {
+                "typeDemande": "Autre",
+                "categorie": "Autre",
+            },
+            "details": {},
+        }
+
+        response = model._build_autre_response(payload, "")
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertIn("ai_custom_projet", custom_fields)
+        self.assertEqual(custom_fields["ai_custom_projet"]["value"], "atlas")
+        self.assertIn("ai_custom_livrable", custom_fields)
+        self.assertIn("maquette finale", custom_fields["ai_custom_livrable"]["value"].lower())
+        self.assertNotIn("ai_salle_souhaitee", custom_fields)
+        self.assertNotIn("ai_poste_souhaite", custom_fields)
+
+        title = (response.get("general", {}) or {}).get("titre", "").lower()
+        self.assertIn("atlas", title)
+
+    def test_finance_with_maladie_keeps_justification_without_leave_or_hotel_fields(self):
+        prompt = "remboursement de salaire 250dt pour raison de maladie"
+        response = model._build_autre_response({"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}}, "")
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        amount_like = custom_fields.get("ai_montant") or {}
+        justification_like = custom_fields.get("ai_justification_metier") or {}
+
+        self.assertEqual(amount_like.get("value"), "250")
+        self.assertIn("maladie", justification_like.get("value", "").lower())
+        self.assertNotIn("ai_type_conge", custom_fields)
+        self.assertNotIn("ai_date_debut_conge", custom_fields)
+        self.assertNotIn("ai_date_fin_conge", custom_fields)
+        self.assertNotIn("Hotel", [str(field.get("value", "")) for field in custom_fields.values()])
+
+    def test_leave_prompt_generates_leave_fields_when_conge_is_explicit(self):
+        prompt = "conge maladie du 1 au 3 juin"
+        response = model._build_autre_response({"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}}, "")
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertEqual(custom_fields["ai_type_conge"]["value"], "Conge maladie")
+        self.assertTrue(custom_fields["ai_date_debut_conge"]["value"])
+        self.assertTrue(custom_fields["ai_date_fin_conge"]["value"])
+
+    def test_hotel_reimbursement_generates_expense_type_when_explicit(self):
+        prompt = "remboursement hotel 300dt"
+        response = model._build_autre_response({"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}}, "")
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertEqual(custom_fields["ai_type_depense"]["value"], "Hotel")
+        self.assertEqual(custom_fields["ai_montant"]["value"], "300")
+
+    def test_mission_client_does_not_create_location_or_beneficiary(self):
+        prompt = "remboursement de 85 tnd pour taxi le 14 fevrier 2027 mission client"
+
+        intents = model._detect_intents(prompt)
+        fields = model._build_context_fields(prompt, intents)
+        self.assertEqual(fields.get("montant"), 85)
+        self.assertEqual(fields.get("type_transport_souhaite"), "Taxi")
+        self.assertEqual(fields.get("date_souhaitee"), "2027-02-14")
+        self.assertNotIn("lieu_souhaite", fields)
+        self.assertNotIn("beneficiaire", fields)
+
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        justification = (custom_fields.get("ai_justification_metier") or {}).get("value", "")
+        justification_norm = model._norm(justification)
+        self.assertIn("mission client", justification_norm)
+        self.assertNotIn("mission a client", justification_norm)
+        self.assertFalse(any("beneficiaire" in str(key) for key in custom_fields.keys()))
+
+    def test_mission_with_explicit_preposition_keeps_location(self):
+        prompt = "remboursement taxi 85 tnd mission a Paris le 14 fevrier 2027"
+        fields = model._build_context_fields(prompt, model._detect_intents(prompt))
+
+        self.assertEqual(fields.get("lieu_souhaite"), "Paris")
+
+    def test_beneficiary_requires_explicit_person_evidence(self):
+        prompt = "remboursement 85 tnd taxi pour Ahmed Ben Ali le 14 fevrier 2027"
+        fields = model._build_context_fields(prompt, model._detect_intents(prompt))
+
+        self.assertEqual(fields.get("beneficiaire"), "Ahmed Ben Ali")
+
+    def test_objet_reimbursement_taxi_is_not_redundant(self):
+        prompt = "remboursement de 85 tnd pour taxi le 14 fevrier 2027 mission client"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        objet = self._find_objet_value(response.get("custom_fields", []))
+        if objet:
+            objet_norm = model._norm(objet)
+            self.assertNotEqual(objet_norm, "taxi")
+            self.assertTrue("frais de taxi" in objet_norm or "mission client" in objet_norm)
+
+    def test_objet_reimbursement_restaurant_is_refined(self):
+        prompt = "remboursement 120 dt restaurant client le 3 mai 2027"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        objet = self._find_objet_value(response.get("custom_fields", []))
+        self.assertEqual(model._norm(objet), "frais de restaurant")
+
+    def test_objet_does_not_duplicate_nom_formation(self):
+        prompt = "formation professionnel de html"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        custom_fields = response.get("custom_fields", [])
+        objet = self._find_objet_value(custom_fields)
+        nom_formation = ""
+        for field in custom_fields:
+            if str((field or {}).get("key", "")).strip() == "ai_nom_formation":
+                nom_formation = str((field or {}).get("value", "")).strip()
+                break
+
+        if objet and nom_formation:
+            self.assertNotEqual(model._norm(objet), model._norm(nom_formation))
+
+    def test_no_constraint_field_without_explicit_constraint_evidence(self):
+        prompt = "remboursement 85 tnd taxi mission client le 14 fevrier 2027"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        self.assertEqual((custom_fields.get("ai_type_transport") or {}).get("value"), "Taxi")
+        self.assertFalse(any("contrainte" in model._norm(str(key)) for key in custom_fields.keys()))
+
+    def test_constraint_field_allowed_with_explicit_uniquement_bus(self):
+        prompt = "transport vers rades uniquement en bus"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        self.assertEqual((custom_fields.get("ai_type_transport") or {}).get("value"), "Bus")
+
+        constraint_value = ""
+        for key, field in custom_fields.items():
+            if "contrainte" in model._norm(str(key)):
+                constraint_value = str((field or {}).get("value", "")).strip()
+                break
+
+        if constraint_value:
+            self.assertIn("bus", model._norm(constraint_value))
+
+    def test_constraint_field_extracts_sans_taxi(self):
+        prompt = "transport sans taxi"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        constraint_value = ""
+        for key, field in custom_fields.items():
+            if "contrainte" in model._norm(str(key)):
+                constraint_value = str((field or {}).get("value", "")).strip()
+                break
+
+        self.assertTrue(constraint_value)
+        self.assertEqual(model._norm(constraint_value), "sans taxi")
+
+    def test_transport_route_uniquement_bus_destination_and_justification(self):
+        prompt = "transport de tunis vers rades uniquement en bus"
+
+        fields = model._build_context_fields(prompt, model._detect_intents(prompt))
+        self.assertEqual(fields.get("lieu_depart_actuel"), "Tunis")
+        self.assertEqual(fields.get("lieu_souhaite"), "Rades")
+        self.assertEqual(fields.get("type_transport_souhaite"), "Bus")
+
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertEqual((custom_fields.get("ai_lieu_souhaite") or {}).get("value"), "Rades")
+        self.assertEqual((custom_fields.get("ai_type_transport") or {}).get("value"), "Bus")
+        justification = (custom_fields.get("ai_justification_metier") or {}).get("value", "")
+        self.assertNotIn("mission", model._norm(justification))
+
+    def test_transport_route_en_taxi_destination_without_pollution(self):
+        prompt = "transport de tunis vers rades en taxi"
+
+        fields = model._build_context_fields(prompt, model._detect_intents(prompt))
+        self.assertEqual(fields.get("lieu_souhaite"), "Rades")
+        self.assertEqual(fields.get("type_transport_souhaite"), "Taxi")
+
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertEqual((custom_fields.get("ai_lieu_souhaite") or {}).get("value"), "Rades")
+        self.assertEqual((custom_fields.get("ai_type_transport") or {}).get("value"), "Taxi")
+        justification = (custom_fields.get("ai_justification_metier") or {}).get("value", "")
+        self.assertNotIn("mission", model._norm(justification))
 
 
 if __name__ == "__main__":

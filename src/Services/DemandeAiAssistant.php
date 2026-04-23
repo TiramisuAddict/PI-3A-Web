@@ -67,17 +67,17 @@ class DemandeAiAssistant
             }
         }
 
-        $prompt = $this->buildPrompt($generalContext, $currentDetails, $allowedKeys, $requiredKeys, $fieldLabels, $selectOptions);
-        try {
-            $parsed = $this->callMlModel($prompt);
-            error_log('ML_RAW: ' . (json_encode($parsed, JSON_UNESCAPED_UNICODE) ?: '{}'));
-        } catch (\RuntimeException $e) {
-            $this->logger->warning('Autre IA: fallback local deterministic payload.', [
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->buildAutreSuggestionsFallback($generalContext, $currentDetails, $allowedKeys);
-        }
+        $parsed = $this->callLocalGenerationModel([
+            'text' => $sourceText,
+            'general' => $generalContext,
+            'details' => $currentDetails,
+            'allowedKeys' => $allowedKeys,
+            'requiredKeys' => $requiredKeys,
+            'fieldLabels' => $fieldLabels,
+            'selectOptions' => $selectOptions,
+            'acceptedAutreFeedback' => $this->loadAutreFeedbackSamples(),
+            'regenerateCount' => (int) ($generalContext['regenerateCount'] ?? 0),
+        ]);
 
         $generalPayload = isset($parsed['general']) && is_array($parsed['general']) ? $parsed['general'] : [];
         $detailsPayload = isset($parsed['details']) && is_array($parsed['details']) ? $parsed['details'] : [];
@@ -159,15 +159,16 @@ class DemandeAiAssistant
                 'remove' => $removeFields,
                 'replaceBase' => $replaceBase,
             ],
-            'dynamicFieldConfidence' => $this->buildAutrePlanConfidence(
-                $customFields,
-                $removeFields,
-                $replaceBase,
-                $correctedText,
-                $generatedDescription
-            ),
+            'dynamicFieldConfidence' => isset($parsed['dynamicFieldConfidence']) && is_array($parsed['dynamicFieldConfidence'])
+                ? $parsed['dynamicFieldConfidence']
+                : $this->buildAutrePlanConfidence(
+                    $customFields,
+                    $removeFields,
+                    $replaceBase,
+                    $correctedText,
+                    $generatedDescription
+                ),
         ];
-        error_log('FINAL_OUTPUT: ' . (json_encode($result, JSON_UNESCAPED_UNICODE) ?: '{}'));
 
         return [
             'correctedText' => $result['correctedText'],
@@ -186,7 +187,7 @@ class DemandeAiAssistant
      * @param array<int, string> $allowedKeys
      * @return array<string, mixed>
      */
-    private function buildAutreSuggestionsFallback(array $generalContext, array $currentDetails, array $allowedKeys): array
+    private function buildAutreSuggestionsFallback(array $generalContext, array $currentDetails, array $allowedKeys, array $autreFields): array
     {
         $sourceText = $this->firstNonEmpty(
             trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
@@ -220,6 +221,10 @@ class DemandeAiAssistant
             );
         }
 
+        $enriched = $this->enrichAutreSuggestions($correctedText, $autreFields, $suggestedDetails, []);
+        $suggestedDetails = $enriched['suggestedDetails'];
+        $customFields = $enriched['customFields'];
+
         $generatedDescription = $this->firstNonEmpty(
             trim((string) ($suggestedDetails['descriptionBesoin'] ?? '')),
             trim((string) ($generalContext['description'] ?? '')),
@@ -250,7 +255,7 @@ class DemandeAiAssistant
             ],
             'suggestedDetails' => $suggestedDetails,
             'dynamicFieldPlan' => [
-                'add' => [],
+                'add' => $customFields,
                 'remove' => [],
                 'replaceBase' => false,
             ],
@@ -281,20 +286,17 @@ class DemandeAiAssistant
             throw new \RuntimeException('Ajoutez une description avant de lancer la suggestion intelligente.');
         }
 
-        $prompt = $this->buildClassificationPrompt($normalizedText, $categoryTypes, $priorities);
-        $parsed = [];
-
-        try {
-            $rawResponse = $this->callHuggingFace($prompt);
-            $parsed = $this->parseJsonResponse($rawResponse);
-        } catch (\RuntimeException $e) {
-            $this->logger->warning('Classification IA: fallback local active (runner indisponible).', [
-                'error' => $e->getMessage(),
-            ]);
-        }
+        $parsed = $this->callLocalSuggestionModel([
+            'text' => $normalizedText,
+            'categories' => array_values(array_keys($categoryTypes)),
+            'typeMap' => $categoryTypes,
+            'priorities' => array_values($priorities),
+            'trainingSamples' => $this->fetchClassificationTrainingSamples(),
+            'externalTrainingSources' => $this->fetchExternalTrainingSources(),
+        ]);
 
         $normalized = $this->normalizeClassificationSuggestion($parsed, $normalizedText, $categoryTypes, $priorities);
-        $normalized['model'] = $this->model;
+        $normalized['model'] = 'local-ml:demande_suggestion_model.py';
 
         return $normalized;
     }
@@ -309,9 +311,15 @@ class DemandeAiAssistant
             throw new \RuntimeException('Ajoutez un titre avant de lancer la generation de description.');
         }
 
+        $parsed = $this->callLocalDescriptionModel([
+            'title' => $normalizedTitle,
+            'typeDemande' => trim((string) ($typeDemande ?? '')),
+            'categorie' => trim((string) ($categorie ?? '')),
+        ]);
+
         return [
-            'description' => $this->generateDescriptionFromTitleWithFallback($normalizedTitle, $typeDemande, $categorie, null),
-            'model' => $this->model,
+            'description' => trim((string) ($parsed['description'] ?? '')),
+            'model' => 'local-ml:demande_description_model.py',
         ];
     }
 
@@ -329,9 +337,16 @@ class DemandeAiAssistant
             throw new \RuntimeException('Ajoutez un titre avant de lancer la generation de description.');
         }
 
+        $parsed = $this->callLocalDescriptionModel([
+            'title' => $normalizedTitle,
+            'typeDemande' => trim((string) ($typeDemande ?? '')),
+            'categorie' => trim((string) ($categorie ?? '')),
+            'employeId' => $employeId,
+        ]);
+
         return [
-            'description' => $this->generateDescriptionFromTitleWithFallback($normalizedTitle, $typeDemande, $categorie, $employeId),
-            'model' => $this->model,
+            'description' => trim((string) ($parsed['description'] ?? '')),
+            'model' => 'local-ml:demande_description_model.py',
         ];
     }
 
@@ -476,7 +491,7 @@ class DemandeAiAssistant
                     'Conge exceptionnel' => ['exceptionnel', 'mariage', 'deces', 'décès'],
                     'Conge annuel' => ['conge', 'vacances', 'repos'],
                 ]),
-                'dateDebut', 'dateDebutTeletravail', 'dateDebutHoraires', 'dateDebutFormation', 'dateSouhaitee', 'dateSouhaiteeFormation', 'datePassage', 'dateHeuresSup', 'dateDepense' => $allDates[0] ?? '',
+                'dateDebut', 'dateDebutTeletravail', 'dateDebutHoraires', 'dateDebutFormation', 'dateSouhaitee', 'dateSouhaiteeFormation', 'datePassage', 'dateHeuresSup', 'dateDepense', 'dateSouhaiteeAutre' => $allDates[0] ?? '',
                 'dateFin', 'dateFinTeletravail' => $allDates[1] ?? '',
                 'nombreJours' => $this->extractDaysCount($normalizedText, $allDates),
                 'motif', 'motifHoraires', 'motifTeletravail', 'motifHeuresSup', 'objectif', 'objectifFormation', 'justification', 'justificationLogiciel', 'justificationCertif', 'descriptionProbleme', 'details' => $text,
@@ -605,6 +620,202 @@ class DemandeAiAssistant
         }
 
         return $details;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $autreFields
+     * @param array<string, string> $suggestedDetails
+     * @param array<int, array<string, mixed>> $customFields
+     * @return array{suggestedDetails: array<string, string>, customFields: array<int, array<string, mixed>>}
+     */
+    private function enrichAutreSuggestions(string $text, array $autreFields, array $suggestedDetails, array $customFields): array
+    {
+        $heuristicDetails = $this->extractSuggestedDetailsForType($text, 'Autre', $autreFields);
+        foreach ($heuristicDetails as $key => $value) {
+            if (!isset($suggestedDetails[$key]) || '' === trim((string) $suggestedDetails[$key])) {
+                $suggestedDetails[$key] = $value;
+            }
+        }
+
+        $allowedKeys = [];
+        foreach ($autreFields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $fieldKey = trim((string) ($field['key'] ?? ''));
+            if ('' !== $fieldKey) {
+                $allowedKeys[] = $fieldKey;
+            }
+        }
+
+        $forbiddenCustomKeys = array_values(array_unique(array_merge($allowedKeys, array_keys($suggestedDetails))));
+        $existingCustomKeys = [];
+        foreach ($customFields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $candidateKey = strtolower(trim((string) ($field['key'] ?? '')));
+            if ('' === $candidateKey) {
+                continue;
+            }
+
+            $slug = preg_replace('/[^a-z0-9_]+/', '_', $candidateKey) ?? '';
+            $slug = trim($slug, '_');
+            if ('' === $slug) {
+                continue;
+            }
+
+            if (!str_starts_with($slug, 'ai_')) {
+                $slug = 'ai_' . $slug;
+            }
+
+            $existingCustomKeys[$slug] = true;
+        }
+
+        $heuristicCustomFields = [];
+        $date = $this->extractAllFrenchDates($text)[0] ?? '';
+        if (!isset($suggestedDetails['dateSouhaiteeAutre']) || '' === trim((string) $suggestedDetails['dateSouhaiteeAutre'])) {
+            if ('' !== $date) {
+                $suggestedDetails['dateSouhaiteeAutre'] = $date;
+            }
+        }
+
+        if ('' !== $date && !isset($existingCustomKeys['ai_date_souhaitee_metier'])) {
+            $heuristicCustomFields[] = [
+                'key' => 'ai_date_souhaitee_metier',
+                'label' => 'Date souhaitee metier',
+                'type' => 'date',
+                'required' => false,
+                'value' => $date,
+            ];
+            $existingCustomKeys['ai_date_souhaitee_metier'] = true;
+        }
+
+        $location = $this->firstNonEmpty($this->extractTargetLocation($text), $this->extractCurrentLocation($text));
+        if ('' !== $location && !isset($existingCustomKeys['ai_zone_souhaitee'])) {
+            $heuristicCustomFields[] = [
+                'key' => 'ai_zone_souhaitee',
+                'label' => 'Zone souhaitee',
+                'type' => 'text',
+                'required' => false,
+                'value' => $location,
+            ];
+            $existingCustomKeys['ai_zone_souhaitee'] = true;
+        }
+
+        $trainingName = $this->extractTrainingName($text);
+        if ('' !== $trainingName && !isset($existingCustomKeys['ai_nom_formation'])) {
+            $heuristicCustomFields[] = [
+                'key' => 'ai_nom_formation',
+                'label' => 'Nom formation',
+                'type' => 'text',
+                'required' => false,
+                'value' => $trainingName,
+            ];
+            $existingCustomKeys['ai_nom_formation'] = true;
+        }
+
+        $transport = $this->extractTransportType($text);
+        if ('' !== $transport && !isset($existingCustomKeys['ai_type_transport'])) {
+            $heuristicCustomFields[] = [
+                'key' => 'ai_type_transport',
+                'label' => 'Type transport',
+                'type' => 'text',
+                'required' => false,
+                'value' => $transport,
+            ];
+            $existingCustomKeys['ai_type_transport'] = true;
+        }
+
+        $keywords = $this->extractPromptKeywords($text);
+        if ([] !== $keywords && !isset($existingCustomKeys['ai_mots_cles'])) {
+            $heuristicCustomFields[] = [
+                'key' => 'ai_mots_cles',
+                'label' => 'Mots cles detectes',
+                'type' => 'textarea',
+                'required' => false,
+                'value' => implode(', ', $keywords),
+            ];
+        }
+
+        $normalizedCustomFields = $this->normalizeCustomFields(array_merge($customFields, $heuristicCustomFields), $forbiddenCustomKeys);
+
+        return [
+            'suggestedDetails' => $suggestedDetails,
+            'customFields' => $normalizedCustomFields,
+        ];
+    }
+
+    private function extractTransportType(string $text): string
+    {
+        $normalized = $this->normalizeForSearch($text);
+        if ('' === $normalized) {
+            return '';
+        }
+
+        $map = [
+            'bus' => 'Bus',
+            'train' => 'Train',
+            'taxi' => 'Taxi',
+            'voiture' => 'Voiture',
+            'metro' => 'Metro',
+            'tram' => 'Tram',
+        ];
+
+        foreach ($map as $token => $label) {
+            if ($this->containsWord($normalized, $token)) {
+                return $label;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function extractPromptKeywords(string $text): array
+    {
+        $keywords = [];
+
+        if (preg_match_all('/\b[[:alnum:]]{2,}\/[[:alnum:]]{2,}\b/u', $text, $slashMatches) === 1) {
+            foreach (($slashMatches[0] ?? []) as $token) {
+                $value = strtolower(trim((string) $token));
+                if ('' !== $value) {
+                    $keywords[$value] = true;
+                }
+            }
+        }
+
+        $normalized = $this->normalizeForSearch($text);
+        if ('' !== $normalized) {
+            $stopwords = [
+                'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles', 'de', 'du', 'des', 'la', 'le', 'les',
+                'un', 'une', 'en', 'et', 'pour', 'sur', 'avec', 'dans', 'qui', 'que', 'est', 'demande', 'souhaite'
+            ];
+            $stopwordMap = array_fill_keys($stopwords, true);
+
+            $tokens = preg_split('/\s+/', $normalized) ?: [];
+            foreach ($tokens as $token) {
+                $candidate = trim((string) $token);
+                if (strlen($candidate) < 2 || isset($stopwordMap[$candidate])) {
+                    continue;
+                }
+
+                if (preg_match('/^\d+$/', $candidate) === 1) {
+                    continue;
+                }
+
+                $keywords[$candidate] = true;
+                if (count($keywords) >= 10) {
+                    break;
+                }
+            }
+        }
+
+        return array_slice(array_keys($keywords), 0, 8);
     }
 
     private function buildPrompt(
@@ -1158,6 +1369,106 @@ class DemandeAiAssistant
         }
 
         return $parsed;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function callLocalSuggestionModel(array $payload): array
+    {
+        return $this->callLocalMlScript('demande_suggestion_model.py', $payload);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function callLocalDescriptionModel(array $payload): array
+    {
+        return $this->callLocalMlScript('demande_description_model.py', $payload);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function callLocalGenerationModel(array $payload): array
+    {
+        return $this->callLocalMlScript('demande_generation_model.py', $payload);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function callLocalMlScript(string $scriptName, array $payload): array
+    {
+        $scriptPath = $this->resolveMlScriptPath($scriptName);
+        if (!is_file($scriptPath)) {
+            throw new \RuntimeException(sprintf('Script ML local introuvable: %s', $scriptPath));
+        }
+
+        $encodedPayload = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        if (false === $encodedPayload) {
+            throw new \RuntimeException('Impossible d encoder le payload JSON pour le script ML local.');
+        }
+
+        $lastError = '';
+        foreach ($this->getPythonCommandCandidates() as $commandPrefix) {
+            try {
+                $process = new Process(array_merge($commandPrefix, [$scriptPath]));
+                $process->setInput($encodedPayload);
+                $process->setTimeout($this->timeoutSeconds + 5);
+                $process->run();
+
+                if (!$process->isSuccessful()) {
+                    $lastError = trim($process->getErrorOutput() ?: $process->getOutput());
+                    continue;
+                }
+
+                $stdout = trim($process->getOutput());
+                $decoded = json_decode($stdout, true);
+                if (!is_array($decoded)) {
+                    $lastError = 'Le script ML local a retourne un JSON invalide.';
+                    continue;
+                }
+
+                if (array_key_exists('ok', $decoded)) {
+                    if (!($decoded['ok'] ?? false)) {
+                        $lastError = (string) ($decoded['error'] ?? 'Erreur inconnue du script ML local.');
+                        continue;
+                    }
+
+                    $result = $decoded['result'] ?? null;
+                    if (!is_array($result)) {
+                        $lastError = 'Le script ML local n a pas retourne de resultat valide.';
+                        continue;
+                    }
+
+                    return $result;
+                }
+
+                return $decoded;
+            } catch (\Throwable $e) {
+                $lastError = $e->getMessage();
+            }
+        }
+
+        throw new \RuntimeException('Le script ML local est indisponible. ' . ('' !== $lastError ? ('Details: ' . $lastError) : ''));
+    }
+
+    private function resolveMlScriptPath(string $scriptName): string
+    {
+        $configured = trim($this->pythonScriptPath);
+        if ('' !== $configured) {
+            $candidate = dirname($configured) . DIRECTORY_SEPARATOR . $scriptName;
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'ml' . DIRECTORY_SEPARATOR . $scriptName;
     }
 
     /**
@@ -1757,6 +2068,10 @@ class DemandeAiAssistant
             return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
         }
 
+        if (preg_match('/\b(?:a|à|dans)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:qui|que|dont|le|du|de|pour|afin|car|avec|des|a\s+partir|depuis|jusqu|debut|debute|commence)\b|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
+            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
+        }
+
         if (preg_match('/\bdans\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
             return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
         }
@@ -1824,7 +2139,7 @@ class DemandeAiAssistant
             return '';
         }
 
-        $matchCount = preg_match_all('/\b(?:de|du|des|d|depuis|partant de)\s+([a-z0-9\- ]{2,60}?)(?=\s+(?:vers|pour|afin|car|avec|la|le|je|j|nous|on|formation|certification|transport)\b|$)/iu', $compactText, $matches);
+        $matchCount = preg_match_all('/\b(?:de|du|des|d[\'’]|depuis|partant de)\s+([a-z0-9\- ]{2,60}?)(?=\s+(?:vers|pour|afin|car|avec|la|le|je|j|nous|on|formation|certification|transport)\b|$)/iu', $compactText, $matches);
         if (false === $matchCount || 0 === $matchCount) {
             return '';
         }
@@ -1863,6 +2178,8 @@ class DemandeAiAssistant
         $clean = preg_replace('/\s+type\s+de\s+formation\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\s+formation\s+est\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\s+moyen\s+de\s+transport\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s+(?:qui|que|dont)\b.*$/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s+(?:debut|debute|commence)\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\s+(?:je|j|nous|on)\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\s+(?:depuis|depart\s+de)\s+.*$/iu', '', $clean) ?? $clean;
 
@@ -1905,6 +2222,8 @@ class DemandeAiAssistant
             'demande', 'besoin', 'souhaite', 'soumettre', 'traiter', 'complement', 'information',
             'retour', 'merci', 'avance', 'bonjour', 'cette', 'correspond', 'utile', 'moyen', 'transport',
             'type', 'formation', 'ui', 'ux', 'deplacement', 'trajet', 'destination', 'souhaitee', 'souhaitee',
+            'janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre',
+            'janv', 'fev', 'fevr', 'avr', 'juil', 'sept', 'oct', 'nov', 'dec', 'ecembre', 'cembre',
         ];
 
         foreach ($forbiddenTokens as $token) {
@@ -2114,7 +2433,7 @@ class DemandeAiAssistant
 
             $scores[$category] = 0;
             foreach ($keywords as $keyword => $weight) {
-                if ($this->containsWord($text, $keyword) || $this->containsFragment($text, $keyword)) {
+                if ($this->containsWord($text, $keyword)) {
                     $scores[$category] += (int) $weight;
                 }
             }
@@ -2126,7 +2445,7 @@ class DemandeAiAssistant
     private function containsAny(string $text, array $keywords): bool
     {
         foreach ($keywords as $keyword) {
-            if ($this->containsFragment($text, (string) $keyword)) {
+            if ($this->containsWord($text, (string) $keyword)) {
                 return true;
             }
         }
@@ -2136,14 +2455,9 @@ class DemandeAiAssistant
 
     private function containsFragment(string $text, string $fragment): bool
     {
-        $normalizedText = $this->normalizeForSearch($text);
-        $normalizedFragment = $this->normalizeForSearch($fragment);
-
-        if ('' === $normalizedText || '' === $normalizedFragment) {
-            return false;
-        }
-
-        return str_contains($normalizedText, $normalizedFragment);
+        // Keep backward compatibility for existing call sites while enforcing
+        // strict token-boundary behavior.
+        return $this->containsWord($text, $fragment);
     }
 
     private function containsWord(string $text, string $keyword): bool
@@ -2619,7 +2933,7 @@ class DemandeAiAssistant
 
             $keywords = $keywordMap[$typeLabel] ?? [];
             foreach ($keywords as $keyword => $weight) {
-                if ($this->containsWord($text, (string) $keyword) || $this->containsFragment($text, (string) $keyword)) {
+                if ($this->containsWord($text, (string) $keyword)) {
                     $scores[$typeLabel] += (int) $weight;
                 }
             }
@@ -2830,42 +3144,97 @@ class DemandeAiAssistant
      */
     private function extractAllFrenchDates(string $text): array
     {
-        $normalized = strtolower($text);
-        preg_match_all('/\b(\d{1,2})\s+(janvier|fevrier|fÃ©vrier|mars|avril|mai|juin|juillet|aout|aoÃ»t|septembre|octobre|novembre|decembre|dÃ©cembre)(?:\s+(\d{4}))?\b/u', $normalized, $matches, PREG_SET_ORDER);
+        $normalized = $this->normalizeForSearch($text);
+        if ('' === $normalized) {
+            return [];
+        }
 
+        $today = new \DateTimeImmutable('today');
         $dates = [];
-        foreach ($matches as $match) {
-            $day = (int) ($match[1] ?? 0);
-            $monthRaw = (string) ($match[2] ?? '');
-            $year = isset($match[3]) && '' !== $match[3]
-                ? (int) $match[3]
-                : (int) (new \DateTimeImmutable())->format('Y');
+        $monthMap = [
+            'janvier' => 1, 'janv' => 1,
+            'fevrier' => 2, 'fevr' => 2, 'fev' => 2,
+            'mars' => 3,
+            'avril' => 4, 'avr' => 4,
+            'mai' => 5,
+            'juin' => 6,
+            'juillet' => 7, 'juil' => 7,
+            'aout' => 8,
+            'septembre' => 9, 'sept' => 9,
+            'octobre' => 10, 'oct' => 10,
+            'novembre' => 11, 'nov' => 11,
+            'decembre' => 12, 'dec' => 12,
+        ];
 
-            $months = [
-                'janvier' => 1,
-                'fevrier' => 2,
-                'fÃ©vrier' => 2,
-                'mars' => 3,
-                'avril' => 4,
-                'mai' => 5,
-                'juin' => 6,
-                'juillet' => 7,
-                'aout' => 8,
-                'aoÃ»t' => 8,
-                'septembre' => 9,
-                'octobre' => 10,
-                'novembre' => 11,
-                'decembre' => 12,
-                'dÃ©cembre' => 12,
-            ];
+        $pushDate = static function (int $day, int $month, int $year, array &$bucket): void {
+            if ($month < 1 || $month > 12 || $day < 1 || $day > 31) {
+                return;
+            }
+            if (!checkdate($month, $day, $year)) {
+                return;
+            }
+            $bucket[] = sprintf('%04d-%02d-%02d', $year, $month, $day);
+        };
 
-            $month = $months[$monthRaw] ?? 0;
-            if ($month > 0 && checkdate($month, $day, $year)) {
-                $dates[] = sprintf('%04d-%02d-%02d', $year, $month, $day);
+        if (preg_match_all('/\b(\d{4})-(\d{2})-(\d{2})\b/', $normalized, $isoMatches, PREG_SET_ORDER) === 1 || !empty($isoMatches)) {
+            foreach ($isoMatches as $match) {
+                $pushDate((int) ($match[3] ?? 0), (int) ($match[2] ?? 0), (int) ($match[1] ?? 0), $dates);
             }
         }
 
-        return array_values(array_unique($dates));
+        if (preg_match_all('/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/', $normalized, $fullNumeric, PREG_SET_ORDER) === 1 || !empty($fullNumeric)) {
+            foreach ($fullNumeric as $match) {
+                $year = (int) ($match[3] ?? 0);
+                if ($year > 0 && $year < 100) {
+                    $year += 2000;
+                }
+                $pushDate((int) ($match[1] ?? 0), (int) ($match[2] ?? 0), $year, $dates);
+            }
+        }
+
+        if (preg_match_all('/\b(\d{1,2})[\/\-](\d{1,2})\b/', $normalized, $shortNumeric, PREG_SET_ORDER) === 1 || !empty($shortNumeric)) {
+            foreach ($shortNumeric as $match) {
+                $day = (int) ($match[1] ?? 0);
+                $month = (int) ($match[2] ?? 0);
+                $year = (int) $today->format('Y');
+                if ($month < (int) $today->format('m') || ($month === (int) $today->format('m') && $day < (int) $today->format('d'))) {
+                    ++$year;
+                }
+                $pushDate($day, $month, $year, $dates);
+            }
+        }
+
+        if (preg_match_all('/\b(\d{1,2})\s+(janvier|janv|fevrier|fevr|fev|mars|avril|avr|mai|juin|juillet|juil|aout|septembre|sept|octobre|oct|novembre|nov|decembre|dec)(?:\s+(\d{4}))?\b/', $normalized, $namedMatches, PREG_SET_ORDER) === 1 || !empty($namedMatches)) {
+            foreach ($namedMatches as $match) {
+                $day = (int) ($match[1] ?? 0);
+                $month = $monthMap[(string) ($match[2] ?? '')] ?? 0;
+                $year = isset($match[3]) && '' !== (string) $match[3]
+                    ? (int) $match[3]
+                    : (int) $today->format('Y');
+
+                if (!isset($match[3]) || '' === (string) $match[3]) {
+                    if ($month < (int) $today->format('m') || ($month === (int) $today->format('m') && $day < (int) $today->format('d'))) {
+                        ++$year;
+                    }
+                }
+
+                $pushDate($day, $month, $year, $dates);
+            }
+        }
+
+        if (preg_match('/\baujourd hui\b/', $normalized) === 1) {
+            $dates[] = $today->format('Y-m-d');
+        }
+        if (preg_match('/\b(?:demain|des demain)\b/', $normalized) === 1) {
+            $dates[] = $today->modify('+1 day')->format('Y-m-d');
+        }
+        if (preg_match('/\bapres demain\b/', $normalized) === 1) {
+            $dates[] = $today->modify('+2 day')->format('Y-m-d');
+        }
+
+        $dates = array_values(array_unique($dates));
+        sort($dates);
+        return $dates;
     }
 
     private function extractDaysCount(string $text, array $dates): string
@@ -2958,7 +3327,7 @@ class DemandeAiAssistant
     {
         foreach ($keywordMap as $targetOption => $keywords) {
             foreach ($keywords as $keyword) {
-                if (str_contains($text, strtolower((string) $keyword))) {
+                if ($this->containsWord($text, (string) $keyword)) {
                     foreach ($options as $option) {
                         if (strcasecmp($option, $targetOption) === 0) {
                             return $option;
@@ -2977,7 +3346,7 @@ class DemandeAiAssistant
     private function matchMonthOption(array $options, int $months, string $text, string $specialOption = '', array $specialKeywords = []): string
     {
         foreach ($specialKeywords as $keyword) {
-            if (str_contains($text, strtolower($keyword)) && '' !== $specialOption) {
+            if ($this->containsWord($text, (string) $keyword) && '' !== $specialOption) {
                 foreach ($options as $option) {
                     if (strcasecmp($option, $specialOption) === 0) {
                         return $option;
@@ -3123,11 +3492,6 @@ class DemandeAiAssistant
                 if ($this->containsWord($normalized, $normalizedKeyword)) {
                     $score += strlen($normalizedKeyword) >= 8 ? 2 : 1;
                     continue;
-                }
-
-                // Fragment matching is restricted to longer keywords/phrases.
-                if (strlen($normalizedKeyword) >= 6 && str_contains($normalized, $normalizedKeyword)) {
-                    $score += 1;
                 }
             }
 
