@@ -26,8 +26,8 @@ class DemandeAiAssistant
      * @param array<string, mixed> $generalContext
      * @param array<string, mixed> $currentDetails
      * @param array<int, array<string, mixed>> $autreFields
-     * Returns the Autre payload from the local ML model with no PHP post-processing
-     * beyond the minimal response shaping required by the frontend contract.
+     * Returns the Autre payload from the local ML model.
+     * PHP does not enrich/override the model decisions.
      * @return array<string, mixed>
      */
     public function generateAutreSuggestions(array $generalContext, array $currentDetails, array $autreFields): array
@@ -83,195 +83,23 @@ class DemandeAiAssistant
         $detailsPayload = isset($parsed['details']) && is_array($parsed['details']) ? $parsed['details'] : [];
         $customPayload = isset($parsed['custom_fields']) && is_array($parsed['custom_fields']) ? $parsed['custom_fields'] : [];
         $removePayload = isset($parsed['remove_fields']) && is_array($parsed['remove_fields']) ? $parsed['remove_fields'] : [];
-        $replaceBase = $this->toBooleanFlag($parsed['replace_base'] ?? false);
-
-        $suggestedDetails = [];
-        foreach ($allowedKeys as $key) {
-            if (isset($detailsPayload[$key]) && is_scalar($detailsPayload[$key])) {
-                $suggestedDetails[$key] = trim((string) $detailsPayload[$key]);
-            }
-        }
-
-        $customFields = [];
-        foreach ($customPayload as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            $customFields[] = $field;
-            if (count($customFields) >= 8) {
-                break;
-            }
-        }
-
-        $removeFields = [];
-        foreach ($removePayload as $removeKeyRaw) {
-            $removeKey = trim((string) $removeKeyRaw);
-            if ('' === $removeKey) {
-                continue;
-            }
-
-            $removeFields[] = $removeKey;
-        }
-
-        $correctedText = $this->firstNonEmpty(
-            trim((string) ($parsed['correctedText'] ?? '')),
-            trim((string) ($generalPayload['description'] ?? '')),
-            trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-            trim((string) ($suggestedDetails['descriptionBesoin'] ?? ''))
-        );
-        $correctedText = trim((string) (preg_replace('/\s+/u', ' ', $correctedText) ?? $correctedText));
-
-        $generatedDescription = $this->firstNonEmpty(
-            trim((string) ($suggestedDetails['descriptionBesoin'] ?? '')),
-            trim((string) ($generalPayload['description'] ?? '')),
-            trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-            trim((string) ($generalContext['description'] ?? ''))
-        );
-
-        $result = [
-            'correctedText' => $correctedText,
-            'generatedDescription' => $generatedDescription,
-            'suggestedGeneral' => [
-                'titre' => $this->firstNonEmpty(
-                    trim((string) ($generalPayload['titre'] ?? '')),
-                    trim((string) ($suggestedDetails['besoinPersonnalise'] ?? '')),
-                    'Demande personnalisee'
-                ),
-                'description' => $this->firstNonEmpty(
-                    trim((string) ($generalPayload['description'] ?? '')),
-                    trim((string) ($suggestedDetails['descriptionBesoin'] ?? '')),
-                    trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-                    trim((string) ($generalContext['description'] ?? ''))
-                ),
-                'priorite' => in_array(strtoupper(trim((string) ($generalPayload['priorite'] ?? ''))), ['HAUTE', 'NORMALE', 'BASSE'], true)
-                    ? strtoupper(trim((string) ($generalPayload['priorite'] ?? '')))
-                    : 'NORMALE',
-                'categorie' => $this->firstNonEmpty(
-                    trim((string) ($generalPayload['categorie'] ?? '')),
-                    trim((string) ($generalContext['categorie'] ?? '')),
-                    'Autre'
-                ),
-            ],
-            'suggestedDetails' => $suggestedDetails,
-            'dynamicFieldPlan' => [
-                'add' => $customFields,
-                'remove' => $removeFields,
-                'replaceBase' => $replaceBase,
-            ],
-            'dynamicFieldConfidence' => isset($parsed['dynamicFieldConfidence']) && is_array($parsed['dynamicFieldConfidence'])
-                ? $parsed['dynamicFieldConfidence']
-                : $this->buildAutrePlanConfidence(
-                    $customFields,
-                    $removeFields,
-                    $replaceBase,
-                    $correctedText,
-                    $generatedDescription
-                ),
+        $planPayload = [
+            'add' => array_values(array_filter($customPayload, static fn ($item): bool => is_array($item))),
+            'remove' => array_values(array_filter(array_map('strval', $removePayload), static fn (string $item): bool => '' !== trim($item))),
+            'replaceBase' => $this->toBooleanFlag($parsed['replace_base'] ?? false),
         ];
 
         return [
-            'correctedText' => $result['correctedText'],
-            'generatedDescription' => $result['generatedDescription'],
-            'suggestedGeneral' => $result['suggestedGeneral'],
-            'suggestedDetails' => $result['suggestedDetails'],
-            'dynamicFieldPlan' => $result['dynamicFieldPlan'],
-            'dynamicFieldConfidence' => $result['dynamicFieldConfidence'],
+            'correctedText' => trim((string) ($parsed['correctedText'] ?? '')),
+            'generatedDescription' => trim((string) ($parsed['generatedDescription'] ?? ($generalPayload['description'] ?? ''))),
+            'suggestedGeneral' => $generalPayload,
+            'suggestedDetails' => $detailsPayload,
+            'dynamicFieldPlan' => $planPayload,
+            'dynamicFieldConfidence' => isset($parsed['dynamicFieldConfidence']) && is_array($parsed['dynamicFieldConfidence'])
+                ? $parsed['dynamicFieldConfidence']
+                : null,
             'model' => 'local-ml:demande_ai_model.py',
         ];
-    }
-
-    /**
-     * @param array<string, mixed> $generalContext
-     * @param array<string, mixed> $currentDetails
-     * @param array<int, string> $allowedKeys
-     * @return array<string, mixed>
-     */
-    private function buildAutreSuggestionsFallback(array $generalContext, array $currentDetails, array $allowedKeys, array $autreFields): array
-    {
-        $sourceText = $this->firstNonEmpty(
-            trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-            trim((string) ($generalContext['description'] ?? '')),
-            trim((string) ($generalContext['titre'] ?? ''))
-        );
-
-        $correctedText = $this->autoCorrectSuggestionText($sourceText);
-        if ('' === $correctedText) {
-            $correctedText = trim((string) ($sourceText ?: 'Demande personnalisee.'));
-        }
-
-        $suggestedDetails = [];
-        foreach ($allowedKeys as $key) {
-            if (isset($currentDetails[$key]) && is_scalar($currentDetails[$key])) {
-                $value = trim((string) $currentDetails[$key]);
-                if ('' !== $value) {
-                    $suggestedDetails[$key] = $value;
-                }
-            }
-        }
-
-        if (!isset($suggestedDetails['descriptionBesoin']) || '' === trim((string) $suggestedDetails['descriptionBesoin'])) {
-            $suggestedDetails['descriptionBesoin'] = $correctedText;
-        }
-
-        if (!isset($suggestedDetails['besoinPersonnalise']) || '' === trim((string) $suggestedDetails['besoinPersonnalise'])) {
-            $suggestedDetails['besoinPersonnalise'] = $this->firstNonEmpty(
-                trim((string) ($generalContext['titre'] ?? '')),
-                'Demande personnalisee'
-            );
-        }
-
-        $enriched = $this->enrichAutreSuggestions($correctedText, $autreFields, $suggestedDetails, []);
-        $suggestedDetails = $enriched['suggestedDetails'];
-        $customFields = $enriched['customFields'];
-
-        $generatedDescription = $this->firstNonEmpty(
-            trim((string) ($suggestedDetails['descriptionBesoin'] ?? '')),
-            trim((string) ($generalContext['description'] ?? '')),
-            $correctedText
-        );
-
-        $result = [
-            'correctedText' => $correctedText,
-            'generatedDescription' => $generatedDescription,
-            'suggestedGeneral' => [
-                'titre' => $this->firstNonEmpty(
-                    trim((string) ($generalContext['titre'] ?? '')),
-                    trim((string) ($suggestedDetails['besoinPersonnalise'] ?? '')),
-                    'Demande personnalisee'
-                ),
-                'description' => $this->firstNonEmpty(
-                    trim((string) ($generalContext['description'] ?? '')),
-                    $generatedDescription,
-                    $correctedText
-                ),
-                'priorite' => in_array(strtoupper(trim((string) ($generalContext['priorite'] ?? ''))), ['HAUTE', 'NORMALE', 'BASSE'], true)
-                    ? strtoupper(trim((string) ($generalContext['priorite'] ?? '')))
-                    : 'NORMALE',
-                'categorie' => $this->firstNonEmpty(
-                    trim((string) ($generalContext['categorie'] ?? '')),
-                    'Autre'
-                ),
-            ],
-            'suggestedDetails' => $suggestedDetails,
-            'dynamicFieldPlan' => [
-                'add' => $customFields,
-                'remove' => [],
-                'replaceBase' => false,
-            ],
-            'dynamicFieldConfidence' => $this->buildAutrePlanConfidence(
-                [],
-                [],
-                false,
-                $correctedText,
-                $generatedDescription
-            ),
-            'model' => 'local-fallback:demande_ai_assistant',
-        ];
-
-        error_log('FINAL_OUTPUT_FALLBACK: ' . (json_encode($result, JSON_UNESCAPED_UNICODE) ?: '{}'));
-
-        return $result;
     }
 
     /**
@@ -292,7 +120,6 @@ class DemandeAiAssistant
             'typeMap' => $categoryTypes,
             'priorities' => array_values($priorities),
             'trainingSamples' => $this->fetchClassificationTrainingSamples(),
-            'externalTrainingSources' => $this->fetchExternalTrainingSources(),
         ]);
 
         $normalized = $this->normalizeClassificationSuggestion($parsed, $normalizedText, $categoryTypes, $priorities);
@@ -321,6 +148,154 @@ class DemandeAiAssistant
             'description' => trim((string) ($parsed['description'] ?? '')),
             'model' => 'local-ml:demande_description_model.py',
         ];
+    }
+
+    public function autoCorrectText(string $rawText): string
+    {
+        $text = trim($rawText);
+        if ('' === $text) {
+            throw new \RuntimeException('Ajoutez un texte avant de lancer la correction.');
+        }
+
+        $ltCorrected = $this->tryLanguageToolSentenceAutocorrect($text);
+        if ('' !== $ltCorrected) {
+            return $ltCorrected;
+        }
+
+        $modelCorrected = $this->tryModelSentenceAutocorrect($text);
+        if ('' !== $modelCorrected) {
+            return $modelCorrected;
+        }
+
+        $corrected = $this->autoCorrectSuggestionText($text);
+        $corrected = $this->autoCorrectSuggestionText($corrected);
+
+        return '' !== trim($corrected) ? $corrected : $text;
+    }
+
+    private function tryLanguageToolSentenceAutocorrect(string $text): string
+    {
+        try {
+            $response = $this->httpClient->request('POST', 'https://api.languagetool.org/v2/check', [
+                'body' => [
+                    'text' => $text,
+                    'language' => 'fr',
+                    'level' => 'default',
+                ],
+                'timeout' => $this->timeoutSeconds,
+            ]);
+
+            /** @var mixed $payload */
+            $payload = $response->toArray(false);
+            if (!is_array($payload)) {
+                return '';
+            }
+
+            $matches = $payload['matches'] ?? null;
+            if (!is_array($matches) || [] === $matches) {
+                return '';
+            }
+
+            $corrected = $text;
+            $edits = [];
+            foreach ($matches as $match) {
+                if (!is_array($match)) {
+                    continue;
+                }
+
+                $offset = isset($match['offset']) ? (int) $match['offset'] : -1;
+                $length = isset($match['length']) ? (int) $match['length'] : 0;
+                $replacements = $match['replacements'] ?? null;
+                if ($offset < 0 || $length < 0 || !is_array($replacements) || [] === $replacements) {
+                    continue;
+                }
+
+                $first = $replacements[0] ?? null;
+                if (!is_array($first)) {
+                    continue;
+                }
+
+                $value = trim((string) ($first['value'] ?? ''));
+                if ('' === $value) {
+                    continue;
+                }
+
+                $edits[] = [
+                    'offset' => $offset,
+                    'length' => $length,
+                    'value' => $value,
+                ];
+            }
+
+            if ([] === $edits) {
+                return '';
+            }
+
+            usort(
+                $edits,
+                static fn(array $a, array $b): int => (int) $b['offset'] <=> (int) $a['offset']
+            );
+
+            foreach ($edits as $edit) {
+                $offset = (int) $edit['offset'];
+                $length = (int) $edit['length'];
+                $value = (string) $edit['value'];
+
+                $prefix = mb_substr($corrected, 0, $offset, 'UTF-8');
+                $suffix = mb_substr($corrected, $offset + $length, null, 'UTF-8');
+                $corrected = $prefix . $value . $suffix;
+            }
+
+            $normalized = trim((string) (preg_replace('/\s+/u', ' ', $corrected) ?? $corrected));
+            if ('' === $normalized || 0 === strcasecmp($normalized, trim($text))) {
+                return '';
+            }
+
+            return $normalized;
+        } catch (\Throwable $e) {
+            $this->logger->warning('LanguageTool autocorrect unavailable, fallback engines will be used.', [
+                'exception' => $e->getMessage(),
+            ]);
+
+            return '';
+        }
+    }
+
+    private function tryModelSentenceAutocorrect(string $text): string
+    {
+        if ('' === trim($this->apiKey) || '' === trim($this->model)) {
+            return '';
+        }
+
+        $prompt =
+            "Tu es un correcteur orthographique et grammatical en francais.\n"
+            . "Corrige le texte utilisateur, mais sans inventer ni changer le sens.\n"
+            . "Regles strictes:\n"
+            . "- Ne remplace pas un mot technique, une technologie, un nom propre, une ville, une date ou un acronyme par un autre.\n"
+            . "- Ne transforme pas Java en JavaFX, ni l inverse.\n"
+            . "- Ne fais que des corrections de fautes (orthographe, grammaire, ponctuation, espaces).\n"
+            . "- Conserve la meme langue que le texte source.\n"
+            . "Retourne uniquement un JSON valide: {\"correctedText\":\"...\"}.\n"
+            . "Texte utilisateur:\n"
+            . $text;
+
+        try {
+            $raw = $this->callHuggingFaceViaHttp($prompt, 0.0, 220);
+            $parsed = $this->parseJsonResponse($raw);
+            $candidate = trim((string) ($parsed['correctedText'] ?? ''));
+
+            if ('' === $candidate) {
+                $candidate = trim((string) preg_replace('/^```(?:json)?\s*|\s*```$/i', '', $raw));
+            }
+
+            return '' !== $candidate ? $candidate : '';
+        } catch (\Throwable $e) {
+            $this->logger->warning('Sentence autocorrect model unavailable, falling back to local correction.', [
+                'exception' => $e->getMessage(),
+            ]);
+
+            return '';
+        }
     }
 
     /**
@@ -424,6 +399,7 @@ class DemandeAiAssistant
             'createdAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
             'employeId' => $employeId,
             'prompt' => $normalizedPrompt,
+            'rawPrompt' => $normalizedPrompt,
             'general' => [
                 'titre' => $generalTitle,
                 'description' => $generalDescription,
@@ -1298,7 +1274,6 @@ class DemandeAiAssistant
             'temperature' => 0.2,
             'maxTokens' => 420,
             'trainingSamples' => $this->fetchClassificationTrainingSamples(),
-            'externalTrainingSources' => $this->fetchExternalTrainingSources(),
             'acceptedAutreFeedback' => $this->loadAutreFeedbackSamples(),
         ];
 
@@ -1350,25 +1325,6 @@ class DemandeAiAssistant
             'Configurez ml.python_executable ou installez Python dans le PATH. ' .
             ('' !== $lastError ? ('Details: ' . $lastError) : '')
         );
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function callMlModel(string $prompt): array
-    {
-        if (!$this->canUsePythonRunner()) {
-            throw new \RuntimeException('Le modele ML local est indisponible: script Python introuvable.');
-        }
-
-        $rawText = $this->callHuggingFaceViaPython($prompt);
-        $parsed = $this->parseJsonResponse($rawText);
-
-        if ([] === $parsed) {
-            throw new \RuntimeException('Le modele ML local a retourne une reponse JSON vide ou invalide.');
-        }
-
-        return $parsed;
     }
 
     /**
@@ -1581,47 +1537,6 @@ class DemandeAiAssistant
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function fetchExternalTrainingSources(): array
-    {
-        $path = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'ai' . DIRECTORY_SEPARATOR . 'curated_external_training_sources.json';
-        if (!is_file($path)) {
-            return [];
-        }
-
-        $raw = @file_get_contents($path);
-        if (!is_string($raw) || '' === trim($raw)) {
-            return [];
-        }
-
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            return [];
-        }
-
-        $sanitized = [];
-        foreach ($decoded as $entry) {
-            if (!is_array($entry)) {
-                continue;
-            }
-
-            $source = trim((string) ($entry['source'] ?? ''));
-            $samples = $entry['samples'] ?? null;
-            if ('' === $source || !is_array($samples)) {
-                continue;
-            }
-
-            $sanitized[] = [
-                'source' => $source,
-                'samples' => $samples,
-            ];
-        }
-
-        return $sanitized;
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
     private function loadAutreFeedbackSamples(): array
     {
         $fileSamples = $this->loadAutreFeedbackSamplesFromFile();
@@ -1659,6 +1574,7 @@ class DemandeAiAssistant
                 'prompt' => $prompt,
                 'general' => $general,
                 'details' => $details,
+                'createdAt' => trim((string) ($sample['createdAt'] ?? '')),
                 'fieldPlan' => $fieldPlan,
             ];
         }
@@ -1945,13 +1861,6 @@ class DemandeAiAssistant
     {
         if ($this->isFormationNoiseOnlyContext($text)) {
             return '';
-        }
-
-        $knownTopic = $this->extractKnownFormationKeywordTopic($text);
-        if ('' !== $knownTopic) {
-            return str_contains($this->normalizeForSearch($knownTopic), 'certif')
-                ? 'Certification'
-                : 'Formation externe';
         }
 
         $explicitType = $this->extractExplicitFormationType($text);
@@ -2789,79 +2698,11 @@ class DemandeAiAssistant
         if ('' === $clean) {
             return '';
         }
+        // Neutral fallback only: keep text intact except spacing and punctuation cleanup.
+        $clean = preg_replace('/\s+([,.!?;:])/u', '$1', $clean) ?? $clean;
+        $clean = preg_replace('/([,.!?;:])(\S)/u', '$1 $2', $clean) ?? $clean;
 
-        $normalized = mb_strtolower($clean, 'UTF-8');
-
-        $directReplacements = [
-            '/\b(?:bjr|slt|salu+t?)\b/u' => 'bonjour',
-            '/\b(?:jvux|jveux|j veu|j veu[x]?|jvx|j vu[x]?)\b/u' => 'je veux',
-            '/\b(?:dqnde|deqnde|demde|dmande|demnde)\b/u' => 'demande',
-            '/\b(?:conhe|conh[eé]|conje|congee|congéé|congee)\b/u' => 'conge',
-            '/\b(?:qnnuel|qnuel|anuel)\b/u' => 'annuel',
-            '/\b(?:tele travail|télé travail)\b/u' => 'teletravail',
-            '/\b(?:remboursemnt|remboursemnt)\b/u' => 'remboursement',
-            '/\b(?:acces syteme|acces system|acess systeme)\b/u' => 'acces systeme',
-        ];
-
-        foreach ($directReplacements as $pattern => $replacement) {
-            $normalized = preg_replace($pattern, $replacement, $normalized) ?? $normalized;
-        }
-
-        $knownTerms = [
-            'bonjour', 'demande', 'conge', 'annuel', 'maladie', 'sans', 'solde', 'attestation', 'certificat', 'mutation', 'demission',
-            'avance', 'salaire', 'remboursement', 'materiel', 'bureau', 'badge', 'acces', 'carte', 'visite',
-            'informatique', 'logiciel', 'probleme', 'technique', 'formation', 'interne', 'externe', 'certification',
-            'teletravail', 'horaire', 'heures', 'supplementaires', 'parking', 'stationnement', 'transport', 'deplacement',
-        ];
-
-        $knownMap = [];
-        foreach ($knownTerms as $term) {
-            $knownMap[$this->normalizeForSearch($term)] = $term;
-        }
-
-        $parts = preg_split('/(\s+)/u', $normalized, -1, PREG_SPLIT_DELIM_CAPTURE);
-        if (!is_array($parts)) {
-            $parts = [$normalized];
-        }
-
-        foreach ($parts as $idx => $part) {
-            if ($part === '' || preg_match('/^\s+$/u', $part) === 1) {
-                continue;
-            }
-
-            $token = trim($part);
-            $normalizedToken = $this->normalizeForSearch($token);
-            if (strlen($normalizedToken) < 4 || isset($knownMap[$normalizedToken])) {
-                continue;
-            }
-
-            $best = '';
-            $bestDistance = PHP_INT_MAX;
-
-            foreach ($knownMap as $normalizedKnown => $knownOriginal) {
-                if (abs(strlen($normalizedKnown) - strlen($normalizedToken)) > 2) {
-                    continue;
-                }
-
-                $distance = levenshtein($normalizedToken, $normalizedKnown);
-                $threshold = max(1, (int) floor(strlen($normalizedKnown) / 4));
-                if ($distance <= $threshold && $distance < $bestDistance) {
-                    $bestDistance = $distance;
-                    $best = $knownOriginal;
-                }
-            }
-
-            if ('' !== $best) {
-                $parts[$idx] = $best;
-            }
-        }
-
-        $corrected = trim((string) (preg_replace('/\s+/u', ' ', implode('', $parts)) ?? implode('', $parts)));
-
-        // Keep phrase-level readability after token correction.
-        $corrected = preg_replace('/\bje\s+veux\s+un\s+de\b/u', 'je veux une', $corrected) ?? $corrected;
-
-        return $corrected;
+        return trim((string) (preg_replace('/\s+/u', ' ', $clean) ?? $clean));
     }
 
     /**
@@ -3432,11 +3273,6 @@ class DemandeAiAssistant
 
     private function extractTrainingName(string $text): string
     {
-        $knownTopic = $this->extractKnownFormationKeywordTopic($text);
-        if ('' !== $knownTopic) {
-            return $knownTopic;
-        }
-
         $patterns = [
             "/(?:nom(?:\\s+de)?\\s+la\\s+formation|intitule\\s+de\\s+formation|formation\\s+intitulee|formation\\s+intitulée|nom\\s+formation)\\s*[:\\-]?\\s*([A-Za-z0-9À-ÿ\\/+().'’\\-\\s]{2,120}?)(?=\\s+(?:pour|de|du|des|d['’]|vers|dans|sur|en|avec|car|afin|transport|deplacement|déplacement|bonjour|salut|slt|je\\b|j\\b|nous\\b|on\\b|type\\b|lieu\\b|date\\b)|[\\.,;:\"'»”]|$)/iu",
             "/(?:formation|certification)\\s*(?:en|sur|de|d['’])?\\s*([A-Za-z0-9À-ÿ\\/+().'’\\-\\s]{2,120}?)(?=\\s+(?:pour|de|du|des|d['’]|vers|dans|sur|en|avec|car|afin|transport|deplacement|déplacement|bonjour|salut|slt|je\\b|j\\b|nous\\b|on\\b|type\\b|lieu\\b|date\\b)|[\\.,;:\"'»”]|$)/iu",
@@ -3454,124 +3290,6 @@ class DemandeAiAssistant
         }
 
         return '';
-    }
-
-    private function extractKnownFormationKeywordTopic(string $text): string
-    {
-        if ($this->isFormationNoiseOnlyContext($text)) {
-            return '';
-        }
-
-        $normalized = $this->normalizeForSearch($text);
-        if ('' === $normalized) {
-            return '';
-        }
-
-        $topicMap = $this->loadFormationKeywordTopicMap();
-        if ([] === $topicMap) {
-            return '';
-        }
-
-        $bestLabel = '';
-        $bestScore = 0;
-
-        foreach ($topicMap as $label => $keywords) {
-            $score = 0;
-            foreach ($keywords as $keyword) {
-                $candidate = trim((string) $keyword);
-                if ('' === $candidate) {
-                    continue;
-                }
-
-                $normalizedKeyword = $this->normalizeForSearch($candidate);
-                if ('' === $normalizedKeyword) {
-                    continue;
-                }
-
-                // Only allow exact word matching for short terms to avoid noisy false positives.
-                if ($this->containsWord($normalized, $normalizedKeyword)) {
-                    $score += strlen($normalizedKeyword) >= 8 ? 2 : 1;
-                    continue;
-                }
-            }
-
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $bestLabel = (string) $label;
-            }
-        }
-
-        return $bestScore > 0 ? $bestLabel : '';
-    }
-
-    /**
-     * @return array<string, array<int, string>>
-     */
-    private function loadFormationKeywordTopicMap(): array
-    {
-        $path = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'ai' . DIRECTORY_SEPARATOR . 'formation_keywords.json';
-        if (!is_file($path)) {
-            return $this->getDefaultFormationKeywordTopicMap();
-        }
-
-        $raw = @file_get_contents($path);
-        if (!is_string($raw) || '' === trim($raw)) {
-            return $this->getDefaultFormationKeywordTopicMap();
-        }
-
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            return $this->getDefaultFormationKeywordTopicMap();
-        }
-
-        $normalizedMap = [];
-        foreach ($decoded as $topic => $keywords) {
-            $label = trim((string) $topic);
-            if ('' === $label || !is_array($keywords)) {
-                continue;
-            }
-
-            $cleanKeywords = [];
-            foreach ($keywords as $keyword) {
-                $value = trim((string) $keyword);
-                if ('' === $value) {
-                    continue;
-                }
-
-                $cleanKeywords[] = $value;
-                if (count($cleanKeywords) >= 40) {
-                    break;
-                }
-            }
-
-            if ([] !== $cleanKeywords) {
-                $normalizedMap[$label] = $cleanKeywords;
-            }
-        }
-
-        return [] !== $normalizedMap ? $normalizedMap : $this->getDefaultFormationKeywordTopicMap();
-    }
-
-    /**
-     * @return array<string, array<int, string>>
-     */
-    private function getDefaultFormationKeywordTopicMap(): array
-    {
-        return [
-            'UI/UX' => ['ui ux', 'ux ui', 'design ui', 'design ux', 'user experience', 'experience utilisateur'],
-            'Developpement Web' => ['dev web', 'developpement web', 'frontend', 'backend', 'full stack'],
-            'Developpement Python' => ['python', 'django', 'flask', 'fastapi'],
-            'Developpement Java' => ['java', 'spring', 'spring boot'],
-            'DevOps' => ['devops', 'docker', 'kubernetes', 'ci cd', 'jenkins'],
-            'Data Science' => ['data science', 'machine learning', 'deep learning', 'intelligence artificielle', 'ai'],
-            'Marketing Digital' => ['marketing', 'marketing digital', 'seo', 'sea', 'social media'],
-            'Ressources Humaines' => ['rh', 'ressources humaines', 'gestion rh', 'paie'],
-            'Gestion de Projet' => ['gestion de projet', 'project management', 'scrum', 'agile', 'kanban'],
-            'Salesforce' => ['salesforce', 'crm salesforce'],
-            'Excel Avance' => ['excel', 'excel avance', 'tableau croise dynamique', 'vba'],
-            'Cybersecurite' => ['cybersecurite', 'securite informatique', 'security', 'pentest'],
-            'Certification' => ['certification', 'certif', 'iso 27001', 'pmp', 'itil', 'aws certified'],
-        ];
     }
 
     private function cleanupTrainingNameCandidate(string $value): string

@@ -126,6 +126,39 @@ class DemandeApiController extends AbstractController
         }
     }
 
+    #[Route('/demande-api/autocorrect', name: 'demande_api_autocorrect', methods: ['POST'])]
+    public function autocorrect(Request $request, SessionInterface $session): JsonResponse
+    {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return new JsonResponse(['success' => false, 'message' => 'Vous devez etre connecte.'], 401);
+        }
+
+        if ($this->canManageDemandes($session)) {
+            return new JsonResponse(['success' => false, 'message' => 'Les comptes RH/Admin ne peuvent pas creer de demande employe.'], 403);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            return new JsonResponse(['success' => false, 'message' => 'Payload JSON invalide.'], 400);
+        }
+
+        $rawText = trim((string) ($payload['text'] ?? ''));
+        if ('' === $rawText) {
+            return new JsonResponse(['success' => false, 'message' => 'Ajoutez un texte avant de lancer la correction.'], 400);
+        }
+
+        try {
+            return new JsonResponse([
+                'success' => true,
+                'correctedText' => $this->aiAssistant->autoCorrectText($rawText),
+            ]);
+        } catch (\RuntimeException $e) {
+            return new JsonResponse(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Throwable) {
+            return new JsonResponse(['success' => false, 'message' => 'Une erreur inattendue est survenue pendant la correction IA.'], 500);
+        }
+    }
+
     #[Route('/demande-api/autre/generate', name: 'demande_api_autre_generate', methods: ['POST'])]
     public function generateAutre(Request $request, SessionInterface $session): JsonResponse
     {

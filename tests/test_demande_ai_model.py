@@ -126,6 +126,37 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
         self.assertIn("java", normalized_formation)
         self.assertNotIn("tunis", normalized_formation)
 
+    def test_autre_response_strips_template_boilerplate_and_generic_formation_prefixes(self):
+        prompt = (
+            "Bonjour, je souhaite demander transport de tunis vers sfax pour formation professionnel de javafx. "
+            "Mon besoin concerne precisement transport de tunis vers sfax pour formation professionnel de javafx "
+            "dans le cadre de mon activite professionnelle. Type: Autre. Categorie: Autre. "
+            "Je reste disponible pour tout complement d information."
+        )
+
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertEqual((custom_fields.get("ai_lieu_depart_actuel") or {}).get("value"), "Tunis")
+        self.assertEqual((custom_fields.get("ai_lieu_souhaite") or {}).get("value"), "Sfax")
+        self.assertEqual((custom_fields.get("ai_nom_formation") or {}).get("value"), "Javafx")
+        self.assertNotIn("mon besoin concerne", model._norm(response.get("correctedText", "")))
+
+    def test_description_generation_no_longer_returns_template_style_extra_info(self):
+        response = model._build_description_response(
+            {"title": "Demande de transport de Tunis vers Sfax", "typeDemande": "Autre", "categorie": "Autre"},
+            "",
+        )
+
+        description = str(response.get("description", ""))
+        self.assertNotIn("Bonjour", description)
+        self.assertNotIn("Type:", description)
+        self.assertNotIn("Categorie:", description)
+        self.assertIn("transport de tunis vers sfax", model._norm(description))
+
     def test_date_location_and_keywords_are_prompt_agnostic(self):
         prompts = [
             "transport bus pour formation ui/ux a tunis le 12/12",
@@ -237,18 +268,9 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
         self.assertIn("Taxi", custom_fields["ai_type_transport"].get("options", []))
         self.assertIn("A definir", custom_fields["ai_type_transport"].get("options", []))
 
-    def test_seed_samples_are_loaded_for_autre_learning(self):
-        samples = model._load_autre_training_samples()
-        prompts = {sample.get("prompt") for sample in samples}
-
-        self.assertIn(
-            "Je souhaite un acces VPN en lecture ecriture pour travailler a distance des demain.",
-            prompts,
-        )
-        self.assertIn(
-            "Je demande une place reservee au parking pres de l entree principale.",
-            prompts,
-        )
+    def test_autre_runtime_training_sources_do_not_use_static_seed_samples(self):
+        source_paths = [str(path) for path in model._autre_source_paths()]
+        self.assertFalse(any("autre_seed_samples.json" in path for path in source_paths))
 
     def test_unknown_demande_generates_dynamic_custom_fields_and_title(self):
         payload = {

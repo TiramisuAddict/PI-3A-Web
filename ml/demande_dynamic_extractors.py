@@ -561,7 +561,11 @@ class BoundaryAwareExtractor:
                 qualifier = self._clean_subject(match.group(1))
                 subject = self._clean_subject(match.group(2))
                 if qualifier and subject:
-                    candidate = f"{capitalize_entity(qualifier)} {connector} {capitalize_entity(subject)}"
+                    normalized_qualifier = norm(qualifier)
+                    if normalized_qualifier in {"professionnel", "professionnelle", "professionel"}:
+                        candidate = capitalize_entity(subject)
+                    else:
+                        candidate = f"{capitalize_entity(qualifier)} {connector} {capitalize_entity(subject)}"
                     candidate = trim_route_suffix(candidate)
                     if candidate:
                         return capitalize_entity(candidate)
@@ -587,7 +591,11 @@ class BoundaryAwareExtractor:
                 qualifier = self._clean_subject(qualifier_subject_match.group(1))
                 subject = self._clean_subject(qualifier_subject_match.group(2))
                 if qualifier and subject:
-                    candidate = capitalize_entity(f"{qualifier} {subject}")
+                    normalized_qualifier = norm(qualifier)
+                    if normalized_qualifier in {"professionnel", "professionnelle", "professionel"}:
+                        candidate = capitalize_entity(subject)
+                    else:
+                        candidate = capitalize_entity(f"{qualifier} {subject}")
                     candidate = trim_route_suffix(candidate)
                     if candidate:
                         return capitalize_entity(candidate)

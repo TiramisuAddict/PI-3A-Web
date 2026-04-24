@@ -328,6 +328,9 @@ class DemandeRepository extends ServiceEntityRepository
                 'prompt' => $prompt,
                 'general' => $general,
                 'details' => is_array($details) ? $details : [],
+                'createdAt' => $row['createdAt'] instanceof \DateTimeInterface
+                    ? $row['createdAt']->format(DATE_ATOM)
+                    : trim((string) ($row['createdAt'] ?? '')),
                 'fieldPlan' => [
                     'add' => $planAdd,
                     'remove' => [],

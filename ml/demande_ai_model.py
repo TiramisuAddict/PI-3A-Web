@@ -44,6 +44,56 @@ def _sentence_case(text):
     return "".join(chunks).strip()
 
 
+def _strip_autre_prompt_boilerplate(text):
+    cleaned = _normalize_ws(text)
+    if not cleaned:
+        return ""
+
+    patterns = [
+        r"^(?:bonjour|salut|bonsoir)\s*[,;:\-]?\s*",
+        r"\bmon besoin concerne precisement\b",
+        r"\bdans le cadre de mon activite professionnelle\b",
+        r"\bje reste disponible pour tout complement d information\b\.?",
+        r"\bmerci de passer cette information\b\.?",
+        r"\btype\s*:\s*[^.]+\.?",
+        r"\bcategorie\s*:\s*[^.]+\.?",
+        r"\b(?:je souhaite|je voudrais|je veux)\s+(?:demander|soumettre|mettre|faire|creer|créer)\s+",
+        r"\bune?\s+demande\s+(?:liee|liée)\s+a\s+",
+    ]
+    for pattern in patterns:
+        cleaned = re.sub(pattern, " ", cleaned, flags=re.IGNORECASE)
+
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = re.sub(r"\s+([,.;:])", r"\1", cleaned)
+    cleaned = cleaned.strip(" ,;:-.")
+
+    duplicate_match = re.match(r"(.{12,160}?)\.\s+\1\b", cleaned, flags=re.IGNORECASE)
+    if duplicate_match:
+        cleaned = duplicate_match.group(1)
+
+    return _normalize_ws(cleaned)
+
+
+def _is_generic_autre_subject_value(value):
+    normalized = _norm(value)
+    if not normalized:
+        return True
+
+    generic_values = {
+        "professionnel",
+        "professionnelle",
+        "formation",
+        "formation professionnelle",
+        "formation professionel",
+        "certification",
+        "autre",
+        "demande",
+        "objet",
+        "besoin",
+    }
+    return normalized in generic_values
+
+
 # ═══════════════════════════════════════════════════════════════
 # AUTRE PATTERN MINER SUPPORT
 # ═══════════════════════════════════════════════════════════════
@@ -71,15 +121,10 @@ def _autre_pattern_miner_path():
     return _autre_data_dir() / "autre_pattern_miner.json"
 
 
-def _autre_seed_samples_path():
-    return _autre_data_dir() / "autre_seed_samples.json"
-
-
 def _autre_source_paths():
     return [
         _autre_db_training_path(),
         _autre_feedback_path(),
-        _autre_seed_samples_path(),
     ]
 
 
@@ -165,6 +210,8 @@ def _sanitize_autre_training_value(field_key, value):
 
     if key in {"ai_nom_formation", "ai_lieu_depart_actuel", "ai_lieu_souhaite", "ai_systeme_concerne", "ai_localisation_souhaitee"}:
         cleaned = dyn_extract.clean_entity_text(text)
+        if key == "ai_nom_formation" and _is_generic_autre_subject_value(cleaned):
+            return ""
         return cleaned[:1].upper() + cleaned[1:] if cleaned else ""
 
     if key.startswith("ai_") and ("justification" not in key and "description" not in key):
@@ -179,8 +226,9 @@ def _normalize_autre_training_record(record):
         return None
 
     general = record.get("general") if isinstance(record.get("general"), dict) else {}
-    prompt = _normalize_ws(
-        record.get("prompt")
+    prompt = _strip_autre_prompt_boilerplate(_normalize_ws(
+        record.get("rawPrompt")
+        or record.get("prompt")
         or record.get("text")
         or record.get("rawText")
         or record.get("userPromptAutre")
@@ -189,7 +237,7 @@ def _normalize_autre_training_record(record):
         or record.get("titre")
         or general.get("titre")
         or ""
-    )
+    ))
 
     details = _normalize_autre_detail_items(record.get("details"))
     if not prompt and not details:
@@ -230,13 +278,6 @@ def _load_autre_training_samples():
         if sample:
             samples.append(sample)
 
-    seed_rows = _read_json_file(_autre_seed_samples_path())
-    if isinstance(seed_rows, list):
-        for row in seed_rows:
-            sample = _normalize_autre_training_record(row)
-            if sample:
-                samples.append(sample)
-
     return samples
 
 
@@ -244,6 +285,19 @@ def _build_autre_pattern_miner():
     miner = dyn_extract.PatternMiner()
     miner.fit(_load_autre_training_samples())
     return miner
+
+
+def _miner_has_suspicious_autre_values(miner):
+    value_counts = getattr(miner, "value_counts", {}) or {}
+    formation_values = value_counts.get("ai_nom_formation", {}) if isinstance(value_counts, dict) else {}
+    if not isinstance(formation_values, dict):
+        return False
+
+    for candidate in formation_values.keys():
+        if _is_generic_autre_subject_value(candidate):
+            return True
+
+    return False
 
 
 def _load_autre_pattern_miner(force_refresh=False):
@@ -272,7 +326,7 @@ def _load_autre_pattern_miner(force_refresh=False):
         latest_source_mtime is not None
         and (mtime is None or latest_source_mtime > mtime)
     )
-    if miner_outdated or not getattr(miner, "total_samples", 0) or not getattr(miner, "value_counts", {}):
+    if miner_outdated or not getattr(miner, "total_samples", 0) or not getattr(miner, "value_counts", {}) or _miner_has_suspicious_autre_values(miner):
         miner = _build_autre_pattern_miner()
         if getattr(miner, "total_samples", 0) > 0:
             miner.save(path)
@@ -2149,22 +2203,51 @@ def _feedback_similarity_score(source_text, sample):
     return (0.65 * jaccard) + (0.35 * source_coverage)
 
 
+def _feedback_timestamp(sample):
+    if not isinstance(sample, dict):
+        return datetime.min
+
+    raw = _normalize_ws(sample.get("createdAt", ""))
+    if not raw:
+        return datetime.min
+
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except Exception:
+        return datetime.min
+
+
 def _pick_similar_autre_feedback(source_text, feedback_samples, top_k=4, min_score=0.20):
     ranked = []
     all_samples = [s for s in (feedback_samples or []) if isinstance(s, dict)]
-    total = len(all_samples)
+    source_norm = _norm(source_text)
+
+    timestamps = [_feedback_timestamp(sample) for sample in all_samples]
+    valid_timestamps = [ts for ts in timestamps if ts != datetime.min]
+    ts_min = min(valid_timestamps) if valid_timestamps else datetime.min
+    ts_max = max(valid_timestamps) if valid_timestamps else datetime.min
+
     for index, sample in enumerate(all_samples):
         score = _feedback_similarity_score(source_text, sample)
+
+        prompt_norm = _norm(_normalize_ws(sample.get("prompt", "")))
+        exact_prompt_bonus = 0.45 if prompt_norm and prompt_norm == source_norm else 0.0
+
         recency_bonus = 0.0
-        if total > 1:
-            recency_bonus = 0.06 * (index / float(total - 1))
-        final_score = score + recency_bonus
+        current_ts = timestamps[index]
+        if current_ts != datetime.min and ts_max != datetime.min and ts_max > ts_min:
+            span = (ts_max - ts_min).total_seconds()
+            if span > 0:
+                recency_ratio = (current_ts - ts_min).total_seconds() / span
+                recency_bonus = 0.12 * max(0.0, min(1.0, recency_ratio))
+
+        final_score = score + exact_prompt_bonus + recency_bonus
         if final_score < min_score:
             continue
-        ranked.append((final_score, sample))
+        ranked.append((final_score, current_ts, sample))
 
-    ranked.sort(key=lambda item: item[0], reverse=True)
-    return ranked[:max(1, int(top_k))]
+    ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [(score, sample) for score, _, sample in ranked[:max(1, int(top_k))]]
 
 
 def _get_feedback_detail_value(details, target_key):
@@ -4188,18 +4271,11 @@ def _build_description_response(request_data, prompt):
     if title_raw is None:
         title_raw = request_data.get("titre", "") or request_data.get("title", "")
     title = _auto_correct_text(str(title_raw or "").strip()) or "Nouvelle demande"
-    type_d = str(_extract_json_value(prompt, "Type de demande: ") or request_data.get("typeDemande", "") or "").strip()
-    cat = str(_extract_json_value(prompt, "Categorie: ") or request_data.get("categorie", "") or "").strip()
-
     ct = re.sub(r"^(demande|besoin)\s+de\s+", "", title, flags=re.IGNORECASE).strip() or title
-    lead = f"Bonjour, je souhaite demander {ct.lower()}."
-    body = f"Mon besoin concerne precisement {ct.lower()} dans le cadre de mon activite professionnelle."
-    if type_d:
-        body += f" Type: {type_d}."
-    if cat:
-        body += f" Categorie: {cat}."
-    closing = "Je reste disponible pour tout complement d information."
-    return {"description": _normalize_ws(f"{lead} {body} {closing}")}
+    description = _sentence_case(ct)
+    if description and not re.search(r"[.!?]$", description):
+        description += "."
+    return {"description": _normalize_ws(description)}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -4218,9 +4294,9 @@ def _build_autre_response(request_data, prompt):
         or _extract_text_from_payload(request_data, prompt)
         or ""
     )
-    source = _normalize_ws(raw_source)
+    source = _strip_autre_prompt_boilerplate(_normalize_ws(raw_source))
     if not source:
-        source = _normalize_ws(prompt)
+        source = _strip_autre_prompt_boilerplate(_normalize_ws(prompt))
 
     explicit_urgency = _autre_detect_explicit_urgency(source)
 
@@ -4616,6 +4692,8 @@ def _extract_subject_name(corrected_text, subject_keyword):
             continue
         raw = match.group(1).strip()
         cleaned = _clean_entity_text(raw)
+        cleaned = re.sub(r"^(?:professionnel(?:le)?|professionel)\s+(?:de|en|sur)\s+", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"^(?:professionnel(?:le)?|professionel)\s+", "", cleaned, flags=re.IGNORECASE)
         if cleaned and len(cleaned) >= 2 and _is_likely_proper_noun(cleaned.split()[0]):
             return _capitalize_entity(cleaned)
         if cleaned and len(cleaned) >= 2:

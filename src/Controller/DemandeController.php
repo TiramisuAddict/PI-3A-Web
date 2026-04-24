@@ -136,6 +136,7 @@ class DemandeController extends AbstractController
         $submittedDetails = [];
         $submittedType    = null;
         $submittedAiDescription = '';
+        $submittedAiRawPrompt = '';
         $submittedAiFieldPlan = ['add' => [], 'remove' => [], 'replaceBase' => false];
         $aiGenerated = false;
 
@@ -144,6 +145,7 @@ class DemandeController extends AbstractController
             $submittedType = $formData['demande']['typeDemande'] ?? null;
             $submittedDetails = $formData['details'] ?? [];
             $submittedAiDescription = trim((string) $request->request->get('autre_ai_description', ''));
+            $submittedAiRawPrompt = trim((string) $request->request->get('autre_ai_raw_prompt', ''));
             $aiFieldPlanRaw = trim((string) $request->request->get('ai_field_plan', ''));
             if ('' !== $aiFieldPlanRaw) {
                 $decodedPlan = json_decode($aiFieldPlanRaw, true);
@@ -206,7 +208,7 @@ class DemandeController extends AbstractController
 
                         if ('Autre' === $demande->getTypeDemande()) {
                             $this->demandeAiAssistant->recordAcceptedAutreFeedback(
-                                $submittedAiDescription,
+                                '' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription,
                                 [
                                     'titre' => (string) ($demande->getTitre() ?? ''),
                                     'description' => (string) ($demande->getDescription() ?? ''),
@@ -236,6 +238,7 @@ class DemandeController extends AbstractController
             'submittedDetails' => $submittedDetails,
             'submittedType'    => $submittedType,
             'submittedAiDescription' => $submittedAiDescription,
+            'submittedAiRawPrompt' => $submittedAiRawPrompt,
             'submittedAiFieldPlan' => $submittedAiFieldPlan,
             'aiGenerated'      => $aiGenerated,
             'email'            => $session->get('employe_email') ?? '',

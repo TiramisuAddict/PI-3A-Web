@@ -240,7 +240,7 @@ class Employe
     }
 
 
-    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employé')]
+    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employe')]
     private Collection $demandes;
 
     /**

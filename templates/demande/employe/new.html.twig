@@ -122,6 +122,7 @@
             {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'id': 'demandeForm'}}) }}
             <input type="hidden" name="ai_generated" id="aiGeneratedInput" value="{{ aiGenerated ? '1' : '0' }}">
             <input type="hidden" name="ai_confirmed" id="aiConfirmedInput" value="0">
+            <input type="hidden" name="autre_ai_raw_prompt" id="autreAiRawPromptInput" value="{{ submittedAiRawPrompt|default('')|e('html_attr') }}">
             <input type="hidden" name="ai_field_plan" id="aiFieldPlanInput" value="{{ submittedAiFieldPlan|default({'add': [], 'remove': [], 'replaceBase': false})|json_encode|e('html_attr') }}">
 
             <div class="row">
@@ -355,8 +356,10 @@
     var SUBMITTED_TYPE = {{ submittedType|json_encode|raw }};
     var DETAIL_ERRORS = {{ detailErrors|json_encode|raw }};
     var SUBMITTED_AI_DESCRIPTION = {{ submittedAiDescription|default('')|json_encode|raw }};
+    var SUBMITTED_AI_RAW_PROMPT = {{ submittedAiRawPrompt|default('')|json_encode|raw }};
     var SUBMITTED_AI_FIELD_PLAN = {{ submittedAiFieldPlan|default({'add': [], 'remove': [], 'replaceBase': false})|json_encode|raw }};
     var CLASSIFICATION_AI_ENDPOINT = "{{ path('demande_api_suggest_classification') }}";
+    var AUTOCORRECT_AI_ENDPOINT = "{{ path('demande_api_autocorrect') }}";
     var DESCRIPTION_AI_ENDPOINT = "{{ path('demande_api_generate_description') }}";
     var AUTRE_AI_ENDPOINT = "{{ path('demande_api_autre_generate') }}";
 
@@ -382,6 +385,13 @@
     var autreGenerationRequestId = 0;
     var latestAppliedAutreGenerationRequestId = 0;
     var autreRegenerateCount = 0;
+    var classificationAutocorrectTimer = null;
+    var classificationAutocorrectRequestId = 0;
+    var latestAppliedClassificationAutocorrectRequestId = 0;
+    var isApplyingClassificationAutocorrect = false;
+    var autrePromptAutocorrectTimer = null;
+    var autrePromptAutocorrectRequestId = 0;
+    var latestAppliedAutrePromptAutocorrectRequestId = 0;
 
     function loadDynamicFields(type, existingValues, container, card) {
         fetch("{{ path('demande_api_fields', {type: '__TYPE__'}) }}".replace("__TYPE__", encodeURIComponent(type)))
@@ -525,6 +535,127 @@
         var promptInput = document.getElementById("classificationAiPrompt");
         if (!promptInput) return;
         promptInput.value = String(value || "").trim();
+    }
+
+    function requestLiveClassificationAutocorrect() {
+        var promptInput = document.getElementById("classificationAiPrompt");
+        if (!promptInput) return;
+
+        var rawText = String(promptInput.value || "").trim();
+        if (rawText.length < 6) return;
+
+        var requestId = ++classificationAutocorrectRequestId;
+
+        fetch(AUTOCORRECT_AI_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({ text: rawText })
+        })
+            .then(function (response) {
+                return response.json().then(function (json) {
+                    if (!response.ok || !json.success) {
+                        throw new Error(json.message || "Correction IA indisponible.");
+                    }
+                    return json;
+                });
+            })
+            .then(function (json) {
+                if (requestId < latestAppliedClassificationAutocorrectRequestId) {
+                    return;
+                }
+
+                var correctedText = String(json.correctedText || "").trim();
+                if (!correctedText) {
+                    return;
+                }
+
+                var currentText = String(promptInput.value || "").trim();
+                if (normalizeUiLabel(currentText) === normalizeUiLabel(correctedText)) {
+                    return;
+                }
+
+                latestAppliedClassificationAutocorrectRequestId = requestId;
+                isApplyingClassificationAutocorrect = true;
+                promptInput.value = correctedText;
+                if (typeof promptInput.setSelectionRange === "function") {
+                    var caret = correctedText.length;
+                    promptInput.setSelectionRange(caret, caret);
+                }
+                isApplyingClassificationAutocorrect = false;
+                setClassificationStatus("Texte corrige automatiquement pendant la saisie.", "info");
+            })
+            .catch(function () {
+                // Keep typing smooth: ignore transient live-correction errors.
+            });
+    }
+
+    function requestLiveAutrePromptAutocorrect() {
+        var promptInput = document.getElementById("autreAiDescription");
+        if (!promptInput || isUpdatingAutrePromptFromAi) return;
+
+        var rawText = String(promptInput.value || "").trim();
+        if (rawText.length < 6) return;
+
+        var requestId = ++autrePromptAutocorrectRequestId;
+
+        fetch(AUTOCORRECT_AI_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({ text: rawText })
+        })
+            .then(function (response) {
+                return response.json().then(function (json) {
+                    if (!response.ok || !json.success) {
+                        throw new Error(json.message || "Correction IA indisponible.");
+                    }
+                    return json;
+                });
+            })
+            .then(function (json) {
+                if (requestId < latestAppliedAutrePromptAutocorrectRequestId) {
+                    return;
+                }
+
+                var correctedText = String(json.correctedText || "").trim();
+                if (!correctedText) {
+                    return;
+                }
+
+                var currentText = String(promptInput.value || "").trim();
+                if (normalizeUiLabel(currentText) === normalizeUiLabel(correctedText)) {
+                    return;
+                }
+
+                latestAppliedAutrePromptAutocorrectRequestId = requestId;
+                isUpdatingAutrePromptFromAi = true;
+                promptInput.value = correctedText;
+                if (typeof promptInput.setSelectionRange === "function") {
+                    var caret = correctedText.length;
+                    promptInput.setSelectionRange(caret, caret);
+                }
+                isUpdatingAutrePromptFromAi = false;
+            })
+            .catch(function () {
+                // Keep typing smooth: ignore transient live-correction errors.
+            });
+    }
+
+    function syncAutreRawPromptFromVisible(force) {
+        var promptInput = document.getElementById("autreAiDescription");
+        var rawPromptInput = document.getElementById("autreAiRawPromptInput");
+        if (!promptInput || !rawPromptInput) return;
+
+        var visibleValue = String(promptInput.value || "").trim();
+        var rawValue = String(rawPromptInput.value || "").trim();
+        if (force || !rawValue) {
+            rawPromptInput.value = visibleValue;
+        }
     }
 
     function updateClassificationSummary(suggestion) {
@@ -1273,11 +1404,6 @@
             descriptionInput.value = description;
         }
 
-        var autrePromptInput = document.getElementById("autreAiDescription");
-        if (autrePromptInput && correctedText) {
-            autrePromptInput.value = correctedText;
-        }
-
         var aiGeneratedInput = document.getElementById("aiGeneratedInput");
         var aiConfirmedInput = document.getElementById("aiConfirmedInput");
         if (aiGeneratedInput) aiGeneratedInput.value = "1";
@@ -1461,7 +1587,7 @@
                 }
 
                 var typeInfoEl = document.getElementById("typeInfo");
-                autoAdjustCategoryForAutreFlow(categorieInput, typeInput, typeInfoEl, generatedDescription);
+                autoAdjustCategoryForAutreFlow(categorieInput, typeInput, typeInfoEl, "");
 
                 if ("manual" === trigger) {
                     if (sendToSuggestionToggle && sendToSuggestionToggle.checked) {
@@ -1719,6 +1845,7 @@
         var originalText = generateBtn ? generateBtn.innerHTML : "";
         var requestId = ++autreGenerationRequestId;
         var promptValue = String((autrePromptInput || {}).value || "").trim();
+        syncAutreRawPromptFromVisible(false);
 
         var general = collectGeneralContext();
         general.aiDescriptionPrompt = promptValue;
@@ -2757,6 +2884,7 @@
         var submitBtn = document.getElementById("submitBtn");
         var aiGeneratedInput = document.getElementById("aiGeneratedInput");
         var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var autreAiRawPromptInput = document.getElementById("autreAiRawPromptInput");
         var aiModalEl = document.getElementById("aiConfirmModal");
         var aiModalRejectBtn = document.getElementById("aiModalRejectBtn");
         var aiModalConfirmBtn = document.getElementById("aiModalConfirmBtn");
@@ -2768,6 +2896,9 @@
 
         if (autreAiDescription && SUBMITTED_AI_DESCRIPTION) {
             autreAiDescription.value = SUBMITTED_AI_DESCRIPTION;
+        }
+        if (autreAiRawPromptInput) {
+            autreAiRawPromptInput.value = SUBMITTED_AI_RAW_PROMPT || SUBMITTED_AI_DESCRIPTION || String((autreAiDescription || {}).value || "").trim();
         }
 
         if (aiModalEl && window.bootstrap && bootstrap.Modal) {
@@ -2785,6 +2916,51 @@
 
         if (classificationAiPrompt && !classificationAiPrompt.value) {
             classificationAiPrompt.value = String((document.getElementById("demande_description") || {}).value || "").trim();
+        }
+
+        if (classificationAiPrompt) {
+            classificationAiPrompt.addEventListener("input", function () {
+                if (isApplyingClassificationAutocorrect) {
+                    return;
+                }
+
+                if (classificationAutocorrectTimer) {
+                    window.clearTimeout(classificationAutocorrectTimer);
+                }
+
+                var current = String(classificationAiPrompt.value || "").trim();
+                if (!current) {
+                    return;
+                }
+
+                classificationAutocorrectTimer = window.setTimeout(function () {
+                    requestLiveClassificationAutocorrect();
+                }, 1200);
+            });
+        }
+
+        if (autreAiDescription) {
+            autreAiDescription.addEventListener("input", function () {
+                if (isUpdatingAutrePromptFromAi) {
+                    return;
+                }
+
+                if (autrePromptAutocorrectTimer) {
+                    window.clearTimeout(autrePromptAutocorrectTimer);
+                }
+
+                var current = String(autreAiDescription.value || "").trim();
+                if (!current) {
+                    syncAutreRawPromptFromVisible(true);
+                    return;
+                }
+
+                syncAutreRawPromptFromVisible(true);
+
+                autrePromptAutocorrectTimer = window.setTimeout(function () {
+                    requestLiveAutrePromptAutocorrect();
+                }, 1200);
+            });
         }
 
         if (descriptionInput) {
@@ -2900,6 +3076,8 @@
                 return;
             }
 
+            syncAutreRawPromptFromVisible(false);
+
             if (!validateDemandeFormBeforeSubmit(form)) {
                 return;
             }
@@ -2948,6 +3126,7 @@
                     return;
                 }
 
+                syncAutreRawPromptFromVisible(false);
                 if (aiConfirmedInput) aiConfirmedInput.value = "1";
                 closeAiModal(aiModal, aiModalEl);
                 markFormSubmitting(submitBtn, aiModalConfirmBtn);

@@ -89,26 +89,41 @@ class DemandeFormHelper
         'matériel informatique' => 'Materiel informatique',
     ];
 
+    /**
+     * @return array<string, array<int, string>>
+     */
     public function getCategoryTypes(): array
     {
         return self::CATEGORY_TYPES;
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function getCategories(): array
     {
         return array_keys(self::CATEGORY_TYPES);
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function getTypesForCategory(string $category): array
     {
         return self::CATEGORY_TYPES[$category] ?? [];
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function getPriorites(): array
     {
         return self::PRIORITES;
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function getStatuses(): array
     {
         return self::STATUSES;
@@ -116,8 +131,8 @@ class DemandeFormHelper
 
     public function resolveCanonicalCategory(?string $category, ?string $typeDemande = null): ?string
     {
-        $rawCategory = trim((string) ($category ?? ''));
-        $rawType = trim((string) ($typeDemande ?? ''));
+        $rawCategory = trim($category ?? '');
+        $rawType = trim($typeDemande ?? '');
 
         if (isset(self::CATEGORY_TYPES[$rawCategory])) {
             return $rawCategory;
@@ -146,7 +161,7 @@ class DemandeFormHelper
 
     public function resolveCanonicalType(?string $typeDemande, ?string $category = null): ?string
     {
-        $rawType = trim((string) ($typeDemande ?? ''));
+        $rawType = trim($typeDemande ?? '');
         if ('' === $rawType) {
             return null;
         }
@@ -176,6 +191,9 @@ class DemandeFormHelper
         return $rawType;
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function getFieldsForType(string $typeDemande): array
     {
         $fieldsMap = [
@@ -934,7 +952,7 @@ class DemandeFormHelper
         ];
 
         $resolvedType = $this->resolveCanonicalType($typeDemande);
-        $normalizedType = $this->normalizeTypeKey((string) ($resolvedType ?? $typeDemande));
+        $normalizedType = $this->normalizeTypeKey($resolvedType ?? $typeDemande);
         foreach ($fieldsMap as $knownType => $fields) {
             if ($this->normalizeTypeKey($knownType) === $normalizedType) {
                 return $fields;

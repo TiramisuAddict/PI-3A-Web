@@ -324,11 +324,11 @@ def _evaluate_field_benchmark(workspace_root):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train demande ML bundle from DB + curated external samples")
+    parser = argparse.ArgumentParser(description="Train demande ML bundle from DB + accepted Autre feedback")
     parser.add_argument("--db-samples", default="var/ai/classification_training_samples.json", help="Path to DB samples JSON")
     parser.add_argument("--external-sources", default=None, help="Path to external sources JSON")
     parser.add_argument("--autre-feedback", default=None, help="Path to accepted Autre feedback JSONL")
-    parser.add_argument("--output-sources", default="var/ai/curated_external_training_sources.json", help="Path to write curated external sources")
+    parser.add_argument("--output-sources", default=None, help="Optional path to write normalized external sources")
     parser.add_argument("--report", default="var/ai/demande_training_report.json", help="Path to write training report")
     parser.add_argument("--field-benchmark-report", default="var/ai/demande_field_benchmark_report.json", help="Path to write field extraction benchmark report")
     args = parser.parse_args()
@@ -402,9 +402,11 @@ def main():
         },
     }
 
-    output_sources_path = Path(args.output_sources)
-    output_sources_path.parent.mkdir(parents=True, exist_ok=True)
-    output_sources_path.write_text(json.dumps(curated_sources_out, ensure_ascii=False, indent=2), encoding="utf-8")
+    output_sources_path = None
+    if args.output_sources:
+        output_sources_path = Path(args.output_sources)
+        output_sources_path.parent.mkdir(parents=True, exist_ok=True)
+        output_sources_path.write_text(json.dumps(curated_sources_out, ensure_ascii=False, indent=2), encoding="utf-8")
 
     report_path = Path(args.report)
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -414,7 +416,7 @@ def main():
     field_benchmark_path.parent.mkdir(parents=True, exist_ok=True)
     field_benchmark_path.write_text(json.dumps(field_benchmark_report, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(json.dumps({"ok": True, "report": report, "output_sources": str(output_sources_path), "report_file": str(report_path), "field_benchmark_report_file": str(field_benchmark_path)}, ensure_ascii=False))
+    print(json.dumps({"ok": True, "report": report, "output_sources": str(output_sources_path) if output_sources_path else None, "report_file": str(report_path), "field_benchmark_report_file": str(field_benchmark_path)}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
