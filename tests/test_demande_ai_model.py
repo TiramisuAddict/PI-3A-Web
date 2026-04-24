@@ -1,5 +1,7 @@
 import sys
 import unittest
+from calendar import monthrange
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -33,6 +35,13 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
             if "objet" in key:
                 return str((field or {}).get("value", "")).strip()
         return ""
+
+    def _add_months(self, date_value, months):
+        month_index = date_value.month - 1 + months
+        year = date_value.year + (month_index // 12)
+        month = (month_index % 12) + 1
+        day = min(date_value.day, monthrange(year, month)[1])
+        return date_value.replace(year=year, month=month, day=day)
 
     def test_negative_prompts_do_not_trigger_formation(self):
         for prompt in NEGATIVE_PROMPTS:
@@ -97,6 +106,26 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
         self.assertNotIn("Qui", formation_name)
         self.assertNotIn("Hammam-lif", formation_name)
 
+    def test_transport_for_formation_does_not_attach_route_city_to_formation_name(self):
+        prompt = "demande de transport pour une formation java de tunis vers rades le 21 mai"
+        intents = model._detect_intents(prompt)
+        fields = model._build_context_fields(prompt, intents)
+
+        self.assertEqual(fields.get("lieu_depart_actuel"), "Tunis")
+        self.assertEqual(fields.get("lieu_souhaite"), "Rades")
+        self.assertEqual(fields.get("type_transport_souhaite"), "A definir")
+        self.assertIn("Java", fields.get("nom_formation", ""))
+        self.assertNotIn("Tunis", fields.get("nom_formation", ""))
+
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        normalized_formation = model._norm((custom_fields.get("ai_nom_formation") or {}).get("value", ""))
+        self.assertIn("java", normalized_formation)
+        self.assertNotIn("tunis", normalized_formation)
+
     def test_date_location_and_keywords_are_prompt_agnostic(self):
         prompts = [
             "transport bus pour formation ui/ux a tunis le 12/12",
@@ -122,6 +151,47 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
         keywords = [k.lower() for k in (fields.get("mots_cles") or [])]
         self.assertTrue(any("ui/ux" == k or "ui" == k for k in keywords))
         self.assertIn("api", keywords)
+
+    def test_relative_dates_are_calculated_from_today(self):
+        today = datetime.now().date()
+        tomorrow = (today + timedelta(days=1)).isoformat()
+        next_month = self._add_months(today, 1).isoformat()
+
+        prompt_tomorrow = "demande d acces vpn demain"
+        response_tomorrow = model._build_autre_response(
+            {"text": prompt_tomorrow, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+        custom_fields_tomorrow = {field.get("key"): field for field in response_tomorrow.get("custom_fields", [])}
+        self.assertEqual((custom_fields_tomorrow.get("ai_date_souhaitee_metier") or {}).get("value"), tomorrow)
+
+        prompt_month = "demande d acces vpn dans 1 mois"
+        fields_month = model._build_context_fields(prompt_month, model._detect_intents(prompt_month))
+        self.assertEqual(fields_month.get("date_souhaitee"), next_month)
+
+        prompt_month_later = "demande d acces vpn 1 mois plus tard"
+        response_month_later = model._build_autre_response(
+            {"text": prompt_month_later, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+        custom_fields_month_later = {field.get("key"): field for field in response_month_later.get("custom_fields", [])}
+        self.assertEqual((custom_fields_month_later.get("ai_date_souhaitee_metier") or {}).get("value"), next_month)
+
+    def test_duration_only_schedule_prompt_creates_date_fields(self):
+        today = datetime.now().date().isoformat()
+        next_month = self._add_months(datetime.now().date(), 1).isoformat()
+        prompt = "demande d amenagement d horaire arriver a 10h partir a 19h pendant 1 mois"
+
+        fields = model._build_context_fields(prompt, model._detect_intents(prompt))
+        self.assertEqual(fields.get("date_souhaitee"), today)
+
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        self.assertEqual((custom_fields.get("ai_date_souhaitee_metier") or {}).get("value"), today)
+        self.assertEqual((custom_fields.get("ai_date_fin_extra") or {}).get("value"), next_month)
 
     def test_autre_response_is_model_driven_and_self_contained(self):
         payload = {
@@ -394,6 +464,68 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
         self.assertEqual((custom_fields.get("ai_type_transport") or {}).get("value"), "Taxi")
         justification = (custom_fields.get("ai_justification_metier") or {}).get("value", "")
         self.assertNotIn("mission", model._norm(justification))
+
+    def test_parking_badge_prompt_does_not_leak_unrelated_zone(self):
+        prompt = "demande d acces parking souterrain badge parking"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        self.assertEqual((custom_fields.get("ai_systeme_concerne") or {}).get("value"), "Parking Souterrain Badge Parking")
+        zone = (custom_fields.get("ai_zone_souhaitee") or {}).get("value", "")
+        self.assertFalse(zone)
+
+    def test_stationnement_prompt_without_zone_does_not_reuse_old_zone_value(self):
+        prompt = "autorisation de stationnement pour un visiteur le 5 mai 2027 de 10h a 14h"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        self.assertEqual((custom_fields.get("ai_type_stationnement") or {}).get("value"), "Place reservee")
+        self.assertFalse((custom_fields.get("ai_zone_souhaitee") or {}).get("value"))
+        self.assertEqual((custom_fields.get("ai_date_souhaitee_metier") or {}).get("value"), "2027-05-05")
+
+    def test_schedule_change_prompt_extracts_horaires_and_date(self):
+        prompt = "demande de changement d horaire je veux passer de 9h-18h a 8h-17h a partir du 1er mai 2027"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        self.assertEqual((custom_fields.get("ai_horaire_actuel") or {}).get("value"), "9h-18h")
+        self.assertEqual((custom_fields.get("ai_horaire_souhaite") or {}).get("value"), "8h-17h")
+        self.assertEqual((custom_fields.get("ai_date_souhaitee_metier") or {}).get("value"), "2027-05-01")
+
+    def test_vpn_access_prompt_does_not_leak_unrelated_custom_objet(self):
+        prompt = "besoin d acces vpn urgent pour travailler a distance des demain"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        self.assertIn("vpn", model._norm((custom_fields.get("ai_systeme_concerne") or {}).get("value", "")))
+        self.assertNotIn("ai_custom_objet", custom_fields)
+
+    def test_sharepoint_access_prompt_stays_prompt_supported(self):
+        prompt = "demande d acces a sharepoint pour consulter les documents de projet"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        self.assertIn("sharepoint", model._norm((custom_fields.get("ai_systeme_concerne") or {}).get("value", "")))
+        self.assertIn("consulter", model._norm((custom_fields.get("ai_justification_metier") or {}).get("value", "")))
+        for field in custom_fields.values():
+            field_value = model._norm(field.get("value", ""))
+            self.assertNotIn("formation", field_value)
+            self.assertNotIn("javascript", field_value)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ import math
 import random
 import re
 import sys
+from calendar import monthrange
 import unicodedata
 from difflib import get_close_matches
 from collections import Counter, defaultdict
@@ -409,7 +410,16 @@ def _autre_clean_field_value(field_key, field_value, prompt, extractor):
         return value or "A definir"
     if key == "ai_zone_souhaitee":
         extracted_zone = dyn_extract.extract_descriptive_location(prompt, "parking") or _extract_parking_zone(prompt)
-        return extracted_zone or value
+        if extracted_zone:
+            return extracted_zone
+        if _source_supports_field_override(prompt, "ai_zone_souhaitee"):
+            return value
+        return ""
+    if key in {"ai_horaire_actuel", "ai_horaire_souhaite"}:
+        current, target = dyn_extract._extract_schedule_change(prompt)
+        if key == "ai_horaire_actuel":
+            return current or value
+        return target or value
     if key == "ai_type_stationnement":
         extracted_type = _infer_parking_type(prompt)
         return extracted_type or value or "Place reservee"
@@ -1328,10 +1338,88 @@ def _parse_date_candidate(day, month, year):
         return None
 
 
+def _shift_date_by_months(base_date, months):
+    try:
+        month_index = base_date.month - 1 + int(months)
+        year = base_date.year + (month_index // 12)
+        month = (month_index % 12) + 1
+        day = min(base_date.day, monthrange(year, month)[1])
+        return base_date.replace(year=year, month=month, day=day)
+    except ValueError:
+        return base_date
+
+
+def _extract_relative_duration_dates(text):
+    lowered = _norm(str(text or ""))
+    if not lowered:
+        return None, None
+
+    today = datetime.now().date()
+    duration_match = re.search(r"\b(?:pendant|pour|durant|sur)\s+(\d+|un|une)\s+(jour|jours|mois)\b", lowered, flags=re.IGNORECASE)
+    if not duration_match:
+        return None, None
+
+    raw_amount = duration_match.group(1)
+    amount = 1 if raw_amount in {"un", "une"} else int(raw_amount)
+    unit = duration_match.group(2)
+
+    start_date = today
+    if unit == "jour" or unit == "jours":
+        end_date = today + timedelta(days=amount)
+    else:
+        end_date = _shift_date_by_months(today, amount)
+
+    return start_date.isoformat(), end_date.isoformat()
+
+
 def _extract_date_range(text):
     normalized_text = str(text or "")
     extracted = []
     current_dt = datetime.now()
+    lowered = _norm(normalized_text)
+
+    duration_start, duration_end = _extract_relative_duration_dates(normalized_text)
+    if duration_start:
+        extracted.append(duration_start)
+        if duration_end:
+            extracted.append(duration_end)
+
+    if re.search(r"\b(?:aujourd['’ ]hui|ce\s+jour)\b", lowered, flags=re.IGNORECASE):
+        extracted.append(current_dt.strftime("%Y-%m-%d"))
+    if re.search(r"\b(?:demain|des\s+demain)\b", lowered, flags=re.IGNORECASE):
+        extracted.append((current_dt + timedelta(days=1)).strftime("%Y-%m-%d"))
+    if re.search(r"\b(?:apres\s+demain|apr[eè]s\s+demain)\b", lowered, flags=re.IGNORECASE):
+        extracted.append((current_dt + timedelta(days=2)).strftime("%Y-%m-%d"))
+
+    relative_day_match = re.search(
+        r"\b(?:dans|d['’]ici|sous)\s+(\d+|un|une)\s+jours?\b",
+        lowered,
+        flags=re.IGNORECASE,
+    )
+    if relative_day_match:
+        raw_days = relative_day_match.group(1)
+        days = 1 if raw_days in {"un", "une"} else int(raw_days)
+        extracted.append((current_dt + timedelta(days=days)).strftime("%Y-%m-%d"))
+
+    relative_month_match = re.search(
+        r"\b(?:dans|d['’]ici|sous)\s+(\d+|un|une)\s+mois\b",
+        lowered,
+        flags=re.IGNORECASE,
+    )
+    if relative_month_match:
+        raw_months = relative_month_match.group(1)
+        months = 1 if raw_months in {"un", "une"} else int(raw_months)
+        extracted.append(_shift_date_by_months(current_dt.date(), months).isoformat())
+
+    months_later_match = re.search(
+        r"\b(\d+|un|une)?\s*mois\s+(?:plus\s+tard|apres|apr[eè]s|plus\s+loin)\b",
+        lowered,
+        flags=re.IGNORECASE,
+    )
+    if months_later_match:
+        raw_months = months_later_match.group(1)
+        months = 1 if not raw_months or raw_months in {"un", "une"} else int(raw_months)
+        extracted.append(_shift_date_by_months(current_dt.date(), months).isoformat())
 
     for m in re.finditer(r"\b(\d{4})-(\d{2})-(\d{2})\b", normalized_text):
         p = _parse_date_candidate(m.group(3), m.group(2), m.group(1))
@@ -1386,13 +1474,6 @@ def _extract_date_range(text):
         p = _parse_date_candidate(day, month_num, year)
         if p:
             extracted.append(p)
-
-    if re.search(r"\baujourd\s*hui\b", lowered, flags=re.IGNORECASE):
-        extracted.append(current_dt.strftime("%Y-%m-%d"))
-    if re.search(r"\b(?:demain|des\s+demain)\b", lowered, flags=re.IGNORECASE):
-        extracted.append((current_dt + timedelta(days=1)).strftime("%Y-%m-%d"))
-    if re.search(r"\b(?:apres\s+demain|apr[eè]s\s+demain)\b", lowered, flags=re.IGNORECASE):
-        extracted.append((current_dt + timedelta(days=2)).strftime("%Y-%m-%d"))
 
     if not extracted:
         return None, None
@@ -1576,7 +1657,9 @@ def _extract_parking_zone(text):
         candidate = _normalize_ws(candidate).strip(" ,;:-")
 
         if len(candidate) >= 2:
-            return _capitalize_entity(_clean_entity_text(candidate))
+            cleaned_candidate = _capitalize_entity(_clean_entity_text(candidate))
+            if cleaned_candidate and _has_any_word(_norm(cleaned_candidate), ["pres", "proche", "cote", "devant", "derriere", "loin", "zone", "entree", "sortie", "hall", "batiment", "bloc", "tour", "niveau", "etage", "sous-sol", "souterrain"]):
+                return cleaned_candidate
 
     if _has_word(normalized, "entree"):
         return "Entree principale"
@@ -1642,6 +1725,26 @@ def _clean_subject_like_name(value):
         candidate = " ".join(words[:6])
 
     return candidate
+
+
+def _trim_route_suffix_from_subject(subject, route_locations):
+    candidate = _normalize_ws(subject)
+    if not candidate:
+        return ""
+
+    for location in route_locations or []:
+        location_text = _normalize_ws(location)
+        if not location_text:
+            continue
+        if re.search(rf"\b(?:de|du)\s+{re.escape(location_text)}$", candidate, flags=re.IGNORECASE):
+            candidate = re.sub(
+                rf"\s+(?:de|du)\s+{re.escape(location_text)}$",
+                "",
+                candidate,
+                flags=re.IGNORECASE,
+            ).strip()
+
+    return _normalize_ws(candidate)
 
 
 def _extract_keywords(text, limit=8):
@@ -2268,6 +2371,12 @@ def _autre_can_apply_predicted_value(field_key, value, source):
     if key == "ai_type_stationnement":
         return _source_supports_field_override(source, "type_stationnement")
 
+    if key == "ai_zone_souhaitee":
+        prompt_zone = _normalize_ws(dyn_extract.extract_descriptive_location(source, "parking") or _extract_parking_zone(source))
+        if not prompt_zone:
+            return False
+        return _normalize_field_compare_value(prompt_zone) == _normalize_field_compare_value(candidate)
+
     if key == "ai_type_conge":
         return _source_supports_field_override(source, "type_conge")
 
@@ -2861,6 +2970,8 @@ def _build_context_fields(corrected_text, intents):
         if not nom and _has_word(normalized, "certification"):
             nom = _extract_subject_name(corrected_text, "certification")
         nom = _clean_subject_like_name(nom)
+        if nom and roles["has_route"]:
+            nom = _trim_route_suffix_from_subject(nom, [fields.get("lieu_depart_actuel", ""), fields.get("lieu_souhaite", "")])
         if nom:
             fields["nom_formation"] = nom
 
@@ -3748,6 +3859,21 @@ def _is_too_generic_objet(value):
     return token in generic
 
 
+def _value_has_prompt_support(prompt_text, value):
+    prompt_norm = _normalize_field_compare_value(prompt_text)
+    value_norm = _normalize_field_compare_value(value)
+    if not prompt_norm or not value_norm:
+        return False
+    if _has_phrase(prompt_norm, value_norm):
+        return True
+    prompt_tokens = set(_tokenize(prompt_text, use_bigrams=False))
+    value_tokens = set(_tokenize(value, use_bigrams=False))
+    if not prompt_tokens or not value_tokens:
+        return False
+    overlap_ratio = len(prompt_tokens & value_tokens) / float(len(value_tokens))
+    return overlap_ratio >= 0.6
+
+
 def _limit_custom_fields_keep_explicit(custom_fields, max_fields=8):
     if len(custom_fields) <= max_fields:
         return custom_fields
@@ -3840,6 +3966,10 @@ def _dedupe_and_refine_custom_fields(custom_fields, context_fields, corrected_te
             continue
         if key.startswith("ai_custom_") and _normalize_ws(field.get("type", "")) == "select" and _normalize_ws(field.get("source", "")) != "explicit":
             field["value"] = ""
+        if key.startswith("ai_custom_") and _normalize_ws(field.get("source", "")) != "explicit":
+            candidate_value = _normalize_ws(field.get("value", ""))
+            if candidate_value and not _value_has_prompt_support(corrected_text, candidate_value):
+                continue
         if not _is_objet_field_key(key):
             filtered.append(field)
             continue
@@ -4142,6 +4272,8 @@ def _build_autre_response(request_data, prompt):
                 if _structured_justification_preserves_evidence(source, structured_description)
                 else _normalize_ws(source)
             )
+        if key == "ai_zone_souhaitee" and not cleaned_value:
+            continue
         if key.startswith("ai_custom_") and _normalize_ws(field.get("type", "")) == "select" and _normalize_ws(field.get("source", "")) != "explicit":
             cleaned_value = ""
         field["value"] = cleaned_value

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from calendar import monthrange
+from datetime import datetime, timedelta
 from pathlib import Path
 import json
 import re
@@ -53,6 +54,40 @@ MONTHS = {
     "decembre": 12,
     "décembre": 12,
 }
+
+
+def _shift_date_by_months(base_date, months: int):
+    try:
+        month_index = base_date.month - 1 + int(months)
+        year = base_date.year + (month_index // 12)
+        month = (month_index % 12) + 1
+        day = min(base_date.day, monthrange(year, month)[1])
+        return base_date.replace(year=year, month=month, day=day)
+    except ValueError:
+        return base_date
+
+
+def _extract_relative_duration_dates(text: str) -> tuple[str, str]:
+    lowered = norm(text)
+    if not lowered:
+        return "", ""
+
+    today = datetime.now().date()
+    duration_match = re.search(r"\b(?:pendant|pour|durant|sur)\s+(\d+|un|une)\s+(jour|jours|mois)\b", lowered, flags=re.IGNORECASE)
+    if not duration_match:
+        return "", ""
+
+    raw_amount = duration_match.group(1)
+    amount = 1 if raw_amount in {"un", "une"} else int(raw_amount)
+    unit = duration_match.group(2)
+
+    start_date = today.isoformat()
+    if unit in {"jour", "jours"}:
+        end_date = (today + timedelta(days=amount)).isoformat()
+    else:
+        end_date = _shift_date_by_months(today, amount).isoformat()
+
+    return start_date, end_date
 
 PRIORITY_SIGNALS = {
     "HAUTE": ["urgent", "urgence", "des aujourd hui", "immédiatement", "immediatement", "medical", "hospitalisation", "accident", "bloquant"],
@@ -349,6 +384,61 @@ def _is_time_sensitive(text: str) -> bool:
     )
 
 
+def _has_explicit_zone_evidence(text: str) -> bool:
+    lowered = norm(text)
+    if not lowered:
+        return False
+    return _has_any_phrase(
+        lowered,
+        [
+            "pres de",
+            "a cote de",
+            "proche de",
+            "devant",
+            "derriere",
+            "loin de",
+            "dans",
+            "zone",
+            "batiment",
+            "bloc",
+            "tour",
+            "entree",
+            "sortie",
+            "hall",
+        ],
+    )
+
+
+def _normalize_schedule_token(token: str) -> str:
+    cleaned = normalize_ws(token).lower()
+    cleaned = re.sub(r"\s*[-–]\s*", "-", cleaned)
+    cleaned = re.sub(r"\s*h\s*", "h", cleaned)
+    return cleaned
+
+
+def _extract_schedule_change(text: str) -> tuple[str, str]:
+    source = normalize_ws(text)
+    if not source:
+        return "", ""
+
+    range_pattern = r"\d{1,2}\s*h\s*(?:[-–]\s*\d{1,2}\s*h)?"
+    direct_patterns = [
+        rf"\bpasser\s+de\s*({range_pattern})\s*(?:a|à|vers)\s*({range_pattern})\b",
+        rf"\bchangement\s+d\s*horaire.*?\bde\s*({range_pattern})\s*(?:a|à|vers)\s*({range_pattern})\b",
+    ]
+    for pattern in direct_patterns:
+        match = re.search(pattern, source, flags=re.IGNORECASE)
+        if match:
+            return _normalize_schedule_token(match.group(1)), _normalize_schedule_token(match.group(2))
+
+    if re.search(r"\b(changement\s+d\s*horaire|horaire|passer)\b", source, flags=re.IGNORECASE):
+        ranges = re.findall(range_pattern, source, flags=re.IGNORECASE)
+        if len(ranges) >= 2:
+            return _normalize_schedule_token(ranges[0]), _normalize_schedule_token(ranges[1])
+
+    return "", ""
+
+
 class BoundaryAwareExtractor:
     def extract_location_pair(self, text: str) -> tuple[str, str]:
         source = normalize_ws(text)
@@ -426,6 +516,25 @@ class BoundaryAwareExtractor:
         if norm(keyword) == "formation":
             qualifier_pattern = r"[a-zA-ZÀ-ÿ]+"
             subject_pattern = r"[a-zA-ZÀ-ÿ0-9\s\-\./+#]+?"
+            route_depart, route_destination = self.extract_location_pair(source)
+            route_locations = [normalize_ws(route_depart), normalize_ws(route_destination)]
+
+            def trim_route_suffix(candidate: str) -> str:
+                cleaned_candidate = normalize_ws(candidate)
+                if not cleaned_candidate:
+                    return ""
+                for location in route_locations:
+                    if not location:
+                        continue
+                    if re.search(rf"\b(?:de|du)\s+{re.escape(location)}$", cleaned_candidate, flags=re.IGNORECASE):
+                        cleaned_candidate = re.sub(
+                            rf"\s+(?:de|du)\s+{re.escape(location)}$",
+                            "",
+                            cleaned_candidate,
+                            flags=re.IGNORECASE,
+                        ).strip()
+                return normalize_ws(cleaned_candidate)
+
             formation_patterns = [
                 (
                     rf"\b{keyword_pattern}\b\s+({qualifier_pattern})\s+de\s+({subject_pattern})"
@@ -452,7 +561,10 @@ class BoundaryAwareExtractor:
                 qualifier = self._clean_subject(match.group(1))
                 subject = self._clean_subject(match.group(2))
                 if qualifier and subject:
-                    return f"{capitalize_entity(qualifier)} {connector} {capitalize_entity(subject)}"
+                    candidate = f"{capitalize_entity(qualifier)} {connector} {capitalize_entity(subject)}"
+                    candidate = trim_route_suffix(candidate)
+                    if candidate:
+                        return capitalize_entity(candidate)
 
             direct_subject_match = re.search(
                 rf"\b{keyword_pattern}\b\s+de\s+({subject_pattern})(?={generic_stop_tail}|\s+\d|$)",
@@ -461,6 +573,7 @@ class BoundaryAwareExtractor:
             )
             if direct_subject_match:
                 direct_subject = self._clean_subject(direct_subject_match.group(1))
+                direct_subject = trim_route_suffix(direct_subject)
                 if direct_subject:
                     return capitalize_entity(direct_subject)
 
@@ -474,7 +587,10 @@ class BoundaryAwareExtractor:
                 qualifier = self._clean_subject(qualifier_subject_match.group(1))
                 subject = self._clean_subject(qualifier_subject_match.group(2))
                 if qualifier and subject:
-                    return capitalize_entity(f"{qualifier} {subject}")
+                    candidate = capitalize_entity(f"{qualifier} {subject}")
+                    candidate = trim_route_suffix(candidate)
+                    if candidate:
+                        return capitalize_entity(candidate)
 
         patterns = [
             rf"\b{keyword_pattern}\b(?:\s+(?:en|sur|de|d['’]))?\s+([a-z][a-z0-9\s\-\./+#]*?)(?={generic_stop_tail}|\s+\d|\b\d{{4}}\b|$)",
@@ -486,6 +602,7 @@ class BoundaryAwareExtractor:
             if not match:
                 continue
             candidate = self._clean_subject(match.group(1))
+            candidate = trim_route_suffix(candidate) if norm(keyword) == "formation" else candidate
             if candidate:
                 return capitalize_entity(candidate)
 
@@ -501,6 +618,40 @@ class BoundaryAwareExtractor:
             return "", ""
 
         protected_source, placeholders = _protect_date_prefixes(source)
+        lowered = norm(source)
+        today = datetime.now().date()
+        extracted: list[str] = []
+
+        duration_start, duration_end = _extract_relative_duration_dates(source)
+        if duration_start:
+            extracted.append(duration_start)
+            if duration_end:
+                extracted.append(duration_end)
+
+        if re.search(r"\b(?:aujourd['’ ]hui|ce\s+jour)\b", lowered, flags=re.IGNORECASE):
+            extracted.append(today.isoformat())
+        if re.search(r"\b(?:demain|des\s+demain)\b", lowered, flags=re.IGNORECASE):
+            extracted.append((today + timedelta(days=1)).isoformat())
+        if re.search(r"\b(?:apres\s+demain|apr[eè]s\s+demain)\b", lowered, flags=re.IGNORECASE):
+            extracted.append((today + timedelta(days=2)).isoformat())
+
+        relative_day_match = re.search(r"\b(?:dans|d['’]ici|sous)\s+(\d+|un|une)\s+jours?\b", lowered, flags=re.IGNORECASE)
+        if relative_day_match:
+            raw_days = relative_day_match.group(1)
+            days = 1 if raw_days in {"un", "une"} else int(raw_days)
+            extracted.append((today + timedelta(days=days)).isoformat())
+
+        relative_month_match = re.search(r"\b(?:dans|d['’]ici|sous)\s+(\d+|un|une)\s+mois\b", lowered, flags=re.IGNORECASE)
+        if relative_month_match:
+            raw_months = relative_month_match.group(1)
+            months = 1 if raw_months in {"un", "une"} else int(raw_months)
+            extracted.append(_shift_date_by_months(today, months).isoformat())
+
+        months_later_match = re.search(r"\b(\d+|un|une)?\s*mois\s+(?:plus\s+tard|apres|apr[eè]s|plus\s+loin)\b", lowered, flags=re.IGNORECASE)
+        if months_later_match:
+            raw_months = months_later_match.group(1)
+            months = 1 if not raw_months or raw_months in {"un", "une"} else int(raw_months)
+            extracted.append(_shift_date_by_months(today, months).isoformat())
 
         compact_range = re.search(
             r"\bdu\s+(\d{1,2})\s+au\s+(\d{1,2})\s+(janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)\s+(\d{4})\b",
@@ -512,7 +663,7 @@ class BoundaryAwareExtractor:
             first = self._parse_date_token(f"{compact_range.group(1)} {compact_range.group(3)} {year}")
             second = self._parse_date_token(f"{compact_range.group(2)} {compact_range.group(3)} {year}")
             if first:
-                return first, second
+                extracted.extend([first, second] if second else [first])
 
         compact_range_without_year = re.search(
             r"\b(?:du\s+)?(\d{1,2})\s+au\s+(\d{1,2})\s+(janvier|fevrier|fÃ©vrier|mars|avril|mai|juin|juillet|aout|aoÃ»t|septembre|octobre|novembre|decembre|dÃ©cembre)\b",
@@ -524,7 +675,7 @@ class BoundaryAwareExtractor:
             first = self._parse_date_token(f"{compact_range_without_year.group(1)} {compact_range_without_year.group(3)} {year}")
             second = self._parse_date_token(f"{compact_range_without_year.group(2)} {compact_range_without_year.group(3)} {year}")
             if first:
-                return first, second
+                extracted.extend([first, second] if second else [first])
 
         patterns = [
             r"\bdu\s+(\d{1,2}(?:er)?[/-]\d{1,2}(?:[/-]\d{2,4})?)\s+au\s+(\d{1,2}(?:er)?[/-]\d{1,2}(?:[/-]\d{2,4})?)",
@@ -543,10 +694,17 @@ class BoundaryAwareExtractor:
                 tail = protected_source[match.end():]
                 next_match = re.search(r"\b(?:au|jusqu(?:'|e)?\s+a|a|à)\s+(\d{1,2}(?:er)?[/-]\d{1,2}(?:[/-]\d{2,4})?|\d{1,2}(?:er)?\s+(?:janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)(?:\s+\d{4})?)", tail, flags=re.IGNORECASE)
                 second = self._parse_date_token(_restore_date_prefixes(next_match.group(1), placeholders)) if next_match else ""
-                return first, second
+                extracted.extend([first, second] if second else [first])
 
         fallback = self._extract_first_calendar_date(_restore_date_prefixes(protected_source, placeholders))
-        return fallback, ""
+        if fallback:
+            extracted.append(fallback)
+
+        if not extracted:
+            return "", ""
+
+        unique = sorted(set(extracted))
+        return unique[0], (unique[1] if len(unique) > 1 else "")
 
     def extract_amount(self, text: str) -> str:
         source = normalize_ws(text)
@@ -1195,6 +1353,12 @@ FIELD_BLUEPRINTS = {
         {"key": "ai_equipement_concerne", "label": "Equipement concerne", "type": "text", "required": True},
         {"key": "ai_description_probleme", "label": "Description du probleme", "type": "textarea", "required": True},
     ],
+    "schedule": [
+        {"key": "ai_horaire_actuel", "label": "Horaire actuel", "type": "text", "required": True},
+        {"key": "ai_horaire_souhaite", "label": "Horaire souhaite", "type": "text", "required": True},
+        {"key": "ai_date_souhaitee_metier", "label": "Date souhaitee", "type": "date", "required": False},
+        {"key": "ai_justification_metier", "label": "Justification", "type": "textarea", "required": False},
+    ],
 }
 
 
@@ -1234,6 +1398,8 @@ ALLOWED_CUSTOM_FIELD_KEYS = {
     "ai_date_fin_conge",
     "ai_equipement_concerne",
     "ai_description_probleme",
+    "ai_horaire_actuel",
+    "ai_horaire_souhaite",
     "ai_objectif",
     "ai_motif",
     "ai_contexte",
@@ -1285,6 +1451,21 @@ def _has_constraint_evidence(text: str) -> bool:
     return _has_any_phrase(lowered, [norm(marker) for marker in CONSTRAINT_MARKERS])
 
 
+def _value_has_prompt_support(text: str, value: str) -> bool:
+    lowered = norm(text)
+    normalized_value = norm(value)
+    if not lowered or not normalized_value:
+        return False
+    if _has_phrase(lowered, normalized_value):
+        return True
+    prompt_tokens = set(_tokenize(text))
+    value_tokens = set(_tokenize(value))
+    if not prompt_tokens or not value_tokens:
+        return False
+    overlap_ratio = len(prompt_tokens & value_tokens) / float(len(value_tokens))
+    return overlap_ratio >= 0.6
+
+
 def _field_has_minimal_evidence(field_key: str, text: str, value: str = "", source_kind: str = "inferred") -> bool:
     key = normalize_ws(field_key)
     lowered = norm(text)
@@ -1326,7 +1507,27 @@ def _field_has_minimal_evidence(field_key: str, text: str, value: str = "", sour
         return _has_any_phrase(lowered, ["formation", "certification"])
 
     if key == "ai_zone_souhaitee":
-        return _has_any_phrase(lowered, ["parking", "stationnement"])
+        if not _has_any_phrase(lowered, ["parking", "stationnement"]):
+            return False
+        if not _has_explicit_zone_evidence(text):
+            return False
+        if normalized_value and not _has_phrase(lowered, normalized_value):
+            direct_zone = extract_descriptive_location(text, "parking")
+            return bool(direct_zone and norm(direct_zone) == normalized_value)
+        return True
+
+    if key.startswith("ai_custom_"):
+        if not normalized_value:
+            return False
+        return _value_has_prompt_support(text, value)
+
+    if key in {"ai_horaire_actuel", "ai_horaire_souhaite"}:
+        current, target = _extract_schedule_change(text)
+        if not current or not target:
+            return False
+        if key == "ai_horaire_actuel":
+            return not normalized_value or normalized_value == norm(current)
+        return not normalized_value or normalized_value == norm(target)
 
     return True
 
@@ -1360,6 +1561,8 @@ FIELD_INTENT_AFFINITY = {
     "ai_date_fin_conge": {"leave"},
     "ai_equipement_concerne": {"maintenance"},
     "ai_description_probleme": {"maintenance"},
+    "ai_horaire_actuel": {"schedule"},
+    "ai_horaire_souhaite": {"schedule"},
     "ai_objectif": set(),
     "ai_motif": set(),
     "ai_contexte": set(),
@@ -1381,6 +1584,7 @@ INTENT_KEYWORDS = {
     "mission": ["mission", "etranger", "étranger", "voyage"],
     "refund": ["remboursement", "restaurant", "taxi", "hotel", "hébergement", "frais"],
     "workplace": ["ergonomique", "bureau", "open space", "casier", "eclairage", "éclairage"],
+    "schedule": ["changement d horaire", "horaire", "passer de", "8h", "9h", "17h", "18h"],
 }
 
 
@@ -1440,6 +1644,10 @@ class DynamicFieldGenerator:
             if _is_constraint_field_key(key) and not has_constraint_evidence:
                 return
             if _is_constraint_field_key(key) and source_kind != "explicit" and normalize_ws(value) and not _has_phrase(normalized_source, norm(value)):
+                return
+            if key == "ai_zone_souhaitee" and source_kind != "explicit" and normalize_ws(value) and not _has_phrase(normalized_source, norm(value)):
+                return
+            if key.startswith("ai_custom_") and source_kind != "explicit" and normalize_ws(value) and not _value_has_prompt_support(source, value):
                 return
             if normalize_ws(definition.get("type") or "") == "select" and key.startswith("ai_custom_") and source_kind != "explicit":
                 value = ""
@@ -1598,6 +1806,7 @@ class DynamicFieldGenerator:
     def _extract_blueprint_value(self, text: str, blueprint: dict[str, Any], extractor: BoundaryAwareExtractor, miner: PatternMiner | None) -> str:
         key = normalize_ws(blueprint.get("key") or "")
         lowered = norm(text)
+        schedule_current, schedule_target = _extract_schedule_change(text)
 
         if key == "ai_lieu_depart_actuel" or key == "ai_lieu_souhaite":
             depart, destination = extractor.extract_location_pair(text)
@@ -1625,7 +1834,11 @@ class DynamicFieldGenerator:
         if key == "ai_duree":
             return extractor._extract_duration(text)
         if key == "ai_zone_souhaitee":
-            return extract_descriptive_location(text, "parking") or self._extract_after_any(text, ["parking", "stationnement"])
+            return extract_descriptive_location(text, "parking") or ""
+        if key == "ai_horaire_actuel":
+            return schedule_current
+        if key == "ai_horaire_souhaite":
+            return schedule_target
         if key == "ai_type_stationnement":
             if re.search(r"\b(moto|deux roues)\b", lowered):
                 return "Autorisation temporaire"
