@@ -232,6 +232,12 @@
                                     <span id="aiStatusText" class="ai-status"></span>
                                 </div>
                                 <div id="autreConfidenceBadge" class="autre-confidence-badge"></div>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="openManualAutreFieldsBtn" data-bs-toggle="modal" data-bs-target="#manualAutreFieldsModal">
+                                        <i class="ti ti-layout-grid-add me-1"></i>Configurer les champs
+                                    </button>
+                                    <span class="text-secondary small">Definissez vos propres champs, puis modifiez les valeurs avant confirmation.</span>
+                                </div>
                             </div>
                             <div id="aiPrefillHint" class="ai-prefill-hint"></div>
                             <div class="row g-3" id="dynamicFields"></div>
@@ -321,6 +327,34 @@
 </div>
 </div>
 
+<div class="modal" id="manualAutreFieldsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            <div class="modal-status bg-primary"></div>
+            <div class="modal-body py-4">
+                <h3 class="mb-2">Definir les champs specifiques</h3>
+                <p class="text-secondary mb-3">Choisissez combien de champs vous voulez, nommez-les puis appliquez-les. Vous pourrez ensuite modifier chaque valeur dans la demande.</p>
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-sm-4">
+                        <label for="manualAutreFieldCount" class="form-label">Nombre de champs</label>
+                        <input type="number" min="1" max="6" step="1" value="1" class="form-control" id="manualAutreFieldCount">
+                    </div>
+                    <div class="col-sm-8 d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-secondary" id="buildManualAutreFieldsBtn">Generer les champs</button>
+                        <button type="button" class="btn btn-primary" id="applyManualAutreFieldsBtn">Appliquer au formulaire</button>
+                    </div>
+                </div>
+                <div class="text-secondary small mb-2">Saisissez les noms des champs puis leurs valeurs par defaut si besoin.</div>
+                <div id="manualAutreFieldEditor" class="row g-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal" id="aiConfirmModal" tabindex="-1">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -393,6 +427,14 @@
     var autrePromptAutocorrectTimer = null;
     var autrePromptAutocorrectRequestId = 0;
     var latestAppliedAutrePromptAutocorrectRequestId = 0;
+    var classificationAutocorrectApplied = false;
+    var autrePromptAutocorrectApplied = false;
+    var manualAutreFieldCountInput = null;
+    var manualAutreFieldEditor = null;
+    var buildManualAutreFieldsBtn = null;
+    var applyManualAutreFieldsBtn = null;
+    var openManualAutreFieldsBtn = null;
+    var manualAutreFieldsModal = null;
 
     function loadDynamicFields(type, existingValues, container, card) {
         fetch("{{ path('demande_api_fields', {type: '__TYPE__'}) }}".replace("__TYPE__", encodeURIComponent(type)))
@@ -542,6 +584,10 @@
         var promptInput = document.getElementById("classificationAiPrompt");
         if (!promptInput) return;
 
+        if (classificationAutocorrectApplied) {
+            return;
+        }
+
         var rawText = String(promptInput.value || "").trim();
         if (rawText.length < 6) return;
 
@@ -586,6 +632,7 @@
                     promptInput.setSelectionRange(caret, caret);
                 }
                 isApplyingClassificationAutocorrect = false;
+                classificationAutocorrectApplied = true;
                 setClassificationStatus("Texte corrige automatiquement pendant la saisie.", "info");
             })
             .catch(function () {
@@ -596,6 +643,10 @@
     function requestLiveAutrePromptAutocorrect() {
         var promptInput = document.getElementById("autreAiDescription");
         if (!promptInput || isUpdatingAutrePromptFromAi) return;
+
+        if (autrePromptAutocorrectApplied) {
+            return;
+        }
 
         var rawText = String(promptInput.value || "").trim();
         if (rawText.length < 6) return;
@@ -641,6 +692,7 @@
                     promptInput.setSelectionRange(caret, caret);
                 }
                 isUpdatingAutrePromptFromAi = false;
+                autrePromptAutocorrectApplied = true;
             })
             .catch(function () {
                 // Keep typing smooth: ignore transient live-correction errors.
@@ -775,6 +827,17 @@
 
     function resetAiFieldPlan() {
         setAiFieldPlan({ add: [], remove: [], replaceBase: false });
+        resetManualAutreFieldBuilder();
+    }
+
+    function resetManualAutreFieldBuilder() {
+        if (manualAutreFieldCountInput) {
+            manualAutreFieldCountInput.value = "1";
+        }
+
+        if (manualAutreFieldEditor) {
+            renderManualAutreFieldBuilder();
+        }
     }
 
     function shouldHideAutreBaseField(fieldKey) {
@@ -910,6 +973,139 @@
         }
 
         return dedupeAutreComposedFields(finalFields);
+    }
+
+    function slugifyManualAutreFieldKey(label, fallbackIndex) {
+        var key = normalizeUiLabel(String(label || "")).toLowerCase();
+        key = key.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+        if (!key) {
+            key = "custom_" + String(fallbackIndex || 1);
+        }
+
+        if (key.indexOf("ai_") !== 0) {
+            key = "ai_" + key;
+        }
+
+        return key;
+    }
+
+    function renderManualAutreFieldBuilder() {
+        if (!manualAutreFieldEditor || !manualAutreFieldCountInput) {
+            return;
+        }
+
+        var count = parseInt(manualAutreFieldCountInput.value, 10);
+        if (!count || count < 1) {
+            count = 1;
+        }
+        if (count > 6) {
+            count = 6;
+        }
+
+        manualAutreFieldEditor.innerHTML = "";
+
+        for (var i = 0; i < count; i++) {
+            var col = document.createElement("div");
+            col.className = "col-12 col-md-6";
+
+            var card = document.createElement("div");
+            card.className = "border rounded p-2 h-100";
+
+            var label = document.createElement("label");
+            label.className = "form-label small mb-1";
+            label.textContent = "Champ " + (i + 1);
+
+            var labelInput = document.createElement("input");
+            labelInput.type = "text";
+            labelInput.className = "form-control form-control-sm mb-2 manual-autre-field-label";
+            labelInput.placeholder = "Nom du champ";
+            labelInput.setAttribute("data-manual-autre-index", String(i));
+
+            var typeInput = document.createElement("select");
+            typeInput.className = "form-select form-select-sm mb-2 manual-autre-field-type";
+            typeInput.setAttribute("data-manual-autre-index", String(i));
+            ["text", "textarea", "number", "date", "select"].forEach(function (optionValue) {
+                var option = document.createElement("option");
+                option.value = optionValue;
+                option.textContent = optionValue === "textarea" ? "Zone de texte" : optionValue.charAt(0).toUpperCase() + optionValue.slice(1);
+                typeInput.appendChild(option);
+            });
+
+            var valueInput = document.createElement("input");
+            valueInput.type = "text";
+            valueInput.className = "form-control form-control-sm manual-autre-field-value";
+            valueInput.placeholder = "Valeur initiale";
+            valueInput.setAttribute("data-manual-autre-index", String(i));
+
+            var keyPreview = document.createElement("div");
+            keyPreview.className = "text-secondary small mt-2 manual-autre-field-key-preview";
+            keyPreview.setAttribute("data-manual-autre-index", String(i));
+            keyPreview.textContent = "Cle: " + slugifyManualAutreFieldKey("custom " + (i + 1), i + 1);
+
+            labelInput.addEventListener("input", function () {
+                var index = this.getAttribute("data-manual-autre-index");
+                var preview = manualAutreFieldEditor.querySelector('.manual-autre-field-key-preview[data-manual-autre-index="' + index + '"]');
+                if (preview) {
+                    preview.textContent = "Cle: " + slugifyManualAutreFieldKey(this.value, parseInt(index, 10) + 1);
+                }
+            });
+
+            card.appendChild(label);
+            card.appendChild(labelInput);
+            card.appendChild(typeInput);
+            card.appendChild(valueInput);
+            card.appendChild(keyPreview);
+            col.appendChild(card);
+            manualAutreFieldEditor.appendChild(col);
+        }
+    }
+
+    function applyManualAutreFieldPlan(categorieSelect, typeSelect, dynamicFieldsContainer, dynamicFieldsCard) {
+        if (!manualAutreFieldEditor || !typeSelect) {
+            return;
+        }
+
+        var labelInputs = manualAutreFieldEditor.querySelectorAll(".manual-autre-field-label");
+        var fields = [];
+
+        for (var i = 0; i < labelInputs.length; i++) {
+            var labelInput = labelInputs[i];
+            var index = parseInt(labelInput.getAttribute("data-manual-autre-index") || String(i), 10);
+            var typeInput = manualAutreFieldEditor.querySelector('.manual-autre-field-type[data-manual-autre-index="' + index + '"]');
+            var valueInput = manualAutreFieldEditor.querySelector('.manual-autre-field-value[data-manual-autre-index="' + index + '"]');
+            var label = String(labelInput.value || "").trim();
+            if (!label) {
+                label = "Champ " + (index + 1);
+            }
+
+            fields.push({
+                key: slugifyManualAutreFieldKey(label, index + 1),
+                label: label,
+                type: String((typeInput || {}).value || "text").trim() || "text",
+                required: false,
+                value: String((valueInput || {}).value || "").trim(),
+                options: []
+            });
+        }
+
+        setAiFieldPlan({ add: fields, remove: [], replaceBase: true });
+
+        var currentType = String((typeSelect || {}).value || "");
+        if (isAutreType(currentType)) {
+            var aiGeneratedInput = document.getElementById("aiGeneratedInput");
+            var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+            var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
+            var regenerateBtn = document.getElementById("regenerateWithAiBtn");
+
+            if (aiGeneratedInput) aiGeneratedInput.value = "1";
+            if (aiConfirmedInput) aiConfirmedInput.value = "0";
+            if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
+            if (regenerateBtn) regenerateBtn.style.display = "inline-block";
+
+            setAutoFilledDetailKeys([]);
+            loadDynamicFields(currentType, {}, dynamicFieldsContainer, dynamicFieldsCard);
+            setAiStatus(String(fields.length) + " champ(s) personnalise(s) appliques. Verifiez les valeurs puis confirmez la demande.", "success");
+        }
     }
 
     function canonicalAutreFieldSignature(field) {
@@ -1902,7 +2098,20 @@
         var requestPayload = {
             general: general,
             details: details,
-            userPromptAutre: promptValue
+            userPromptAutre: promptValue,
+            fieldPlan: (function () {
+                var planInput = document.getElementById("aiFieldPlanInput");
+                if (!planInput) {
+                    return { add: [], remove: [], replaceBase: false };
+                }
+
+                try {
+                    var parsedPlan = JSON.parse(String(planInput.value || "{}"));
+                    return parsedPlan && typeof parsedPlan === "object" ? parsedPlan : { add: [], remove: [], replaceBase: false };
+                } catch (error) {
+                    return { add: [], remove: [], replaceBase: false };
+                }
+            })()
         };
 
         fetch(AUTRE_AI_ENDPOINT, {
@@ -2866,6 +3075,11 @@
         var aiModalRegenerateBtn = document.getElementById("aiModalRegenerateBtn");
         var aiConfirmPreview = document.getElementById("aiConfirmPreview");
         var aiModal = null;
+        manualAutreFieldCountInput = document.getElementById("manualAutreFieldCount");
+        manualAutreFieldEditor = document.getElementById("manualAutreFieldEditor");
+        buildManualAutreFieldsBtn = document.getElementById("buildManualAutreFieldsBtn");
+        applyManualAutreFieldsBtn = document.getElementById("applyManualAutreFieldsBtn");
+        openManualAutreFieldsBtn = document.getElementById("openManualAutreFieldsBtn");
 
         setupLiveFieldValidation(form);
 
@@ -2878,6 +3092,11 @@
 
         if (aiModalEl && window.bootstrap && bootstrap.Modal) {
             aiModal = new bootstrap.Modal(aiModalEl);
+        }
+
+        var manualAutreFieldsModalEl = document.getElementById("manualAutreFieldsModal");
+        if (manualAutreFieldsModalEl && window.bootstrap && bootstrap.Modal) {
+            manualAutreFieldsModal = new bootstrap.Modal(manualAutreFieldsModalEl);
         }
 
         setAiFieldPlan(SUBMITTED_AI_FIELD_PLAN);
@@ -2897,6 +3116,10 @@
             classificationAiPrompt.addEventListener("input", function () {
                 if (isApplyingClassificationAutocorrect) {
                     return;
+                }
+
+                if (!String(classificationAiPrompt.value || "").trim()) {
+                    classificationAutocorrectApplied = false;
                 }
 
                 if (classificationAutocorrectTimer) {
@@ -2922,6 +3145,10 @@
 
                 if (aiTrustedLearningInput) {
                     aiTrustedLearningInput.value = "0";
+                }
+
+                if (!String(autreAiDescription.value || "").trim()) {
+                    autrePromptAutocorrectApplied = false;
                 }
 
                 if (autrePromptAutocorrectTimer) {
@@ -3050,6 +3277,35 @@
             });
         }
 
+        if (buildManualAutreFieldsBtn) {
+            buildManualAutreFieldsBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                renderManualAutreFieldBuilder();
+            });
+        }
+
+        if (applyManualAutreFieldsBtn) {
+            applyManualAutreFieldsBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                applyManualAutreFieldPlan(categorieSelect, typeSelect, dynamicFieldsContainer, dynamicFieldsCard);
+                if (manualAutreFieldsModal) {
+                    manualAutreFieldsModal.hide();
+                }
+            });
+        }
+
+        if (openManualAutreFieldsBtn) {
+            openManualAutreFieldsBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                renderManualAutreFieldBuilder();
+                if (manualAutreFieldsModal) {
+                    manualAutreFieldsModal.show();
+                }
+            });
+        }
+
+        renderManualAutreFieldBuilder();
+
         function handleFormSubmitIntent() {
             if (isSubmittingForm) {
                 return;
@@ -3090,6 +3346,10 @@
 
         if (form) {
             form.addEventListener("submit", function (event) {
+                if (isSubmittingForm) {
+                    return;
+                }
+
                 event.preventDefault();
                 handleFormSubmitIntent();
             });
@@ -3109,7 +3369,11 @@
                 if (aiConfirmedInput) aiConfirmedInput.value = "1";
                 closeAiModal(aiModal, aiModalEl);
                 markFormSubmitting(submitBtn, aiModalConfirmBtn);
-                form.submit();
+                if (typeof form.requestSubmit === "function") {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
             });
         }
 

@@ -177,10 +177,13 @@ class DemandeApiController extends AbstractController
 
         $general = is_array($payload['general'] ?? null) ? $payload['general'] : [];
         $details = is_array($payload['details'] ?? null) ? $payload['details'] : [];
+        $fieldPlan = is_array($payload['fieldPlan'] ?? null) ? $payload['fieldPlan'] : [];
         $userPromptAutre = trim((string) ($payload['userPromptAutre'] ?? ''));
         if ('' !== $userPromptAutre) {
             $general['aiDescriptionPrompt'] = $userPromptAutre;
         }
+
+        $general['manualFieldPlan'] = $fieldPlan;
 
         $typeDemande = (string) ($general['typeDemande'] ?? '');
         if ('Autre' !== $typeDemande) {

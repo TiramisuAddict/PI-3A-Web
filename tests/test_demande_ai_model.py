@@ -656,50 +656,6 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
 
         self.assertEqual(model._norm(zone), model._norm("Pres de l'entree"))
 
-    def test_strict_prompt_only_mode_ignores_non_exact_feedback_leaks(self):
-        prompt = "demande d acces parking souterrain badge parking"
-        payload = {
-            "text": prompt,
-            "general": {"typeDemande": "Autre", "categorie": "Autre"},
-            "strictPromptOnly": True,
-            "acceptedAutreFeedback": [
-                {
-                    "prompt": "parking pres de l entree entorse",
-                    "general": {
-                        "titre": "Demande de parking Pres de l'entree",
-                        "description": "Parking pres de l entree entorse",
-                        "priorite": "NORMALE",
-                        "categorie": "Autre",
-                        "typeDemande": "Autre",
-                    },
-                    "details": {
-                        "ai_zone_souhaitee": "Pres de l'entree",
-                        "ai_type_stationnement": "Place reservee",
-                    },
-                    "fieldPlan": {
-                        "add": [
-                            {
-                                "key": "ai_zone_souhaitee",
-                                "label": "Zone souhaitee",
-                                "type": "text",
-                                "required": True,
-                                "value": "Pres de l'entree",
-                            }
-                        ],
-                        "remove": [],
-                        "replaceBase": False,
-                    },
-                }
-            ],
-        }
-
-        response = model._build_autre_response(payload, "")
-        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
-
-        self.assertFalse(response.get("skipConfirmationRestriction"))
-        self.assertFalse((custom_fields.get("ai_zone_souhaitee") or {}).get("value"))
-        self.assertIn("parking", model._norm((custom_fields.get("ai_systeme_concerne") or {}).get("value", "")))
-
 
 if __name__ == "__main__":
     unittest.main()

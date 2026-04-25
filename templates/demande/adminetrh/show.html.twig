@@ -594,10 +594,10 @@
                             <div class="card-body">
                                 <div class="row g-3">
                                     {% for key, value in detailsData %}
-                                        {% if not (key ends with 'Lat' or key ends with 'Lon') %}
+                                        {% if not (key starts with '_ai_' or key == 'ai_field_plan' or key ends with 'Lat' or key ends with 'Lon') %}
                                             <div class="col-md-6">
                                                 <div class="detail-label">{{ fieldLabels[key] ?? key }}</div>
-                                                <div class="detail-value">{{ value }}</div>
+                                                <div class="detail-value">{{ value is iterable ? value|json_encode : value }}</div>
                                             </div>
                                         {% endif %}
                                     {% endfor %}

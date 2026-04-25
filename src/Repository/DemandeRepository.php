@@ -305,37 +305,66 @@ class DemandeRepository extends ServiceEntityRepository
                 'typeDemande' => trim((string) ($row['typeDemande'] ?? 'Autre')),
             ];
 
-            $planAdd = [];
-            foreach ($feedbackDetails as $detailKey => $detailValue) {
-                $key = trim((string) $detailKey);
-                if ('' === $key || 0 !== strpos($key, 'ai_')) {
+            $storedFieldPlan = $details['_ai_field_plan'] ?? $details['__ai_field_plan'] ?? null;
+            if (is_string($storedFieldPlan) && '' !== trim($storedFieldPlan)) {
+                $decodedPlan = json_decode($storedFieldPlan, true);
+                $storedFieldPlan = is_array($decodedPlan) ? $decodedPlan : null;
+            }
+            if (!is_array($storedFieldPlan)) {
+                $storedFieldPlan = [];
+            }
+
+            $planAdd = is_array($storedFieldPlan['add'] ?? null) ? array_values($storedFieldPlan['add']) : [];
+            foreach ($planAdd as $index => $field) {
+                if (!is_array($field)) {
+                    unset($planAdd[$index]);
                     continue;
                 }
 
-                $value = is_scalar($detailValue) ? trim((string) $detailValue) : '';
-                if ('' === $value) {
+                $key = trim((string) ($field['key'] ?? ''));
+                if ('' === $key) {
+                    unset($planAdd[$index]);
                     continue;
                 }
 
-                $type = 'text';
-                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 || str_contains($key, 'date')) {
-                    $type = 'date';
-                } elseif (is_numeric($value)) {
-                    $type = 'number';
-                } elseif (mb_strlen($value) > 80 || str_contains($key, 'justification') || str_contains($key, 'description')) {
-                    $type = 'textarea';
+                if (isset($feedbackDetails[$key]) && is_scalar($feedbackDetails[$key])) {
+                    $planAdd[$index]['value'] = trim((string) $feedbackDetails[$key]);
                 }
+            }
+            $planAdd = array_values($planAdd);
 
-                $label = trim((string) preg_replace('/\s+/', ' ', str_replace('_', ' ', preg_replace('/^ai_/', '', $key) ?? $key)));
-                $label = '' !== $label ? ucfirst($label) : $key;
+            if ([] === $planAdd) {
+                foreach ($feedbackDetails as $detailKey => $detailValue) {
+                    $key = trim((string) $detailKey);
+                    if ('' === $key || 0 !== strpos($key, 'ai_')) {
+                        continue;
+                    }
 
-                $planAdd[] = [
-                    'key' => $key,
-                    'label' => $label,
-                    'type' => $type,
-                    'required' => in_array($key, ['ai_nom_formation', 'ai_lieu_depart_actuel', 'ai_lieu_souhaite'], true),
-                    'value' => $value,
-                ];
+                    $value = is_scalar($detailValue) ? trim((string) $detailValue) : '';
+                    if ('' === $value) {
+                        continue;
+                    }
+
+                    $type = 'text';
+                    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 || str_contains($key, 'date')) {
+                        $type = 'date';
+                    } elseif (is_numeric($value)) {
+                        $type = 'number';
+                    } elseif (mb_strlen($value) > 80 || str_contains($key, 'justification') || str_contains($key, 'description')) {
+                        $type = 'textarea';
+                    }
+
+                    $label = trim((string) preg_replace('/\s+/', ' ', str_replace('_', ' ', preg_replace('/^ai_/', '', $key) ?? $key)));
+                    $label = '' !== $label ? ucfirst($label) : $key;
+
+                    $planAdd[] = [
+                        'key' => $key,
+                        'label' => $label,
+                        'type' => $type,
+                        'required' => in_array($key, ['ai_nom_formation', 'ai_lieu_depart_actuel', 'ai_lieu_souhaite'], true),
+                        'value' => $value,
+                    ];
+                }
             }
 
             $hasSignal = '' !== $prompt || [] !== $feedbackDetails || '' !== $general['description'] || '' !== $general['titre'];
@@ -353,8 +382,10 @@ class DemandeRepository extends ServiceEntityRepository
                     : trim((string) ($row['createdAt'] ?? '')),
                 'fieldPlan' => [
                     'add' => $planAdd,
-                    'remove' => [],
-                    'replaceBase' => false,
+                    'remove' => is_array($storedFieldPlan['remove'] ?? null)
+                        ? array_values(array_map('strval', $storedFieldPlan['remove']))
+                        : [],
+                    'replaceBase' => [] !== $planAdd || true === ($storedFieldPlan['replaceBase'] ?? false),
                 ],
             ];
         }

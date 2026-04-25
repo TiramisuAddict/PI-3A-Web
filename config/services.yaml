@@ -7,7 +7,8 @@ parameters:
     huggingface.api_key: '%env(string:HUGGINGFACE_API_KEY)%'
     huggingface.model: '%env(string:HUGGINGFACE_MODEL)%'
     huggingface.timeout_seconds: 20
-    ml.python_executable: ''
+    ml.python_executable_default: 'python'
+    ml.python_executable: '%env(default:ml.python_executable_default:ML_PYTHON_EXECUTABLE)%'
     ml.demande_ai_script: '%kernel.project_dir%/ml/demande_ai_model.py'
     ml.demande_decision_script: '%kernel.project_dir%/ml/demande_decision_model.py'
 

@@ -187,10 +187,11 @@ class DemandeController extends AbstractController
                         $persistedDetails = $submittedDetails;
                         if ('Autre' === $submittedType && $aiGenerated && ($aiConfirmed || $aiTrustedFromLearning)) {
                             $trustedPrompt = trim('' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription);
+                            $persistedDetails['_ai_feedback_confirmed'] = true;
+                            $persistedDetails['_ai_confirmed_at'] = (new \DateTimeImmutable())->format(DATE_ATOM);
+                            $persistedDetails['_ai_field_plan'] = $submittedAiFieldPlan;
                             if ('' !== $trustedPrompt) {
-                                $persistedDetails['_ai_feedback_confirmed'] = true;
                                 $persistedDetails['_ai_raw_prompt'] = $trustedPrompt;
-                                $persistedDetails['_ai_confirmed_at'] = (new \DateTimeImmutable())->format(DATE_ATOM);
                             }
                         }
 
