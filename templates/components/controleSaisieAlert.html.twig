@@ -1,49 +1,65 @@
-{% if form.vars.submitted %}
-  {% set hasError = false %}
-  {% set hasBlank = false %}
-  {% set hasFormat = false %}
+{% set hasError = false %}
+{% set hasBlank = false %}
+{% set hasFormat = false %}
 
-  {% for field in form %}
-    {% if field.vars.errors is defined and field.vars.errors|length > 0 %}
-      {% set hasError = true %}
-      {% for error in field.vars.errors %}
-        {% if 'obligatoire' in error.message %}
-          {% set hasBlank = true %}
-        {% else %}
-          {% set hasFormat = true %}
-        {% endif %}
-      {% endfor %}
+{% if form.vars.errors is defined and form.vars.errors|length > 0 %}
+  {% set hasError = true %}
+  {% for error in form.vars.errors %}
+    {% if 'obligatoire' in error.message|lower %}
+      {% set hasBlank = true %}
+    {% else %}
+      {% set hasFormat = true %}
     {% endif %}
   {% endfor %}
+{% endif %}
 
-  {% if hasError %}
-    <div class="alert alert-danger py-2" role="alert">
-      <div class="d-flex gap-2 align-items-start">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-          class="icon alert-icon flex-shrink-0 mt-1">
-          <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/>
-          <path d="M12 8v4"/>
-          <path d="M12 16h.01"/>
-        </svg>
-        <div style="font-size:0.85rem;">
-          {% if hasBlank %}
-            <div>Veuillez remplir tous les champs obligatoires.</div>
-          {% endif %}
-          {% if hasFormat %}
-            {% for field in form %}
-              {% if field.vars.errors is defined %}
-                {% for error in field.vars.errors %}
-                  {% if 'obligatoire' not in error.message %}
-                    <div>{{ error.message }}</div>
-                  {% endif %}
-                {% endfor %}
+{% for field in form %}
+  {% if field.vars.errors is defined and field.vars.errors|length > 0 %}
+    {% set hasError = true %}
+    {% for error in field.vars.errors %}
+      {% if 'obligatoire' in error.message|lower %}
+        {% set hasBlank = true %}
+      {% else %}
+        {% set hasFormat = true %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endfor %}
+
+{% if hasError %}
+  <div class="alert alert-danger py-2" role="alert">
+    <div class="d-flex gap-2 align-items-start">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+        viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        class="icon alert-icon flex-shrink-0 mt-1">
+        <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/>
+        <path d="M12 8v4"/>
+        <path d="M12 16h.01"/>
+      </svg>
+      <div style="font-size:0.85rem;">
+        {% if hasBlank %}
+          <div>Veuillez remplir tous les champs obligatoires.</div>
+        {% endif %}
+        {% if hasFormat %}
+          {% if form.vars.errors is defined %}
+            {% for error in form.vars.errors %}
+              {% if 'obligatoire' not in error.message|lower %}
+                <div>{{ error.message }}</div>
               {% endif %}
             {% endfor %}
           {% endif %}
-        </div>
+          {% for field in form %}
+            {% if field.vars.errors is defined %}
+              {% for error in field.vars.errors %}
+                {% if 'obligatoire' not in error.message|lower %}
+                  <div>{{ error.message }}</div>
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
       </div>
     </div>
-  {% endif %}
+  </div>
 {% endif %}

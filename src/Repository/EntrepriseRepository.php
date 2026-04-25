@@ -40,20 +40,59 @@ class EntrepriseRepository extends ServiceEntityRepository
     //            ->getOneOrNullResult()
     //        ;
     //    }
-         public function findByFilters($search, $status)
-            {
-                $qb = $this->createQueryBuilder('e');
+    public function findByFilters($search, $status)
+    {
+        return $this->createByFiltersQueryBuilder($search, $status)
+            ->getQuery()
+            ->getResult();
+    }
 
-                if ($search) {
-                    $qb->andWhere('LOWER(e.nom) LIKE :search')
-                    ->setParameter('search', '%'.strtolower($search).'%');
-                }
+    public function createByFiltersQueryBuilder($search, $status)
+    {
+        $qb = $this->createQueryBuilder('e');
 
-                if ($status) {
-                    $qb->andWhere('e.statut = :status')
-                    ->setParameter('status', $status);
-                }
+        if ($search) {
+            $qb->andWhere('LOWER(e.nom_entreprise) LIKE :search OR LOWER(e.nom) LIKE :search')
+                ->setParameter('search', '%' . strtolower((string) $search) . '%');
+        }
 
-                return $qb->getQuery()->getResult();
-            }
+        if ($status) {
+            $qb->andWhere('e.statut = :status')
+                ->setParameter('status', $status);
+        }
+
+        return $qb->orderBy('e.date_demande', 'DESC');
+    }
+
+    public function countByStatus(): array
+    {
+        return $this->createQueryBuilder('e')
+            ->select('e.statut AS statut, COUNT(e.id_entreprise) AS total')
+            ->groupBy('e.statut')
+            ->orderBy('total', 'DESC')
+            ->getQuery()
+            ->getArrayResult();
+    }
+
+    public function countByDateDemande(): array
+    {
+        return $this->createQueryBuilder('e')
+            ->select('e.date_demande AS date_demande, COUNT(e.id_entreprise) AS total')
+            ->groupBy('e.date_demande')
+            ->orderBy('e.date_demande', 'ASC')
+            ->getQuery()
+            ->getArrayResult();
+    }
+
+    public function countByCountry(int $limit = 5): array
+    {
+        return $this->createQueryBuilder('e')
+            ->select('e.pays AS pays, COUNT(e.id_entreprise) AS total')
+            ->groupBy('e.pays')
+            ->orderBy('total', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getArrayResult();
+    }
 }
+

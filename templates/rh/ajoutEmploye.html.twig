@@ -11,62 +11,70 @@
       <div class="modal-header mt-3">
         <div>
           <h2 class="h2 modal-title">Ajouter un nouvel employé</h2>
-          <small class="text-muted">Remplissez les informations ci-dessous</small>
+          <small class="text-muted">Choisissez une méthode: formulaire ou import CSV</small>
         </div>
         <a href="{{ path('RH_Home') }}" class="btn-close" aria-label="Fermer"></a>
       </div>
-      
+      <div class="modal-body p-4">
+        <div class="btn-group mb-4" role="group" aria-label="Méthode d'ajout">
+          <button type="button" id="method-form-btn" class="btn btn-primary" onclick="switchAjoutMethod('form')">Formulaire</button>
+          <button type="button" id="method-csv-btn" class="btn btn-outline-primary" onclick="switchAjoutMethod('csv')">Importer CSV</button>
+        </div>
 
-      {{ form_start(form, {action: path('employe_ajouter'),method: 'POST',attr: {class: 'row g-0', novalidate: 'novalidate'}}) }}
-
-        <div class="modal-body p-4">
-        {{ include('components/controleSaisieAlert.html.twig', {'form': form}) }}
+        <div id="ajout-form-method">
+          {{ form_start(form, {action: path('employe_ajouter'), method: 'POST', attr: {class: 'row g-0', novalidate: 'novalidate'}}) }}
+          {{ include('components/controleSaisieAlert.html.twig', {'form': form}) }}
           <div class="row g-3">
-
             <div class="col-md-6">
               {{ form_label(form.nom, 'Nom', {'label_attr': {'class': 'form-label small mb-1'}}) }}
               {{ form_widget(form.nom, {'attr': {'class': 'form-control', 'placeholder': 'Nom'}}) }}
             </div>
-
             <div class="col-md-6">
               {{ form_label(form.prenom, 'Prénom', {'label_attr': {'class': 'form-label small mb-1'}}) }}
               {{ form_widget(form.prenom, {'attr': {'class': 'form-control', 'placeholder': 'Prénom'}}) }}
             </div>
-
             <div class="col-md-6">
               {{ form_label(form.e_mail, 'Email', {'label_attr': {'class': 'form-label small mb-1'}}) }}
               {{ form_widget(form.e_mail, {'attr': {'class': 'form-control', 'placeholder': 'Email'}}) }}
             </div>
-
             <div class="col-md-6">
               {{ form_label(form.telephone, 'Téléphone', {'label_attr': {'class': 'form-label small mb-1'}}) }}
               {{ form_widget(form.telephone, {'attr': {'class': 'form-control', 'placeholder': 'Téléphone'}}) }}
             </div>
-
             <div class="col-md-6">
               {{ form_label(form.poste, 'Poste', {'label_attr': {'class': 'form-label small mb-1'}}) }}
               {{ form_widget(form.poste, {'attr': {'class': 'form-control', 'placeholder': 'Ex: Développeur, Manager...'}}) }}
             </div>
-
             <div class="col-md-6">
               {{ form_label(form.role, 'Rôle', {'label_attr': {'class': 'form-label small mb-1'}}) }}
               {{ form_widget(form.role, {'attr': {'class': 'form-select'}}) }}
             </div>
-
             <div class="col-md-6">
               {{ form_label(form.date_embauche, "Date d'embauche", {'label_attr': {'class': 'form-label small mb-1'}}) }}
               {{ form_widget(form.date_embauche, {'attr': {'class': 'form-control'}}) }}
             </div>
-
+            <div class="col-md-6">
+              {{ form_label(form.cv_data, 'CV (PDF)', {'label_attr': {'class': 'form-label small mb-1'}}) }}
+              {{ form_widget(form.cv_data, {'attr': {'class': 'form-control', 'accept': '.pdf,application/pdf'}}) }}
+            </div>
           </div>
+          <div class="modal-footer bg-white px-0 mt-4">
+            <button type="submit" class="btn btn-sm text-white px-5 py-2" style="background:#4A5DEF;">Ajouter</button>
+          </div>
+          {{ form_end(form) }}
         </div>
 
-        {# Footer INSIDE the form #}
-        <div class="modal-footer bg-white">
-          <button type="submit" class="btn btn-sm  text-white px-5 py-2" style="background:#4254D6;">Ajouter</button>
+        <div id="ajout-csv-method" style="display:none;">
+          <h4 class="h4 mb-2">Importer depuis un fichier CSV</h4>
+          <p class="text-muted small mb-3">Colonnes: nom, prenom, email, telephone, poste, role, date_embauche (optionnelle). Separateur accepte: ; ou ,</p>
+          <form action="{{ path('employe_import_csv') }}" method="POST" enctype="multipart/form-data" class="d-flex flex-column gap-3">
+            <input type="file" name="employees_csv" class="form-control" accept=".csv" required>
+            <div class="modal-footer bg-white px-0 mt-2">
+              <button type="submit" class="btn btn-sm btn-primary px-4 py-2">Importer le CSV</button>
+            </div>
+          </form>
         </div>
-
-      {{ form_end(form) }}
+      </div>
 
     </div>
   </div>
@@ -75,4 +83,26 @@
 {% if show_ajout is defined and show_ajout %}
 <div class="modal-backdrop fade show"></div>
 {% endif %}
+
+<script>
+function switchAjoutMethod(method) {
+  const formSection = document.getElementById('ajout-form-method');
+  const csvSection = document.getElementById('ajout-csv-method');
+  const formBtn = document.getElementById('method-form-btn');
+  const csvBtn = document.getElementById('method-csv-btn');
+
+  if (!formSection || !csvSection || !formBtn || !csvBtn) {
+    return;
+  }
+
+  const isForm = method === 'form';
+  formSection.style.display = isForm ? '' : 'none';
+  csvSection.style.display = isForm ? 'none' : '';
+
+  formBtn.classList.toggle('btn-primary', isForm);
+  formBtn.classList.toggle('btn-outline-primary', !isForm);
+  csvBtn.classList.toggle('btn-primary', !isForm);
+  csvBtn.classList.toggle('btn-outline-primary', isForm);
+}
+</script>
 {% endif %}

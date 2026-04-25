@@ -1,5 +1,8 @@
 {% set logged_user = logged_user|default(false) %}
 {% set active_nav = active_nav|default('home') %}
+{% set visiteur_nom = visiteur_nom|default(app.session.get('visiteur_nom')) %}
+{% set visiteur_prenom = visiteur_prenom|default(app.session.get('visiteur_prenom')) %}
+{% set visiteur_email = visiteur_email|default(app.session.get('visiteur_email')) %}
 
 {% set nav_items = nav_items|default([
     { key: 'home', label: 'Accueil', href: path('app_offre_home') },
@@ -53,23 +56,18 @@
                 <span class="avatar avatar-sm"
                     style="background-image: url({{ asset('images/WKlogo.svg') }})"></span>
                 <div class="d-none d-xl-block ps-2">
-                    <div>Paweł Kuna</div>
-                    <div class="mt-1 small text-secondary">UI Designer</div>
+                    <div>{{ (visiteur_prenom|default('')) ~ ' ' ~ (visiteur_nom|default('')) }}</div>
+                    <div class="mt-1 small text-secondary">{{ visiteur_email|default('Visiteur') }}</div>
                 </div>
                 </a>
                 <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                <a href="#" class="dropdown-item">Status</a>
-                <a href="./profile.html" class="dropdown-item">Profile</a>
-                <a href="#" class="dropdown-item">Feedback</a>
-                <div class="dropdown-divider"></div>
-                <a href="./settings.html" class="dropdown-item">Settings</a>
-                <a href="./sign-in.html" class="dropdown-item">Logout</a>
+                <a href="{{ path('logout') }}" class="dropdown-item">Logout</a>
                 </div>
             </div>
             {% else %}
                 {# TODO: Replace # with real auth routes: login/register. #}
                 <a href="{{ path('login') }}"  class="btn btn-primary btn-md">Sign in</a>
-                <a href="#" class="btn btn-outline-primary btn-md">Register</a>
+                <a href="{{ path('compte_visiteur') }}" class="btn btn-outline-primary btn-md">Register</a>
             {% endif %}
         </div>
     </div>

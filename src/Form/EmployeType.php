@@ -14,7 +14,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\EmailType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
-use Symfony\Component\Form\Extension\Core\Type\ChoiceType;  
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Validator\Constraints as Assert;
 
 
@@ -23,17 +24,17 @@ class EmployeType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
-            ->add('nom',TextType::class,['label' => 'Nom','constraints' => [
+            ->add('nom',TextType::class,['label' => 'Nom', 'empty_data' => '', 'constraints' => [
                     new Assert\NotBlank(message: 'Le nom est obligatoire'),
                 ],])
-            ->add('prenom',TextType::class,['label' => 'Prénom','constraints' => [
+            ->add('prenom',TextType::class,['label' => 'Prénom', 'empty_data' => '', 'constraints' => [
                     new Assert\NotBlank(message: 'Le prénom est obligatoire'),
                 ],])
-            ->add('e_mail',EmailType::class,['label' => 'Email','constraints' => [
+            ->add('e_mail',EmailType::class,['label' => 'Email', 'empty_data' => '', 'constraints' => [
                     new Assert\NotBlank(message: 'L\'email est obligatoire'),
                     new Assert\Email(message: 'L\'email n\'est pas valide'),
                 ],])
-            ->add('telephone',TextType::class,['label' => 'Téléphone','constraints' => [
+            ->add('telephone',TextType::class,['label' => 'Téléphone', 'empty_data' => '', 'constraints' => [
                     new Assert\NotBlank(message: 'Le téléphone est obligatoire'),
                     new Assert\Regex(
                         pattern: '/^[0-9]+$/',
@@ -57,6 +58,24 @@ class EmployeType extends AbstractType
             ->add('date_embauche', DateType::class,['label'   => 'Date d\'embauche',
                 'widget'  => 'single_text',
                 'required' => false,
+                'constraints' => [
+                    new Assert\GreaterThan([
+                        'value' => 'today',
+                        'message' => 'La date doit etre superieure a la date d\'aujourd\'hui.',
+                    ]),
+                ],
+            ])
+            ->add('cv_data', FileType::class, [
+                'label' => 'CV (PDF)',
+                'mapped' => false,
+                'required' => false,
+                'constraints' => [
+                    new Assert\File(
+                        maxSize: '5M',
+                        mimeTypes: ['application/pdf'],
+                        mimeTypesMessage: 'Veuillez importer un fichier PDF valide.',
+                    ),
+                ],
             ]);
     }
 

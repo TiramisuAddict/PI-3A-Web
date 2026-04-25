@@ -5,12 +5,13 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 
 use App\Repository\CompteRepository;
 
 #[ORM\Entity(repositoryClass: CompteRepository::class)]
 #[ORM\Table(name: 'compte')]
-class Compte
+class Compte implements PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -42,35 +43,27 @@ class Compte
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'comptes')]
-    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
-    private ?Employe $employé = null;
-
-    public function getEmployé(): ?Employe
-    {
-        return $this->employé;
-    }
-
-    public function setEmployé(?Employe $employé): self
-    {
-        $this->employé = $employé;
-        return $this;
-    }
-
-    public function getIdCompte(): ?int
-    {
-        return $this->id_compte;
-    }
-
-    public function getMotDePasse(): ?string
+    public function getPassword(): ?string
     {
         return $this->mot_de_passe;
     }
 
-    public function setMotDePasse(string $mot_de_passe): static
+    public function eraseCredentials(): void
     {
-        $this->mot_de_passe = $mot_de_passe;
+    }
 
+    #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'comptes')]
+    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
+    private ?Employe $employe = null;
+
+    public function getEmploye(): ?Employe
+    {
+        return $this->employe;
+    }
+
+    public function setEmploye(?Employe $employe): self
+    {
+        $this->employe = $employe;
         return $this;
     }
 
