@@ -270,13 +270,32 @@ final class CandidatController extends AbstractController
         $processedOffreDescription = $matchingService->preprocessRichText($offreDescription);
 
         $offreCandidats = $offre->getCandidats();
+        $scoredCandidats = [];
+
         foreach ($offreCandidats as $candidat){
             $pdfcontent = $candidat->getCvData();
             $textFromPdf = $matchingService->extractTextFromPDF($pdfcontent);
             
             $matchingResult = $matchingService->match($processedOffreDescription, $textFromPdf);
             $candidat->setScore($matchingResult);
-            
+
+            $scoredCandidats[] = [
+                'candidat' => $candidat,
+                'score' => $matchingResult,
+            ];
+
+            $entityManager->persist($candidat);
+        }
+
+        usort($scoredCandidats, static function (array $a, array $b): int {
+            return $b['score'] <=> $a['score'];
+        });
+
+        foreach ($scoredCandidats as $scoredCandidat) {
+            /** @var Candidat $candidat */
+            $candidat = $scoredCandidat['candidat'];
+            $matchingResult = $scoredCandidat['score'];
+
             if ($matchingResult >= 0.4 && $i < $numberOfWantedCandidats) {
                 $candidat->setEtat("Présélectionné");
                 $i++;

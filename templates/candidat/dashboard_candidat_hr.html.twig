@@ -91,6 +91,7 @@
 	<div class="candidat-dashboard flex-grow-1">
 		<div class="container-xl">
 		{{ include('offre/_navigation_tab.html.twig') }}
+		{% set canCreateMeeting = selectedCandidat and selectedCandidat.etat == 'Présélectionné' %}
 		{% for message in app.flashes('success') %}
 			<div class="alert alert-success alert-dismissible fade show" role="alert">
 				{{ message }}
@@ -144,7 +145,14 @@
 								<button type="submit" class="btn btn-primary text-nowrap flex-grow-1">
 									<i class="bi bi-cpu me-1"></i> Lancer l'IA Matching
 								</button>
-								<button type="button" class="btn btn-outline-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#createMeetingModal">
+								<button
+									type="button"
+									class="btn btn-outline-primary text-nowrap"
+									data-bs-toggle="modal"
+									data-bs-target="#createMeetingModal"
+									{{ canCreateMeeting ? '' : 'disabled' }}
+									title="{{ canCreateMeeting ? 'Créer une réunion' : 'Disponible uniquement pour les candidats présélectionnés' }}"
+								>
 									Créer une réunion
 								</button>
 							</div>
