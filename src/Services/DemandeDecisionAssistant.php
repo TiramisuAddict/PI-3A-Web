@@ -420,6 +420,10 @@ class DemandeDecisionAssistant
             $candidates[] = [$pythonPath];
         }
 
+        foreach ($this->getCommonWindowsPythonExecutables() as $pythonPath) {
+            $candidates[] = [$pythonPath];
+        }
+
         if ('\\' === DIRECTORY_SEPARATOR) {
             $candidates[] = ['py', '-3'];
             $candidates[] = ['py'];
@@ -464,6 +468,31 @@ class DemandeDecisionAssistant
         }
 
         return array_values(array_filter(array_unique($candidates), static fn (string $path): bool => is_file($path)));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function getCommonWindowsPythonExecutables(): array
+    {
+        if ('\\' !== DIRECTORY_SEPARATOR) {
+            return [];
+        }
+
+        $candidates = [];
+        $localAppData = (string) getenv('LOCALAPPDATA');
+        if ('' !== $localAppData) {
+            $paths = glob($localAppData . DIRECTORY_SEPARATOR . 'Programs' . DIRECTORY_SEPARATOR . 'Python' . DIRECTORY_SEPARATOR . 'Python*' . DIRECTORY_SEPARATOR . 'python.exe');
+            if (is_array($paths)) {
+                foreach ($paths as $path) {
+                    if (is_string($path) && is_file($path)) {
+                        $candidates[] = $path;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($candidates));
     }
 
     /**

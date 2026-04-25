@@ -549,6 +549,157 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
             self.assertNotIn("formation", field_value)
             self.assertNotIn("javascript", field_value)
 
+    def test_confirmed_exact_feedback_can_skip_confirmation_for_stable_prompt(self):
+        prompt = "parking pres de l entree entorse"
+        payload = {
+            "text": prompt,
+            "general": {"typeDemande": "Autre", "categorie": "Autre"},
+            "acceptedAutreFeedback": [
+                {
+                    "prompt": prompt,
+                    "general": {
+                        "titre": "Demande de parking Pres de l'entree",
+                        "description": "Parking pres de l entree entorse",
+                        "priorite": "NORMALE",
+                        "categorie": "Autre",
+                        "typeDemande": "Autre",
+                    },
+                    "details": {
+                        "besoinPersonnalise": "Demande de parking Pres de l'entree",
+                        "descriptionBesoin": "Parking pres de l entree entorse",
+                        "niveauUrgenceAutre": "Normale",
+                        "ai_zone_souhaitee": "Pres de l'entree",
+                        "ai_type_stationnement": "Place reservee",
+                    },
+                    "fieldPlan": {
+                        "add": [
+                            {
+                                "key": "ai_zone_souhaitee",
+                                "label": "Zone souhaitee",
+                                "type": "text",
+                                "required": True,
+                                "value": "Pres de l'entree",
+                            },
+                            {
+                                "key": "ai_type_stationnement",
+                                "label": "Type de stationnement",
+                                "type": "select",
+                                "required": True,
+                                "value": "Place reservee",
+                                "options": ["Place reservee", "Acces parking", "Autorisation temporaire", "Autre"],
+                            },
+                        ],
+                        "remove": [],
+                        "replaceBase": False,
+                    },
+                }
+            ],
+        }
+
+        response = model._build_autre_response(payload, "")
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertTrue(response.get("skipConfirmationRestriction"))
+        self.assertEqual((response.get("dynamicFieldConfidence") or {}).get("label"), "Elevee")
+        self.assertEqual(model._norm((custom_fields.get("ai_zone_souhaitee") or {}).get("value", "")), model._norm("Pres de l'entree"))
+
+    def test_confirmed_exact_feedback_keeps_confirmation_for_relative_time_prompt(self):
+        prompt = "transport de tunis vers rades uniquement en bus demain a 8 h"
+        payload = {
+            "text": prompt,
+            "general": {"typeDemande": "Autre", "categorie": "Autre"},
+            "acceptedAutreFeedback": [
+                {
+                    "prompt": prompt,
+                    "general": {
+                        "titre": "Transport de Tunis vers Rades",
+                        "description": "Transport de tunis vers rades uniquement en bus demain a 8 h",
+                        "priorite": "NORMALE",
+                        "categorie": "Autre",
+                        "typeDemande": "Autre",
+                    },
+                    "details": {
+                        "besoinPersonnalise": "Transport de Tunis vers Rades",
+                        "descriptionBesoin": "Transport de tunis vers rades uniquement en bus demain a 8 h",
+                        "niveauUrgenceAutre": "Normale",
+                        "ai_lieu_depart_actuel": "Tunis",
+                        "ai_lieu_souhaite": "Rades",
+                        "ai_type_transport": "Bus",
+                    },
+                    "fieldPlan": {
+                        "add": [
+                            {"key": "ai_lieu_depart_actuel", "label": "Lieu de depart actuel", "type": "text", "required": True, "value": "Tunis"},
+                            {"key": "ai_lieu_souhaite", "label": "Lieu souhaite", "type": "text", "required": True, "value": "Rades"},
+                            {"key": "ai_type_transport", "label": "Type de transport", "type": "select", "required": False, "value": "Bus", "options": ["A definir", "Bus", "Train"]},
+                        ],
+                        "remove": [],
+                        "replaceBase": False,
+                    },
+                }
+            ],
+        }
+
+        response = model._build_autre_response(payload, "")
+
+        self.assertFalse(response.get("skipConfirmationRestriction"))
+        self.assertEqual((response.get("dynamicFieldConfidence") or {}).get("label"), "Elevee")
+
+    def test_parking_zone_extraction_stops_before_duration_and_medical_reason(self):
+        prompt = "parking pres de l entree seulement 2 semaines entorse"
+        response = model._build_autre_response(
+            {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
+            "",
+        )
+
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        zone = (custom_fields.get("ai_zone_souhaitee") or {}).get("value", "")
+
+        self.assertEqual(model._norm(zone), model._norm("Pres de l'entree"))
+
+    def test_strict_prompt_only_mode_ignores_non_exact_feedback_leaks(self):
+        prompt = "demande d acces parking souterrain badge parking"
+        payload = {
+            "text": prompt,
+            "general": {"typeDemande": "Autre", "categorie": "Autre"},
+            "strictPromptOnly": True,
+            "acceptedAutreFeedback": [
+                {
+                    "prompt": "parking pres de l entree entorse",
+                    "general": {
+                        "titre": "Demande de parking Pres de l'entree",
+                        "description": "Parking pres de l entree entorse",
+                        "priorite": "NORMALE",
+                        "categorie": "Autre",
+                        "typeDemande": "Autre",
+                    },
+                    "details": {
+                        "ai_zone_souhaitee": "Pres de l'entree",
+                        "ai_type_stationnement": "Place reservee",
+                    },
+                    "fieldPlan": {
+                        "add": [
+                            {
+                                "key": "ai_zone_souhaitee",
+                                "label": "Zone souhaitee",
+                                "type": "text",
+                                "required": True,
+                                "value": "Pres de l'entree",
+                            }
+                        ],
+                        "remove": [],
+                        "replaceBase": False,
+                    },
+                }
+            ],
+        }
+
+        response = model._build_autre_response(payload, "")
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertFalse(response.get("skipConfirmationRestriction"))
+        self.assertFalse((custom_fields.get("ai_zone_souhaitee") or {}).get("value"))
+        self.assertIn("parking", model._norm((custom_fields.get("ai_systeme_concerne") or {}).get("value", "")))
+
 
 if __name__ == "__main__":
     unittest.main()

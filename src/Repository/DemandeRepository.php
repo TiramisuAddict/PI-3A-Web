@@ -272,11 +272,30 @@ class DemandeRepository extends ServiceEntityRepository
                 $details = $detailsRaw;
             }
 
+            $rawPrompt = trim((string) ($details['_ai_raw_prompt'] ?? $details['__ai_raw_prompt'] ?? ''));
+            $isConfirmedAiFeedback = $this->toBooleanValue(
+                $details['_ai_feedback_confirmed'] ?? $details['__ai_feedback_confirmed'] ?? false
+            );
+            if (!$isConfirmedAiFeedback && '' === $rawPrompt) {
+                continue;
+            }
+
             $description = trim((string) ($row['description'] ?? ''));
-            $prompt = trim((string) ($details['descriptionBesoin'] ?? ''));
+            $prompt = $rawPrompt;
+            if ('' === $prompt) {
+                $prompt = trim((string) ($details['descriptionBesoin'] ?? ''));
+            }
             if ('' === $prompt) {
                 $prompt = $description;
             }
+
+            $feedbackDetails = is_array($details)
+                ? array_filter(
+                    $details,
+                    static fn ($detailKey): bool => !str_starts_with((string) $detailKey, '_ai_') && !str_starts_with((string) $detailKey, '__ai_'),
+                    ARRAY_FILTER_USE_KEY
+                )
+                : [];
 
             $general = [
                 'titre' => trim((string) ($row['titre'] ?? '')),
@@ -287,7 +306,7 @@ class DemandeRepository extends ServiceEntityRepository
             ];
 
             $planAdd = [];
-            foreach ($details as $detailKey => $detailValue) {
+            foreach ($feedbackDetails as $detailKey => $detailValue) {
                 $key = trim((string) $detailKey);
                 if ('' === $key || 0 !== strpos($key, 'ai_')) {
                     continue;
@@ -319,7 +338,7 @@ class DemandeRepository extends ServiceEntityRepository
                 ];
             }
 
-            $hasSignal = '' !== $prompt || [] !== $details || '' !== $general['description'] || '' !== $general['titre'];
+            $hasSignal = '' !== $prompt || [] !== $feedbackDetails || '' !== $general['description'] || '' !== $general['titre'];
             if (!$hasSignal) {
                 continue;
             }
@@ -327,7 +346,8 @@ class DemandeRepository extends ServiceEntityRepository
             $samples[] = [
                 'prompt' => $prompt,
                 'general' => $general,
-                'details' => is_array($details) ? $details : [],
+                'details' => $feedbackDetails,
+                'confirmed' => $isConfirmedAiFeedback,
                 'createdAt' => $row['createdAt'] instanceof \DateTimeInterface
                     ? $row['createdAt']->format(DATE_ATOM)
                     : trim((string) ($row['createdAt'] ?? '')),
@@ -358,5 +378,20 @@ class DemandeRepository extends ServiceEntityRepository
         }
 
         return $status;
+    }
+
+    private function toBooleanValue(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (int) $value === 1;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        return in_array($normalized, ['1', 'true', 'yes', 'oui', 'on'], true);
     }
 }

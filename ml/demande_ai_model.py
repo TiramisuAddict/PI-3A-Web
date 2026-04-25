@@ -1698,6 +1698,10 @@ def _extract_parking_zone(text):
             continue
 
         candidate = _normalize_ws(match.group(1))
+        candidate = re.sub(r"\b(?:uniquement|seulement)\s+\d+\s*(?:jour|jours|semaine|semaines|mois|heure|heures)\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+        candidate = re.sub(r"\b\d+\s*(?:jour|jours|semaine|semaines|mois|heure|heures)\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+        candidate = re.sub(r"\b(?:entorse|fracture|douleur|blessure|maladie)\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+        candidate = re.sub(r"\b(?:uniquement|seulement|exclusivement)\b.*$", "", candidate, flags=re.IGNORECASE).strip()
         candidate = re.sub(r"\b(?:tot|t[oô]t)\s+le\s+matin\b.*$", "", candidate, flags=re.IGNORECASE).strip()
         candidate = re.sub(r"\b(?:matin|apres\s*midi|soir|nuit)\b.*$", "", candidate, flags=re.IGNORECASE).strip()
         candidate = re.sub(r"\b(?:a|a\s+partir\s+de)\s+\d{1,2}(?:h|:\d{2})?(?:\s*(?:am|pm|du\s+matin|du\s+soir))?\b.*$", "", candidate, flags=re.IGNORECASE).strip()
@@ -2250,6 +2254,99 @@ def _pick_similar_autre_feedback(source_text, feedback_samples, top_k=4, min_sco
     return [(score, sample) for score, _, sample in ranked[:max(1, int(top_k))]]
 
 
+def _source_has_relative_time_signal(source_text):
+    lowered = _norm(_normalize_ws(source_text))
+    if not lowered:
+        return False
+
+    return bool(re.search(
+        r"\b(?:aujourd hui|demain|apres demain|ce soir|ce matin|cette semaine|ce mois|prochaine semaine|"
+        r"dans\s+\d+\s+(?:jour|jours|semaine|semaines|mois)|"
+        r"pendant\s+\d+\s+(?:jour|jours|semaine|semaines|mois)|"
+        r"pour\s+\d+\s+(?:jour|jours|semaine|semaines|mois))\b",
+        lowered,
+        flags=re.IGNORECASE,
+    ))
+
+
+def _build_autre_feedback_signal(source_text, ranked_feedback):
+    if not ranked_feedback:
+        return (
+            {
+                "score": 0,
+                "label": "Faible",
+                "tone": "info",
+                "message": "Aucun apprentissage confirme similaire n a ete retrouve.",
+            },
+            False,
+            False,
+        )
+
+    top_score, top_sample = ranked_feedback[0]
+    source_norm = _norm(_normalize_ws(source_text))
+    prompt_norm = _norm(_normalize_ws(top_sample.get("prompt", "")))
+    exact_prompt_match = bool(prompt_norm and prompt_norm == source_norm)
+    relative_time_signal = _source_has_relative_time_signal(source_text)
+    numeric_score = max(0, min(99, int(round(top_score * 100))))
+
+    if exact_prompt_match and top_score >= 0.95 and not relative_time_signal:
+        return (
+            {
+                "score": max(96, numeric_score),
+                "label": "Elevee",
+                "tone": "success",
+                "message": "Demande deja confirmee retrouvee en base. La confirmation supplementaire peut etre ignoree.",
+            },
+            True,
+            True,
+        )
+
+    if exact_prompt_match:
+        message = (
+            "Demande confirmee retrouvee en base. Les informations stables sont reappliquees, "
+            "mais la verification reste conseillee."
+        )
+        if relative_time_signal:
+            message = (
+                "Demande confirmee retrouvee en base. Les champs stables sont reappliques, "
+                "mais la confirmation reste requise car le texte contient un repere temporel relatif."
+            )
+
+        return (
+            {
+                "score": max(86, numeric_score),
+                "label": "Elevee",
+                "tone": "success",
+                "message": message,
+            },
+            False,
+            True,
+        )
+
+    if top_score >= 0.72:
+        return (
+            {
+                "score": max(72, numeric_score),
+                "label": "Moyenne",
+                "tone": "info",
+                "message": "Un exemple confirme proche a ete retrouve. Les champs les plus fiables sont guides par cet historique.",
+            },
+            False,
+            False,
+        )
+
+    return (
+        {
+            "score": max(35, numeric_score),
+            "label": "Faible",
+            "tone": "info",
+            "message": "Un historique confirme existe, mais il reste trop eloigne pour supprimer la verification.",
+        },
+        False,
+        False,
+    )
+
+
 def _get_feedback_detail_value(details, target_key):
     if not isinstance(details, dict) or not target_key:
         return ""
@@ -2303,6 +2400,30 @@ def _field_semantic_bucket(key):
     if any(token in nk for token in ["type", "niveau", "priorite"]):
         return "label"
     return "text"
+
+
+def _infer_feedback_field_type(key, value=""):
+    bucket = _field_semantic_bucket(key)
+    if bucket == "date":
+        return "date"
+    if bucket == "long_text":
+        return "textarea"
+    if bucket == "label" and key.startswith("ai_type_"):
+        return "select"
+
+    candidate = _normalize_ws(value)
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", candidate):
+        return "date"
+    if len(candidate) > 80:
+        return "textarea"
+    return "text"
+
+
+def _humanize_feedback_field_label(key):
+    label = _normalize_ws(str(key or "")).replace("ai_custom_", "").replace("ai_", "").replace("_", " ")
+    if not label:
+        return str(key or "")
+    return label[:1].upper() + label[1:]
 
 
 CONSTRAINT_MARKERS = [
@@ -2514,6 +2635,8 @@ def _feedback_context_overrides(ranked_feedback, source=""):
     if not ranked_feedback:
         return context
 
+    parking_like_source = _has_any_phrase(_norm(source), ["parking", "stationnement", "badge parking", "acces parking"])
+
     for score, sample in ranked_feedback:
         if score < 0.40:
             continue
@@ -2538,6 +2661,8 @@ def _feedback_context_overrides(ranked_feedback, source=""):
                 if candidate and _source_supports_field_override(source, "lieu_depart_actuel"):
                     context["lieu_depart_actuel"] = candidate
             elif ("lieu_souhaite" in nkey or "destination" in nkey or "zone" in nkey or "emplacement" in nkey) and "lieu_souhaite" not in context:
+                if parking_like_source and ("zone" in nkey or "emplacement" in nkey):
+                    continue
                 candidate = _sanitize_value_for_field("lieu_souhaite", value)
                 if candidate and _source_supports_field_override(source, "lieu_souhaite"):
                     context["lieu_souhaite"] = candidate
@@ -2622,6 +2747,34 @@ def _feedback_custom_field_overrides(ranked_feedback, source="", regenerate_coun
             overrides[key] = best_value
 
     return overrides
+
+
+def _feedback_custom_field_definitions(ranked_feedback):
+    definitions = {}
+    for score, sample in ranked_feedback:
+        if score < 0.20:
+            continue
+
+        field_plan = sample.get("fieldPlan") if isinstance(sample.get("fieldPlan"), dict) else {}
+        add_fields = field_plan.get("add") if isinstance(field_plan.get("add"), list) else []
+        for field in add_fields:
+            if not isinstance(field, dict):
+                continue
+
+            key = _normalize_ws(field.get("key", ""))
+            if not key.startswith("ai_") or key in definitions:
+                continue
+
+            raw_value = _normalize_ws(field.get("value", ""))
+            definitions[key] = {
+                "key": key,
+                "label": _normalize_ws(field.get("label", "")) or _humanize_feedback_field_label(key),
+                "type": _normalize_ws(field.get("type", "")) or _infer_feedback_field_type(key, raw_value),
+                "required": bool(field.get("required", False)),
+                "options": field.get("options") if isinstance(field.get("options"), list) else [],
+            }
+
+    return definitions
 
 
 def _normalize_training_samples(raw):
@@ -4298,6 +4451,29 @@ def _build_autre_response(request_data, prompt):
     if not source:
         source = _strip_autre_prompt_boilerplate(_normalize_ws(prompt))
 
+    strict_prompt_only = bool(request_data.get("strictPromptOnly"))
+    feedback_samples = _extract_autre_feedback_samples(request_data)
+    ranked_feedback = _pick_similar_autre_feedback(source, feedback_samples, top_k=4, min_score=0.24)
+    feedback_confidence, skip_confirmation_restriction, exact_feedback_match = _build_autre_feedback_signal(source, ranked_feedback)
+    feedback_sample = ranked_feedback[0][1] if ranked_feedback else {}
+    feedback_general = feedback_sample.get("general") if isinstance(feedback_sample.get("general"), dict) else {}
+    feedback_details = feedback_sample.get("details") if isinstance(feedback_sample.get("details"), dict) else {}
+    feedback_field_plan = feedback_sample.get("fieldPlan") if isinstance(feedback_sample.get("fieldPlan"), dict) else {}
+    feedback_context = _feedback_context_overrides(ranked_feedback, source)
+    feedback_custom_overrides = _feedback_custom_field_overrides(
+        ranked_feedback,
+        source,
+        request_data.get("regenerateCount", 0),
+    )
+    feedback_custom_definitions = _feedback_custom_field_definitions(ranked_feedback)
+    allow_feedback_learning = exact_feedback_match or not strict_prompt_only
+    allow_miner_prediction = exact_feedback_match or not strict_prompt_only
+
+    if not allow_feedback_learning:
+        feedback_context = {}
+        feedback_custom_overrides = {}
+        feedback_custom_definitions = {}
+
     explicit_urgency = _autre_detect_explicit_urgency(source)
 
     miner = _load_autre_pattern_miner()
@@ -4306,6 +4482,13 @@ def _build_autre_response(request_data, prompt):
     intents = generator.analyze_intent(source)
     rule_fields = extractor.extract_all_fields(source, intents)
     context_fields = _build_autre_structured_context(source, rule_fields, intents)
+    for feedback_key, feedback_value in feedback_context.items():
+        if not _normalize_ws(feedback_value):
+            continue
+        current_value = context_fields.get(feedback_key, "")
+        if not _normalize_ws(current_value) or _is_generic_detail_value(feedback_key, current_value, source):
+            context_fields[feedback_key] = feedback_value
+
     structured_description = _build_structured_justification(context_fields, source)
     if explicit_urgency:
         base_priority_label = explicit_urgency["priority"]
@@ -4315,6 +4498,14 @@ def _build_autre_response(request_data, prompt):
 
     title = _autre_build_title(source, rule_fields, intents)
     description = _autre_build_description(source, title)
+
+    if exact_feedback_match:
+        confirmed_title = _normalize_ws(feedback_general.get("titre", ""))
+        confirmed_description = _normalize_ws(feedback_general.get("description", ""))
+        if confirmed_title:
+            title = confirmed_title
+        if confirmed_description:
+            description = confirmed_description
 
     generated_plan = generator.generate_field_plan(source, intents, miner)
     custom_fields = []
@@ -4332,9 +4523,17 @@ def _build_autre_response(request_data, prompt):
             continue
         seen_custom_keys.add(key)
         raw_value = _normalize_ws(field.get("value", ""))
-        cleaned_value = _autre_clean_field_value(key, raw_value, source, extractor)
+        feedback_value = _normalize_ws(feedback_custom_overrides.get(key, ""))
+        cleaned_value = ""
+        if feedback_value and exact_feedback_match:
+            cleaned_value = _autre_clean_field_value(key, feedback_value, source, extractor)
         if not cleaned_value:
-            if generator._field_semantic_bucket(key) != "long_text" and (
+            cleaned_value = _autre_clean_field_value(key, raw_value, source, extractor)
+        if not cleaned_value:
+            if feedback_value and allow_feedback_learning:
+                cleaned_value = _autre_clean_field_value(key, feedback_value, source, extractor)
+        if not cleaned_value:
+            if allow_miner_prediction and generator._field_semantic_bucket(key) != "long_text" and (
                 _normalize_ws(field.get("source", "")) == "explicit" or not key.startswith("ai_custom_")
             ):
                 predicted_value, predicted_confidence = miner.predict_field(key, source)
@@ -4357,23 +4556,52 @@ def _build_autre_response(request_data, prompt):
             field["options"] = []
         custom_fields.append(field)
 
+    strongest_feedback_score = ranked_feedback[0][0] if ranked_feedback else 0.0
+    existing_custom_keys = {
+        _normalize_ws(field.get("key", ""))
+        for field in custom_fields
+        if isinstance(field, dict)
+    }
+    for key, raw_value in feedback_custom_overrides.items():
+        if key in existing_custom_keys:
+            continue
+        if strongest_feedback_score < 0.58 and not exact_feedback_match:
+            continue
+
+        cleaned_value = _autre_clean_field_value(key, raw_value, source, extractor)
+        if not cleaned_value or not _autre_can_apply_predicted_value(key, cleaned_value, source):
+            continue
+
+        field_definition = feedback_custom_definitions.get(key, {})
+        custom_fields.append({
+            "key": key,
+            "label": field_definition.get("label") or _humanize_feedback_field_label(key),
+            "type": field_definition.get("type") or _infer_feedback_field_type(key, cleaned_value),
+            "required": bool(field_definition.get("required", False)),
+            "value": cleaned_value,
+            "options": field_definition.get("options") if isinstance(field_definition.get("options"), list) else [],
+            "source": "feedback",
+        })
+        existing_custom_keys.add(key)
+
     # Miner corrections are applied after the rule-based extraction so the final
     # values stay boundary-safe even if the prompt is noisy.
-    for field in custom_fields:
-        key = _normalize_ws(field.get("key", ""))
-        if not key:
-            continue
-        if generator._field_semantic_bucket(key) == "long_text":
-            continue
-        predicted_value, predicted_confidence = miner.predict_field(key, source)
-        current_value = _normalize_ws(field.get("value", ""))
-        cleaned_prediction = _autre_clean_field_value(key, predicted_value, source, extractor)
-        if cleaned_prediction and _autre_can_apply_predicted_value(key, cleaned_prediction, source) and (
-            not current_value
-            or predicted_confidence >= 0.8
-            or any(token in current_value.lower() for token in ["pour", "le", "du", "des", "vers"])
-        ):
-            field["value"] = cleaned_prediction
+    if allow_miner_prediction:
+        for field in custom_fields:
+            key = _normalize_ws(field.get("key", ""))
+            if not key:
+                continue
+            if generator._field_semantic_bucket(key) == "long_text":
+                continue
+            predicted_value, predicted_confidence = miner.predict_field(key, source)
+            current_value = _normalize_ws(field.get("value", ""))
+            cleaned_prediction = _autre_clean_field_value(key, predicted_value, source, extractor)
+            if cleaned_prediction and _autre_can_apply_predicted_value(key, cleaned_prediction, source) and (
+                not current_value
+                or predicted_confidence >= 0.8
+                or any(token in current_value.lower() for token in ["pour", "le", "du", "des", "vers"])
+            ):
+                field["value"] = cleaned_prediction
 
     title_details = dict(rule_fields)
     for field in custom_fields:
@@ -4541,6 +4769,23 @@ def _build_autre_response(request_data, prompt):
     if not details["descriptionBesoin"]:
         details["descriptionBesoin"] = description
 
+    if exact_feedback_match and _normalize_ws(feedback_details.get("besoinPersonnalise", "")):
+        details["besoinPersonnalise"] = _normalize_ws(feedback_details.get("besoinPersonnalise", ""))
+
+    if exact_feedback_match and _normalize_ws(feedback_details.get("descriptionBesoin", "")):
+        details["descriptionBesoin"] = _normalize_ws(feedback_details.get("descriptionBesoin", ""))
+
+    if exact_feedback_match and _normalize_ws(feedback_details.get("niveauUrgenceAutre", "")):
+        details["niveauUrgenceAutre"] = _normalize_ws(feedback_details.get("niveauUrgenceAutre", ""))
+
+    feedback_date = _normalize_ws(feedback_details.get("dateSouhaiteeAutre", ""))
+    if exact_feedback_match and feedback_date and not details["dateSouhaiteeAutre"] and not _source_has_relative_time_signal(source):
+        details["dateSouhaiteeAutre"] = feedback_date
+
+    feedback_context_extra = _normalize_ws(feedback_details.get("pieceOuContexte", ""))
+    if exact_feedback_match and feedback_context_extra and not _normalize_ws(details.get("pieceOuContexte", "")):
+        details["pieceOuContexte"] = feedback_context_extra
+
     general = {
         "titre": title,
         "description": description,
@@ -4558,6 +4803,8 @@ def _build_autre_response(request_data, prompt):
         "remove_fields": ["ALL"],
         "custom_fields": custom_fields,
         "replace_base": True,
+        "dynamicFieldConfidence": feedback_confidence,
+        "skipConfirmationRestriction": skip_confirmation_restriction,
     }
 
 

@@ -122,6 +122,7 @@
             {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'id': 'demandeForm'}}) }}
             <input type="hidden" name="ai_generated" id="aiGeneratedInput" value="{{ aiGenerated ? '1' : '0' }}">
             <input type="hidden" name="ai_confirmed" id="aiConfirmedInput" value="0">
+            <input type="hidden" name="ai_trusted_learning" id="aiTrustedLearningInput" value="{{ aiTrustedFromLearning|default(false) ? '1' : '0' }}">
             <input type="hidden" name="autre_ai_raw_prompt" id="autreAiRawPromptInput" value="{{ submittedAiRawPrompt|default('')|e('html_attr') }}">
             <input type="hidden" name="ai_field_plan" id="aiFieldPlanInput" value="{{ submittedAiFieldPlan|default({'add': [], 'remove': [], 'replaceBase': false})|json_encode|e('html_attr') }}">
 
@@ -1002,7 +1003,7 @@
         return ordered;
     }
 
-    function applySuggestedGeneralFields(suggestedGeneral, fallbackDescription) {
+    function applySuggestedGeneralFields(suggestedGeneral) {
         var general = suggestedGeneral || {};
 
         var titreInput = document.getElementById("demande_titre");
@@ -1017,12 +1018,8 @@
             titreInput.value = suggestedTitre;
         }
 
-        if (descriptionInput) {
-            if (suggestedDescription) {
-                descriptionInput.value = suggestedDescription;
-            } else if (!String(descriptionInput.value || "").trim() && fallbackDescription) {
-                descriptionInput.value = fallbackDescription;
-            }
+        if (descriptionInput && suggestedDescription) {
+            descriptionInput.value = suggestedDescription;
         }
 
         if (prioriteInput && suggestedPriorite) {
@@ -1045,8 +1042,9 @@
         var regenerateBtn = document.getElementById("regenerateWithAiBtn");
         var aiGeneratedInput = document.getElementById("aiGeneratedInput");
         var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
 
-        if (!autreAiBox || !regenerateBtn || !aiGeneratedInput || !aiConfirmedInput) return;
+        if (!autreAiBox || !regenerateBtn || !aiGeneratedInput || !aiConfirmedInput || !aiTrustedLearningInput) return;
 
         if (isAutreType(type)) {
             autreAiBox.style.display = "block";
@@ -1064,8 +1062,10 @@
     function resetAutreAiGeneratedState() {
         var aiGeneratedInput = document.getElementById("aiGeneratedInput");
         var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
         if (aiGeneratedInput) aiGeneratedInput.value = "0";
         if (aiConfirmedInput) aiConfirmedInput.value = "0";
+        if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
     }
 
     function clearAutreGeneratedContent(dynamicFieldsContainer, dynamicFieldsCard) {
@@ -1406,8 +1406,10 @@
 
         var aiGeneratedInput = document.getElementById("aiGeneratedInput");
         var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
         if (aiGeneratedInput) aiGeneratedInput.value = "1";
         if (aiConfirmedInput) aiConfirmedInput.value = "0";
+        if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
         resetAiFieldPlan();
         setAiStatus("", "");
         updateAutreAiControls(typeDemande);
@@ -1585,9 +1587,6 @@
                 if (sendToSuggestionToggle && sendToSuggestionToggle.checked) {
                     setSuggestionPromptFromGeneratedDescription(generatedDescription);
                 }
-
-                var typeInfoEl = document.getElementById("typeInfo");
-                autoAdjustCategoryForAutreFlow(categorieInput, typeInput, typeInfoEl, "");
 
                 if ("manual" === trigger) {
                     if (sendToSuggestionToggle && sendToSuggestionToggle.checked) {
@@ -1787,7 +1786,11 @@
         }
     }
 
-    function shouldRequireAiConfirmation(typeSelect, aiGeneratedInput, regenerateWithAiBtn) {
+    function shouldRequireAiConfirmation(typeSelect, aiGeneratedInput, regenerateWithAiBtn, aiTrustedLearningInput) {
+        if (aiTrustedLearningInput && aiTrustedLearningInput.value === "1") {
+            return false;
+        }
+
         if (aiGeneratedInput && aiGeneratedInput.value === "1") {
             return true;
         }
@@ -1842,6 +1845,7 @@
         var autrePromptInput = document.getElementById("autreAiDescription");
         var aiGeneratedInput = document.getElementById("aiGeneratedInput");
         var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
         var originalText = generateBtn ? generateBtn.innerHTML : "";
         var requestId = ++autreGenerationRequestId;
         var promptValue = String((autrePromptInput || {}).value || "").trim();
@@ -1891,6 +1895,7 @@
             generateBtn.innerHTML = "<span class='spinner-border spinner-border-sm me-1'></span>Generation...";
         }
         if (regenerateBtn) regenerateBtn.disabled = true;
+        if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
         setAiStatus("Generation IA en cours...", "");
         clearAutreConfidenceBadge();
 
@@ -1899,8 +1904,6 @@
             details: details,
             userPromptAutre: promptValue
         };
-
-        console.log("Sending prompt:", promptValue);
 
         fetch(AUTRE_AI_ENDPOINT, {
             method: "POST",
@@ -1984,35 +1987,21 @@
                 }
 
                 var generatedDescription = String(json.generatedDescription || "").trim();
+                var suggestedGeneralTitle = String((json.suggestedGeneral || {}).titre || "").trim();
                 var suggestedGeneralDescription = String((json.suggestedGeneral || {}).description || "").trim();
-                var aiGeneratedDescription = shouldReplaceBase
-                    ? (
-                        generatedDescription
-                        || suggestedGeneralDescription
-                        || String(general.aiDescriptionPrompt || "").trim()
-                    )
-                    : (
-                        generatedDescription
-                        || suggestedGeneralDescription
-                        || String(general.aiDescriptionPrompt || "").trim()
-                        || String(general.description || "").trim()
-                    );
+                var aiGeneratedDescription = generatedDescription || suggestedGeneralDescription;
 
                 if (shouldReplaceBase) {
                     if (generatedDescription) {
                         merged.descriptionBesoin = generatedDescription;
                     }
 
-                    if (!String(merged.besoinPersonnalise || "").trim()) {
-                        merged.besoinPersonnalise = String((json.suggestedGeneral || {}).titre || "Demande personnalisee");
+                    if (!String(merged.besoinPersonnalise || "").trim() && suggestedGeneralTitle) {
+                        merged.besoinPersonnalise = suggestedGeneralTitle;
                     }
 
-                    if (!String(merged.descriptionBesoin || "").trim()) {
+                    if (!String(merged.descriptionBesoin || "").trim() && aiGeneratedDescription) {
                         merged.descriptionBesoin = aiGeneratedDescription;
-                    }
-
-                    if (!String(merged.niveauUrgenceAutre || "").trim()) {
-                        merged.niveauUrgenceAutre = "Normale";
                     }
                 } else {
                     if (json.generatedDescription && !merged.descriptionBesoin) {
@@ -2023,35 +2012,17 @@
                         merged.descriptionBesoin = aiGeneratedDescription;
                     }
 
-                    if (!String(merged.besoinPersonnalise || "").trim()) {
-                        merged.besoinPersonnalise = String((json.suggestedGeneral || {}).titre || "Demande personnalisee");
-                    }
-
-                    if (!String(merged.descriptionBesoin || "").trim()) {
-                        merged.descriptionBesoin = aiGeneratedDescription;
-                    }
-
-                    if (!String(merged.niveauUrgenceAutre || "").trim()) {
-                        merged.niveauUrgenceAutre = "Normale";
+                    if (!String(merged.besoinPersonnalise || "").trim() && suggestedGeneralTitle) {
+                        merged.besoinPersonnalise = suggestedGeneralTitle;
                     }
                 }
 
-                // For Autre generation, also sync the general section.
-                applySuggestedGeneralFields(json.suggestedGeneral || {}, aiGeneratedDescription || "");
-                applyAiSuggestedCategory(json.suggestedGeneral || {}, categorieSelect, typeSelect, typeInfo);
+                // Keep the ML response authoritative for the general section.
+                applySuggestedGeneralFields(json.suggestedGeneral || {});
 
                 var currentType = String((typeSelect || {}).value || "");
                 var isStillAutre = isAutreType(currentType);
                 updateAutreAiControls(currentType);
-
-                var generalTitleInput = document.getElementById("demande_titre");
-                var generalDescriptionInput = document.getElementById("demande_description");
-                if (generalTitleInput && String(merged.besoinPersonnalise || "").trim()) {
-                    generalTitleInput.value = String(merged.besoinPersonnalise || "").trim();
-                }
-                if (generalDescriptionInput && aiGeneratedDescription) {
-                    generalDescriptionInput.value = aiGeneratedDescription;
-                }
 
                 if (isStillAutre) {
                     if (shouldReplaceBase) {
@@ -2065,6 +2036,9 @@
 
                 if (aiGeneratedInput) aiGeneratedInput.value = "1";
                 if (aiConfirmedInput) aiConfirmedInput.value = "0";
+                if (aiTrustedLearningInput) {
+                    aiTrustedLearningInput.value = json.skipConfirmationRestriction ? "1" : "0";
+                }
 
                 if (isStillAutre && regenerateBtn) regenerateBtn.style.display = "inline-block";
                 if (isStillAutre) {
@@ -2884,6 +2858,7 @@
         var submitBtn = document.getElementById("submitBtn");
         var aiGeneratedInput = document.getElementById("aiGeneratedInput");
         var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
         var autreAiRawPromptInput = document.getElementById("autreAiRawPromptInput");
         var aiModalEl = document.getElementById("aiConfirmModal");
         var aiModalRejectBtn = document.getElementById("aiModalRejectBtn");
@@ -2943,6 +2918,10 @@
             autreAiDescription.addEventListener("input", function () {
                 if (isUpdatingAutrePromptFromAi) {
                     return;
+                }
+
+                if (aiTrustedLearningInput) {
+                    aiTrustedLearningInput.value = "0";
                 }
 
                 if (autrePromptAutocorrectTimer) {
@@ -3082,7 +3061,7 @@
                 return;
             }
 
-            if (shouldRequireAiConfirmation(typeSelect, aiGeneratedInput, regenerateWithAiBtn)) {
+            if (shouldRequireAiConfirmation(typeSelect, aiGeneratedInput, regenerateWithAiBtn, aiTrustedLearningInput)) {
                 if (aiGeneratedInput) aiGeneratedInput.value = "1";
                 if (aiConfirmedInput) aiConfirmedInput.value = "0";
                 if (aiConfirmPreview) {

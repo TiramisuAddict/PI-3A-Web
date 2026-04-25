@@ -139,6 +139,7 @@ class DemandeController extends AbstractController
         $submittedAiRawPrompt = '';
         $submittedAiFieldPlan = ['add' => [], 'remove' => [], 'replaceBase' => false];
         $aiGenerated = false;
+        $aiTrustedFromLearning = false;
 
         if ($form->isSubmitted()) {
             $formData      = $request->request->all();
@@ -161,6 +162,7 @@ class DemandeController extends AbstractController
             }
             $aiGenerated = '1' === (string) $request->request->get('ai_generated', '0');
             $aiConfirmed = '1' === (string) $request->request->get('ai_confirmed', '0');
+            $aiTrustedFromLearning = '1' === (string) $request->request->get('ai_trusted_learning', '0');
 
             if ($submittedType) {
                 $detailErrors = $this->validateDetails($submittedType, $submittedDetails);
@@ -175,16 +177,26 @@ class DemandeController extends AbstractController
             $demande->setEmploye($employe);
 
             if ($form->isValid() && empty($detailErrors)) {
-                if ($aiGenerated && !$aiConfirmed) {
+                if ($aiGenerated && !$aiConfirmed && !$aiTrustedFromLearning) {
                     $this->addFlash('warning', 'Veuillez confirmer la demande apres generation IA avant de creer la demande.');
                 } else {
                     $this->em->persist($demande);
                     $this->em->flush();
 
                     if (!empty($submittedDetails)) {
+                        $persistedDetails = $submittedDetails;
+                        if ('Autre' === $submittedType && $aiGenerated && ($aiConfirmed || $aiTrustedFromLearning)) {
+                            $trustedPrompt = trim('' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription);
+                            if ('' !== $trustedPrompt) {
+                                $persistedDetails['_ai_feedback_confirmed'] = true;
+                                $persistedDetails['_ai_raw_prompt'] = $trustedPrompt;
+                                $persistedDetails['_ai_confirmed_at'] = (new \DateTimeImmutable())->format(DATE_ATOM);
+                            }
+                        }
+
                         $demandeDetail = new DemandeDetail();
                         $demandeDetail->setDemande($demande);
-                        $demandeDetail->setDetails(json_encode($submittedDetails));
+                        $demandeDetail->setDetails(json_encode($persistedDetails));
                         $this->em->persist($demandeDetail);
                     }
 
@@ -197,7 +209,7 @@ class DemandeController extends AbstractController
                     $this->em->persist($historique);
                     $this->em->flush();
 
-                    if ($aiGenerated && $aiConfirmed) {
+                    if ($aiGenerated && ($aiConfirmed || $aiTrustedFromLearning)) {
                         $this->demandeAiAssistant->recordAcceptedDescriptionFeedback(
                             (string) ($demande->getTitre() ?? ''),
                             (string) ($demande->getDescription() ?? ''),
@@ -241,6 +253,7 @@ class DemandeController extends AbstractController
             'submittedAiRawPrompt' => $submittedAiRawPrompt,
             'submittedAiFieldPlan' => $submittedAiFieldPlan,
             'aiGenerated'      => $aiGenerated,
+            'aiTrustedFromLearning' => $aiTrustedFromLearning,
             'email'            => $session->get('employe_email') ?? '',
             'role'             => $session->get('employe_role') ?? '',
         ]);

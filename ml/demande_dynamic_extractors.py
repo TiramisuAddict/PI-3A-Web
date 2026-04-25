@@ -246,6 +246,8 @@ def extract_descriptive_location(text: Any, intent_keyword: str | None = None) -
         r"\b(?:pour|afin|car|avec|urgent|urgence|immediat|immediatement)\b",
         r"\b\d{4}-\d{2}-\d{2}\b",
         r"\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b",
+        r"\b\d+\s*(?:jour|jours|semaine|semaines|mois|heure|heures)\b",
+        r"\b(?:entorse|fracture|douleur|blessure|maladie)\b",
         r"\b\d{1,2}(?:er|eme|e)?\s+(?:janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)\b",
         r"\btrop\s+de\b",
     ]
@@ -270,6 +272,7 @@ def extract_descriptive_location(text: Any, intent_keyword: str | None = None) -
         if not location:
             continue
 
+        location = re.sub(r"\b(?:uniquement|seulement|exclusivement)\b.*$", "", location, flags=re.IGNORECASE)
         location = re.sub(r"\b(?:ou|et)\b.*$", "", location, flags=re.IGNORECASE)
         location = _normalize_spatial_phrase(location)
         if len(location) < 3:

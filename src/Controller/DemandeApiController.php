@@ -175,8 +175,6 @@ class DemandeApiController extends AbstractController
             return new JsonResponse(['success' => false, 'message' => 'Payload JSON invalide.'], 400);
         }
 
-        error_log('AUTRE BODY: ' . (json_encode($payload, JSON_UNESCAPED_UNICODE) ?: '{}'));
-
         $general = is_array($payload['general'] ?? null) ? $payload['general'] : [];
         $details = is_array($payload['details'] ?? null) ? $payload['details'] : [];
         $userPromptAutre = trim((string) ($payload['userPromptAutre'] ?? ''));
@@ -202,6 +200,7 @@ class DemandeApiController extends AbstractController
                 'suggestedDetails' => $result['suggestedDetails'] ?? [],
                 'dynamicFieldPlan' => $result['dynamicFieldPlan'] ?? ['add' => [], 'remove' => [], 'replaceBase' => false],
                 'dynamicFieldConfidence' => $result['dynamicFieldConfidence'] ?? ['score' => 0, 'label' => 'Faible', 'tone' => 'warning', 'message' => 'Aucune evaluation disponible.'],
+                'skipConfirmationRestriction' => true === ($result['skipConfirmationRestriction'] ?? false),
                 'model' => $result['model'] ?? null,
             ]);
         } catch (\RuntimeException $e) {

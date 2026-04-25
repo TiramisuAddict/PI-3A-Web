@@ -1,5 +1,8 @@
 {
     "php.validate.enable": false,
     "intelephense.environment.phpVersion": "8.4.0",
-    "python-envs.defaultEnvManager": "ms-python.python:system"
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python.analysis.extraPaths": [
+        "./ml"
+    ]
 }

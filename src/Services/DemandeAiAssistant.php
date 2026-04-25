@@ -77,6 +77,7 @@ class DemandeAiAssistant
             'selectOptions' => $selectOptions,
             'acceptedAutreFeedback' => $this->loadAutreFeedbackSamples(),
             'regenerateCount' => (int) ($generalContext['regenerateCount'] ?? 0),
+            'strictPromptOnly' => true,
         ]);
 
         $generalPayload = isset($parsed['general']) && is_array($parsed['general']) ? $parsed['general'] : [];
@@ -97,7 +98,8 @@ class DemandeAiAssistant
             'dynamicFieldPlan' => $planPayload,
             'dynamicFieldConfidence' => isset($parsed['dynamicFieldConfidence']) && is_array($parsed['dynamicFieldConfidence'])
                 ? $parsed['dynamicFieldConfidence']
-                : null,
+                : ['score' => 0, 'label' => 'Faible', 'tone' => 'info', 'message' => 'Aucun apprentissage confirme similaire n a ete retrouve.'],
+            'skipConfirmationRestriction' => $this->toBooleanFlag($parsed['skipConfirmationRestriction'] ?? false),
             'model' => 'local-ml:demande_ai_model.py',
         ];
     }
@@ -157,12 +159,12 @@ class DemandeAiAssistant
             throw new \RuntimeException('Ajoutez un texte avant de lancer la correction.');
         }
 
-        $ltCorrected = $this->tryLanguageToolSentenceAutocorrect($text);
+        $ltCorrected = $this->acceptAutocorrectCandidate($text, $this->tryLanguageToolSentenceAutocorrect($text));
         if ('' !== $ltCorrected) {
             return $ltCorrected;
         }
 
-        $modelCorrected = $this->tryModelSentenceAutocorrect($text);
+        $modelCorrected = $this->acceptAutocorrectCandidate($text, $this->tryModelSentenceAutocorrect($text));
         if ('' !== $modelCorrected) {
             return $modelCorrected;
         }
@@ -171,6 +173,85 @@ class DemandeAiAssistant
         $corrected = $this->autoCorrectSuggestionText($corrected);
 
         return '' !== trim($corrected) ? $corrected : $text;
+    }
+
+    private function acceptAutocorrectCandidate(string $original, string $candidate): string
+    {
+        $candidate = trim($candidate);
+        if ('' === $candidate || 0 === strcasecmp(trim($original), $candidate)) {
+            return '';
+        }
+
+        $normalizedOriginal = $this->normalizeAutocorrectComparisonText($original);
+        $normalizedCandidate = $this->normalizeAutocorrectComparisonText($candidate);
+        if ('' === $normalizedOriginal || '' === $normalizedCandidate) {
+            return '';
+        }
+
+        $lengthRatio = mb_strlen($candidate) / max(1, mb_strlen($original));
+        if ($lengthRatio < 0.7 || $lengthRatio > 1.35) {
+            return '';
+        }
+
+        similar_text($normalizedOriginal, $normalizedCandidate, $similarity);
+
+        $originalTokens = $this->tokenizeAutocorrectComparisonText($normalizedOriginal);
+        $candidateTokens = $this->tokenizeAutocorrectComparisonText($normalizedCandidate);
+        $overlap = count(array_intersect($originalTokens, $candidateTokens));
+        $originalCoverage = [] !== $originalTokens ? ($overlap / count($originalTokens)) : 0.0;
+        $candidateCoverage = [] !== $candidateTokens ? ($overlap / count($candidateTokens)) : 0.0;
+
+        $unexpectedNewToken = false;
+        foreach (array_diff($candidateTokens, $originalTokens) as $token) {
+            if (mb_strlen($token) >= 5) {
+                $unexpectedNewToken = true;
+                break;
+            }
+        }
+
+        if ($similarity < 78.0 && ($originalCoverage < 0.7 || $candidateCoverage < 0.7)) {
+            return '';
+        }
+
+        if ($unexpectedNewToken && $similarity < 88.0) {
+            return '';
+        }
+
+        return $candidate;
+    }
+
+    private function normalizeAutocorrectComparisonText(string $text): string
+    {
+        $normalized = trim($text);
+        if ('' === $normalized) {
+            return '';
+        }
+
+        if (function_exists('iconv')) {
+            $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $normalized);
+            if (false !== $ascii && '' !== trim($ascii)) {
+                $normalized = $ascii;
+            }
+        }
+
+        $normalized = mb_strtolower($normalized);
+        $normalized = preg_replace('/[^a-z0-9\s\/+#.:-]+/u', ' ', $normalized) ?? $normalized;
+
+        return trim((string) (preg_replace('/\s+/u', ' ', $normalized) ?? $normalized));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function tokenizeAutocorrectComparisonText(string $text): array
+    {
+        $tokens = preg_split('/[^a-z0-9+#\/.-]+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $tokens = array_values(array_unique(array_filter(array_map(
+            static fn (string $token): string => trim($token),
+            $tokens
+        ), static fn (string $token): bool => mb_strlen($token) >= 2)));
+
+        return $tokens;
     }
 
     private function tryLanguageToolSentenceAutocorrect(string $text): string
