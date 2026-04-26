@@ -643,6 +643,125 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
         self.assertFalse(response.get("skipConfirmationRestriction"))
         self.assertEqual((response.get("dynamicFieldConfidence") or {}).get("label"), "Elevee")
 
+    def test_learned_feedback_uses_edited_detail_values_over_old_field_plan_values(self):
+        prompt = "Demande de transport le 21 mai en voiture, la raison est de voir ma famille"
+        response = model._build_autre_response(
+            {
+                "text": prompt,
+                "general": {"typeDemande": "Autre", "categorie": "Autre"},
+                "acceptedAutreFeedback": [
+                    {
+                        "prompt": "Demande de transport le 21 mai par voiture, la raison est de voir ma famille",
+                        "general": {
+                            "titre": "Transport - objet: voir la famille",
+                            "description": "Demande de transport le 21 mai en voiture, la raison est de voir ma famille",
+                            "priorite": "NORMALE",
+                            "categorie": "Autre",
+                            "typeDemande": "Autre",
+                        },
+                        "details": {
+                            "ai_custom_objet": "voir ma famille",
+                            "ai_date_souhaitee_metier": "2026-05-21",
+                            "ai_type_transport": "Voiture",
+                            "ai_justification_metier": "voir ma famille",
+                        },
+                        "fieldPlan": {
+                            "add": [
+                                {"key": "ai_custom_objet", "label": "Custom Objet", "type": "text", "required": False, "value": "Demande"},
+                                {"key": "ai_date_souhaitee_metier", "label": "Date souhaitee", "type": "date", "required": False, "value": "2026-05-21"},
+                                {
+                                    "key": "ai_type_transport",
+                                    "label": "Type de transport",
+                                    "type": "select",
+                                    "required": False,
+                                    "value": "Voiture de service",
+                                    "options": ["A definir", "Bus", "Train", "Voiture", "Vehicule", "Taxi", "Navette"],
+                                },
+                                {"key": "ai_justification_metier", "label": "Justification", "type": "textarea", "required": False, "value": "voir ma famille"},
+                            ],
+                            "remove": ["ALL"],
+                            "replaceBase": True,
+                        },
+                    }
+                ],
+            },
+            "",
+        )
+
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+        self.assertEqual((custom_fields.get("ai_custom_objet") or {}).get("value"), "Voir ma famille")
+        self.assertEqual((custom_fields.get("ai_type_transport") or {}).get("value"), "Voiture")
+        self.assertIn("Voiture", (custom_fields.get("ai_type_transport") or {}).get("options", []))
+        self.assertNotEqual((custom_fields.get("ai_custom_objet") or {}).get("value"), "Demande")
+
+    def test_learned_material_schema_does_not_turn_screen_size_into_quantity(self):
+        feedback = {
+            "prompt": "je veux un ecran 32 pouces pour travail sur design",
+            "general": {"typeDemande": "Autre", "categorie": "Autre"},
+            "details": {
+                "ai_type_de_materiel": "ecran",
+                "ai_specification_modele_souhaite": "32 pouces",
+                "ai_usage_justification_metier": "travail sur design",
+            },
+            "fieldPlan": {
+                "add": [
+                    {"key": "ai_type_de_materiel", "label": "Type de materiel", "type": "text", "required": False, "value": "ecran"},
+                    {"key": "ai_specification_modele_souhaite", "label": "Specification / modele souhaite", "type": "text", "required": False, "value": "32 pouces"},
+                    {"key": "ai_usage_justification_metier", "label": "Usage / justification metier", "type": "textarea", "required": False, "value": "travail sur design"},
+                ],
+                "remove": ["ALL"],
+                "replaceBase": True,
+            },
+        }
+
+        response = model._build_autre_response(
+            {
+                "text": "je veux un ecran 32 pouces pour travail sur design",
+                "general": {"typeDemande": "Autre", "categorie": "Autre"},
+                "acceptedAutreFeedback": [feedback],
+            },
+            "",
+        )
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertEqual((custom_fields.get("ai_type_de_materiel") or {}).get("value"), "Ecran")
+        self.assertEqual(model._norm((custom_fields.get("ai_specification_modele_souhaite") or {}).get("value")), "32 pouces")
+        self.assertNotIn("ai_quantite", custom_fields)
+
+    def test_learned_material_schema_matches_synonym_and_updates_specification(self):
+        response = model._build_autre_response(
+            {
+                "text": "je veux un moniteur 27 pouces pour design",
+                "general": {"typeDemande": "Autre", "categorie": "Autre"},
+                "acceptedAutreFeedback": [
+                    {
+                        "prompt": "je veux un ecran 32 pouces pour travail sur design",
+                        "general": {"typeDemande": "Autre", "categorie": "Autre"},
+                        "details": {
+                            "ai_type_de_materiel": "ecran",
+                            "ai_specification_modele_souhaite": "32 pouces",
+                            "ai_usage_justification_metier": "travail sur design",
+                        },
+                        "fieldPlan": {
+                            "add": [
+                                {"key": "ai_type_de_materiel", "label": "Type de materiel", "type": "text", "required": False, "value": "ecran"},
+                                {"key": "ai_specification_modele_souhaite", "label": "Specification / modele souhaite", "type": "text", "required": False, "value": "32 pouces"},
+                                {"key": "ai_usage_justification_metier", "label": "Usage / justification metier", "type": "textarea", "required": False, "value": "travail sur design"},
+                            ],
+                            "remove": ["ALL"],
+                            "replaceBase": True,
+                        },
+                    }
+                ],
+            },
+            "",
+        )
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertEqual((custom_fields.get("ai_type_de_materiel") or {}).get("value"), "Ecran")
+        self.assertEqual(model._norm((custom_fields.get("ai_specification_modele_souhaite") or {}).get("value")), "27 pouces")
+        self.assertNotIn("ai_quantite", custom_fields)
+
     def test_parking_zone_extraction_stops_before_duration_and_medical_reason(self):
         prompt = "parking pres de l entree seulement 2 semaines entorse"
         response = model._build_autre_response(

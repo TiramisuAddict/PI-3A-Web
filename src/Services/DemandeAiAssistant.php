@@ -69,7 +69,10 @@ class DemandeAiAssistant
             }
         }
 
-        $manualFieldPlan = is_array($generalContext['manualFieldPlan'] ?? null) ? $generalContext['manualFieldPlan'] : [];
+        $manualFieldMode = true === ($generalContext['manualFieldMode'] ?? false);
+        $manualFieldPlan = $manualFieldMode && is_array($generalContext['manualFieldPlan'] ?? null)
+            ? $generalContext['manualFieldPlan']
+            : [];
         $manualFields = $this->buildManualAutreFieldsFromPlan($manualFieldPlan);
         $manualOnlyMode = [] !== $manualFields;
         $allAutreFields = $manualOnlyMode ? $manualFields : array_merge($autreFields, $manualFields);
@@ -96,11 +99,10 @@ class DemandeAiAssistant
         $feedbackSamples = $this->loadAutreFeedbackSamples();
         if (!$manualOnlyMode) {
             $matchedSample = $this->findConfirmedAutreFeedbackSample($sourceText, $feedbackSamples, $allAutreFields);
-            if (null !== $matchedSample && ('regenerate' !== $regenerateMode || $this->isStrongConfirmedAutreFeedbackMatch($matchedSample))) {
-                $learnedSuggestion = $this->buildAutreSuggestionFromSample($sourceText, $matchedSample);
-                if (null !== $learnedSuggestion) {
-                    return $learnedSuggestion;
-                }
+            // Keep matching metadata for model guidance, but avoid short-circuiting
+            // to static PHP replay so extraction stays dynamic and prompt-driven.
+            if (null !== $matchedSample) {
+                $generalContext['matchedConfirmedAutreSample'] = $matchedSample;
             }
         }
 
@@ -114,7 +116,8 @@ class DemandeAiAssistant
             'selectOptions' => $selectOptions,
             'acceptedAutreFeedback' => $feedbackSamples,
             'regenerateCount' => (int) ($generalContext['regenerateCount'] ?? 0),
-            'strictPromptOnly' => true,
+            // Semantic learning mode: do not require strict prompt equality.
+            'strictPromptOnly' => false,
             'manualOnlyMode' => $manualOnlyMode,
         ]);
 
@@ -133,23 +136,25 @@ class DemandeAiAssistant
             $manualFieldsByKey[$manualKey] = $manualField;
         }
 
-        foreach ($manualFieldsByKey as $manualKey => $manualField) {
-            $manualValue = trim((string) ($detailsPayload[$manualKey] ?? ''));
-            if ('' === $manualValue) {
-                $manualValue = $this->inferAutreCustomFieldValue($sourceText, $manualField);
-            }
+        if ($manualFieldMode) {
+            foreach ($manualFieldsByKey as $manualKey => $manualField) {
+                $manualValue = trim((string) ($detailsPayload[$manualKey] ?? ''));
+                if ('' === $manualValue) {
+                    $manualValue = $this->inferAutreCustomFieldValue($sourceText, $manualField);
+                }
 
-            if ('' !== $manualValue) {
-                $detailsPayload[$manualKey] = $manualValue;
-            }
+                if ('' !== $manualValue) {
+                    $detailsPayload[$manualKey] = $manualValue;
+                }
 
-            $customPayload[] = [
-                'key' => $manualKey,
-                'label' => (string) ($manualField['label'] ?? $manualKey),
-                'type' => (string) ($manualField['type'] ?? 'text'),
-                'required' => true === ($manualField['required'] ?? false),
-                'value' => $detailsPayload[$manualKey] ?? ($manualField['value'] ?? ''),
-            ];
+                $customPayload[] = [
+                    'key' => $manualKey,
+                    'label' => (string) ($manualField['label'] ?? $manualKey),
+                    'type' => (string) ($manualField['type'] ?? 'text'),
+                    'required' => true === ($manualField['required'] ?? false),
+                    'value' => $detailsPayload[$manualKey] ?? ($manualField['value'] ?? ''),
+                ];
+            }
         }
 
         if ($manualOnlyMode) {
@@ -167,7 +172,7 @@ class DemandeAiAssistant
         $planPayload = [
             'add' => array_values(array_filter($customPayload, static fn ($item): bool => is_array($item))),
             'remove' => array_values(array_filter(array_map('strval', $removePayload), static fn (string $item): bool => '' !== trim($item))),
-            'replaceBase' => $this->toBooleanFlag($parsed['replace_base'] ?? false) || [] !== $customPayload,
+            'replaceBase' => $this->toBooleanFlag($parsed['replace_base'] ?? false),
         ];
 
         return [
@@ -3273,6 +3278,14 @@ class DemandeAiAssistant
             return '';
         }
 
+        // Prefer structural route phrase "de X vers Y" when present.
+        if (preg_match('/\b(?:de|du|des|d)\s+([a-z0-9\- ]{2,60}?)\s+vers\b/iu', $compactText, $routeMatch) === 1) {
+            $routeCandidate = $this->sanitizeLikelyLocation((string) ($routeMatch[1] ?? ''));
+            if ('' !== $routeCandidate) {
+                return $routeCandidate;
+            }
+        }
+
         $matchCount = preg_match_all('/\b(?:de|du|des|d[\'’]|depuis|partant de)\s+([a-z0-9\- ]{2,60}?)(?=\s+(?:vers|pour|afin|car|avec|la|le|je|j|nous|on|formation|certification|transport)\b|$)/iu', $compactText, $matches);
         if (false === $matchCount || 0 === $matchCount) {
             return '';
@@ -3283,8 +3296,10 @@ class DemandeAiAssistant
             return '';
         }
 
-        for ($index = count($candidates) - 1; $index >= 0; --$index) {
-            $candidate = $this->sanitizeLikelyLocation((string) ($candidates[$index] ?? ''));
+        // Iterate from first to last to avoid grabbing trailing reason clauses
+        // like "de visiter ma famille".
+        foreach ($candidates as $candidateRaw) {
+            $candidate = $this->sanitizeLikelyLocation((string) ($candidateRaw ?? ''));
             if ('' !== $candidate) {
                 return $candidate;
             }
@@ -3356,6 +3371,7 @@ class DemandeAiAssistant
             'demande', 'besoin', 'souhaite', 'soumettre', 'traiter', 'complement', 'information',
             'retour', 'merci', 'avance', 'bonjour', 'cette', 'correspond', 'utile', 'moyen', 'transport',
             'type', 'formation', 'ui', 'ux', 'deplacement', 'trajet', 'destination', 'souhaitee', 'souhaitee',
+            'visiter', 'visite', 'famille', 'justification', 'justificatif', 'raison', 'motif', 'travail', 'professionnel',
             'janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre',
             'janv', 'fev', 'fevr', 'avr', 'juil', 'sept', 'oct', 'nov', 'dec', 'ecembre', 'cembre',
         ];
@@ -4858,7 +4874,7 @@ class DemandeAiAssistant
         }
 
         if (preg_match('/\b(raison|motif|cause|pourquoi|usage|justification)\b/i', $haystack) === 1) {
-            $reason = $this->extractTailClauseAfterKeywords($text, ['pour', 'car', 'parce que', 'afin de']);
+            $reason = $this->extractDynamicReasonClause($text);
             if ('' !== $reason) {
                 return $reason;
             }
@@ -5097,6 +5113,36 @@ class DemandeAiAssistant
             if (preg_match($pattern, $clean, $matches) === 1) {
                 return $this->truncateCustomFieldText((string) ($matches[1] ?? ''), 120);
             }
+        }
+
+        return '';
+    }
+
+    private function extractDynamicReasonClause(string $text): string
+    {
+        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        if ('' === $clean) {
+            return '';
+        }
+
+        $patterns = [
+            '/\b(?:justification|justificatif|motif|raison)\s*(?:est\s+de|:|\-)?\s*(.{2,180}?)(?=[\.,;:!?]|$)/iu',
+            '/\b(?:pour|afin\s+de|parce\s+que|car)\s+(.{2,180}?)(?=[\.,;:!?]|$)/iu',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $clean, $matches) !== 1) {
+                continue;
+            }
+
+            $candidate = trim((string) ($matches[1] ?? ''));
+            $candidate = preg_replace('/^(?:de|du|des|d[\'’])\s+/iu', '', $candidate) ?? $candidate;
+            $candidate = trim((string) (preg_replace('/\s+/u', ' ', $candidate) ?? $candidate), " ,;:-");
+            if ('' === $candidate) {
+                continue;
+            }
+
+            return $this->truncateCustomFieldText($candidate, 120);
         }
 
         return '';

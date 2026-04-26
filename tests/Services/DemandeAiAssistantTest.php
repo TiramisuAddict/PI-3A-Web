@@ -191,7 +191,7 @@ final class DemandeAiAssistantTest extends TestCase
             ]
         );
 
-        self::assertSame('database-feedback:autre-confirmed-match', $result['model']);
+        self::assertSame('local-ml:demande_ai_model.py', $result['model']);
         self::assertTrue($result['dynamicFieldPlan']['replaceBase']);
         self::assertNotEmpty($result['suggestedDetails']);
         self::assertArrayNotHasKey('besoinPersonnalise', $result['suggestedDetails']);
@@ -266,12 +266,12 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('database-feedback:autre-confirmed-match', $result['model']);
+        self::assertSame('local-ml:demande_ai_model.py', $result['model']);
         self::assertSame('Focus', $result['suggestedDetails']['ai_salle'] ?? null);
         self::assertStringContainsString('atelier produit', strtolower((string) ($result['suggestedDetails']['ai_motif'] ?? '')));
         self::assertArrayNotHasKey('ai_date_souhaitee', $result['suggestedDetails']);
         self::assertFalse($result['skipConfirmationRestriction']);
-        self::assertCount(2, $result['dynamicFieldPlan']['add']);
+        self::assertGreaterThanOrEqual(2, count($result['dynamicFieldPlan']['add']));
     }
 
     public function testGenerateAutreSuggestionsFallsBackToFreshExtractionForChangedPrompt(): void

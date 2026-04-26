@@ -425,6 +425,11 @@ def _autre_clean_field_value(field_key, field_value, prompt, extractor):
         return ""
 
     lowered = _norm(prompt)
+    if _field_semantic_bucket(key) == "date":
+        if not _source_has_explicit_date_signal(prompt):
+            return ""
+        extracted_date = extractor.extract_date(prompt)
+        return extracted_date or (value if re.match(r"^\d{4}-\d{2}-\d{2}$", value) else "")
     if key in {"ai_lieu_depart_actuel", "ai_lieu_souhaite"}:
         depart, destination = extractor.extract_location_pair(prompt)
         return depart if key == "ai_lieu_depart_actuel" else destination
@@ -441,7 +446,9 @@ def _autre_clean_field_value(field_key, field_value, prompt, extractor):
     if key == "ai_date_fin_conge":
         _, end = extractor.extract_date_range(prompt)
         return end or value
-    if key in {"ai_montant", "ai_quantite"}:
+    if key == "ai_quantite":
+        return _extract_explicit_quantity(prompt)
+    if key == "ai_montant":
         extracted = extractor.extract_amount(prompt)
         return extracted or value
     if key == "ai_systeme_concerne":
@@ -485,6 +492,13 @@ def _autre_clean_field_value(field_key, field_value, prompt, extractor):
         cleaned = dyn_extract.clean_entity_text(value)
         return cleaned or value
     if key in {"ai_justification_metier", "ai_description_probleme", "descriptionBesoin"}:
+        return _normalize_ws(value)
+    if _is_objet_field_key(key):
+        explicit_reason = _extract_explicit_reason_clause(prompt)
+        if explicit_reason:
+            return explicit_reason
+        if _is_generic_learned_value(key, value):
+            return ""
         return _normalize_ws(value)
     if key.startswith("ai_custom_"):
         cleaned = dyn_extract.clean_entity_text(value)
@@ -2184,7 +2198,8 @@ def _feedback_similarity_score(source_text, sample):
     if not isinstance(sample, dict):
         return 0.0
 
-    source_tokens = set(_tokenize(source_text, use_bigrams=False))
+    comparable_source = _normalize_autre_learning_similarity_text(source_text)
+    source_tokens = set(_tokenize(comparable_source or source_text, use_bigrams=False))
     if not source_tokens:
         return 0.0
 
@@ -2198,7 +2213,8 @@ def _feedback_similarity_score(source_text, sample):
     if details:
         sample_chunks.extend(str(v) for v in details.values() if isinstance(v, str) and v.strip())
     sample_text = _normalize_ws(" ".join(sample_chunks))
-    sample_tokens = set(_tokenize(sample_text, use_bigrams=False))
+    comparable_sample = _normalize_autre_learning_similarity_text(sample_text)
+    sample_tokens = set(_tokenize(comparable_sample or sample_text, use_bigrams=False))
     if not sample_tokens:
         return 0.0
 
@@ -2209,6 +2225,31 @@ def _feedback_similarity_score(source_text, sample):
     jaccard = overlap / float(max(1, len(source_tokens | sample_tokens)))
     source_coverage = overlap / float(max(1, len(source_tokens)))
     return (0.65 * jaccard) + (0.35 * source_coverage)
+
+
+def _normalize_autre_learning_similarity_text(text):
+    normalized = _norm(text)
+    if not normalized:
+        return ""
+
+    replacements = {
+        r"\b(?:ecran|écran|moniteur|monitor)\b": "ecran",
+        r"\b(?:ordinateur portable|laptop|portable)\b": "ordinateur portable",
+        r"\b(?:ordinateur fixe|pc fixe|desktop)\b": "ordinateur fixe",
+        r"\b(?:pc|ordinateur)\b": "ordinateur",
+        r"\b(?:camera|caméra)\b": "webcam",
+        r"\b(?:keyboard)\b": "clavier",
+        r"\b(?:mouse)\b": "souris",
+        r"\b(?:pouces?|inch|inches|cm|mm|go|gb|to|tb|mo|mb|hz|mah|watts?|w)\b": "dimension",
+    }
+    for pattern, replacement in replacements.items():
+        normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
+
+    normalized = re.sub(r"\b\d+(?:[\.,]\d+)?\s*dimension\b", "dimension", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\b\d{4}-\d{2}-\d{2}\b", "date", normalized)
+    normalized = re.sub(r"\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b", "date", normalized)
+    normalized = re.sub(r"\b\d+\b", " ", normalized)
+    return _normalize_ws(normalized)
 
 
 def _feedback_timestamp(sample):
@@ -2621,6 +2662,9 @@ def _autre_can_apply_predicted_value(field_key, value, source):
     if not key or not candidate:
         return False
 
+    if _field_semantic_bucket(key) == "date":
+        return _source_supports_field_override(source, key)
+
     if key == "ai_type_transport":
         return _source_supports_field_override(source, "type_transport_souhaite")
 
@@ -2830,6 +2874,503 @@ def _feedback_custom_field_definitions(ranked_feedback):
             }
 
     return definitions
+
+
+def _feedback_schema_entries(sample):
+    entries = []
+    if not isinstance(sample, dict):
+        return entries
+
+    details = sample.get("details") if isinstance(sample.get("details"), dict) else {}
+    field_plan = sample.get("fieldPlan") if isinstance(sample.get("fieldPlan"), dict) else {}
+    add_fields = field_plan.get("add") if isinstance(field_plan.get("add"), list) else []
+    seen = set()
+
+    for field in add_fields:
+        if not isinstance(field, dict):
+            continue
+        key = _normalize_ws(field.get("key", ""))
+        if not key or key in seen or not key.startswith("ai_"):
+            continue
+        raw_value = _normalize_ws(field.get("value", ""))
+        detail_value = _get_feedback_detail_value(details, key)
+        entries.append({
+            "key": key,
+            "label": _normalize_ws(field.get("label", "")) or _humanize_feedback_field_label(key),
+            "type": _normalize_ws(field.get("type", "")) or _infer_feedback_field_type(key, detail_value or raw_value),
+            "required": bool(field.get("required", False)),
+            "options": field.get("options") if isinstance(field.get("options"), list) else [],
+            "value": detail_value or raw_value,
+        })
+        seen.add(key)
+
+    for raw_key, raw_value in details.items():
+        key = _normalize_ws(str(raw_key))
+        if not key.startswith("ai_") or key in seen:
+            continue
+        if not isinstance(raw_value, (str, int, float)):
+            continue
+        value = _normalize_ws(str(raw_value))
+        if not value:
+            continue
+        entries.append({
+            "key": key,
+            "label": _humanize_feedback_field_label(key),
+            "type": _infer_feedback_field_type(key, value),
+            "required": False,
+            "options": [],
+            "value": value,
+        })
+        seen.add(key)
+
+    return entries
+
+
+def _is_prompt_sensitive_learned_field(key, definition=None):
+    bucket = _field_semantic_bucket(key)
+    haystack = _norm(" ".join([
+        str(key or ""),
+        str((definition or {}).get("label", "") if isinstance(definition, dict) else ""),
+    ])).replace("_", " ")
+
+    if bucket in {"date", "time", "location", "long_text"}:
+        return True
+
+    return bool(re.search(
+        r"\b(?:date|jour|echeance|deadline|heure|horaire|duree|periode|delai|montant|prix|cout|budget|"
+        r"quantite|nombre|lieu|zone|destination|depart|arrivee|adresse|localisation|organisme|destinataire|"
+        r"usage|justification|motif|description|contexte|besoin|objet|materiel|equipement|modele|taille)\b",
+        haystack,
+        flags=re.IGNORECASE,
+    ))
+
+
+def _is_generic_learned_value(key, value):
+    normalized_value = _normalize_field_compare_value(value)
+    if not normalized_value:
+        return True
+
+    if _is_objet_field_key(key):
+        return normalized_value in {
+            "demande",
+            "une demande",
+            "demande de transport",
+            "transport",
+            "objet",
+            "custom objet",
+        }
+
+    if normalized_value in {"a definir", "autre", "none", "null", "na"}:
+        return True
+
+    return False
+
+
+def _extract_explicit_quantity(source):
+    text = _normalize_ws(source)
+    if not text:
+        return ""
+
+    normalized = _norm(text)
+    number_words = {
+        "un": "1",
+        "une": "1",
+        "deux": "2",
+        "trois": "3",
+        "quatre": "4",
+        "cinq": "5",
+        "six": "6",
+        "sept": "7",
+        "huit": "8",
+        "neuf": "9",
+        "dix": "10",
+    }
+    number_word_pattern = "|".join(number_words)
+    count_units = (
+        "unite|unites|piece|pieces|exemplaire|exemplaires|article|articles|"
+        "ecran|ecrans|moniteur|moniteurs|clavier|claviers|souris|casque|casques|"
+        "webcam|webcams|ordinateur|ordinateurs|pc|laptop|laptops|chaise|chaises|bureau|bureaux"
+    )
+    dimension_units = r"(?:pouce|pouces|inch|inches|cm|mm|go|gb|to|tb|mo|mb|hz|mah|w|watt|watts)"
+
+    explicit = re.search(
+        rf"\b(?:quantite|quantité|qte|qty|nombre|nb)\s*(?:de)?\s*[:=\-]?\s*(\d+|{number_word_pattern})\b",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if explicit:
+        token = explicit.group(1)
+        return number_words.get(token, token)
+
+    multiplier = re.search(r"\b(\d+)\s*[xX]\b", text)
+    if multiplier:
+        return multiplier.group(1)
+
+    count_after_number = re.search(rf"\b(\d+)\s+(?:{count_units})\b", normalized, flags=re.IGNORECASE)
+    if count_after_number:
+        value = count_after_number.group(1)
+        end = count_after_number.end(1)
+        if not re.match(rf"\s*(?:{dimension_units})\b", normalized[end:], flags=re.IGNORECASE):
+            return value
+
+    counted_number_word_pattern = "|".join(key for key in number_words if key not in {"un", "une"})
+    count_word = re.search(rf"\b({counted_number_word_pattern})\s+(?:{count_units})\b", normalized, flags=re.IGNORECASE)
+    if count_word:
+        return number_words.get(count_word.group(1), "")
+
+    pieces = re.search(r"\b(\d+)\s+(?:unite|unites|piece|pieces|exemplaire|exemplaires)\b", normalized, flags=re.IGNORECASE)
+    if pieces:
+        return pieces.group(1)
+
+    return ""
+
+
+def _extract_material_specification(source):
+    text = _normalize_ws(source)
+    if not text:
+        return ""
+
+    match = re.search(
+        r"\b(\d+(?:[\.,]\d+)?\s*(?:pouces?|inch|inches|\"|cm|mm|go|gb|to|tb|mo|mb|hz|mah|w|watts?))\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return _sentence_case(match.group(1))
+
+    labeled = re.search(
+        r"\b(?:specification|specifications|modele|modèle|taille|dimension|version)\s*[:=\-]?\s*([a-zA-Z0-9][a-zA-Z0-9+\-_/ .]{1,80}?)(?=\s+(?:pour|afin|car|avec|le|la|les|du|de|des)\b|[.,;:!?]|$)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if labeled:
+        return _normalize_ws(labeled.group(1)).strip(" ,;:-")
+
+    return ""
+
+
+def _extract_material_object(source):
+    normalized = _norm(source)
+    if not normalized:
+        return ""
+
+    has_keyboard = _has_any_word(normalized, ["clavier", "keyboard"])
+    has_mouse = _has_any_word(normalized, ["souris", "mouse"])
+    if has_keyboard and has_mouse:
+        return "Clavier/Souris"
+    if has_keyboard:
+        return "Clavier"
+    if has_mouse:
+        return "Souris"
+
+    aliases = [
+        (["ecran", "ecrans", "écran", "écrans", "moniteur", "moniteurs", "monitor", "monitors"], "Ecran"),
+        (["ordinateur portable", "laptop", "portable"], "Ordinateur portable"),
+        (["ordinateur fixe", "pc fixe", "desktop"], "Ordinateur fixe"),
+        (["ordinateur", "pc"], "Ordinateur"),
+        (["casque", "headset"], "Casque"),
+        (["webcam", "camera", "caméra"], "Webcam"),
+        (["imprimante", "printer"], "Imprimante"),
+        (["chaise"], "Chaise"),
+        (["bureau"], "Bureau"),
+    ]
+    for terms, label in aliases:
+        if _has_any_phrase(normalized, [_norm(term) for term in terms]):
+            return label
+
+    generic = re.search(
+        r"\b(?:materiel|matériel|equipement|équipement|outil|article)\s+(?:de|du|des|pour|souhaite|souhaité)?\s*([a-zA-ZÀ-ÿ][a-zA-ZÀ-ÿ'\- ]{2,40}?)(?=\s+\d|\s+(?:pour|afin|car|avec|le|la|les|du|de|des)\b|[.,;:!?]|$)",
+        source,
+        flags=re.IGNORECASE,
+    )
+    if generic:
+        return _sentence_case(dyn_extract.clean_entity_text(generic.group(1)))
+
+    return ""
+
+
+def _coerce_select_value_to_options(value, options):
+    candidate = _normalize_ws(value)
+    if not candidate or not isinstance(options, list) or not options:
+        return candidate
+
+    normalized_candidate = _normalize_field_compare_value(candidate)
+    normalized_options = [
+        (_normalize_ws(option), _normalize_field_compare_value(option))
+        for option in options
+        if _normalize_ws(option)
+    ]
+
+    for raw_option, normalized_option in normalized_options:
+        if normalized_candidate == normalized_option:
+            return raw_option
+
+    for raw_option, normalized_option in normalized_options:
+        if normalized_option and (
+            _has_phrase(normalized_candidate, normalized_option)
+            or _has_phrase(normalized_option, normalized_candidate)
+        ):
+            return raw_option
+
+    candidate_tokens = set(_tokenize(candidate, use_bigrams=False))
+    best_option = ""
+    best_overlap = 0.0
+    for raw_option, _ in normalized_options:
+        option_tokens = set(_tokenize(raw_option, use_bigrams=False))
+        if not option_tokens:
+            continue
+        overlap = len(candidate_tokens & option_tokens) / float(len(option_tokens))
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_option = raw_option
+
+    return best_option if best_overlap >= 0.5 else candidate
+
+
+def _extract_learned_field_value_from_prompt(key, definition, source, extractor):
+    field_key = _normalize_ws(key)
+    source_text = _normalize_ws(source)
+    if not field_key or not source_text:
+        return ""
+
+    haystack = _norm(" ".join([
+        field_key,
+        str((definition or {}).get("label", "") if isinstance(definition, dict) else ""),
+    ])).replace("_", " ")
+    lowered = _norm(source_text)
+
+    if "date" in haystack or "jour" in haystack or _field_semantic_bucket(field_key) == "date":
+        if not _source_has_explicit_date_signal(source_text):
+            return ""
+        return extractor.extract_date(source_text)
+
+    if any(token in haystack for token in ["heure", "horaire", "time"]):
+        return _extract_arrival_time(source_text)
+
+    if any(token in haystack for token in ["montant", "prix", "cout", "budget"]):
+        amount = _extract_amount(source_text)
+        return str(amount) if amount is not None else ""
+
+    if any(token in haystack for token in ["quantite", "nombre"]):
+        return _extract_explicit_quantity(source_text)
+
+    if any(token in haystack for token in ["specification", "modele", "taille", "dimension", "version"]):
+        return _extract_material_specification(source_text)
+
+    if any(token in haystack for token in ["organisme", "destinataire"]):
+        direct = re.search(
+            r"\b(?:organisme|destinataire|pour|chez|a|au|aux)\s+([^\W\d_][^\W\d_'\- ]{0,50}(?:[ '\-][^\W\d_][^\W\d_'\- ]{0,50}){0,5}?)(?=\s+(?:pour|afin|car|avec|le|la|les|du|de|des)\b|[.,;:!?]|$)",
+            source_text,
+            flags=re.IGNORECASE,
+        )
+        if direct:
+            return _capitalize_entity(dyn_extract.clean_entity_text(direct.group(1)))
+        if _has_any_word(lowered, ["banque", "bancaire"]):
+            return "Banque"
+        if _has_any_word(lowered, ["visa", "ambassade", "consulat"]):
+            return "Visa"
+
+    if "attestation" in haystack and _has_word(lowered, "attestation"):
+        match = re.search(
+            r"\b(attestation(?:\s+(?:de|du|des|d'))?\s+[^\W\d_][^\W\d_'\- ]{0,50}(?:[ '\-][^\W\d_][^\W\d_'\- ]{0,50}){0,5}?)(?=\s+(?:pour|chez|a|au|aux|afin|car|avec)\b|[.,;:!?]|$)",
+            source_text,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            return _sentence_case(dyn_extract.clean_entity_text(match.group(1)))
+        return "Attestation"
+
+    if any(token in haystack for token in ["lieu", "zone", "destination", "depart", "adresse", "localisation"]):
+        if "depart" in haystack:
+            depart, _ = extractor.extract_location_pair(source_text)
+            return depart
+        if any(token in haystack for token in ["destination", "arrivee", "lieu"]):
+            _, destination = extractor.extract_location_pair(source_text)
+            if destination:
+                return destination
+        return dyn_extract.extract_descriptive_location(source_text) or _extract_parking_zone(source_text)
+
+    if "objet" in haystack:
+        reason = _extract_explicit_reason_clause(source_text)
+        if reason:
+            return reason
+
+    if any(token in haystack for token in ["materiel", "equipement"]):
+        material = _extract_material_object(source_text)
+        if material:
+            return material
+        material = extractor._extract_after_any(
+            source_text,
+            ["materiel", "matÃ©riel", "equipement", "Ã©quipement", "clavier", "souris", "ecran", "ordinateur", "pc", "casque", "webcam"],
+        )
+        return dyn_extract.clean_entity_text(material)
+
+    if any(token in haystack for token in ["motif", "justification", "usage", "besoin", "contexte", "description"]):
+        reason = _extract_explicit_reason_clause(source_text)
+        return reason or source_text
+
+    return ""
+
+
+def _build_learned_autre_schema_fields(ranked_feedback, source, extractor, intents=None, max_fields=8):
+    if not ranked_feedback:
+        return []
+
+    top_score = ranked_feedback[0][0]
+    if top_score < 0.40:
+        return []
+
+    weighted = {}
+    order = {}
+    for sample_index, (score, sample) in enumerate(ranked_feedback):
+        if score < 0.32:
+            continue
+        entries = _feedback_schema_entries(sample)
+        for field_index, entry in enumerate(entries):
+            key = _normalize_ws(entry.get("key", ""))
+            if not key or not _is_feedback_key_compatible_with_source(key, source, intents):
+                continue
+            if key not in weighted:
+                weighted[key] = {
+                    "weight": 0.0,
+                    "definition": entry,
+                    "values": Counter(),
+                    "required_weight": 0.0,
+                }
+                order[key] = (sample_index, field_index)
+            weighted[key]["weight"] += float(score)
+            if bool(entry.get("required", False)):
+                weighted[key]["required_weight"] += float(score)
+            value = _normalize_ws(entry.get("value", ""))
+            if value:
+                weighted[key]["values"][value] += float(score)
+
+    if not weighted:
+        return []
+
+    selected = []
+    for key, data in weighted.items():
+        weight = float(data.get("weight", 0.0))
+        sample_index, _ = order.get(key, (99, 99))
+        if sample_index > 0 and weight < 0.52:
+            continue
+
+        definition = dict(data.get("definition", {}))
+        learned_values = data.get("values") if isinstance(data.get("values"), Counter) else Counter()
+        learned_value = learned_values.most_common(1)[0][0] if learned_values else ""
+        prompt_value = _extract_learned_field_value_from_prompt(key, definition, source, extractor)
+
+        value = ""
+        if prompt_value:
+            value = _autre_clean_field_value(key, prompt_value, source, extractor)
+        if (
+            not value
+            and learned_value
+            and not _is_generic_learned_value(key, learned_value)
+            and _value_has_prompt_support(source, learned_value)
+        ):
+            value = _autre_clean_field_value(key, learned_value, source, extractor)
+        if (
+            not value
+            and learned_value
+            and not _is_generic_learned_value(key, learned_value)
+            and top_score >= 0.68
+            and not _is_prompt_sensitive_learned_field(key, definition)
+        ):
+            value = _autre_clean_field_value(key, learned_value, source, extractor)
+
+        field_options = definition.get("options") if isinstance(definition.get("options"), list) else []
+        if (definition.get("type") or _infer_feedback_field_type(key, value or learned_value)) == "select":
+            value = _coerce_select_value_to_options(value, field_options)
+
+        selected.append({
+            "key": key,
+            "label": definition.get("label") or _humanize_feedback_field_label(key),
+            "type": definition.get("type") or _infer_feedback_field_type(key, value or learned_value),
+            "required": bool(definition.get("required", False)) or float(data.get("required_weight", 0.0)) >= max(0.35, weight * 0.5),
+            "value": value,
+            "options": field_options,
+            "source": "learned",
+        })
+
+    selected.sort(key=lambda field: (
+        order.get(field.get("key", ""), (99, 99))[0],
+        order.get(field.get("key", ""), (99, 99))[1],
+        0 if field.get("required") else 1,
+        field.get("key", ""),
+    ))
+    return selected[:max_fields]
+
+
+def _learned_schema_covers_field(learned_fields, candidate_field):
+    if not learned_fields or not isinstance(candidate_field, dict):
+        return False
+
+    candidate_key = _normalize_ws(candidate_field.get("key", ""))
+    candidate_label = _normalize_ws(candidate_field.get("label", ""))
+    candidate_bucket = _field_semantic_bucket(candidate_key)
+    candidate_tokens = {
+        token
+        for token in _tokenize(f"{candidate_key} {candidate_label}", use_bigrams=False)
+        if len(token) >= 4 and token not in {"custom", "field", "champ", "type", "value", "valeur", "metier"}
+    }
+
+    for learned in learned_fields:
+        if not isinstance(learned, dict):
+            continue
+        learned_key = _normalize_ws(learned.get("key", ""))
+        if learned_key == candidate_key:
+            return True
+        learned_label = _normalize_ws(learned.get("label", ""))
+        learned_bucket = _field_semantic_bucket(learned_key)
+        learned_tokens = {
+            token
+            for token in _tokenize(f"{learned_key} {learned_label}", use_bigrams=False)
+            if len(token) >= 4 and token not in {"custom", "field", "champ", "type", "value", "valeur", "metier"}
+        }
+        if candidate_bucket == learned_bucket and candidate_bucket in {"date", "time", "long_text"}:
+            return True
+        if candidate_tokens and learned_tokens and candidate_tokens & learned_tokens:
+            return True
+
+    return False
+
+
+def _is_feedback_key_compatible_with_source(key, source, intents=None):
+    normalized_key = _norm(_normalize_ws(key))
+    if not normalized_key:
+        return False
+
+    source_norm = _norm(_normalize_ws(source))
+    intent_names = {name for name, _ in (intents or []) if isinstance(name, str)}
+
+    has_transport = (
+        "transport" in intent_names
+        or _has_any_word(source_norm, ["transport", "deplacement", "trajet", "taxi", "bus", "train", "voiture", "vehicule", "avion", "vol", "mission", "depart", "destination", "vers"])
+    )
+    has_formation = (
+        "formation" in intent_names
+        or _has_any_word(source_norm, ["formation", "certification", "cours", "atelier", "seminaire"])
+    )
+    has_parking = (
+        "parking" in intent_names
+        or _has_any_word(source_norm, ["parking", "stationnement", "badge parking", "acces parking", "place reservee", "place reserve"])
+    )
+
+    if any(token in normalized_key for token in ["formation", "certif"]):
+        return has_formation
+
+    if any(token in normalized_key for token in ["stationnement", "parking"]):
+        return has_parking
+
+    if any(token in normalized_key for token in ["transport", "depart", "destination", "trajet", "lieu", "horaire"]):
+        return has_transport
+
+    # Keep generic business fields compatible with any intent.
+    if any(token in normalized_key for token in ["date", "justification", "motif", "description", "objet", "type", "niveau"]):
+        return True
+
+    return True
 
 
 def _normalize_training_samples(raw):
@@ -3414,6 +3955,10 @@ def _build_autre_structured_context(source, rule_fields, intents):
     if re.search(r"\b(?:remboursement|rembourse|note de frais|frais)\b", _norm(source)):
         context_fields["type_demande"] = "remboursement"
 
+    explicit_reason = _extract_explicit_reason_clause(source)
+    if explicit_reason:
+        context_fields["justification"] = explicit_reason
+
     return context_fields
 
 
@@ -3441,6 +3986,30 @@ def _extract_constraint_clause_for_justification(text):
                 return captured.lower().replace("en ", "uniquement en ", 1)
             return f"{prefix} {captured.lower()}"
         return captured.lower()
+
+    return ""
+
+
+def _extract_explicit_reason_clause(text):
+    source = _normalize_ws(text)
+    if not source:
+        return ""
+
+    patterns = [
+        r"\b(?:la\s+)?raison\s+est\s+de\s+(.{2,180}?)(?=[\.,;:!?]|$)",
+        r"\b(?:motif|justification|justificatif)\s*(?:est\s+de|:|\-)?\s*(.{2,180}?)(?=[\.,;:!?]|$)",
+        r"\b(?:pour|afin\s+de|parce\s+que|car)\s+(.{2,180}?)(?=[\.,;:!?]|$)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, source, flags=re.IGNORECASE)
+        if not match:
+            continue
+        candidate = _normalize_ws(match.group(1))
+        candidate = re.sub(r"^(?:de|du|des|d['’])\s+", "", candidate, flags=re.IGNORECASE)
+        candidate = _normalize_ws(candidate).strip(" ,;:-")
+        if candidate:
+            return candidate[:180]
 
     return ""
 
@@ -3473,6 +4042,10 @@ def _build_structured_justification(context_fields, corrected_text):
         parts.append("mission client")
     elif has_mission and destination:
         parts.append(f"pour mission a {context_fields['lieu_souhaite']}")
+
+    explicit_reason = _normalize_ws(context_fields.get("justification"))
+    if explicit_reason:
+        parts.append(f"pour {explicit_reason}")
 
     constraint_clause = _extract_constraint_clause_for_justification(corrected_text)
     if constraint_clause:
@@ -4267,6 +4840,8 @@ def _dedupe_and_refine_custom_fields(custom_fields, context_fields, corrected_te
             continue
 
         has_objet_field = True
+        if _normalize_ws(field.get("source", "")) not in {"explicit", "learned"} and not finance_context:
+            continue
 
         current_value = _normalize_ws(field.get("value", ""))
         current_norm = _normalize_field_compare_value(current_value)
@@ -4536,6 +5111,25 @@ def _build_autre_response(request_data, prompt):
     extractor = dyn_extract.BoundaryAwareExtractor()
     generator = dyn_extract.DynamicFieldGenerator()
     intents = generator.analyze_intent(source)
+
+    # Prevent cross-domain contamination from historical feedback
+    # (e.g., formation fields appearing in transport prompts).
+    feedback_context = {
+        key: value
+        for key, value in (feedback_context or {}).items()
+        if _is_feedback_key_compatible_with_source(key, source, intents)
+    }
+    feedback_custom_overrides = {
+        key: value
+        for key, value in (feedback_custom_overrides or {}).items()
+        if _is_feedback_key_compatible_with_source(key, source, intents)
+    }
+    feedback_custom_definitions = {
+        key: value
+        for key, value in (feedback_custom_definitions or {}).items()
+        if _is_feedback_key_compatible_with_source(key, source, intents)
+    }
+
     rule_fields = extractor.extract_all_fields(source, intents)
     context_fields = _build_autre_structured_context(source, rule_fields, intents)
     for feedback_key, feedback_value in feedback_context.items():
@@ -4564,9 +5158,20 @@ def _build_autre_response(request_data, prompt):
             description = confirmed_description
 
     generated_plan = generator.generate_field_plan(source, intents, miner)
-    custom_fields = []
+    learned_schema_fields = _build_learned_autre_schema_fields(
+        ranked_feedback,
+        source,
+        extractor,
+        intents,
+        max_fields=8,
+    ) if allow_feedback_learning else []
+    custom_fields = list(learned_schema_fields)
     base_keys = {"besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre", "dateSouhaiteeAutre"}
-    seen_custom_keys = set()
+    seen_custom_keys = {
+        _normalize_ws(field.get("key", ""))
+        for field in custom_fields
+        if isinstance(field, dict)
+    }
     for field in generated_plan:
         if not isinstance(field, dict):
             continue
@@ -4576,6 +5181,10 @@ def _build_autre_response(request_data, prompt):
         if generator._field_semantic_bucket(key) == "long_text" and _normalize_ws(field.get("source", "")) == "inferred":
             continue
         if key in seen_custom_keys:
+            continue
+        if learned_schema_fields and key == "ai_quantite":
+            continue
+        if learned_schema_fields and _learned_schema_covers_field(learned_schema_fields, field):
             continue
         seen_custom_keys.add(key)
         raw_value = _normalize_ws(field.get("value", ""))
@@ -4649,6 +5258,8 @@ def _build_autre_response(request_data, prompt):
             key = _normalize_ws(field.get("key", ""))
             if not key:
                 continue
+            if _normalize_ws(field.get("source", "")) == "learned":
+                continue
             if generator._field_semantic_bucket(key) == "long_text":
                 continue
             predicted_value, predicted_confidence = miner.predict_field(key, source)
@@ -4675,12 +5286,23 @@ def _build_autre_response(request_data, prompt):
 
     def _upsert_custom_field(key, label, field_type, required, value, options=None):
         cleaned = _normalize_ws(value)
+        option_list = list(options or [])
+        if field_type == "select":
+            cleaned = _coerce_select_value_to_options(cleaned, option_list)
         for field in custom_fields:
             if _normalize_ws(field.get("key", "")) != key:
                 continue
-            field["value"] = cleaned
+            existing_value = _normalize_ws(field.get("value", ""))
+            existing_options = field.get("options") if isinstance(field.get("options"), list) else option_list
+            if _normalize_ws(field.get("source", "")) == "learned" and existing_value:
+                if options is not None:
+                    field["options"] = option_list
+                if _normalize_ws(field.get("type", "")) == "select":
+                    field["value"] = _coerce_select_value_to_options(existing_value, existing_options or option_list)
+                return
+            field["value"] = _coerce_select_value_to_options(cleaned, existing_options or option_list) if _normalize_ws(field.get("type", field_type)) == "select" else cleaned
             if options is not None:
-                field["options"] = list(options)
+                field["options"] = option_list
             return
         custom_fields.append({
             "key": key,
@@ -4688,7 +5310,7 @@ def _build_autre_response(request_data, prompt):
             "type": field_type,
             "required": required,
             "value": cleaned,
-            "options": list(options or []),
+            "options": option_list,
         })
 
     custom_fields = [
@@ -4764,7 +5386,10 @@ def _build_autre_response(request_data, prompt):
                 rule_fields.get("ai_date_fin_conge", ""),
             )
 
-    if len(_normalize_ws(structured_description)) > 20:
+    if len(_normalize_ws(structured_description)) > 20 and not _learned_schema_covers_field(
+        learned_schema_fields,
+        {"key": "ai_justification_metier", "label": "Justification", "type": "textarea"},
+    ):
         justification_value = (
             structured_description
             if _structured_justification_preserves_evidence(source, structured_description)
@@ -4859,6 +5484,18 @@ def _build_autre_response(request_data, prompt):
     if explicit_urgency:
         details["niveauUrgenceAutre"] = explicit_urgency["urgency"]
         general["priorite"] = explicit_urgency["priority"]
+
+    for field in custom_fields:
+        if not isinstance(field, dict):
+            continue
+        key = _normalize_ws(field.get("key", ""))
+        value = _normalize_ws(field.get("value", ""))
+        if key and value:
+            details[key] = value
+
+    if learned_schema_fields:
+        for base_key in base_keys:
+            details.pop(base_key, None)
 
     return {
         "correctedText": source,
