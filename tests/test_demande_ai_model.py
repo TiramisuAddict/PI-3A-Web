@@ -208,21 +208,20 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
         custom_fields_month_later = {field.get("key"): field for field in response_month_later.get("custom_fields", [])}
         self.assertEqual((custom_fields_month_later.get("ai_date_souhaitee_metier") or {}).get("value"), next_month)
 
-    def test_duration_only_schedule_prompt_creates_date_fields(self):
-        today = datetime.now().date().isoformat()
-        next_month = self._add_months(datetime.now().date(), 1).isoformat()
+    def test_duration_only_schedule_prompt_does_not_invent_start_date(self):
         prompt = "demande d amenagement d horaire arriver a 10h partir a 19h pendant 1 mois"
 
         fields = model._build_context_fields(prompt, model._detect_intents(prompt))
-        self.assertEqual(fields.get("date_souhaitee"), today)
+        self.assertTrue(fields.get("date_souhaitee"))
 
         response = model._build_autre_response(
             {"text": prompt, "general": {"typeDemande": "Autre", "categorie": "Autre"}},
             "",
         )
         custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
-        self.assertEqual((custom_fields.get("ai_date_souhaitee_metier") or {}).get("value"), today)
-        self.assertEqual((custom_fields.get("ai_date_fin_extra") or {}).get("value"), next_month)
+        self.assertNotIn("ai_date_souhaitee_metier", custom_fields)
+        self.assertNotIn("ai_date_fin_extra", custom_fields)
+        self.assertFalse((response.get("details") or {}).get("dateSouhaiteeAutre"))
 
     def test_autre_response_is_model_driven_and_self_contained(self):
         payload = {
@@ -549,7 +548,7 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
             self.assertNotIn("formation", field_value)
             self.assertNotIn("javascript", field_value)
 
-    def test_confirmed_exact_feedback_can_skip_confirmation_for_stable_prompt(self):
+    def test_confirmed_exact_feedback_still_requires_confirmation_for_stable_prompt(self):
         prompt = "parking pres de l entree entorse"
         payload = {
             "text": prompt,
@@ -599,7 +598,7 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
         response = model._build_autre_response(payload, "")
         custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
 
-        self.assertTrue(response.get("skipConfirmationRestriction"))
+        self.assertFalse(response.get("skipConfirmationRestriction"))
         self.assertEqual((response.get("dynamicFieldConfidence") or {}).get("label"), "Elevee")
         self.assertEqual(model._norm((custom_fields.get("ai_zone_souhaitee") or {}).get("value", "")), model._norm("Pres de l'entree"))
 

@@ -67,4 +67,48 @@ final class DemandeDecisionAssistantTest extends TestCase
         self::assertGreaterThan(0, $result['spamScore']);
         self::assertNotEmpty($result['reasons']);
     }
+
+    public function testAnalyzeIgnoresNestedAiMetadataDetails(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('countRecentSameTypeForEmploye')
+            ->willReturn(0)
+        ;
+
+        $assistant = new DemandeDecisionAssistant(
+            $repository,
+            $this->createMock(LoggerInterface::class)
+        );
+
+        $demande = (new Demande())
+            ->setTypeDemande('Autre')
+            ->setTitre('Reservation salle innovation')
+            ->setDescription('Reservation d une salle pour organiser un atelier produit.')
+            ->setPriorite('NORMALE')
+            ->setStatus('Nouvelle')
+            ->setDateCreation(new \DateTimeImmutable('2026-04-24'));
+
+        $details = [
+            'ai_salle' => 'Innovation',
+            'ai_motif' => 'atelier produit',
+            '_ai_field_plan' => [
+                'add' => [
+                    ['key' => 'ai_salle', 'label' => 'Salle'],
+                ],
+            ],
+            'decisionAdvice' => [
+                'recommendedStatus' => 'En cours',
+            ],
+        ];
+
+        $result = $assistant->analyze($demande, $details, [
+            ['key' => 'ai_salle', 'label' => 'Salle', 'type' => 'text', 'required' => true],
+            ['key' => 'ai_motif', 'label' => 'Motif', 'type' => 'textarea', 'required' => true],
+        ]);
+
+        self::assertIsArray($result);
+        self::assertSame([], $result['missingRequired']);
+        self::assertArrayHasKey('mlSignals', $result);
+    }
 }

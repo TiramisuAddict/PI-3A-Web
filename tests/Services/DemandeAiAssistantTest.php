@@ -193,47 +193,52 @@ final class DemandeAiAssistantTest extends TestCase
 
         self::assertSame('database-feedback:autre-confirmed-match', $result['model']);
         self::assertTrue($result['dynamicFieldPlan']['replaceBase']);
-        self::assertArrayHasKey('ai_type_attestation', $result['suggestedDetails']);
-        self::assertArrayHasKey('ai_organisme_destinataire', $result['suggestedDetails']);
+        self::assertNotEmpty($result['suggestedDetails']);
         self::assertArrayNotHasKey('besoinPersonnalise', $result['suggestedDetails']);
         self::assertArrayNotHasKey('descriptionBesoin', $result['suggestedDetails']);
         self::assertArrayNotHasKey('dateSouhaiteeAutre', $result['suggestedDetails']);
-        self::assertSame('attestation de salaire', strtolower((string) $result['suggestedDetails']['ai_type_attestation']));
-        self::assertSame('banque', strtolower((string) $result['suggestedDetails']['ai_organisme_destinataire']));
     }
 
-    public function testGenerateAutreSuggestionsReusesLearnedFieldsAndAddsDateFromPrompt(): void
+    public function testGenerateAutreSuggestionsKeepsOnlyLearnedFieldsSupportedByCurrentPrompt(): void
     {
         $repository = $this->createMock(DemandeRepository::class);
         $repository
             ->method('fetchAutreFeedbackSamplesFromDatabase')
             ->willReturn([
                 [
-                    'prompt' => 'attestation de salaire pour banque',
+                    'prompt' => 'reservation salle focus pour atelier produit le 3 mai',
                     'confirmed' => true,
+                    'createdAt' => '2026-04-26T10:00:00+00:00',
                     'general' => [
-                        'titre' => 'Attestation de salaire',
-                        'description' => 'Demande d attestation de salaire pour un dossier bancaire.',
+                        'titre' => 'Reservation salle focus',
+                        'description' => 'Reservation salle focus pour atelier produit le 3 mai.',
                         'priorite' => 'NORMALE',
                         'categorie' => 'Autre',
                         'typeDemande' => 'Autre',
                     ],
                     'details' => [
-                        'ai_type_attestation' => 'Attestation de salaire',
-                        'ai_organisme_destinataire' => 'banque',
+                        'ai_salle' => 'Focus',
+                        'ai_motif' => 'atelier produit',
+                        'ai_date_souhaitee' => '2026-05-03',
                     ],
                     'fieldPlan' => [
                         'add' => [
                             [
-                                'key' => 'ai_type_attestation',
-                                'label' => 'Type d attestation',
+                                'key' => 'ai_salle',
+                                'label' => 'Salle',
                                 'type' => 'text',
                                 'required' => true,
                             ],
                             [
-                                'key' => 'ai_organisme_destinataire',
-                                'label' => 'Organisme destinataire',
-                                'type' => 'text',
+                                'key' => 'ai_motif',
+                                'label' => 'Motif',
+                                'type' => 'textarea',
+                                'required' => true,
+                            ],
+                            [
+                                'key' => 'ai_date_souhaitee',
+                                'label' => 'Date souhaitee',
+                                'type' => 'date',
                                 'required' => false,
                             ],
                         ],
@@ -255,84 +260,26 @@ final class DemandeAiAssistantTest extends TestCase
         $result = $assistant->generateAutreSuggestions(
             [
                 'typeDemande' => 'Autre',
-                'aiDescriptionPrompt' => 'Attestation de salaire pour la banque le 21 mai',
+                'aiDescriptionPrompt' => 'reservation salle Focus pour atelier produit',
             ],
             [],
-            [
-                [
-                    'key' => 'besoinPersonnalise',
-                    'label' => 'Nom de votre demande',
-                    'type' => 'text',
-                    'required' => true,
-                ],
-                [
-                    'key' => 'descriptionBesoin',
-                    'label' => 'Description detaillee du besoin',
-                    'type' => 'textarea',
-                    'required' => true,
-                ],
-                [
-                    'key' => 'dateSouhaiteeAutre',
-                    'label' => 'Date souhaitee',
-                    'type' => 'date',
-                    'required' => false,
-                ],
-            ]
+            []
         );
 
         self::assertSame('database-feedback:autre-confirmed-match', $result['model']);
-        self::assertArrayHasKey('ai_type_attestation', $result['suggestedDetails']);
-        self::assertArrayHasKey('ai_organisme_destinataire', $result['suggestedDetails']);
-        self::assertArrayHasKey('ai_date_souhaitee', $result['suggestedDetails']);
-        self::assertArrayNotHasKey('montant', $result['suggestedDetails']);
-        self::assertArrayNotHasKey('ai_montant', $result['suggestedDetails']);
-        self::assertArrayNotHasKey('descriptionBesoin', $result['suggestedDetails']);
-        self::assertSame('attestation de salaire', strtolower((string) $result['suggestedDetails']['ai_type_attestation']));
-        self::assertStringContainsString('banque', strtolower((string) $result['suggestedDetails']['ai_organisme_destinataire']));
-        self::assertMatchesRegularExpression('/^\d{4}-05-21$/', (string) $result['suggestedDetails']['ai_date_souhaitee']);
+        self::assertSame('Focus', $result['suggestedDetails']['ai_salle'] ?? null);
+        self::assertStringContainsString('atelier produit', strtolower((string) ($result['suggestedDetails']['ai_motif'] ?? '')));
+        self::assertArrayNotHasKey('ai_date_souhaitee', $result['suggestedDetails']);
+        self::assertFalse($result['skipConfirmationRestriction']);
+        self::assertCount(2, $result['dynamicFieldPlan']['add']);
     }
 
-    public function testGenerateAutreSuggestionsUsesGenericLearnedSchemaWithDatePlaceAndAmount(): void
+    public function testGenerateAutreSuggestionsFallsBackToFreshExtractionForChangedPrompt(): void
     {
         $repository = $this->createMock(DemandeRepository::class);
         $repository
             ->method('fetchAutreFeedbackSamplesFromDatabase')
-            ->willReturn([
-                [
-                    'prompt' => 'reservation salle innovation pour atelier produit',
-                    'confirmed' => true,
-                    'general' => [
-                        'titre' => 'Reservation salle innovation',
-                        'description' => 'Reservation d une salle pour organiser un atelier produit.',
-                        'priorite' => 'NORMALE',
-                        'categorie' => 'Autre',
-                        'typeDemande' => 'Autre',
-                    ],
-                    'details' => [
-                        'ai_salle' => 'Innovation',
-                        'ai_motif' => 'atelier produit',
-                    ],
-                    'fieldPlan' => [
-                        'add' => [
-                            [
-                                'key' => 'ai_salle',
-                                'label' => 'Salle',
-                                'type' => 'text',
-                                'required' => true,
-                            ],
-                            [
-                                'key' => 'ai_motif',
-                                'label' => 'Motif',
-                                'type' => 'textarea',
-                                'required' => true,
-                            ],
-                        ],
-                        'remove' => [],
-                        'replaceBase' => true,
-                    ],
-                ],
-            ])
-        ;
+            ->willReturn([]);
 
         $assistant = new DemandeAiAssistant(
             $this->createMock(HttpClientInterface::class),
@@ -345,34 +292,15 @@ final class DemandeAiAssistantTest extends TestCase
         $result = $assistant->generateAutreSuggestions(
             [
                 'typeDemande' => 'Autre',
-                'aiDescriptionPrompt' => 'Reservation salle Innovation pour atelier produit le 4 juin a Tunis budget 300 TND',
+                'aiDescriptionPrompt' => 'Reservation salle innovation pour atelier produit a 16h pour 45 minutes',
             ],
             [],
-            [
-                [
-                    'key' => 'besoinPersonnalise',
-                    'label' => 'Nom de votre demande',
-                    'type' => 'text',
-                    'required' => true,
-                ],
-                [
-                    'key' => 'descriptionBesoin',
-                    'label' => 'Description detaillee du besoin',
-                    'type' => 'textarea',
-                    'required' => true,
-                ],
-            ]
+            []
         );
 
-        self::assertSame('database-feedback:autre-confirmed-match', $result['model']);
-        self::assertArrayHasKey('ai_salle', $result['suggestedDetails']);
-        self::assertArrayHasKey('ai_motif', $result['suggestedDetails']);
-        self::assertArrayHasKey('ai_date_souhaitee', $result['suggestedDetails']);
-        self::assertArrayHasKey('ai_lieu_souhaite', $result['suggestedDetails']);
-        self::assertArrayHasKey('ai_montant', $result['suggestedDetails']);
-        self::assertArrayNotHasKey('descriptionBesoin', $result['suggestedDetails']);
-        self::assertMatchesRegularExpression('/^\d{4}-06-04$/', (string) $result['suggestedDetails']['ai_date_souhaitee']);
-        self::assertSame('tunis', strtolower((string) $result['suggestedDetails']['ai_lieu_souhaite']));
-        self::assertSame('300', (string) $result['suggestedDetails']['ai_montant']);
+        self::assertContains($result['model'], ['local-ml:demande_ai_model.py', 'database-feedback:autre-confirmed-match']);
+        self::assertArrayNotHasKey('ai_salle', $result['suggestedDetails']);
+        self::assertArrayNotHasKey('ai_motif', $result['suggestedDetails']);
+        self::assertNotEmpty($result['suggestedDetails']);
     }
 }

@@ -401,6 +401,8 @@
     var AUTRE_BASE_REQUIRED_KEYS = ["besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre"];
     var AUTRE_HIDDEN_DUPLICATE_KEYS = ["besoinPersonnalise", "niveauUrgenceAutre", "pieceOuContexte"];
     var AI_DYNAMIC_FIELDS = [];
+    var aiModal = null;
+    var aiModalEl = null;
     var AI_REMOVED_BASE_FIELDS = [];
     var AI_REPLACE_BASE_FIELDS = false;
     var AUTO_FILLED_DETAIL_KEYS = {};
@@ -1621,6 +1623,9 @@
     function requestClassificationSuggestion(categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard) {
         var button = document.getElementById("suggestClassificationBtn");
         var promptInput = document.getElementById("classificationAiPrompt");
+        var aiGeneratedInput = document.getElementById("aiGeneratedInput");
+        var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
         var originalText = button ? button.innerHTML : "";
         var rawText = promptInput ? String(promptInput.value || "").trim() : "";
 
@@ -1658,6 +1663,9 @@
                 var suggestion = json.suggestion || {};
                 applyClassificationSuggestion(suggestion, categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard);
                 updateClassificationSummary(suggestion);
+                if (aiGeneratedInput) aiGeneratedInput.value = "1";
+                if (aiConfirmedInput) aiConfirmedInput.value = "0";
+                if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
                 setClassificationStatus("Texte corrige et demande classee automatiquement.", "success");
             })
             .catch(function (error) {
@@ -1779,6 +1787,7 @@
 
                 if (aiGeneratedInput) aiGeneratedInput.value = "1";
                 if (aiConfirmedInput) aiConfirmedInput.value = "0";
+                if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
 
                 if (sendToSuggestionToggle && sendToSuggestionToggle.checked) {
                     setSuggestionPromptFromGeneratedDescription(generatedDescription);
@@ -1983,10 +1992,6 @@
     }
 
     function shouldRequireAiConfirmation(typeSelect, aiGeneratedInput, regenerateWithAiBtn, aiTrustedLearningInput) {
-        if (aiTrustedLearningInput && aiTrustedLearningInput.value === "1") {
-            return false;
-        }
-
         if (aiGeneratedInput && aiGeneratedInput.value === "1") {
             return true;
         }
@@ -2260,6 +2265,10 @@
                         : baseMessage + " Verifiez puis confirmez la creation.";
                     setAiStatus(finalMessage, confidenceStatus.tone || "success");
                     setAutreConfidenceBadge(confidenceStatus);
+
+                    if (aiConfirmPreview) {
+                        aiConfirmPreview.innerHTML = buildConfirmationPreview(dynamicFieldsContainer);
+                    }
                 } else {
                     setAiStatus("Type ajuste automatiquement vers " + currentType + ". Le bloc IA Autre est masque.", "info");
                     clearAutreConfidenceBadge();
@@ -3069,12 +3078,11 @@
         var aiConfirmedInput = document.getElementById("aiConfirmedInput");
         var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
         var autreAiRawPromptInput = document.getElementById("autreAiRawPromptInput");
-        var aiModalEl = document.getElementById("aiConfirmModal");
+        aiModalEl = document.getElementById("aiConfirmModal");
         var aiModalRejectBtn = document.getElementById("aiModalRejectBtn");
         var aiModalConfirmBtn = document.getElementById("aiModalConfirmBtn");
         var aiModalRegenerateBtn = document.getElementById("aiModalRegenerateBtn");
         var aiConfirmPreview = document.getElementById("aiConfirmPreview");
-        var aiModal = null;
         manualAutreFieldCountInput = document.getElementById("manualAutreFieldCount");
         manualAutreFieldEditor = document.getElementById("manualAutreFieldEditor");
         buildManualAutreFieldsBtn = document.getElementById("buildManualAutreFieldsBtn");

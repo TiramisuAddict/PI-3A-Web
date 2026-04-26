@@ -435,6 +435,8 @@ def _autre_clean_field_value(field_key, field_value, prompt, extractor):
             return "Certification"
         return "Formation externe" if extractor.extract_subject_name(prompt, "formation") else value
     if key in {"ai_date_souhaitee_metier", "ai_date_reservation", "ai_date_debut_conge", "dateSouhaiteeAutre"}:
+        if not _source_has_explicit_date_signal(prompt):
+            return ""
         return extractor.extract_date(prompt) or value
     if key == "ai_date_fin_conge":
         _, end = extractor.extract_date_range(prompt)
@@ -1597,7 +1599,7 @@ def _extract_subject_name(corrected_text, subject_keyword):
     Given keyword (e.g. 'formation'), extracts the name that follows it.
     """
     lowered = _norm(corrected_text)
-    stop_tail = r"\s+(?:le|du|de|vers|pour|a|à|dans|qui|que|debut|debute|commence|a\s+partir|depuis|jusqu)\b"
+    stop_tail = r"\s+(?:le|du|de|vers|pour|a|à|dans|qui|que|debut|debute|commence|a\s+partir|depuis|jusqu|demain|aujourd'hui|aujourdhui|matin|soir|taxi|transport|deplacement|déplacement)\b"
     patterns = [
         rf"\b{re.escape(subject_keyword)}\s+(?:en\s+)?([a-z][a-z0-9\s\-\./+#]+?)(?={stop_tail}|$)",
         rf"\bpour\s+(?:une?\s+)?{re.escape(subject_keyword)}\s+(?:en\s+)?([a-z][a-z0-9\s\-\./+#]+?)(?={stop_tail}|$)",
@@ -1607,6 +1609,8 @@ def _extract_subject_name(corrected_text, subject_keyword):
         if match:
             raw = match.group(1).strip()
             cleaned = _clean_entity_text(raw)
+            if cleaned and any(token in _norm(cleaned) for token in ["demande", "transport", "taxi", "formation", "deplacement", "déplacement"]):
+                continue
             if cleaned and len(cleaned) >= 2 and _is_likely_proper_noun(cleaned.split()[0]):
                 return _capitalize_entity(cleaned)
             elif cleaned and len(cleaned) >= 2:
@@ -2269,6 +2273,58 @@ def _source_has_relative_time_signal(source_text):
     ))
 
 
+def _source_has_explicit_date_signal(source_text):
+    lowered = _norm(_normalize_ws(source_text))
+    if not lowered:
+        return False
+
+    if re.search(
+        r"\b(?:aujourd['’ ]hui|ce\s+jour|demain|des\s+demain|apres\s+demain|apr[eè]s\s+demain)\b",
+        lowered,
+        flags=re.IGNORECASE,
+    ):
+        return True
+
+    if re.search(r"\b\d{4}-\d{2}-\d{2}\b", lowered):
+        return True
+
+    if re.search(r"\b\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?\b", lowered):
+        return True
+
+    if re.search(
+        rf"\b\d{{1,2}}(?:er)?\s+{MONTH_PATTERN}(?:\s+\d{{4}})?\b",
+        lowered,
+        flags=re.IGNORECASE,
+    ):
+        return True
+
+    if re.search(
+        r"\b(?:dans|d['’]ici|sous)\s+(\d+|un|une)\s+(?:jour|jours|mois)\b",
+        lowered,
+        flags=re.IGNORECASE,
+    ):
+        return True
+
+    if re.search(
+        r"\b(\d+|un|une)?\s*mois\s+(?:plus\s+tard|apres|apr[eè]s|plus\s+loin)\b",
+        lowered,
+        flags=re.IGNORECASE,
+    ):
+        return True
+
+    return bool(
+        re.search(r"\b(?:date|jour|echeance|deadline)\b", lowered, flags=re.IGNORECASE)
+        and (
+            re.search(r"\b\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?\b", lowered) is not None
+            or re.search(
+                r"\b\d{1,2}\s+(?:janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)\s+\d{4}\b",
+                lowered,
+                flags=re.IGNORECASE,
+            ) is not None
+        )
+    )
+
+
 def _build_autre_feedback_signal(source_text, ranked_feedback):
     if not ranked_feedback:
         return (
@@ -2295,9 +2351,9 @@ def _build_autre_feedback_signal(source_text, ranked_feedback):
                 "score": max(96, numeric_score),
                 "label": "Elevee",
                 "tone": "success",
-                "message": "Demande deja confirmee retrouvee en base. La confirmation supplementaire peut etre ignoree.",
+                "message": "Demande deja confirmee retrouvee en base. Verifiez les champs avant validation.",
             },
-            True,
+            False,
             True,
         )
 
@@ -2463,6 +2519,8 @@ def _sanitize_value_for_field(key, value, source=""):
     normalized = _norm(raw_value)
 
     if bucket == "date":
+        if source and not _source_supports_field_override(source, key):
+            return ""
         if re.match(r"^\d{4}-\d{2}-\d{2}$", raw_value):
             return raw_value
         date_value, _ = _extract_date_range(raw_value)
@@ -2544,10 +2602,7 @@ def _source_supports_field_override(source, key):
         return _has_constraint_evidence(source_text)
 
     if bucket == "date":
-        date_start, date_end = _extract_date_range(source_text)
-        if date_start or date_end:
-            return True
-        return bool(re.search(r"\b(?:le|des|d[èe]s|a\s+partir\s+de)\s+\d{1,2}\b", normalized_source))
+        return _source_has_explicit_date_signal(source_text)
 
     if bucket == "time":
         return "" != _extract_arrival_time(source_text)
@@ -3334,10 +3389,11 @@ def _build_autre_structured_context(source, rule_fields, intents):
     context_fields = _build_context_fields(source, intents)
 
     date_debut, date_fin = _extract_structured_date_range(source)
-    if date_debut:
+    has_explicit_date_signal = _source_has_explicit_date_signal(source)
+    if date_debut and has_explicit_date_signal:
         context_fields["date_debut"] = date_debut
         context_fields["date_souhaitee"] = date_debut
-    if date_fin:
+    if date_fin and has_explicit_date_signal:
         context_fields["date_fin"] = date_fin
 
     transport_type = _normalize_ws(
@@ -4551,6 +4607,8 @@ def _build_autre_response(request_data, prompt):
             continue
         if key.startswith("ai_custom_") and _normalize_ws(field.get("type", "")) == "select" and _normalize_ws(field.get("source", "")) != "explicit":
             cleaned_value = ""
+        if not cleaned_value:
+            continue
         field["value"] = cleaned_value
         if "options" in field and not isinstance(field.get("options"), list):
             field["options"] = []
@@ -4652,7 +4710,9 @@ def _build_autre_response(request_data, prompt):
             context_fields.get("lieu_souhaite", ""),
         )
 
-    if _normalize_ws(context_fields.get("date_debut", "")):
+    has_explicit_date_signal = _source_has_explicit_date_signal(source)
+
+    if has_explicit_date_signal and _normalize_ws(context_fields.get("date_debut", "")):
         _upsert_custom_field(
             "ai_date_souhaitee_metier",
             "Date demandee",
@@ -4669,7 +4729,7 @@ def _build_autre_response(request_data, prompt):
                 context_fields.get("date_debut", ""),
             )
 
-    if _normalize_ws(context_fields.get("date_fin", "")):
+    if has_explicit_date_signal and _normalize_ws(context_fields.get("date_fin", "")):
         _upsert_custom_field(
             "ai_date_fin_extra",
             "Date fin",
@@ -4760,7 +4820,11 @@ def _build_autre_response(request_data, prompt):
         "besoinPersonnalise": title,
         "descriptionBesoin": rule_fields.get("descriptionBesoin") or description,
         "niveauUrgenceAutre": explicit_urgency["urgency"] if explicit_urgency else _autre_priority_to_base_label(base_priority_label, priority_confidence),
-        "dateSouhaiteeAutre": context_fields.get("date_debut") or rule_fields.get("dateSouhaiteeAutre") or rule_fields.get("ai_date_souhaitee_metier") or extractor.extract_date(source) or "",
+        "dateSouhaiteeAutre": (
+            (context_fields.get("date_debut") or rule_fields.get("dateSouhaiteeAutre") or rule_fields.get("ai_date_souhaitee_metier") or "")
+            if has_explicit_date_signal
+            else ""
+        ),
     }
 
     if not details["besoinPersonnalise"]:
@@ -4929,9 +4993,10 @@ def _extract_location_pair(corrected_text):
 
 def _extract_subject_name(corrected_text, subject_keyword):
     lowered = _norm(corrected_text)
+    stop_tail = r"\s+(?:le|du|de|vers|pour|a|à|dans|qui|que|demain|aujourd'hui|aujourdhui|matin|soir|taxi|transport|deplacement|déplacement|par)\b"
     patterns = [
-        rf"\b{re.escape(subject_keyword)}\s+(?:en\s+|sur\s+|de\s+)?([a-z][a-z0-9\s\-\./+#]*[a-z0-9+#])(?=\s+le\b|\s+du\b|\s+de\b|\s+vers\b|\s+pour\b|\s+a\b|$)",
-        rf"\bpour\s+(?:une?\s+)?{re.escape(subject_keyword)}\s+(?:en\s+|sur\s+|de\s+)?([a-z][a-z0-9\s\-\./+#]*[a-z0-9+#])(?=\s+le\b|\s+du\b|\s+de\b|\s+vers\b|$)",
+        rf"\b{re.escape(subject_keyword)}\s+(?:en\s+|sur\s+|de\s+)?([a-z][a-z0-9\s\-\./+#]*[a-z0-9+#])(?={stop_tail}|$)",
+        rf"\bpour\s+(?:une?\s+)?{re.escape(subject_keyword)}\s+(?:en\s+|sur\s+|de\s+)?([a-z][a-z0-9\s\-\./+#]*[a-z0-9+#])(?={stop_tail}|$)",
     ]
     for pattern in patterns:
         match = re.search(pattern, lowered, flags=re.IGNORECASE)
@@ -4941,6 +5006,8 @@ def _extract_subject_name(corrected_text, subject_keyword):
         cleaned = _clean_entity_text(raw)
         cleaned = re.sub(r"^(?:professionnel(?:le)?|professionel)\s+(?:de|en|sur)\s+", "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"^(?:professionnel(?:le)?|professionel)\s+", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.split(r"\b(?:demain|aujourd'hui|aujourdhui|matin|soir|taxi|transport|deplacement|déplacement|par)\b", cleaned, maxsplit=1, flags=re.IGNORECASE)[0]
+        cleaned = _normalize_ws(cleaned).strip(" ,;:-/")
         if cleaned and len(cleaned) >= 2 and _is_likely_proper_noun(cleaned.split()[0]):
             return _capitalize_entity(cleaned)
         if cleaned and len(cleaned) >= 2:

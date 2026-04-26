@@ -177,7 +177,7 @@ class DemandeController extends AbstractController
             $demande->setEmploye($employe);
 
             if ($form->isValid() && empty($detailErrors)) {
-                if ($aiGenerated && !$aiConfirmed && !$aiTrustedFromLearning) {
+                if ($aiGenerated && !$aiConfirmed) {
                     $this->addFlash('warning', 'Veuillez confirmer la demande apres generation IA avant de creer la demande.');
                 } else {
                     $this->em->persist($demande);
@@ -185,7 +185,7 @@ class DemandeController extends AbstractController
 
                     if (!empty($submittedDetails)) {
                         $persistedDetails = $submittedDetails;
-                        if ('Autre' === $submittedType && $aiGenerated && ($aiConfirmed || $aiTrustedFromLearning)) {
+                        if ('Autre' === $submittedType && $aiGenerated && $aiConfirmed) {
                             $trustedPrompt = trim('' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription);
                             $persistedDetails['_ai_feedback_confirmed'] = true;
                             $persistedDetails['_ai_confirmed_at'] = (new \DateTimeImmutable())->format(DATE_ATOM);
@@ -210,7 +210,7 @@ class DemandeController extends AbstractController
                     $this->em->persist($historique);
                     $this->em->flush();
 
-                    if ($aiGenerated && ($aiConfirmed || $aiTrustedFromLearning)) {
+                    if ($aiGenerated && $aiConfirmed) {
                         $this->demandeAiAssistant->recordAcceptedDescriptionFeedback(
                             (string) ($demande->getTitre() ?? ''),
                             (string) ($demande->getDescription() ?? ''),
@@ -461,22 +461,27 @@ class DemandeController extends AbstractController
         }
 
         $detailsData    = [];
+        $decisionDetails = [];
         $fieldLabels    = [];
         $decisionAdvice = null;
         $demandeDetails = $demande->getDemandeDetails();
 
         if ($demandeDetails->count() > 0) {
             $firstDetail = $demandeDetails->first();
-            $detailsData = json_decode($firstDetail->getDetails(), true) ?? [];
+            $rawDetailsData = json_decode($firstDetail->getDetails(), true) ?? [];
+            $rawDetailsData = is_array($rawDetailsData) ? $rawDetailsData : [];
+            $detailsData = $this->filterVisibleDetails($rawDetailsData);
+            $decisionDetails = $this->filterDecisionDetails($rawDetailsData);
+            $aiFieldLabels = $this->extractAiFieldLabels($rawDetailsData);
 
             foreach ($detailsData as $key => $value) {
-                $fieldLabels[$key] = $this->formHelper->getFieldLabel($demande->getTypeDemande(), $key);
+                $fieldLabels[$key] = $aiFieldLabels[$key] ?? $this->formHelper->getFieldLabel($demande->getTypeDemande(), $key);
             }
         }
 
         $decisionAdvice = $this->demandeDecisionAssistant->analyze(
             $demande,
-            is_array($detailsData) ? $detailsData : [],
+            $decisionDetails,
             $this->formHelper->getFieldsForType((string) $demande->getTypeDemande())
         );
 
@@ -755,6 +760,88 @@ class DemandeController extends AbstractController
         }
         if ('' !== $email) return $email;
         return '' !== $role ? $role : 'Systeme';
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @return array<string, string>
+     */
+    private function filterVisibleDetails(array $details): array
+    {
+        $visible = [];
+        foreach ($details as $key => $value) {
+            $detailKey = trim((string) $key);
+            if ('' === $detailKey || $this->isTechnicalDetailKey($detailKey) || str_ends_with($detailKey, 'Lat') || str_ends_with($detailKey, 'Lon')) {
+                continue;
+            }
+
+            if (is_scalar($value)) {
+                $clean = trim((string) $value);
+                if ('' !== $clean) {
+                    $visible[$detailKey] = $clean;
+                }
+            }
+        }
+
+        return $visible;
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @return array<string, string>
+     */
+    private function filterDecisionDetails(array $details): array
+    {
+        $filtered = [];
+        foreach ($details as $key => $value) {
+            $detailKey = trim((string) $key);
+            if ('' === $detailKey || $this->isTechnicalDetailKey($detailKey)) {
+                continue;
+            }
+
+            if (is_scalar($value)) {
+                $filtered[$detailKey] = trim((string) $value);
+            }
+        }
+
+        return $filtered;
+    }
+
+    private function isTechnicalDetailKey(string $key): bool
+    {
+        return str_starts_with($key, '_ai_') || str_starts_with($key, '__ai_') || 'ai_field_plan' === $key;
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @return array<string, string>
+     */
+    private function extractAiFieldLabels(array $details): array
+    {
+        $plan = $details['_ai_field_plan'] ?? $details['__ai_field_plan'] ?? null;
+        if (is_string($plan) && '' !== trim($plan)) {
+            $decodedPlan = json_decode($plan, true);
+            $plan = is_array($decodedPlan) ? $decodedPlan : null;
+        }
+
+        if (!is_array($plan) || !is_array($plan['add'] ?? null)) {
+            return [];
+        }
+
+        $labels = [];
+        foreach ($plan['add'] as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            $label = trim((string) ($field['label'] ?? ''));
+            if ('' !== $key && '' !== $label) {
+                $labels[$key] = $label;
+            }
+        }
+
+        return $labels;
     }
 
     private function validateDetails(string $typeDemande, array $details): array

@@ -28,6 +28,7 @@ class DemandeDecisionAssistant
      */
     public function analyze(Demande $demande, array $details, array $fieldDefinitions): array
     {
+        $details = $this->normalizeDetailsForDecision($details);
         $missingRequired = [];
         $weakRequired = [];
         $filledRequired = 0;
@@ -251,6 +252,27 @@ class DemandeDecisionAssistant
             'repeatTypePenalty' => $repeatPenalty,
             'mlSignals' => $mlSignals,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @return array<string, string>
+     */
+    private function normalizeDetailsForDecision(array $details): array
+    {
+        $normalized = [];
+        foreach ($details as $key => $value) {
+            $detailKey = trim((string) $key);
+            if ('' === $detailKey || str_starts_with($detailKey, '_ai_') || str_starts_with($detailKey, '__ai_')) {
+                continue;
+            }
+
+            if (is_scalar($value)) {
+                $normalized[$detailKey] = trim((string) $value);
+            }
+        }
+
+        return $normalized;
     }
 
     /**

@@ -89,11 +89,18 @@ class DemandeAiAssistant
             }
         }
 
+        if ($manualOnlyMode) {
+            return $this->buildManualAutreSuggestion($sourceText, $manualFields, $currentDetails, $generalContext);
+        }
+
         $feedbackSamples = $this->loadAutreFeedbackSamples();
-        if ('regenerate' !== $regenerateMode && !$manualOnlyMode) {
-            $matchedSample = $this->findConfirmedAutreFeedbackSample($sourceText, $feedbackSamples);
-            if (null !== $matchedSample) {
-                return $this->buildAutreSuggestionFromSample($sourceText, $matchedSample, $allAutreFields);
+        if (!$manualOnlyMode) {
+            $matchedSample = $this->findConfirmedAutreFeedbackSample($sourceText, $feedbackSamples, $allAutreFields);
+            if (null !== $matchedSample && ('regenerate' !== $regenerateMode || $this->isStrongConfirmedAutreFeedbackMatch($matchedSample))) {
+                $learnedSuggestion = $this->buildAutreSuggestionFromSample($sourceText, $matchedSample);
+                if (null !== $learnedSuggestion) {
+                    return $learnedSuggestion;
+                }
             }
         }
 
@@ -248,10 +255,123 @@ class DemandeAiAssistant
     }
 
     /**
+     * @param array<int, array<string, mixed>> $manualFields
+     * @param array<string, mixed> $currentDetails
+     * @param array<string, mixed> $generalContext
+     * @return array<string, mixed>
+     */
+    private function buildManualAutreSuggestion(string $sourceText, array $manualFields, array $currentDetails, array $generalContext): array
+    {
+        $details = [];
+        $customFields = [];
+
+        foreach ($manualFields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' === $key) {
+                continue;
+            }
+
+            $value = $this->firstNonEmpty(
+                isset($currentDetails[$key]) && is_scalar($currentDetails[$key]) ? trim((string) $currentDetails[$key]) : '',
+                trim((string) ($field['value'] ?? '')),
+                $this->inferAutreCustomFieldValue($sourceText, $field)
+            );
+
+            $type = strtolower(trim((string) ($field['type'] ?? 'text')));
+            if (!in_array($type, ['text', 'textarea', 'select', 'number', 'date'], true)) {
+                $type = 'text';
+            }
+
+            if ('select' === $type && '' === $value) {
+                $value = $this->inferManualSelectValue($sourceText, is_array($field['options'] ?? null) ? $field['options'] : []);
+            }
+
+            if ('' !== $value) {
+                $details[$key] = $value;
+            }
+
+            $customField = [
+                'key' => $key,
+                'label' => trim((string) ($field['label'] ?? $key)),
+                'type' => $type,
+                'required' => true === ($field['required'] ?? false),
+                'value' => $value,
+            ];
+
+            if ('select' === $type) {
+                $customField['options'] = is_array($field['options'] ?? null) ? array_values(array_map('strval', $field['options'])) : [];
+            }
+
+            $customFields[] = $customField;
+        }
+
+        $title = $this->firstNonEmpty(
+            trim((string) ($generalContext['titre'] ?? '')),
+            $this->extractLeadClauseBeforeKeywords($sourceText, ['pour', 'car', 'parce que', 'afin de']),
+            $sourceText
+        );
+        $description = $this->firstNonEmpty(
+            trim((string) ($generalContext['description'] ?? '')),
+            $sourceText
+        );
+
+        return [
+            'correctedText' => trim($sourceText),
+            'generatedDescription' => $description,
+            'suggestedGeneral' => [
+                'titre' => $title,
+                'description' => $description,
+                'priorite' => trim((string) ($generalContext['priorite'] ?? 'NORMALE')),
+                'categorie' => trim((string) ($generalContext['categorie'] ?? 'Autre')),
+                'typeDemande' => trim((string) ($generalContext['typeDemande'] ?? 'Autre')),
+            ],
+            'suggestedDetails' => $details,
+            'dynamicFieldPlan' => [
+                'add' => $customFields,
+                'remove' => ['ALL'],
+                'replaceBase' => [] !== $customFields,
+            ],
+            'dynamicFieldConfidence' => [
+                'score' => 100,
+                'label' => 'Elevee',
+                'tone' => 'success',
+                'message' => 'Champs configures manuellement. Les valeurs detectees dans le texte ont ete appliquees sans changer le plan.',
+            ],
+            'skipConfirmationRestriction' => false,
+            'model' => 'manual-fields:autre-configured',
+        ];
+    }
+
+    /**
+     * @param array<int, mixed> $options
+     */
+    private function inferManualSelectValue(string $sourceText, array $options): string
+    {
+        $normalizedSource = $this->normalizeForSearch($sourceText);
+        foreach ($options as $option) {
+            $optionText = trim((string) $option);
+            if ('' === $optionText) {
+                continue;
+            }
+
+            $normalizedOption = $this->normalizeForSearch($optionText);
+            if ('' !== $normalizedOption && str_contains($normalizedSource, $normalizedOption)) {
+                return $optionText;
+            }
+        }
+
+        return '';
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $samples
      * @return array<string, mixed>|null
      */
-    private function findConfirmedAutreFeedbackSample(string $sourceText, array $samples): ?array
+    private function findConfirmedAutreFeedbackSample(string $sourceText, array $samples, array $autreFields = []): ?array
     {
         $normalizedSource = $this->normalizeLooseLabel($sourceText);
         if ('' === $normalizedSource || [] === $samples) {
@@ -260,8 +380,20 @@ class DemandeAiAssistant
 
         $sourceTokens = $this->tokenizeLooseText($normalizedSource);
         $sourceCoreTokens = $this->tokenizeLooseText($this->normalizeAutreLearningMatchText($sourceText));
-        $bestScore = 0.0;
-        $bestSample = null;
+        $sourceKeywordTokens = $this->filterAutreKeywordTokens($sourceCoreTokens);
+        $targetKeys = [];
+        foreach ($autreFields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' !== $key) {
+                $targetKeys[$key] = true;
+            }
+        }
+
+        $candidates = [];
 
         foreach ($samples as $sample) {
             if (!is_array($sample)) {
@@ -276,7 +408,9 @@ class DemandeAiAssistant
             $sampleGeneral = is_array($sample['general'] ?? null) ? $sample['general'] : [];
             $sampleDetails = is_array($sample['details'] ?? null) ? $sample['details'] : [];
             $sampleFieldPlan = is_array($sample['fieldPlan'] ?? null) ? $sample['fieldPlan'] : [];
-            $hasLearnedSchema = [] !== (is_array($sampleFieldPlan['add'] ?? null) ? $sampleFieldPlan['add'] : []);
+            $learnedSchemaKeys = $this->extractLearnedFieldPlanKeys($sampleFieldPlan);
+            $schemaFieldCount = count($learnedSchemaKeys);
+            $hasLearnedSchema = $schemaFieldCount > 0;
             $samplePrompt = $this->normalizeLooseLabel((string) ($sample['prompt'] ?? ''));
             $sampleTitle = $this->normalizeLooseLabel((string) (($sampleGeneral['titre'] ?? '') ?: ($sampleGeneral['description'] ?? '')));
             $sampleDetailsText = $this->normalizeLooseLabel(implode(' ', array_map(
@@ -290,16 +424,24 @@ class DemandeAiAssistant
 
             $sampleTokens = $this->tokenizeLooseText($sampleText);
             $sampleCoreTokens = $this->tokenizeLooseText($this->normalizeAutreLearningMatchText($sampleText));
+            $sampleKeywordTokens = $this->filterAutreKeywordTokens($sampleCoreTokens);
             $sharedTokens = count(array_intersect($sourceTokens, $sampleTokens));
             $tokenCoverage = [] !== $sourceTokens ? $sharedTokens / count($sourceTokens) : 0.0;
             $sampleCoverage = [] !== $sampleTokens ? $sharedTokens / count($sampleTokens) : 0.0;
             $coreSharedTokens = count(array_intersect($sourceCoreTokens, $sampleCoreTokens));
             $coreCoverage = [] !== $sampleCoreTokens ? $coreSharedTokens / count($sampleCoreTokens) : 0.0;
             $sourceCoreCoverage = [] !== $sourceCoreTokens ? $coreSharedTokens / count($sourceCoreTokens) : 0.0;
+            $keywordSharedTokens = count(array_intersect($sourceKeywordTokens, $sampleKeywordTokens));
+            $keywordSourceCoverage = [] !== $sourceKeywordTokens ? $keywordSharedTokens / count($sourceKeywordTokens) : 0.0;
+            $keywordSampleCoverage = [] !== $sampleKeywordTokens ? $keywordSharedTokens / count($sampleKeywordTokens) : 0.0;
 
             similar_text($normalizedSource, $sampleText, $similarity);
             $score = ($similarity * 0.55) + ($tokenCoverage * 100 * 0.3) + ($sampleCoverage * 100 * 0.15);
             $score = max($score, ($coreCoverage * 100 * 0.72) + ($sourceCoreCoverage * 100 * 0.28));
+
+            if ('' !== $samplePrompt && $samplePrompt === $normalizedSource) {
+                $score = max($score, 100.0);
+            }
 
             if ($normalizedSource === $sampleText || str_contains($normalizedSource, $sampleText) || str_contains($sampleText, $normalizedSource)) {
                 $score += 18;
@@ -309,34 +451,194 @@ class DemandeAiAssistant
                 $score += 16;
             }
 
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $bestSample = $sample;
+            $keywordMatch = $keywordSharedTokens >= 2 && $keywordSourceCoverage >= 0.50 && $keywordSampleCoverage >= 0.25;
+            if ($keywordMatch) {
+                $score = max($score, 60.0 + ($keywordSourceCoverage * 18.0) + ($keywordSampleCoverage * 8.0));
+            }
+
+            if ($score < 58.0) {
+                continue;
+            }
+
+            $schemaHits = 0;
+            $schemaCoverage = 0.0;
+            if ([] !== $targetKeys) {
+                foreach (array_keys($targetKeys) as $targetKey) {
+                    $candidateValue = $sampleDetails[$targetKey] ?? null;
+                    if (is_scalar($candidateValue) && '' !== trim((string) $candidateValue)) {
+                        ++$schemaHits;
+                    }
+                }
+
+                $schemaCoverage = $schemaHits / max(1, count($targetKeys));
+                if ($schemaCoverage >= 0.55) {
+                    $score += 6.0;
+                }
+            }
+
+            $createdAtRaw = trim((string) ($sample['createdAt'] ?? ''));
+            $createdAtTs = strtotime($createdAtRaw);
+            $learningSourceRank = 'database' === trim((string) ($sample['_learningSource'] ?? '')) ? 1 : 0;
+            $candidates[] = [
+                'sample' => $sample,
+                'score' => $score,
+                'schemaHits' => $schemaHits,
+                'schemaCoverage' => $schemaCoverage,
+                'schemaFieldCount' => $schemaFieldCount,
+                'learningSourceRank' => $learningSourceRank,
+                'keywordSharedTokens' => $keywordSharedTokens,
+                'keywordSourceCoverage' => $keywordSourceCoverage,
+                'keywordSampleCoverage' => $keywordSampleCoverage,
+                'createdAtTs' => false === $createdAtTs ? 0 : (int) $createdAtTs,
+            ];
+        }
+
+        if ([] === $candidates) {
+            return null;
+        }
+
+        usort($candidates, static function (array $left, array $right): int {
+            $scoreGap = abs((float) $left['score'] - (float) $right['score']);
+            if ($scoreGap > 10.0) {
+                return $right['score'] <=> $left['score'];
+            }
+
+            if ($left['createdAtTs'] !== $right['createdAtTs']) {
+                return $right['createdAtTs'] <=> $left['createdAtTs'];
+            }
+
+            if ($left['learningSourceRank'] !== $right['learningSourceRank']) {
+                return $right['learningSourceRank'] <=> $left['learningSourceRank'];
+            }
+
+            if ($left['schemaFieldCount'] !== $right['schemaFieldCount']) {
+                return $right['schemaFieldCount'] <=> $left['schemaFieldCount'];
+            }
+
+            if ($left['schemaCoverage'] !== $right['schemaCoverage']) {
+                return $right['schemaCoverage'] <=> $left['schemaCoverage'];
+            }
+
+            if ($left['schemaHits'] !== $right['schemaHits']) {
+                return $right['schemaHits'] <=> $left['schemaHits'];
+            }
+
+            if ($left['score'] !== $right['score']) {
+                return $right['score'] <=> $left['score'];
+            }
+
+            return $right['keywordSharedTokens'] <=> $left['keywordSharedTokens'];
+        });
+
+        $selected = $candidates[0];
+        $ambiguousCount = 0;
+        foreach ($candidates as $index => $candidate) {
+            if (0 === $index) {
+                continue;
+            }
+
+            $scoreGap = abs((float) $selected['score'] - (float) $candidate['score']);
+            $coverageGap = abs((float) $selected['schemaCoverage'] - (float) $candidate['schemaCoverage']);
+            if ($scoreGap <= 2.5 && $coverageGap <= 0.10) {
+                ++$ambiguousCount;
             }
         }
 
-        return $bestScore >= 58.0 && is_array($bestSample) ? $bestSample : null;
+        $sample = is_array($selected['sample']) ? $selected['sample'] : [];
+        $sample['_match_score'] = (float) $selected['score'];
+        $sample['_match_schema_coverage'] = (float) $selected['schemaCoverage'];
+        $sample['_match_ambiguous_count'] = $ambiguousCount;
+
+        return $sample;
     }
 
     /**
-     * @param array<int, array<string, mixed>> $autreFields
-     * @param array<string, mixed> $sample
-     * @return array<string, mixed>
+     * @param array<int, string> $tokens
+     * @return array<int, string>
      */
-    private function buildAutreSuggestionFromSample(string $sourceText, array $sample, array $autreFields): array
+    private function filterAutreKeywordTokens(array $tokens): array
+    {
+        $genericTokens = [
+            'demande' => true,
+            'besoin' => true,
+            'souhaite' => true,
+            'souhaiter' => true,
+            'veux' => true,
+            'voudrais' => true,
+            'faire' => true,
+            'mettre' => true,
+            'creer' => true,
+            'travail' => true,
+            'professionnel' => true,
+            'professionnelle' => true,
+            'activite' => true,
+            'information' => true,
+            'complement' => true,
+        ];
+
+        $keywords = [];
+        foreach ($tokens as $token) {
+            $token = trim((string) $token);
+            if (mb_strlen($token) < 3 || isset($genericTokens[$token])) {
+                continue;
+            }
+
+            $keywords[$token] = $token;
+        }
+
+        return array_values($keywords);
+    }
+
+    /**
+     * @param array<string, mixed> $sample
+     */
+    private function isStrongConfirmedAutreFeedbackMatch(array $sample): bool
+    {
+        return (float) ($sample['_match_score'] ?? 0.0) >= 58.0;
+    }
+
+    /**
+     * @param array<string, mixed> $fieldPlan
+     * @return array<int, string>
+     */
+    private function extractLearnedFieldPlanKeys(array $fieldPlan): array
+    {
+        $keys = [];
+        $addFields = is_array($fieldPlan['add'] ?? null) ? $fieldPlan['add'] : [];
+        foreach ($addFields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' === $key) {
+                continue;
+            }
+
+            $keys[$key] = $key;
+        }
+
+        return array_values($keys);
+    }
+
+    /**
+     * @param array<string, mixed> $sample
+     * @return array<string, mixed>|null
+     */
+    private function buildAutreSuggestionFromSample(string $sourceText, array $sample): ?array
     {
         $general = is_array($sample['general'] ?? null) ? $sample['general'] : [];
         $sampleDetails = is_array($sample['details'] ?? null) ? $sample['details'] : [];
         $fieldPlan = is_array($sample['fieldPlan'] ?? null) ? $sample['fieldPlan'] : ['add' => [], 'remove' => [], 'replaceBase' => false];
         $correctedText = trim($sourceText);
-        $generatedDescription = $this->firstNonEmpty(
-            trim((string) ($general['description'] ?? '')),
-            trim((string) ($sampleDetails['descriptionBesoin'] ?? '')),
-            $correctedText
-        );
+        $ambiguousMatches = max(0, (int) ($sample['_match_ambiguous_count'] ?? 0));
+        $generatedDescription = $correctedText;
 
         if ('' === $generatedDescription) {
-            $generatedDescription = $correctedText;
+            $generatedDescription = $this->firstNonEmpty(
+                trim((string) ($general['description'] ?? '')),
+                trim((string) ($sampleDetails['descriptionBesoin'] ?? ''))
+            );
         }
 
         $customFields = [];
@@ -355,18 +657,73 @@ class DemandeAiAssistant
                 $type = 'text';
             }
 
-            $value = $this->firstNonEmpty(
-                $this->inferAutreCustomFieldValue($sourceText, $field),
-                isset($sampleDetails[$key]) && is_scalar($sampleDetails[$key]) ? trim((string) $sampleDetails[$key]) : '',
-                trim((string) ($field['value'] ?? ''))
-            );
+            $inferredValue = $this->inferAutreCustomFieldValue($sourceText, $field);
+            $sampleValue = isset($sampleDetails[$key]) && is_scalar($sampleDetails[$key])
+                ? trim((string) $sampleDetails[$key])
+                : '';
+            $schemaValue = trim((string) ($field['value'] ?? ''));
+            $sampleSupportsPrompt = $this->sourceContainsFeedbackValue($sourceText, $sampleValue);
+            $schemaSupportsPrompt = $this->sourceContainsFeedbackValue($sourceText, $schemaValue);
+            $isStableField = $this->isStableLearnedAutreField($field);
+            $isPromptSensitiveField = $this->isPromptSensitiveLearnedAutreField($field);
+            $fieldCalledInPrompt = $this->isAutreFieldCalledInPrompt($sourceText, $field);
+            $allowCategoryReuse = $this->canReuseLearnedFieldForPromptCategory($sourceText, $field, $fieldCalledInPrompt);
+            $matchScore = (float) ($sample['_match_score'] ?? 0.0);
+
+            if (
+                $this->looksLikePromptEcho($inferredValue, $sourceText)
+                && '' !== $sampleValue
+                && $isStableField
+                && !$isPromptSensitiveField
+            ) {
+                $inferredValue = '';
+            }
+
+            if ($isStableField) {
+                $promptSupportedValue = $this->firstNonEmpty(
+                    $sampleSupportsPrompt || $matchScore >= 78.0 ? $sampleValue : '',
+                    $inferredValue,
+                    $schemaSupportsPrompt || $matchScore >= 82.0 ? $schemaValue : ''
+                );
+            } else {
+                $promptSupportedValue = $this->firstNonEmpty(
+                    $inferredValue,
+                    $sampleSupportsPrompt ? $sampleValue : '',
+                    $schemaSupportsPrompt ? $schemaValue : ''
+                );
+            }
+
+            if (
+                '' === $promptSupportedValue
+                && $matchScore >= 74.0
+                && $isStableField
+                && !$isPromptSensitiveField
+                && 'textarea' !== $type
+                && $allowCategoryReuse
+            ) {
+                // For close semantic matches, keep non-volatile learned fields
+                // even when wording changes and strict token overlap is lower.
+                $promptSupportedValue = $this->firstNonEmpty($sampleValue, $schemaValue);
+            }
+
+            if ('' === $promptSupportedValue && !$fieldCalledInPrompt && !$allowCategoryReuse) {
+                continue;
+            }
+
+            if ('' === $promptSupportedValue) {
+                continue;
+            }
+
+            if (!$fieldCalledInPrompt && !$allowCategoryReuse) {
+                continue;
+            }
 
             $customField = [
                 'key' => $key,
                 'label' => trim((string) ($field['label'] ?? $key)),
                 'type' => $type,
                 'required' => true === ($field['required'] ?? false),
-                'value' => $value,
+                'value' => $promptSupportedValue,
             ];
 
             if ('select' === $type && isset($field['options']) && is_array($field['options'])) {
@@ -376,7 +733,13 @@ class DemandeAiAssistant
             $customFields[] = $customField;
         }
 
+        // Keep learned schema, but enrich values from current prompt signals
+        // (date/time/location/amount) when newly mentioned.
         $customFields = $this->augmentLearnedAutreFieldsFromPrompt($sourceText, $customFields);
+        $customFields = $this->dedupeAutreFieldsByKey($customFields);
+        if ([] === $customFields) {
+            return null;
+        }
 
         $visibleDetails = [];
         foreach ($customFields as $field) {
@@ -385,14 +748,24 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $visibleDetails[$key] = trim((string) ($field['value'] ?? ''));
+            $value = trim((string) ($field['value'] ?? ''));
+            if ('' !== $value) {
+                $visibleDetails[$key] = $value;
+            }
         }
+
+        $confidenceMessage = $ambiguousMatches > 0
+            ? 'Plusieurs demandes confirmees similaires existent en base. La plus pertinente et la plus recente a ete appliquee.'
+            : 'Demande deja confirmee en base. Le schema sauvegarde est reutilise et les valeurs suivent le texte actuel.';
 
         return [
             'correctedText' => $correctedText,
             'generatedDescription' => $generatedDescription,
             'suggestedGeneral' => [
-                'titre' => trim((string) ($general['titre'] ?? '')),
+                'titre' => $this->firstNonEmpty(
+                    $this->extractLeadClauseBeforeKeywords($sourceText, ['pour', 'car', 'parce que', 'afin de', 'vers', 'destinataire', 'organisme', 'chez']),
+                    trim((string) ($general['titre'] ?? ''))
+                ),
                 'description' => $generatedDescription,
                 'priorite' => trim((string) ($general['priorite'] ?? '')),
                 'categorie' => trim((string) ($general['categorie'] ?? '')),
@@ -405,14 +778,224 @@ class DemandeAiAssistant
                 'replaceBase' => [] !== $customFields || true === ($fieldPlan['replaceBase'] ?? false),
             ],
             'dynamicFieldConfidence' => [
-                'score' => 96,
+                'score' => $ambiguousMatches > 0 ? 91 : 96,
                 'label' => 'Elevee',
                 'tone' => 'success',
-                'message' => 'Demande deja confirmee en base. Les champs sauvegardes sont reutilises et completes avec les nouvelles infos detectees.',
+                'message' => $confidenceMessage,
             ],
-            'skipConfirmationRestriction' => true,
+            'skipConfirmationRestriction' => false,
             'model' => 'database-feedback:autre-confirmed-match',
         ];
+    }
+
+    private function sourceContainsFeedbackValue(string $sourceText, string $value): bool
+    {
+        $normalizedSource = $this->normalizeForSearch($sourceText);
+        $normalizedValue = $this->normalizeForSearch($value);
+
+        if ('' === $normalizedSource || '' === $normalizedValue || mb_strlen($normalizedValue) < 3) {
+            return false;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $normalizedValue) === 1) {
+            return str_contains($normalizedSource, $normalizedValue);
+        }
+
+        if (str_contains($normalizedSource, $normalizedValue)) {
+            return true;
+        }
+
+        $sourceTokens = $this->tokenizeLooseText($normalizedSource);
+        $valueTokens = $this->tokenizeLooseText($normalizedValue);
+        if ([] === $sourceTokens || [] === $valueTokens) {
+            return false;
+        }
+
+        $shared = count(array_intersect($sourceTokens, $valueTokens));
+        $valueCoverage = $shared / max(1, count($valueTokens));
+
+        return $valueCoverage >= 0.6;
+    }
+
+    private function looksLikePromptEcho(string $candidate, string $sourceText): bool
+    {
+        $normalizedCandidate = $this->normalizeForSearch($candidate);
+        $normalizedSource = $this->normalizeForSearch($sourceText);
+        if ('' === $normalizedCandidate || '' === $normalizedSource) {
+            return false;
+        }
+
+        if (mb_strlen($normalizedCandidate) < 30) {
+            return false;
+        }
+
+        if (str_contains($normalizedSource, $normalizedCandidate)) {
+            return true;
+        }
+
+        $sourceTokens = $this->tokenizeLooseText($normalizedSource);
+        $candidateTokens = $this->tokenizeLooseText($normalizedCandidate);
+        if ([] === $sourceTokens || [] === $candidateTokens || count($candidateTokens) < 5) {
+            return false;
+        }
+
+        $sharedTokens = count(array_intersect($sourceTokens, $candidateTokens));
+        $candidateCoverage = $sharedTokens / max(1, count($candidateTokens));
+        similar_text($normalizedSource, $normalizedCandidate, $similarity);
+
+        return $candidateCoverage >= 0.7 && $similarity >= 75.0;
+    }
+
+    /**
+     * Stable fields are usually user-defined taxonomy labels where confirmed values
+     * should be preferred over free-text reformulation.
+     *
+     * @param array<string, mixed> $field
+     */
+    private function isStableLearnedAutreField(array $field): bool
+    {
+        $label = $this->normalizeForSearch((string) ($field['label'] ?? ''));
+        $key = $this->normalizeForSearch((string) ($field['key'] ?? ''));
+        $haystack = trim($label . ' ' . $key);
+        if ('' === $haystack) {
+            return false;
+        }
+
+        return preg_match('/\b(type|nature|incident|intervention|categorie|categorie|niveau|niveau_urgence|classification|statut|mode)\b/i', $haystack) === 1;
+    }
+
+    /**
+     * Prompt-sensitive fields must still be supported by current prompt evidence
+     * to avoid carrying stale values across different user requests.
+     *
+     * @param array<string, mixed> $field
+     */
+    private function isPromptSensitiveLearnedAutreField(array $field): bool
+    {
+        $label = $this->normalizeForSearch((string) ($field['label'] ?? ''));
+        $key = $this->normalizeForSearch((string) ($field['key'] ?? ''));
+        $haystack = trim($label . ' ' . $key);
+        if ('' === $haystack) {
+            return false;
+        }
+
+        return preg_match('/\b(date|jour|echeance|deadline|heure|horaire|time|duree|duration|periode|delai|montant|prix|cout|budget|quantite|total|lieu|zone|destination|depart|arrivee|adresse|localisation|usage|justification|motif|description|contexte|besoin|specification|modele|taille|dimension|materiel|equipement|objet)\b/i', $haystack) === 1;
+    }
+
+    /**
+     * Reuse learned fields by intent/category, not by strict prompt equality.
+     * Values still come from current prompt inference whenever possible.
+     *
+     * @param array<string, mixed> $field
+     */
+    private function canReuseLearnedFieldForPromptCategory(string $sourceText, array $field, bool $fieldCalledInPrompt = false): bool
+    {
+        if ($fieldCalledInPrompt) {
+            return true;
+        }
+
+        $normalizedSource = $this->normalizeForSearch($sourceText);
+        if ('' === $normalizedSource) {
+            return false;
+        }
+
+        $label = $this->normalizeForSearch((string) ($field['label'] ?? ''));
+        $key = $this->normalizeForSearch((string) ($field['key'] ?? ''));
+        $haystack = trim($label . ' ' . $key);
+        if ('' === $haystack) {
+            return false;
+        }
+
+        $equipmentPrompt = preg_match('/\b(materiel|equipement|clavier|souris|ecran|ordinateur|pc|laptop|webcam|imprimante|casque)\b/i', $normalizedSource) === 1;
+        if ($equipmentPrompt) {
+            return preg_match('/\b(materiel|equipement|objet|specification|modele|taille|dimension|usage|justification|motif)\b/i', $haystack) === 1;
+        }
+
+        $transportPrompt = preg_match('/\b(transport|trajet|deplacement|taxi|bus|train|voiture|vehicule|depart|destination)\b/i', $normalizedSource) === 1;
+        if ($transportPrompt) {
+            return preg_match('/\b(transport|trajet|deplacement|depart|destination|lieu|horaire|justification|motif)\b/i', $haystack) === 1;
+        }
+
+        $parkingPrompt = preg_match('/\b(parking|stationnement|place reservee|badge parking|acces parking)\b/i', $normalizedSource) === 1;
+        if ($parkingPrompt) {
+            return preg_match('/\b(parking|stationnement|zone|emplacement|horaire|justification|motif|acces)\b/i', $haystack) === 1;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string, mixed> $field
+     */
+    private function isAutreFieldCalledInPrompt(string $text, array $field): bool
+    {
+        $normalizedText = $this->normalizeForSearch($text);
+        if ('' === $normalizedText) {
+            return false;
+        }
+
+        $label = $this->normalizeForSearch((string) ($field['label'] ?? ''));
+        $key = $this->normalizeForSearch((string) ($field['key'] ?? ''));
+        $haystack = trim($label . ' ' . $key);
+
+        if ('' === $haystack) {
+            return false;
+        }
+
+        if (preg_match('/\b(date|jour|echeance|deadline)\b/i', $haystack) === 1) {
+            return $this->sourceSupportsFieldOverride($text, (string) ($field['key'] ?? ''));
+        }
+
+        if (preg_match('/\b(horaire|heure|time)\b/i', $haystack) === 1) {
+            return '' !== $this->extractExplicitAutreLearningTime($text);
+        }
+
+        if (preg_match('/\b(duree|duration|periode|delai)\b/i', $haystack) === 1) {
+            return '' !== $this->extractExplicitAutreLearningDuration($text);
+        }
+
+        if (preg_match('/\b(montant|prix|cout|budget|quantite|total)\b/i', $haystack) === 1) {
+            return null !== $this->extractAmountFromText($normalizedText);
+        }
+
+        if (preg_match('/\b(lieu|zone|destination|depart|arrivee|adresse|localisation)\b/i', $haystack) === 1) {
+            $route = $this->extractRouteLocations($text);
+            return '' !== trim((string) ($route['from'] ?? ''))
+                || '' !== trim((string) ($route['to'] ?? ''))
+                || '' !== $this->extractTargetLocation($text)
+                || '' !== $this->extractCurrentLocation($text);
+        }
+
+        if (preg_match('/\b(formation|certification|nom_formation|nom formation|intitule formation|intitul[ée] formation)\b/i', $haystack) === 1) {
+            return '' !== $this->firstNonEmpty($this->extractFormationTopic($text), $this->extractTrainingName($text));
+        }
+
+        $options = is_array($field['options'] ?? null) ? $field['options'] : [];
+        foreach ($options as $option) {
+            $normalizedOption = $this->normalizeForSearch((string) $option);
+            if ('' !== $normalizedOption && str_contains($normalizedText, $normalizedOption)) {
+                return true;
+            }
+        }
+
+        $ignoredTokens = [
+            'ai', 'autre', 'custom', 'field', 'champ', 'champs', 'valeur', 'value', 'metier',
+            'info', 'infos', 'information', 'donnee', 'donnees', 'detail', 'details', 'type',
+            'nom', 'objet', 'intitule', 'libelle', 'titre', 'sujet',
+        ];
+        $tokens = preg_split('/[^a-z0-9]+/u', $haystack, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        foreach ($tokens as $token) {
+            $token = trim((string) $token);
+            if (mb_strlen($token) < 4 || in_array($token, $ignoredTokens, true)) {
+                continue;
+            }
+
+            if ($this->containsWord($normalizedText, $token)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -469,6 +1052,52 @@ class DemandeAiAssistant
         };
 
         $dates = $this->extractAllFrenchDates($sourceText);
+        $location = $this->extractExplicitAutreLearningLocation($sourceText, $fields);
+        $amount = $this->extractAmountFromText($this->normalizeForSearch($sourceText));
+        $hasCurrencyToken = preg_match('/\b(?:dt|tnd|dinar|dinars)\b/i', $sourceText) === 1;
+        $time = $this->extractExplicitAutreLearningTime($sourceText);
+        $duration = $this->extractExplicitAutreLearningDuration($sourceText);
+
+        foreach ($fields as $index => $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = strtolower(trim((string) ($field['key'] ?? '')));
+            $label = strtolower(trim((string) ($field['label'] ?? '')));
+            $value = trim((string) ($field['value'] ?? ''));
+            $haystack = trim($key . ' ' . $label);
+
+            if ('' === $value && [] !== $dates && preg_match('/\b(date|jour|echeance|deadline)\b/i', $haystack) === 1) {
+                $fields[$index]['value'] = $dates[0];
+                continue;
+            }
+
+            if ('' === $value && '' !== $location && preg_match('/\b(lieu|localisation|adresse|destination|emplacement|ville)\b/i', $haystack) === 1) {
+                $fields[$index]['value'] = $location;
+                continue;
+            }
+
+            if ('' === $value && '' !== $time && preg_match('/\b(horaire|heure|time)\b/i', $haystack) === 1) {
+                $fields[$index]['value'] = $time;
+                continue;
+            }
+
+            if ('' === $value && '' !== $duration && preg_match('/\b(duree|durée|duration|periode|période|delai|délai)\b/i', $haystack) === 1) {
+                $fields[$index]['value'] = $duration;
+                continue;
+            }
+
+            if (
+                '' === $value
+                && null !== $amount
+                && $hasCurrencyToken
+                && preg_match('/\b(montant|prix|cout|co[uû]t|budget)\b/i', $haystack) === 1
+            ) {
+                $fields[$index]['value'] = (string) $amount;
+            }
+        }
+
         if ([] !== $dates && !$hasFieldLike('/\b(date|jour|echeance|deadline)\b/i')) {
             $fields[] = [
                 'key' => 'ai_date_souhaitee',
@@ -479,7 +1108,26 @@ class DemandeAiAssistant
             ];
         }
 
-        $location = $this->extractExplicitAutreLearningLocation($sourceText, $fields);
+        if ('' !== $time && !$hasFieldLike('/\b(horaire|heure|time)\b/i')) {
+            $fields[] = [
+                'key' => 'ai_horaire_souhaite',
+                'label' => 'Horaire souhaite',
+                'type' => 'text',
+                'required' => false,
+                'value' => $time,
+            ];
+        }
+
+        if ('' !== $duration && !$hasFieldLike('/\b(duree|durée|duration|periode|période|delai|délai)\b/i')) {
+            $fields[] = [
+                'key' => 'ai_duree_souhaitee',
+                'label' => 'Duree souhaitee',
+                'type' => 'text',
+                'required' => false,
+                'value' => $duration,
+            ];
+        }
+
         if ('' !== $location && !$hasFieldLike('/\b(lieu|localisation|adresse|destination|emplacement|ville)\b/i')) {
             $fields[] = [
                 'key' => 'ai_lieu_souhaite',
@@ -490,8 +1138,7 @@ class DemandeAiAssistant
             ];
         }
 
-        $amount = $this->extractAmountFromText($this->normalizeForSearch($sourceText));
-        if (null !== $amount && preg_match('/\b(?:dt|tnd|dinar|dinars)\b/i', $sourceText) === 1 && !$hasFieldLike('/\b(montant|prix|cout|budget)\b/i')) {
+        if (null !== $amount && $hasCurrencyToken && !$hasFieldLike('/\b(montant|prix|cout|budget)\b/i')) {
             $fields[] = [
                 'key' => 'ai_montant',
                 'label' => 'Montant',
@@ -502,6 +1149,48 @@ class DemandeAiAssistant
         }
 
         return $this->dedupeAutreFieldsByKey($fields);
+    }
+
+    private function extractExplicitAutreLearningTime(string $sourceText): string
+    {
+        if (preg_match('/\b([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?\b/iu', $sourceText, $matches) === 1) {
+            $hour = (int) ($matches[1] ?? 0);
+            $minute = trim((string) ($matches[2] ?? ''));
+
+            return '' !== $minute ? sprintf('%02dh%s', $hour, $minute) : sprintf('%02dh', $hour);
+        }
+
+        if (preg_match('/\b([01]?\d|2[0-3])\s+heures?(?:\s+([0-5]\d))?\b/iu', $sourceText, $matches) === 1) {
+            $hour = (int) ($matches[1] ?? 0);
+            $minute = trim((string) ($matches[2] ?? ''));
+
+            return '' !== $minute ? sprintf('%02dh%s', $hour, $minute) : sprintf('%02dh', $hour);
+        }
+
+        return '';
+    }
+
+    private function extractExplicitAutreLearningDuration(string $sourceText): string
+    {
+        if (preg_match('/\b(\d+)\s*(minutes?|mins?|heures?|jours?|semaines?|mois)\b/iu', $sourceText, $matches) !== 1) {
+            return '';
+        }
+
+        $count = (int) ($matches[1] ?? 0);
+        if ($count <= 0) {
+            return '';
+        }
+
+        $unit = mb_strtolower(trim((string) ($matches[2] ?? '')), 'UTF-8');
+        $unit = match (true) {
+            str_starts_with($unit, 'min') => $count > 1 ? 'minutes' : 'minute',
+            str_starts_with($unit, 'heure') => $count > 1 ? 'heures' : 'heure',
+            str_starts_with($unit, 'jour') => $count > 1 ? 'jours' : 'jour',
+            str_starts_with($unit, 'semaine') => $count > 1 ? 'semaines' : 'semaine',
+            default => 'mois',
+        };
+
+        return sprintf('%d %s', $count, $unit);
     }
 
     /**
@@ -881,6 +1570,9 @@ class DemandeAiAssistant
             return;
         }
 
+        $sanitizedDetails = $this->sanitizeFeedbackMap($details);
+        $normalizedFieldPlan = $this->normalizeFeedbackFieldPlan($fieldPlan, $sanitizedDetails);
+
         $record = [
             'createdAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
             'employeId' => $employeId,
@@ -893,12 +1585,8 @@ class DemandeAiAssistant
                 'categorie' => trim((string) ($general['categorie'] ?? '')),
                 'typeDemande' => trim((string) ($general['typeDemande'] ?? 'Autre')),
             ],
-            'details' => $this->sanitizeFeedbackMap($details),
-            'fieldPlan' => [
-                'add' => is_array($fieldPlan['add'] ?? null) ? array_values($fieldPlan['add']) : [],
-                'remove' => is_array($fieldPlan['remove'] ?? null) ? array_values(array_map('strval', $fieldPlan['remove'])) : [],
-                'replaceBase' => true === ($fieldPlan['replaceBase'] ?? false),
-            ],
+            'details' => $sanitizedDetails,
+            'fieldPlan' => $normalizedFieldPlan,
         ];
 
         $line = json_encode($record, JSON_UNESCAPED_UNICODE);
@@ -908,6 +1596,42 @@ class DemandeAiAssistant
 
         file_put_contents($path, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
         $this->trimDescriptionFeedbackStore($path, 800);
+    }
+
+    /**
+     * @param array<string, mixed> $fieldPlan
+     * @param array<string, string> $sanitizedDetails
+     * @return array<string, mixed>
+     */
+    private function normalizeFeedbackFieldPlan(array $fieldPlan, array $sanitizedDetails): array
+    {
+        $keptKeys = [];
+        $normalizedAdd = [];
+
+        $rawAdd = is_array($fieldPlan['add'] ?? null) ? $fieldPlan['add'] : [];
+        foreach ($rawAdd as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' === $key || !array_key_exists($key, $sanitizedDetails)) {
+                continue;
+            }
+
+            if (isset($keptKeys[$key])) {
+                continue;
+            }
+
+            $keptKeys[$key] = true;
+            $normalizedAdd[] = $field;
+        }
+
+        return [
+            'add' => $normalizedAdd,
+            'remove' => is_array($fieldPlan['remove'] ?? null) ? array_values(array_map('strval', $fieldPlan['remove'])) : [],
+            'replaceBase' => true === ($fieldPlan['replaceBase'] ?? false),
+        ];
     }
 
     /**
@@ -2025,8 +2749,22 @@ class DemandeAiAssistant
      */
     private function loadAutreFeedbackSamples(): array
     {
-        $fileSamples = $this->loadAutreFeedbackSamplesFromFile();
-        $dbSamples = $this->loadAutreFeedbackSamplesFromDatabase();
+        $fileSamples = array_map(
+            static function (array $sample): array {
+                $sample['_learningSource'] = 'file';
+
+                return $sample;
+            },
+            $this->loadAutreFeedbackSamplesFromFile()
+        );
+        $dbSamples = array_map(
+            static function (array $sample): array {
+                $sample['_learningSource'] = 'database';
+
+                return $sample;
+            },
+            $this->loadAutreFeedbackSamplesFromDatabase()
+        );
         $merged = array_merge($dbSamples, $fileSamples);
 
         $deduped = [];
@@ -2062,6 +2800,7 @@ class DemandeAiAssistant
                 'details' => $details,
                 'createdAt' => trim((string) ($sample['createdAt'] ?? '')),
                 'fieldPlan' => $fieldPlan,
+                '_learningSource' => trim((string) ($sample['_learningSource'] ?? '')),
             ];
         }
 
@@ -3559,6 +4298,72 @@ class DemandeAiAssistant
             $dates[] = $today->modify('+2 day')->format('Y-m-d');
         }
 
+        $quantityToInt = static function (string $raw): int {
+            $value = trim($raw);
+            if (is_numeric($value)) {
+                return max(0, (int) $value);
+            }
+
+            return match ($value) {
+                'un', 'une' => 1,
+                'deux' => 2,
+                'trois' => 3,
+                'quatre' => 4,
+                'cinq' => 5,
+                'six' => 6,
+                'sept' => 7,
+                'huit' => 8,
+                'neuf' => 9,
+                'dix' => 10,
+                default => 0,
+            };
+        };
+
+        $pushRelative = static function (int $quantity, string $unit, \DateTimeImmutable $base, array &$bucket): void {
+            if ($quantity <= 0) {
+                return;
+            }
+
+            $normalizedUnit = trim($unit);
+            if (str_starts_with($normalizedUnit, 'jour')) {
+                $bucket[] = $base->modify(sprintf('+%d day', $quantity))->format('Y-m-d');
+                return;
+            }
+
+            if (str_starts_with($normalizedUnit, 'semaine')) {
+                $bucket[] = $base->modify(sprintf('+%d week', $quantity))->format('Y-m-d');
+                return;
+            }
+
+            if (str_starts_with($normalizedUnit, 'mois')) {
+                $bucket[] = $base->modify(sprintf('+%d month', $quantity))->format('Y-m-d');
+            }
+        };
+
+        if (preg_match_all('/\b(?:dans|d ici|sous|a partir de|a compter de)\s+(un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|\d+)\s+(jour|jours|semaine|semaines|mois)\b/', $normalized, $relativeMatches, PREG_SET_ORDER) === 1 || !empty($relativeMatches)) {
+            foreach ($relativeMatches as $match) {
+                $quantity = $quantityToInt((string) ($match[1] ?? '0'));
+                $unit = (string) ($match[2] ?? '');
+                $pushRelative($quantity, $unit, $today, $dates);
+            }
+        }
+
+        if (preg_match_all('/\b(?:apres|au bout de)\s+(un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|\d+)\s+(jour|jours|semaine|semaines|mois)\b/', $normalized, $afterMatches, PREG_SET_ORDER) === 1 || !empty($afterMatches)) {
+            foreach ($afterMatches as $match) {
+                $quantity = $quantityToInt((string) ($match[1] ?? '0'));
+                $unit = (string) ($match[2] ?? '');
+                $pushRelative($quantity, $unit, $today, $dates);
+            }
+        }
+
+        if (preg_match('/\bsemaine prochaine\b/', $normalized) === 1) {
+            $dates[] = $today->modify('+1 week')->format('Y-m-d');
+        }
+
+        if (preg_match('/\bmois prochain\b/', $normalized) === 1) {
+            $dates[] = $today->modify('+1 month')->format('Y-m-d');
+        }
+
         $dates = array_values(array_unique($dates));
         sort($dates);
         return $dates;
@@ -3794,6 +4599,7 @@ class DemandeAiAssistant
         $clean = preg_replace('/\b(?:bonjour|salut|slt|je\s+veux|je\s+souhaite|je\s+demande)\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/^(?:une|un|la|le|l[\'’])\s+(?:formation|certification)\s+(?:en|sur|de|d[\'’])\s+/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/^(?:formation|certification)\s+(?:en|sur|de|d[\'’])\s+/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\b(?:demain|aujourd[\'’]hui|aujourdhui|matin|soir|taxi|transport|deplacement|déplacement|par)\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\b(?:transport|moyen\s+de\s+transport|deplacement|déplacement)\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\b(?:de|du|des|d[\'’]|depuis)\s+[A-Za-zÀ-ÿ\'’\- ]{2,80}\s+(?:vers|a|à)\s+[A-Za-zÀ-ÿ\'’\- ]{2,80}\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\b(?:vers|pour|afin|car|avec)\b.*$/iu', '', $clean) ?? $clean;
@@ -4009,24 +4815,71 @@ class DemandeAiAssistant
             return '';
         }
 
+        $type = strtolower(trim((string) ($field['type'] ?? 'text')));
+        if ('select' === $type) {
+            return $this->inferManualSelectValue($text, is_array($field['options'] ?? null) ? $field['options'] : []);
+        }
+
         if (preg_match('/\b(description|details|detail|contenu)\b/i', $haystack) === 1) {
             return $this->truncateCustomFieldText($text, 180);
+        }
+
+        if (preg_match('/\b(specification|specifications|modele|model|taille|dimension|version)\b/i', $haystack) === 1) {
+            return $this->extractSpecificationFromPrompt($text);
+        }
+
+        if (preg_match('/\b(materiel|equipement|objet)\b/i', $haystack) === 1) {
+            $requestedObject = $this->extractRequestedObjectFromPrompt($text);
+            if ('' !== $requestedObject) {
+                return $requestedObject;
+            }
+        }
+
+        if (preg_match('/\b(type)\b/i', $haystack) === 1 && preg_match('/\b(materiel|materiau|equipement|outil|article|produit)\b/i', $haystack) === 1) {
+            return $this->extractRequestedObjectFromPrompt($text);
+        }
+
+        if (preg_match('/\b(salle|room)\b/i', $haystack) === 1) {
+            return $this->extractNamedValueFromPrompt($text, ['salle', 'room']);
+        }
+
+        if (
+            preg_match('/\b(equipement|materiel|accessoire)\b/i', $haystack) === 1
+            && preg_match('/\b(equipement|mat[eé]riel|accessoire|projecteur|micro|camera|cam[eé]ra|ecran|tableau|clavier|souris|casque)\b/iu', $text) === 1
+        ) {
+            $object = $this->extractRequestedObjectFromPrompt($text);
+            if ('' !== $object) {
+                return $object;
+            }
         }
 
         if (preg_match('/\b(organisme|destinataire|recipient|beneficiaire)\b/i', $haystack) === 1) {
             return $this->firstNonEmpty($this->extractRecipient($text), $this->extractOrganization($text));
         }
 
-        if (preg_match('/\b(raison|motif|cause|pourquoi)\b/i', $haystack) === 1) {
+        if (preg_match('/\b(raison|motif|cause|pourquoi|usage|justification)\b/i', $haystack) === 1) {
             $reason = $this->extractTailClauseAfterKeywords($text, ['pour', 'car', 'parce que', 'afin de']);
             if ('' !== $reason) {
                 return $reason;
             }
 
+            return $this->truncateCustomFieldText($text, 180);
+        }
+
+        if (preg_match('/\b(formation|certification|nom_formation|nom formation|intitule formation|intitul[ée] formation)\b/i', $haystack) === 1) {
+            $trainingName = $this->firstNonEmpty(
+                $this->extractFormationTopic($text),
+                $this->extractTrainingName($text)
+            );
+
+            if ('' !== $trainingName) {
+                return $trainingName;
+            }
+
             return '';
         }
 
-        if (preg_match('/\b(type|attestation|nature|nom|objet|intitule|libelle|titre|sujet)\b/i', $haystack) === 1) {
+        if (preg_match('/\b(type|attestation|nature|nom|intitule|libelle|titre|sujet)\b/i', $haystack) === 1) {
             $title = $this->extractLeadClauseBeforeKeywords($text, ['pour', 'car', 'parce que', 'afin de', 'vers', 'destinataire', 'organisme', 'chez']);
             if ('' !== $title) {
                 return $title;
@@ -4036,8 +4889,20 @@ class DemandeAiAssistant
         }
 
         if (preg_match('/\b(date|jour|echeance|deadline)\b/i', $haystack) === 1) {
+            if (!$this->sourceSupportsFieldOverride($text, $field['key'] ?? '')) {
+                return '';
+            }
+
             $dates = $this->extractAllFrenchDates($text);
             return $dates[0] ?? '';
+        }
+
+        if (preg_match('/\b(horaire|heure|time)\b/i', $haystack) === 1) {
+            return $this->extractExplicitAutreLearningTime($text);
+        }
+
+        if (preg_match('/\b(duree|duration|periode|delai)\b/i', $haystack) === 1) {
+            return $this->extractExplicitAutreLearningDuration($text);
         }
 
         if (preg_match('/\b(montant|prix|cout|nombre|quantite|total)\b/i', $haystack) === 1) {
@@ -4050,6 +4915,15 @@ class DemandeAiAssistant
         }
 
         if (preg_match('/\b(lieu|zone|destination|depart|arrivee|adresse)\b/i', $haystack) === 1) {
+            $routeLocations = $this->extractRouteLocations($text);
+            if (preg_match('/\b(depart|origine|from|lieu\s+de\s+depart)\b/i', $haystack) === 1) {
+                return $this->firstNonEmpty($routeLocations['from'] ?? '', $this->extractCurrentLocation($text));
+            }
+
+            if (preg_match('/\b(destination|arrivee|target|lieu\s+souhaite)\b/i', $haystack) === 1) {
+                return $this->firstNonEmpty($routeLocations['to'] ?? '', $this->extractTargetLocation($text));
+            }
+
             return $this->firstNonEmpty($this->extractTargetLocation($text), $this->extractCurrentLocation($text));
         }
 
@@ -4059,6 +4933,100 @@ class DemandeAiAssistant
 
         if (preg_match('/\b(telephone|mobile|numero|t[ée]l[ée]phone)\b/i', $haystack) === 1) {
             return $this->extractPhoneNumber($text);
+        }
+
+        return '';
+    }
+
+    private function sourceSupportsFieldOverride(string $text, string $key): bool
+    {
+        $normalizedText = $this->normalizeForSearch($text);
+        if ('' === $normalizedText) {
+            return false;
+        }
+
+        if (preg_match('/\b(date|jour|echeance|deadline)\b/i', $this->normalizeForSearch($key)) !== 1) {
+            return true;
+        }
+
+        return [] !== $this->extractAllFrenchDates($text);
+    }
+
+    private function extractSpecificationFromPrompt(string $text): string
+    {
+        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        if ('' === $clean) {
+            return '';
+        }
+
+        $patterns = [
+            '/\b(\d+(?:[\.,]\d+)?\s*(?:pouces?|inch|inches|"|cm|mm|go|gb|to|tb|mo|mb|hz|mah|w|watts?))\b/iu',
+            '/\b(?:modele|mod[eè]le|reference|ref)\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9\-_\/\. ]{1,50})(?=\s+(?:pour|car|avec|le|la|les|du|de|des)\b|[\.,;:!?]|$)/iu',
+            '/\b([A-Za-z0-9]+(?:[-_\/\.][A-Za-z0-9]+)+)\b/u',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $clean, $matches) === 1) {
+                return $this->truncateCustomFieldText((string) ($matches[1] ?? ''), 80);
+            }
+        }
+
+        return '';
+    }
+
+    private function extractRequestedObjectFromPrompt(string $text): string
+    {
+        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        if ('' === $clean) {
+            return '';
+        }
+
+        if (preg_match('/\b(?:un|une|des)?\s*(clavier|souris|ecran|ordinateur|pc|laptop|casque|webcam|imprimante)(?:\s+[A-Za-zÀ-ÿ0-9\'’\-]+){0,3}\b/iu', $clean, $materialMatch) === 1) {
+            $material = trim((string) ($materialMatch[0] ?? ''));
+            $material = preg_replace('/^(?:un|une|des)\s+/iu', '', $material) ?? $material;
+            return $this->truncateCustomFieldText($material, 80);
+        }
+
+        $candidate = $clean;
+        if (preg_match('/\b(?:je\s+veux|je\s+souhaite|j[\'’]ai\s+besoin\s+de|besoin\s+de|demande\s+de|demande\s+d[\'’]?)\s+(.{2,120})/iu', $clean, $matches) === 1) {
+            $candidate = (string) ($matches[1] ?? $candidate);
+        }
+
+        $candidate = preg_replace('/\b(?:materiel|equipement)\s+qui\s+est\s+(?:un|une|des)?\s*/iu', '', $candidate) ?? $candidate;
+        $candidate = preg_replace('/\b(?:c[\'’]est|qui\s+est)\s+(?:un|une|des)?\s*/iu', '', $candidate) ?? $candidate;
+
+        $candidate = preg_replace('/\b(?:pour|car|parce que|afin de|avec|le|la|les|du|de|des|a\s+partir|à\s+partir)\b.*$/iu', '', $candidate) ?? $candidate;
+        $candidate = preg_replace('/\b\d+(?:[\.,]\d+)?\s*(?:pouces?|inch|inches|"|cm|mm|go|gb|to|tb|mo|mb|hz|mah|w|watts?)\b/iu', '', $candidate) ?? $candidate;
+        $candidate = preg_replace('/^(?:un|une|du|de|des|d[\'’]|le|la|les|l[\'’])\s+/iu', '', $candidate) ?? $candidate;
+        $candidate = preg_replace('/\s+/', ' ', $candidate) ?? $candidate;
+        $candidate = trim($candidate, " \t\n\r\0\x0B,.;:-");
+
+        return $this->truncateCustomFieldText($candidate, 80);
+    }
+
+    /**
+     * @param array<int, string> $labels
+     */
+    private function extractNamedValueFromPrompt(string $text, array $labels): string
+    {
+        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        if ('' === $clean) {
+            return '';
+        }
+
+        foreach ($labels as $label) {
+            $pattern = '/\b' . preg_quote($label, '/') . '\s*[:\-]?\s+([A-Za-z0-9À-ÿ\'’\-_ ]{2,80})(?=\s+(?:pour|car|avec|le|la|les|du|de|des|a|à)\b|[\.,;:!?]|$)/iu';
+            if (preg_match($pattern, $clean, $matches) !== 1) {
+                continue;
+            }
+
+            $value = trim((string) ($matches[1] ?? ''));
+            $value = preg_replace('/\b(?:pour|car|avec)\b.*$/iu', '', $value) ?? $value;
+            $value = preg_replace('/^(?:de|du|des|d[\'’]|le|la|les|l[\'’])\s+/iu', '', $value) ?? $value;
+            $value = trim($value, " \t\n\r\0\x0B,.;:-");
+            if ('' !== $value) {
+                return $this->truncateCustomFieldText($value, 80);
+            }
         }
 
         return '';
