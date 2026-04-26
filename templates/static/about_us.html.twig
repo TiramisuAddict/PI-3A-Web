@@ -1,0 +1,67 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}About Us - Momentum{% endblock %}
+
+{% block body %}
+<div class="page">
+    {% include 'offre/_home_page_navbar.html.twig' %}
+    <div class="page-wrapper">
+        <div class="page-header d-print-none">
+            <div class="container-xl">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">
+                            About Us
+                        </h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="page-body">
+            <div class="container-xl">
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="card-title">Our Mission</h3>
+                        <p>To empower companies to build amazing teams by providing the most intuitive and powerful recruitment platform. We believe that the right people are the core of any successful business, and we're here to make the connection happen.</p>
+                        
+                        <h3 class="card-title mt-4">Our Story</h3>
+                        <p>Founded in 2025, Momentum was born from a simple idea: recruitment software should be smart, fast, and a joy to use. Frustrated by clunky, outdated systems, our founders set out to build a platform that leverages modern technology to solve real-world hiring challenges. From a small startup, we've grown into a passionate team dedicated to helping businesses of all sizes find the talent they need to thrive.</p>
+
+                        <h3 class="card-title mt-4">Meet the Team</h3>
+                        <div class="row g-4">
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <span class="avatar avatar-xl mb-3" style="background-image: url(https://randomuser.me/api/portraits/men/32.jpg)"></span>
+                                        <h4 class="card-title">John Doe</h4>
+                                        <p class="text-muted">CEO & Co-Founder</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <span class="avatar avatar-xl mb-3" style="background-image: url(https://randomuser.me/api/portraits/women/32.jpg)"></span>
+                                        <h4 class="card-title">Jane Smith</h4>
+                                        <p class="text-muted">CTO & Co-Founder</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <span class="avatar avatar-xl mb-3" style="background-image: url(https://randomuser.me/api/portraits/men/33.jpg)"></span>
+                                        <h4 class="card-title">Peter Jones</h4>
+                                        <p class="text-muted">Head of Product</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% include 'components/front_footer.html.twig' %}
+    </div>
+</div>
+{% endblock %}

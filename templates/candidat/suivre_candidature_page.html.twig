@@ -133,6 +133,11 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        .front-footer {
+            padding-top: 2.25rem;
+            background: #ffffff;
+        }
     </style>
 {% endblock %}
 
@@ -312,6 +317,8 @@
             </div>
         </section>
     {% endif %}
+
+    {% include 'components/front_footer.html.twig' %}
 </div>
 
 {% endblock %}

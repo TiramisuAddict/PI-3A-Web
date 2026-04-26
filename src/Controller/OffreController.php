@@ -27,7 +27,7 @@ final class OffreController extends AbstractController
     }
     
     //Offres
-    #[Route('/offre/home', name: 'app_offre_home')]
+    #[Route('/accueil', name: 'app_offre_home')]
     public function home(OffreRepository $offre_repository){
         $offres = $offre_repository->findAll();
         return $this->render('offre/home_page.html.twig' , [ //page
@@ -36,7 +36,7 @@ final class OffreController extends AbstractController
     }
 
     //Liste des offres
-    #[Route('/offre/list', name: 'app_offre_list')]
+    #[Route('/offres', name: 'app_offre_list')]
     public function listOffres(Request $request, OffreRepository $offre_repository){
         $q = $request->query->get('q');
         $category = $request->query->get('category');
