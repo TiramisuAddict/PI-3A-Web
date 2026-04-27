@@ -20,6 +20,7 @@ use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use App\Form\CandidatType;
 use App\Service\GoogleMeetService;
 use App\Service\GoogleTokenSessionService;
+use Psr\Log\LoggerInterface;
 
 final class CandidatController extends AbstractController
 {
@@ -148,11 +149,23 @@ final class CandidatController extends AbstractController
         ManagerRegistry $doctrine,
         OffreRepository $offreRepository,
         VisiteurRepository $visiteurRepository,
+        SessionInterface $session,
         int $offreId,
         int $visiteurId
     ): Response {
+        $sessionVisiteurId = (int) $session->get('visiteur_id', 0);
+        $visiteurLoggedIn = $session->get('visiteur_logged_in') === true;
+
+        if (!$visiteurLoggedIn || $sessionVisiteurId <= 0) {
+            return new Response('Session visiteur requise.', Response::HTTP_FORBIDDEN);
+        }
+
+        if ($sessionVisiteurId !== $visiteurId) {
+            return new Response('Visiteur invalide pour cette session.', Response::HTTP_FORBIDDEN);
+        }
+
         $offre = $offreRepository->find($offreId);
-        $visiteur = $visiteurRepository->find($visiteurId);
+        $visiteur = $visiteurRepository->find($sessionVisiteurId);
 
         if (!$offre || !$visiteur) {
             return new Response('Offre ou visiteur introuvable.', Response::HTTP_NOT_FOUND);
@@ -162,7 +175,7 @@ final class CandidatController extends AbstractController
         $form = $this->createForm(PostulerType::class, $candidat, [
             'action' => $this->generateUrl('app_candidature_postuler', [
                 'offreId' => $offreId,
-                'visiteurId' => $visiteurId,
+                'visiteurId' => $sessionVisiteurId,
             ]),
             'method' => 'POST',
         ]);
@@ -312,7 +325,7 @@ final class CandidatController extends AbstractController
     }
 
     #[Route('/candidats/meeting/create', name: 'app_candidature_create_meeting', methods: ['POST'])]
-    public function createMeeting(Request $request, ManagerRegistry $doctrine, GoogleMeetService $googleMeetService, GoogleTokenSessionService $GoogleTokenSessionService): Response {   
+    public function createMeeting(Request $request, ManagerRegistry $doctrine, GoogleMeetService $googleMeetService, GoogleTokenSessionService $GoogleTokenSessionService, LoggerInterface $logger): Response {
         
         if (!$GoogleTokenSessionService->isLinked()) {
             $this->addFlash('error', 'Vous devez lier un compte Google pour créer une réunion Meet.');
@@ -327,12 +340,29 @@ final class CandidatController extends AbstractController
         $entityManager = $doctrine->getManager();
         $candidat = $doctrine->getRepository(Candidat::class)->find($candidatId);
 
+        if (!$candidat) {
+            $this->addFlash('error', 'Candidat introuvable.');
+            return $this->redirectToRoute('app_candidat_dashboard', ['offreId' => $offreId]);
+        }
+
         $start = \DateTimeImmutable::createFromFormat('Y-m-d H:i', $meetingDate . ' ' . $meetingTime, new \DateTimeZone('Europe/Paris'));
+        if (!$start instanceof \DateTimeImmutable) {
+            $this->addFlash('error', 'Date ou heure de reunion invalide.');
+            return $this->redirectToRoute('app_candidat_dashboard', ['offreId' => $offreId, 'candidatId' => $candidatId]);
+        }
+
         $end = $start->modify('+1 hour');
 
         try {
             $candidateName = trim(($candidat->getVisiteur()?->getNom() ?? '') . ' ' . ($candidat->getVisiteur()?->getPrenom() ?? ''));
-            $visitorEmail = $candidat->getVisiteur()?->getEMail();
+            $visitorEmailRaw = $candidat->getVisiteur()?->getEmail();
+            $visitorEmail = is_string($visitorEmailRaw) ? mb_strtolower(trim($visitorEmailRaw)) : null;
+
+            if (!$visitorEmail || !filter_var($visitorEmail, FILTER_VALIDATE_EMAIL)) {
+                $this->addFlash('error', 'Invitation non envoyee: email candidat invalide ou manquant.');
+                return $this->redirectToRoute('app_candidat_dashboard', ['offreId' => $offreId, 'candidatId' => $candidatId]);
+            }
+
             $meeting = $googleMeetService->createMeetEvent(
                 'Entretien candidat - ' . ($candidateName !== '' ? $candidateName : 'Momentum'),
                 $start,
@@ -353,6 +383,11 @@ final class CandidatController extends AbstractController
 
             $this->addFlash('success', 'Lien Meet ajouté à la note du candidat.');
         } catch (\Throwable $e) {
+            $logger->error('Meeting creation failed', [
+                'exception' => $e,
+                'offreId' => $offreId,
+                'candidatId' => $candidatId,
+            ]);
             $this->addFlash('error', 'Impossible de créer la réunion Meet pour le moment.');
         }
 

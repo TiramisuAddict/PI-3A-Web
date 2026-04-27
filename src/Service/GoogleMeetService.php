@@ -30,6 +30,11 @@ final class GoogleMeetService
         ?string $description = null,
         ?string $attendeeEmail = null
     ): array {
+        $normalizedAttendeeEmail = is_string($attendeeEmail) ? mb_strtolower(trim($attendeeEmail)) : null;
+        if (!$normalizedAttendeeEmail || !filter_var($normalizedAttendeeEmail, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('A valid attendee email is required to send Google invite notifications.');
+        }
+
         $service = $this->buildCalendarService();
 
         $conferenceRequest = new CreateConferenceRequest();
@@ -53,25 +58,20 @@ final class GoogleMeetService
                 'timeZone' => $timeZone,
             ]),
             'conferenceData' => $conferenceData,
-        ];
-
-        $sendUpdates = 'all';
-        if (is_string($attendeeEmail) && $attendeeEmail !== '') {
-            $eventData['attendees'] = [
+            'attendees' => [
                 new EventAttendee([
-                    'email' => $attendeeEmail,
+                    'email' => $normalizedAttendeeEmail,
                     'responseStatus' => 'needsAction',
                 ]),
-            ];
-        } else {
-            $sendUpdates = 'none';
-        }
+            ],
+        ];
 
         $event = new Event($eventData);
 
         $created = $service->events->insert($calendarId, $event, [
             'conferenceDataVersion' => 1,
-            'sendUpdates' => $sendUpdates,
+            'sendUpdates' => 'all',
+            'sendNotifications' => true,
         ]);
 
         $entryPoints = $created->getConferenceData()?->getEntryPoints() ?? [];

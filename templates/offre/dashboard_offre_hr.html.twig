@@ -294,6 +294,7 @@
 {% endblock %}
 
 {% block body %}
+    {% set creator_names = creatorNames|default({}) %}
     {{ include('components/navbar.html.twig') }}
     <div class="d-flex" style="min-height:calc(100vh - 56px);">
     {{ include('components/sidebar.html.twig', {'active_page': 'offres','sidebar_role': role}) }}
@@ -391,7 +392,7 @@
                                 <div class="offer-meta">
                                     {% if offre.typeContrat %}{{ offre.typeContrat }} - {% endif %}
                                     {% if offre.dateLimite %}Expire le {{ offre.dateLimite|date('d/m/Y') }}{% else %}Pas de date limite{% endif %}
-                                    {% if offre.idEmployer %} - Créé par: #{{ offre.idEmployer }}{% endif %}
+                                    {% if offre.idEmployer %} - Créé par: {{ creator_names[offre.idEmployer]|default('#' ~ offre.idEmployer) }}{% endif %}
                                 </div>
                             </div>
 
