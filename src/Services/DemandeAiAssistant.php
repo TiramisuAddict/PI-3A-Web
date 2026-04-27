@@ -75,7 +75,6 @@ class DemandeAiAssistant
             : [];
         $manualFields = $this->buildManualAutreFieldsFromPlan($manualFieldPlan);
         $manualOnlyMode = [] !== $manualFields;
-        $allAutreFields = $manualOnlyMode ? $manualFields : array_merge($autreFields, $manualFields);
 
         foreach ($manualFields as $manualField) {
             $manualKey = trim((string) ($manualField['key'] ?? ''));
@@ -97,13 +96,9 @@ class DemandeAiAssistant
         }
 
         $feedbackSamples = $this->loadAutreFeedbackSamples();
-        if (!$manualOnlyMode) {
-            $matchedSample = $this->findConfirmedAutreFeedbackSample($sourceText, $feedbackSamples, $allAutreFields);
-            // Keep matching metadata for model guidance, but avoid short-circuiting
-            // to static PHP replay so extraction stays dynamic and prompt-driven.
-            if (null !== $matchedSample) {
-                $generalContext['matchedConfirmedAutreSample'] = $matchedSample;
-            }
+        $exactSample = $this->findExactConfirmedAutreFeedbackSample($sourceText, $feedbackSamples);
+        if (!$manualFieldMode && null !== $exactSample) {
+            return $this->buildAutreSuggestionFromExactSample($sourceText, $exactSample);
         }
 
         $parsed = $this->callLocalGenerationModel([
@@ -116,7 +111,6 @@ class DemandeAiAssistant
             'selectOptions' => $selectOptions,
             'acceptedAutreFeedback' => $feedbackSamples,
             'regenerateCount' => (int) ($generalContext['regenerateCount'] ?? 0),
-            // Semantic learning mode: do not require strict prompt equality.
             'strictPromptOnly' => false,
             'manualOnlyMode' => $manualOnlyMode,
         ]);
@@ -127,18 +121,13 @@ class DemandeAiAssistant
         $removePayload = isset($parsed['remove_fields']) && is_array($parsed['remove_fields']) ? $parsed['remove_fields'] : [];
 
         if (!$manualFieldMode) {
-            $customPayload = $this->augmentLearnedAutreFieldsFromPrompt(
-                $sourceText,
-                array_values(array_filter($customPayload, static fn ($item): bool => is_array($item)))
-            );
-
-            $alignedPromptPayload = $this->alignAutreCustomFieldsWithPrompt(
-                $sourceText,
+            $normalizedModelPayload = $this->normalizeAutreModelPayload(
+                $detailsPayload,
                 $customPayload,
-                $detailsPayload
+                array_values(array_unique($allowedKeys))
             );
-            $customPayload = $alignedPromptPayload['customFields'];
-            $detailsPayload = $alignedPromptPayload['suggestedDetails'];
+            $detailsPayload = $normalizedModelPayload['suggestedDetails'];
+            $customPayload = $normalizedModelPayload['customFields'];
         }
 
         $manualFieldsByKey = [];
@@ -201,6 +190,230 @@ class DemandeAiAssistant
                 : ['score' => 0, 'label' => 'Faible', 'tone' => 'info', 'message' => 'Aucun apprentissage confirme similaire n a ete retrouve.'],
             'skipConfirmationRestriction' => $this->toBooleanFlag($parsed['skipConfirmationRestriction'] ?? false),
             'model' => 'local-ml:demande_ai_model.py',
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $samples
+     * @return array<string, mixed>|null
+     */
+    private function findExactConfirmedAutreFeedbackSample(string $sourceText, array $samples): ?array
+    {
+        $normalizedSource = $this->normalizeForSearch($sourceText);
+        if ('' === $normalizedSource) {
+            return null;
+        }
+
+        $best = null;
+        $bestTimestamp = PHP_INT_MIN;
+
+        foreach ($samples as $sample) {
+            if (!is_array($sample)) {
+                continue;
+            }
+
+            $prompt = trim((string) ($sample['rawPrompt'] ?? ($sample['prompt'] ?? '')));
+            if ('' === $prompt) {
+                continue;
+            }
+
+            if ($this->normalizeForSearch($prompt) !== $normalizedSource) {
+                continue;
+            }
+
+            $timestamp = strtotime((string) ($sample['createdAt'] ?? ''));
+            $score = false === $timestamp ? 0 : (int) $timestamp;
+            if (null === $best || $score >= $bestTimestamp) {
+                $best = $sample;
+                $bestTimestamp = $score;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * @param array<string, mixed> $sample
+     * @return array<string, mixed>
+     */
+    private function buildAutreSuggestionFromExactSample(string $sourceText, array $sample): array
+    {
+        $general = is_array($sample['general'] ?? null) ? $sample['general'] : [];
+        $sampleDetails = is_array($sample['details'] ?? null) ? $sample['details'] : [];
+        $fieldPlan = is_array($sample['fieldPlan'] ?? null) ? $sample['fieldPlan'] : ['add' => [], 'remove' => [], 'replaceBase' => false];
+
+        $customFields = [];
+        $seen = [];
+        $rawAdd = is_array($fieldPlan['add'] ?? null) ? $fieldPlan['add'] : [];
+
+        foreach ($rawAdd as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' === $key || isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $type = strtolower(trim((string) ($field['type'] ?? 'text')));
+            if (!in_array($type, ['text', 'textarea', 'select', 'number', 'date'], true)) {
+                $type = 'text';
+            }
+
+            $value = isset($sampleDetails[$key]) && is_scalar($sampleDetails[$key])
+                ? trim((string) $sampleDetails[$key])
+                : trim((string) ($field['value'] ?? ''));
+
+            $customField = [
+                'key' => $key,
+                'label' => trim((string) ($field['label'] ?? $key)),
+                'type' => $type,
+                'required' => true === ($field['required'] ?? false),
+                'value' => $value,
+            ];
+
+            if ('select' === $type && is_array($field['options'] ?? null)) {
+                $customField['options'] = array_values(array_map('strval', $field['options']));
+            }
+
+            $customFields[] = $customField;
+        }
+
+        $replaceBase = true === ($fieldPlan['replaceBase'] ?? false);
+        $removeBase = in_array('ALL', array_values(array_map('strval', is_array($fieldPlan['remove'] ?? null) ? $fieldPlan['remove'] : [])), true);
+        $baseDetailKeys = [
+            'besoinPersonnalise' => true,
+            'descriptionBesoin' => true,
+            'niveauUrgenceAutre' => true,
+            'dateSouhaiteeAutre' => true,
+        ];
+
+        $visibleDetails = [];
+        foreach ($sampleDetails as $key => $value) {
+            $detailKey = trim((string) $key);
+            if ('' === $detailKey || !is_scalar($value)) {
+                continue;
+            }
+
+            if (($replaceBase || $removeBase) && isset($baseDetailKeys[$detailKey])) {
+                continue;
+            }
+
+            $clean = trim((string) $value);
+            if ('' !== $clean) {
+                $visibleDetails[$detailKey] = $clean;
+            }
+        }
+
+        foreach ($customFields as $field) {
+            $key = trim((string) ($field['key'] ?? ''));
+            $value = trim((string) ($field['value'] ?? ''));
+            if ('' !== $key && '' !== $value) {
+                $visibleDetails[$key] = $value;
+            }
+        }
+
+        return [
+            'correctedText' => trim($sourceText),
+            'generatedDescription' => $this->firstNonEmpty(
+                trim((string) ($general['description'] ?? '')),
+                trim($sourceText)
+            ),
+            'suggestedGeneral' => [
+                'titre' => trim((string) ($general['titre'] ?? '')),
+                'description' => trim((string) ($general['description'] ?? '')),
+                'priorite' => trim((string) ($general['priorite'] ?? 'NORMALE')),
+                'categorie' => trim((string) ($general['categorie'] ?? '')),
+                'typeDemande' => trim((string) ($general['typeDemande'] ?? 'Autre')),
+            ],
+            'suggestedDetails' => $visibleDetails,
+            'dynamicFieldPlan' => [
+                'add' => $customFields,
+                'remove' => array_values(array_map('strval', is_array($fieldPlan['remove'] ?? null) ? $fieldPlan['remove'] : [])),
+                'replaceBase' => true === ($fieldPlan['replaceBase'] ?? false),
+            ],
+            'dynamicFieldConfidence' => [
+                'score' => 100,
+                'label' => 'Elevee',
+                'tone' => 'success',
+                'message' => 'Correspondance exacte trouvee en base. Schema confirme rejoue a l identique.',
+            ],
+            'skipConfirmationRestriction' => false,
+            'model' => 'local-ml:demande_ai_model.py',
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $detailsPayload
+     * @param array<int, mixed> $customPayload
+     * @param array<int, string> $allowedDetailKeys
+     * @return array{suggestedDetails: array<string, string>, customFields: array<int, array<string, mixed>>}
+     */
+    private function normalizeAutreModelPayload(array $detailsPayload, array $customPayload, array $allowedDetailKeys): array
+    {
+        $normalizedCustomFields = $this->normalizeCustomFields($customPayload, $allowedDetailKeys);
+        $customKeyMap = [];
+        foreach ($normalizedCustomFields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' !== $key) {
+                $customKeyMap[$key] = true;
+            }
+        }
+
+        $allowedMap = [];
+        foreach ($allowedDetailKeys as $allowedKey) {
+            $key = trim((string) $allowedKey);
+            if ('' !== $key) {
+                $allowedMap[$key] = true;
+            }
+        }
+        foreach (array_keys($customKeyMap) as $customKey) {
+            $allowedMap[$customKey] = true;
+        }
+
+        $normalizedDetails = [];
+        foreach ($detailsPayload as $key => $value) {
+            $detailKey = trim((string) $key);
+            if ('' === $detailKey || !isset($allowedMap[$detailKey])) {
+                continue;
+            }
+
+            if (!is_scalar($value)) {
+                continue;
+            }
+
+            $clean = trim((string) $value);
+            if ('' !== $clean) {
+                $normalizedDetails[$detailKey] = $clean;
+            }
+        }
+
+        foreach ($normalizedCustomFields as $index => $field) {
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' === $key) {
+                continue;
+            }
+
+            $fieldValue = trim((string) ($field['value'] ?? ''));
+            if (isset($normalizedDetails[$key]) && '' !== trim($normalizedDetails[$key])) {
+                $normalizedCustomFields[$index]['value'] = $normalizedDetails[$key];
+                continue;
+            }
+
+            if ('' !== $fieldValue) {
+                $normalizedDetails[$key] = $fieldValue;
+            }
+        }
+
+        return [
+            'suggestedDetails' => $normalizedDetails,
+            'customFields' => $normalizedCustomFields,
         ];
     }
 
@@ -385,982 +598,6 @@ class DemandeAiAssistant
         }
 
         return '';
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $samples
-     * @return array<string, mixed>|null
-     */
-    private function findConfirmedAutreFeedbackSample(string $sourceText, array $samples, array $autreFields = []): ?array
-    {
-        $normalizedSource = $this->normalizeLooseLabel($sourceText);
-        if ('' === $normalizedSource || [] === $samples) {
-            return null;
-        }
-
-        $sourceTokens = $this->tokenizeLooseText($normalizedSource);
-        $sourceCoreTokens = $this->tokenizeLooseText($this->normalizeAutreLearningMatchText($sourceText));
-        $sourceKeywordTokens = $this->filterAutreKeywordTokens($sourceCoreTokens);
-        $targetKeys = [];
-        foreach ($autreFields as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            $key = trim((string) ($field['key'] ?? ''));
-            if ('' !== $key) {
-                $targetKeys[$key] = true;
-            }
-        }
-
-        $candidates = [];
-
-        foreach ($samples as $sample) {
-            if (!is_array($sample)) {
-                continue;
-            }
-
-            $isConfirmed = true === ($sample['confirmed'] ?? false) || !array_key_exists('confirmed', $sample);
-            if (!$isConfirmed) {
-                continue;
-            }
-
-            $sampleGeneral = is_array($sample['general'] ?? null) ? $sample['general'] : [];
-            $sampleDetails = is_array($sample['details'] ?? null) ? $sample['details'] : [];
-            $sampleFieldPlan = is_array($sample['fieldPlan'] ?? null) ? $sample['fieldPlan'] : [];
-            $learnedSchemaKeys = $this->extractLearnedFieldPlanKeys($sampleFieldPlan);
-            $schemaFieldCount = count($learnedSchemaKeys);
-            $hasLearnedSchema = $schemaFieldCount > 0;
-            $samplePrompt = $this->normalizeLooseLabel((string) ($sample['prompt'] ?? ''));
-            $sampleTitle = $this->normalizeLooseLabel((string) (($sampleGeneral['titre'] ?? '') ?: ($sampleGeneral['description'] ?? '')));
-            $sampleDetailsText = $this->normalizeLooseLabel(implode(' ', array_map(
-                static fn ($value): string => is_scalar($value) ? (string) $value : '',
-                $sampleDetails
-            )));
-            $sampleText = trim($samplePrompt . ' ' . $sampleTitle . ' ' . $sampleDetailsText);
-            if ('' === $sampleText) {
-                continue;
-            }
-
-            $sampleTokens = $this->tokenizeLooseText($sampleText);
-            $sampleCoreTokens = $this->tokenizeLooseText($this->normalizeAutreLearningMatchText($sampleText));
-            $sampleKeywordTokens = $this->filterAutreKeywordTokens($sampleCoreTokens);
-            $sharedTokens = count(array_intersect($sourceTokens, $sampleTokens));
-            $tokenCoverage = [] !== $sourceTokens ? $sharedTokens / count($sourceTokens) : 0.0;
-            $sampleCoverage = [] !== $sampleTokens ? $sharedTokens / count($sampleTokens) : 0.0;
-            $coreSharedTokens = count(array_intersect($sourceCoreTokens, $sampleCoreTokens));
-            $coreCoverage = [] !== $sampleCoreTokens ? $coreSharedTokens / count($sampleCoreTokens) : 0.0;
-            $sourceCoreCoverage = [] !== $sourceCoreTokens ? $coreSharedTokens / count($sourceCoreTokens) : 0.0;
-            $keywordSharedTokens = count(array_intersect($sourceKeywordTokens, $sampleKeywordTokens));
-            $keywordSourceCoverage = [] !== $sourceKeywordTokens ? $keywordSharedTokens / count($sourceKeywordTokens) : 0.0;
-            $keywordSampleCoverage = [] !== $sampleKeywordTokens ? $keywordSharedTokens / count($sampleKeywordTokens) : 0.0;
-
-            similar_text($normalizedSource, $sampleText, $similarity);
-            $score = ($similarity * 0.55) + ($tokenCoverage * 100 * 0.3) + ($sampleCoverage * 100 * 0.15);
-            $score = max($score, ($coreCoverage * 100 * 0.72) + ($sourceCoreCoverage * 100 * 0.28));
-
-            if ('' !== $samplePrompt && $samplePrompt === $normalizedSource) {
-                $score = max($score, 100.0);
-            }
-
-            if ($normalizedSource === $sampleText || str_contains($normalizedSource, $sampleText) || str_contains($sampleText, $normalizedSource)) {
-                $score += 18;
-            }
-
-            if ($hasLearnedSchema && $coreCoverage >= 0.70) {
-                $score += 16;
-            }
-
-            $keywordMatch = $keywordSharedTokens >= 2 && $keywordSourceCoverage >= 0.50 && $keywordSampleCoverage >= 0.25;
-            if ($keywordMatch) {
-                $score = max($score, 60.0 + ($keywordSourceCoverage * 18.0) + ($keywordSampleCoverage * 8.0));
-            }
-
-            if ($score < 58.0) {
-                continue;
-            }
-
-            $schemaHits = 0;
-            $schemaCoverage = 0.0;
-            if ([] !== $targetKeys) {
-                foreach (array_keys($targetKeys) as $targetKey) {
-                    $candidateValue = $sampleDetails[$targetKey] ?? null;
-                    if (is_scalar($candidateValue) && '' !== trim((string) $candidateValue)) {
-                        ++$schemaHits;
-                    }
-                }
-
-                $schemaCoverage = $schemaHits / max(1, count($targetKeys));
-                if ($schemaCoverage >= 0.55) {
-                    $score += 6.0;
-                }
-            }
-
-            $createdAtRaw = trim((string) ($sample['createdAt'] ?? ''));
-            $createdAtTs = strtotime($createdAtRaw);
-            $learningSourceRank = 'database' === trim((string) ($sample['_learningSource'] ?? '')) ? 1 : 0;
-            $candidates[] = [
-                'sample' => $sample,
-                'score' => $score,
-                'schemaHits' => $schemaHits,
-                'schemaCoverage' => $schemaCoverage,
-                'schemaFieldCount' => $schemaFieldCount,
-                'learningSourceRank' => $learningSourceRank,
-                'keywordSharedTokens' => $keywordSharedTokens,
-                'keywordSourceCoverage' => $keywordSourceCoverage,
-                'keywordSampleCoverage' => $keywordSampleCoverage,
-                'createdAtTs' => false === $createdAtTs ? 0 : (int) $createdAtTs,
-            ];
-        }
-
-        if ([] === $candidates) {
-            return null;
-        }
-
-        usort($candidates, static function (array $left, array $right): int {
-            $scoreGap = abs((float) $left['score'] - (float) $right['score']);
-            if ($scoreGap > 10.0) {
-                return $right['score'] <=> $left['score'];
-            }
-
-            if ($left['createdAtTs'] !== $right['createdAtTs']) {
-                return $right['createdAtTs'] <=> $left['createdAtTs'];
-            }
-
-            if ($left['learningSourceRank'] !== $right['learningSourceRank']) {
-                return $right['learningSourceRank'] <=> $left['learningSourceRank'];
-            }
-
-            if ($left['schemaFieldCount'] !== $right['schemaFieldCount']) {
-                return $right['schemaFieldCount'] <=> $left['schemaFieldCount'];
-            }
-
-            if ($left['schemaCoverage'] !== $right['schemaCoverage']) {
-                return $right['schemaCoverage'] <=> $left['schemaCoverage'];
-            }
-
-            if ($left['schemaHits'] !== $right['schemaHits']) {
-                return $right['schemaHits'] <=> $left['schemaHits'];
-            }
-
-            if ($left['score'] !== $right['score']) {
-                return $right['score'] <=> $left['score'];
-            }
-
-            return $right['keywordSharedTokens'] <=> $left['keywordSharedTokens'];
-        });
-
-        $selected = $candidates[0];
-        $ambiguousCount = 0;
-        foreach ($candidates as $index => $candidate) {
-            if (0 === $index) {
-                continue;
-            }
-
-            $scoreGap = abs((float) $selected['score'] - (float) $candidate['score']);
-            $coverageGap = abs((float) $selected['schemaCoverage'] - (float) $candidate['schemaCoverage']);
-            if ($scoreGap <= 2.5 && $coverageGap <= 0.10) {
-                ++$ambiguousCount;
-            }
-        }
-
-        $sample = is_array($selected['sample']) ? $selected['sample'] : [];
-        $sample['_match_score'] = (float) $selected['score'];
-        $sample['_match_schema_coverage'] = (float) $selected['schemaCoverage'];
-        $sample['_match_ambiguous_count'] = $ambiguousCount;
-
-        return $sample;
-    }
-
-    /**
-     * @param array<int, string> $tokens
-     * @return array<int, string>
-     */
-    private function filterAutreKeywordTokens(array $tokens): array
-    {
-        $genericTokens = [
-            'demande' => true,
-            'besoin' => true,
-            'souhaite' => true,
-            'souhaiter' => true,
-            'veux' => true,
-            'voudrais' => true,
-            'faire' => true,
-            'mettre' => true,
-            'creer' => true,
-            'travail' => true,
-            'professionnel' => true,
-            'professionnelle' => true,
-            'activite' => true,
-            'information' => true,
-            'complement' => true,
-        ];
-
-        $keywords = [];
-        foreach ($tokens as $token) {
-            $token = trim((string) $token);
-            if (mb_strlen($token) < 3 || isset($genericTokens[$token])) {
-                continue;
-            }
-
-            $keywords[$token] = $token;
-        }
-
-        return array_values($keywords);
-    }
-
-    /**
-     * @param array<string, mixed> $sample
-     */
-    private function isStrongConfirmedAutreFeedbackMatch(array $sample): bool
-    {
-        return (float) ($sample['_match_score'] ?? 0.0) >= 58.0;
-    }
-
-    /**
-     * @param array<string, mixed> $fieldPlan
-     * @return array<int, string>
-     */
-    private function extractLearnedFieldPlanKeys(array $fieldPlan): array
-    {
-        $keys = [];
-        $addFields = is_array($fieldPlan['add'] ?? null) ? $fieldPlan['add'] : [];
-        foreach ($addFields as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            $key = trim((string) ($field['key'] ?? ''));
-            if ('' === $key) {
-                continue;
-            }
-
-            $keys[$key] = $key;
-        }
-
-        return array_values($keys);
-    }
-
-    /**
-     * @param array<string, mixed> $sample
-     * @return array<string, mixed>|null
-     */
-    private function buildAutreSuggestionFromSample(string $sourceText, array $sample): ?array
-    {
-        $general = is_array($sample['general'] ?? null) ? $sample['general'] : [];
-        $sampleDetails = is_array($sample['details'] ?? null) ? $sample['details'] : [];
-        $fieldPlan = is_array($sample['fieldPlan'] ?? null) ? $sample['fieldPlan'] : ['add' => [], 'remove' => [], 'replaceBase' => false];
-        $correctedText = trim($sourceText);
-        $ambiguousMatches = max(0, (int) ($sample['_match_ambiguous_count'] ?? 0));
-        $generatedDescription = $correctedText;
-
-        if ('' === $generatedDescription) {
-            $generatedDescription = $this->firstNonEmpty(
-                trim((string) ($general['description'] ?? '')),
-                trim((string) ($sampleDetails['descriptionBesoin'] ?? ''))
-            );
-        }
-
-        $customFields = [];
-        foreach ($fieldPlan['add'] ?? [] as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            $key = trim((string) ($field['key'] ?? ''));
-            if ('' === $key) {
-                continue;
-            }
-
-            $type = strtolower(trim((string) ($field['type'] ?? 'text')));
-            if (!in_array($type, ['text', 'textarea', 'select', 'number', 'date'], true)) {
-                $type = 'text';
-            }
-
-            $inferredValue = $this->inferAutreCustomFieldValue($sourceText, $field);
-            $sampleValue = isset($sampleDetails[$key]) && is_scalar($sampleDetails[$key])
-                ? trim((string) $sampleDetails[$key])
-                : '';
-            $schemaValue = trim((string) ($field['value'] ?? ''));
-            $sampleSupportsPrompt = $this->sourceContainsFeedbackValue($sourceText, $sampleValue);
-            $schemaSupportsPrompt = $this->sourceContainsFeedbackValue($sourceText, $schemaValue);
-            $isStableField = $this->isStableLearnedAutreField($field);
-            $isPromptSensitiveField = $this->isPromptSensitiveLearnedAutreField($field);
-            $fieldCalledInPrompt = $this->isAutreFieldCalledInPrompt($sourceText, $field);
-            $allowCategoryReuse = $this->canReuseLearnedFieldForPromptCategory($sourceText, $field, $fieldCalledInPrompt);
-            $matchScore = (float) ($sample['_match_score'] ?? 0.0);
-
-            if (
-                $this->looksLikePromptEcho($inferredValue, $sourceText)
-                && '' !== $sampleValue
-                && $isStableField
-                && !$isPromptSensitiveField
-            ) {
-                $inferredValue = '';
-            }
-
-            if ($isStableField) {
-                $promptSupportedValue = $this->firstNonEmpty(
-                    $sampleSupportsPrompt || $matchScore >= 78.0 ? $sampleValue : '',
-                    $inferredValue,
-                    $schemaSupportsPrompt || $matchScore >= 82.0 ? $schemaValue : ''
-                );
-            } else {
-                $promptSupportedValue = $this->firstNonEmpty(
-                    $inferredValue,
-                    $sampleSupportsPrompt ? $sampleValue : '',
-                    $schemaSupportsPrompt ? $schemaValue : ''
-                );
-            }
-
-            if (
-                '' === $promptSupportedValue
-                && $matchScore >= 74.0
-                && $isStableField
-                && !$isPromptSensitiveField
-                && 'textarea' !== $type
-                && $allowCategoryReuse
-            ) {
-                // For close semantic matches, keep non-volatile learned fields
-                // even when wording changes and strict token overlap is lower.
-                $promptSupportedValue = $this->firstNonEmpty($sampleValue, $schemaValue);
-            }
-
-            if ('' === $promptSupportedValue && !$fieldCalledInPrompt && !$allowCategoryReuse) {
-                continue;
-            }
-
-            if ('' === $promptSupportedValue) {
-                continue;
-            }
-
-            if (!$fieldCalledInPrompt && !$allowCategoryReuse) {
-                continue;
-            }
-
-            $customField = [
-                'key' => $key,
-                'label' => trim((string) ($field['label'] ?? $key)),
-                'type' => $type,
-                'required' => true === ($field['required'] ?? false),
-                'value' => $promptSupportedValue,
-            ];
-
-            if ('select' === $type && isset($field['options']) && is_array($field['options'])) {
-                $customField['options'] = array_values(array_filter(array_map('strval', $field['options'])));
-            }
-
-            $customFields[] = $customField;
-        }
-
-        // Keep learned schema, but enrich values from current prompt signals
-        // (date/time/location/amount) when newly mentioned.
-        $customFields = $this->augmentLearnedAutreFieldsFromPrompt($sourceText, $customFields);
-        $customFields = $this->dedupeAutreFieldsByKey($customFields);
-        if ([] === $customFields) {
-            return null;
-        }
-
-        $visibleDetails = [];
-        foreach ($customFields as $field) {
-            $key = trim((string) ($field['key'] ?? ''));
-            if ('' === $key) {
-                continue;
-            }
-
-            $value = trim((string) ($field['value'] ?? ''));
-            if ('' !== $value) {
-                $visibleDetails[$key] = $value;
-            }
-        }
-
-        $confidenceMessage = $ambiguousMatches > 0
-            ? 'Plusieurs demandes confirmees similaires existent en base. La plus pertinente et la plus recente a ete appliquee.'
-            : 'Demande deja confirmee en base. Le schema sauvegarde est reutilise et les valeurs suivent le texte actuel.';
-
-        return [
-            'correctedText' => $correctedText,
-            'generatedDescription' => $generatedDescription,
-            'suggestedGeneral' => [
-                'titre' => $this->firstNonEmpty(
-                    $this->extractLeadClauseBeforeKeywords($sourceText, ['pour', 'car', 'parce que', 'afin de', 'vers', 'destinataire', 'organisme', 'chez']),
-                    trim((string) ($general['titre'] ?? ''))
-                ),
-                'description' => $generatedDescription,
-                'priorite' => trim((string) ($general['priorite'] ?? '')),
-                'categorie' => trim((string) ($general['categorie'] ?? '')),
-                'typeDemande' => trim((string) ($general['typeDemande'] ?? 'Autre')),
-            ],
-            'suggestedDetails' => $visibleDetails,
-            'dynamicFieldPlan' => [
-                'add' => $customFields,
-                'remove' => array_values(array_map('strval', is_array($fieldPlan['remove'] ?? null) ? $fieldPlan['remove'] : [])),
-                'replaceBase' => [] !== $customFields || true === ($fieldPlan['replaceBase'] ?? false),
-            ],
-            'dynamicFieldConfidence' => [
-                'score' => $ambiguousMatches > 0 ? 91 : 96,
-                'label' => 'Elevee',
-                'tone' => 'success',
-                'message' => $confidenceMessage,
-            ],
-            'skipConfirmationRestriction' => false,
-            'model' => 'database-feedback:autre-confirmed-match',
-        ];
-    }
-
-    private function sourceContainsFeedbackValue(string $sourceText, string $value): bool
-    {
-        $normalizedSource = $this->normalizeForSearch($sourceText);
-        $normalizedValue = $this->normalizeForSearch($value);
-
-        if ('' === $normalizedSource || '' === $normalizedValue || mb_strlen($normalizedValue) < 3) {
-            return false;
-        }
-
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $normalizedValue) === 1) {
-            return str_contains($normalizedSource, $normalizedValue);
-        }
-
-        if (str_contains($normalizedSource, $normalizedValue)) {
-            return true;
-        }
-
-        $sourceTokens = $this->tokenizeLooseText($normalizedSource);
-        $valueTokens = $this->tokenizeLooseText($normalizedValue);
-        if ([] === $sourceTokens || [] === $valueTokens) {
-            return false;
-        }
-
-        $shared = count(array_intersect($sourceTokens, $valueTokens));
-        $valueCoverage = $shared / max(1, count($valueTokens));
-
-        return $valueCoverage >= 0.6;
-    }
-
-    private function looksLikePromptEcho(string $candidate, string $sourceText): bool
-    {
-        $normalizedCandidate = $this->normalizeForSearch($candidate);
-        $normalizedSource = $this->normalizeForSearch($sourceText);
-        if ('' === $normalizedCandidate || '' === $normalizedSource) {
-            return false;
-        }
-
-        if (mb_strlen($normalizedCandidate) < 30) {
-            return false;
-        }
-
-        if (str_contains($normalizedSource, $normalizedCandidate)) {
-            return true;
-        }
-
-        $sourceTokens = $this->tokenizeLooseText($normalizedSource);
-        $candidateTokens = $this->tokenizeLooseText($normalizedCandidate);
-        if ([] === $sourceTokens || [] === $candidateTokens || count($candidateTokens) < 5) {
-            return false;
-        }
-
-        $sharedTokens = count(array_intersect($sourceTokens, $candidateTokens));
-        $candidateCoverage = $sharedTokens / max(1, count($candidateTokens));
-        similar_text($normalizedSource, $normalizedCandidate, $similarity);
-
-        return $candidateCoverage >= 0.7 && $similarity >= 75.0;
-    }
-
-    /**
-     * Stable fields are usually user-defined taxonomy labels where confirmed values
-     * should be preferred over free-text reformulation.
-     *
-     * @param array<string, mixed> $field
-     */
-    private function isStableLearnedAutreField(array $field): bool
-    {
-        $label = $this->normalizeForSearch((string) ($field['label'] ?? ''));
-        $key = $this->normalizeForSearch((string) ($field['key'] ?? ''));
-        $haystack = trim($label . ' ' . $key);
-        if ('' === $haystack) {
-            return false;
-        }
-
-        return preg_match('/\b(type|nature|incident|intervention|categorie|categorie|niveau|niveau_urgence|classification|statut|mode)\b/i', $haystack) === 1;
-    }
-
-    /**
-     * Prompt-sensitive fields must still be supported by current prompt evidence
-     * to avoid carrying stale values across different user requests.
-     *
-     * @param array<string, mixed> $field
-     */
-    private function isPromptSensitiveLearnedAutreField(array $field): bool
-    {
-        $label = $this->normalizeForSearch((string) ($field['label'] ?? ''));
-        $key = $this->normalizeForSearch((string) ($field['key'] ?? ''));
-        $haystack = trim($label . ' ' . $key);
-        if ('' === $haystack) {
-            return false;
-        }
-
-        return preg_match('/\b(date|jour|echeance|deadline|heure|horaire|time|duree|duration|periode|delai|montant|prix|cout|budget|quantite|total|lieu|zone|destination|depart|arrivee|adresse|localisation|usage|justification|motif|description|contexte|besoin|specification|modele|taille|dimension|materiel|equipement|objet)\b/i', $haystack) === 1;
-    }
-
-    /**
-     * Reuse learned fields by intent/category, not by strict prompt equality.
-     * Values still come from current prompt inference whenever possible.
-     *
-     * @param array<string, mixed> $field
-     */
-    private function canReuseLearnedFieldForPromptCategory(string $sourceText, array $field, bool $fieldCalledInPrompt = false): bool
-    {
-        if ($fieldCalledInPrompt) {
-            return true;
-        }
-
-        $normalizedSource = $this->normalizeForSearch($sourceText);
-        if ('' === $normalizedSource) {
-            return false;
-        }
-
-        $label = $this->normalizeForSearch((string) ($field['label'] ?? ''));
-        $key = $this->normalizeForSearch((string) ($field['key'] ?? ''));
-        $haystack = trim($label . ' ' . $key);
-        if ('' === $haystack) {
-            return false;
-        }
-
-        $equipmentPrompt = preg_match('/\b(materiel|equipement|clavier|souris|ecran|ordinateur|pc|laptop|webcam|imprimante|casque)\b/i', $normalizedSource) === 1;
-        if ($equipmentPrompt) {
-            return preg_match('/\b(materiel|equipement|objet|specification|modele|taille|dimension|usage|justification|motif)\b/i', $haystack) === 1;
-        }
-
-        $transportPrompt = preg_match('/\b(transport|trajet|deplacement|taxi|bus|train|voiture|vehicule|depart|destination)\b/i', $normalizedSource) === 1;
-        if ($transportPrompt) {
-            return preg_match('/\b(transport|trajet|deplacement|depart|destination|lieu|horaire|justification|motif)\b/i', $haystack) === 1;
-        }
-
-        $parkingPrompt = preg_match('/\b(parking|stationnement|place reservee|badge parking|acces parking)\b/i', $normalizedSource) === 1;
-        if ($parkingPrompt) {
-            return preg_match('/\b(parking|stationnement|zone|emplacement|horaire|justification|motif|acces)\b/i', $haystack) === 1;
-        }
-
-        return false;
-    }
-
-    /**
-     * @param array<string, mixed> $field
-     */
-    private function isAutreFieldCalledInPrompt(string $text, array $field): bool
-    {
-        $normalizedText = $this->normalizeForSearch($text);
-        if ('' === $normalizedText) {
-            return false;
-        }
-
-        $label = $this->normalizeForSearch((string) ($field['label'] ?? ''));
-        $key = $this->normalizeForSearch((string) ($field['key'] ?? ''));
-        $haystack = trim($label . ' ' . $key);
-
-        if ('' === $haystack) {
-            return false;
-        }
-
-        if (preg_match('/\b(date|jour|echeance|deadline)\b/i', $haystack) === 1) {
-            return $this->sourceSupportsFieldOverride($text, (string) ($field['key'] ?? ''));
-        }
-
-        if (preg_match('/\b(horaire|heure|time)\b/i', $haystack) === 1) {
-            return '' !== $this->extractExplicitAutreLearningTime($text);
-        }
-
-        if (preg_match('/\b(duree|duration|periode|delai)\b/i', $haystack) === 1) {
-            return '' !== $this->extractExplicitAutreLearningDuration($text);
-        }
-
-        if (preg_match('/\b(montant|prix|cout|budget|quantite|total)\b/i', $haystack) === 1) {
-            return null !== $this->extractAmountFromText($normalizedText);
-        }
-
-        if (preg_match('/\b(lieu|zone|destination|depart|arrivee|adresse|localisation)\b/i', $haystack) === 1) {
-            $route = $this->extractRouteLocations($text);
-            return '' !== trim((string) ($route['from'] ?? ''))
-                || '' !== trim((string) ($route['to'] ?? ''))
-                || '' !== $this->extractTargetLocation($text)
-                || '' !== $this->extractCurrentLocation($text);
-        }
-
-        if (preg_match('/\b(formation|certification|nom_formation|nom formation|intitule formation|intitul[ée] formation)\b/i', $haystack) === 1) {
-            return '' !== $this->firstNonEmpty($this->extractFormationTopic($text), $this->extractTrainingName($text));
-        }
-
-        $options = is_array($field['options'] ?? null) ? $field['options'] : [];
-        foreach ($options as $option) {
-            $normalizedOption = $this->normalizeForSearch((string) $option);
-            if ('' !== $normalizedOption && str_contains($normalizedText, $normalizedOption)) {
-                return true;
-            }
-        }
-
-        $ignoredTokens = [
-            'ai', 'autre', 'custom', 'field', 'champ', 'champs', 'valeur', 'value', 'metier',
-            'info', 'infos', 'information', 'donnee', 'donnees', 'detail', 'details', 'type',
-            'nom', 'objet', 'intitule', 'libelle', 'titre', 'sujet',
-        ];
-        $tokens = preg_split('/[^a-z0-9]+/u', $haystack, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        foreach ($tokens as $token) {
-            $token = trim((string) $token);
-            if (mb_strlen($token) < 4 || in_array($token, $ignoredTokens, true)) {
-                continue;
-            }
-
-            if ($this->containsWord($normalizedText, $token)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function tokenizeLooseText(string $text): array
-    {
-        $tokens = preg_split('/[^a-z0-9]+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $tokens = array_values(array_unique(array_filter(array_map(
-            static fn (string $token): string => trim($token),
-            $tokens
-        ), static fn (string $token): bool => mb_strlen($token) >= 2)));
-
-        return $tokens;
-    }
-
-    private function normalizeAutreLearningMatchText(string $text): string
-    {
-        $normalized = $this->normalizeLooseLabel($text);
-        if ('' === $normalized) {
-            return '';
-        }
-
-        $normalized = preg_replace('/\b\d{4}-\d{2}-\d{2}\b/u', ' ', $normalized) ?? $normalized;
-        $normalized = preg_replace('/\b\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b/u', ' ', $normalized) ?? $normalized;
-        $normalized = preg_replace('/\b\d{1,2}\s+(?:janvier|janv|fevrier|fevr|fev|mars|avril|avr|mai|juin|juillet|juil|aout|septembre|sept|octobre|novembre|decembre|dec)(?:\s+\d{4})?\b/u', ' ', $normalized) ?? $normalized;
-        $normalized = preg_replace('/\b\d+(?:[\.,]\d+)?\s*(?:dt|tnd|dinar|dinars)\b/u', ' ', $normalized) ?? $normalized;
-
-        $stopwords = [
-            'je', 'j', 'veux', 'souhaite', 'demande', 'besoin', 'un', 'une', 'le', 'la', 'les',
-            'de', 'du', 'des', 'd', 'pour', 'a', 'au', 'aux', 'avec', 'sur', 'svp', 'merci',
-            'bonjour', 'salut', 'slt', 'mon', 'ma', 'mes', 'ce', 'cette',
-        ];
-        foreach ($stopwords as $stopword) {
-            $normalized = preg_replace('/\b' . preg_quote($stopword, '/') . '\b/u', ' ', $normalized) ?? $normalized;
-        }
-
-        return trim((string) (preg_replace('/\s+/u', ' ', $normalized) ?? $normalized));
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $customFields
-     * @return array<int, array<string, mixed>>
-     */
-    private function augmentLearnedAutreFieldsFromPrompt(string $sourceText, array $customFields): array
-    {
-        $fields = $customFields;
-        $fieldText = $this->normalizeForSearch(implode(' ', array_map(static function (array $field): string {
-            return trim((string) ($field['key'] ?? '') . ' ' . (string) ($field['label'] ?? ''));
-        }, $fields)));
-
-        $hasFieldLike = static function (string $pattern) use ($fieldText): bool {
-            return preg_match($pattern, $fieldText) === 1;
-        };
-
-        $dates = $this->extractAllFrenchDates($sourceText);
-        $location = $this->extractExplicitAutreLearningLocation($sourceText, $fields);
-        $amount = $this->extractAmountFromText($this->normalizeForSearch($sourceText));
-        $hasCurrencyToken = preg_match('/\b(?:dt|tnd|dinar|dinars)\b/i', $sourceText) === 1;
-        $time = $this->firstNonEmpty(
-            $this->extractFlexibleTimeWindow($sourceText),
-            $this->extractExplicitAutreLearningTime($sourceText)
-        );
-        $duration = $this->extractExplicitAutreLearningDuration($sourceText);
-        $period = $this->extractRelativePeriodLabel($sourceText);
-
-        foreach ($fields as $index => $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            $key = strtolower(trim((string) ($field['key'] ?? '')));
-            $label = strtolower(trim((string) ($field['label'] ?? '')));
-            $value = trim((string) ($field['value'] ?? ''));
-            $haystack = trim($key . ' ' . $label);
-
-            if ('' === $value && [] !== $dates && preg_match('/\b(date|jour|echeance|deadline)\b/i', $haystack) === 1) {
-                $fields[$index]['value'] = $dates[0];
-                continue;
-            }
-
-            if ('' === $value && '' !== $location && preg_match('/\b(lieu|localisation|adresse|destination|emplacement|ville)\b/i', $haystack) === 1) {
-                $fields[$index]['value'] = $location;
-                continue;
-            }
-
-            if ('' === $value && '' !== $time && preg_match('/\b(horaire|heure|time)\b/i', $haystack) === 1) {
-                $fields[$index]['value'] = $time;
-                continue;
-            }
-
-            if ('' === $value && '' !== $duration && preg_match('/\b(duree|durée|duration|periode|période|delai|délai)\b/i', $haystack) === 1) {
-                $fields[$index]['value'] = $duration;
-                continue;
-            }
-
-            if ('' === $value && '' !== $period && preg_match('/\b(periode|période|semaine|mois|intervalle|concern[ée]e?)\b/i', $haystack) === 1) {
-                $fields[$index]['value'] = $period;
-                continue;
-            }
-
-            if (
-                '' === $value
-                && null !== $amount
-                && $hasCurrencyToken
-                && preg_match('/\b(montant|prix|cout|co[uû]t|budget)\b/i', $haystack) === 1
-            ) {
-                $fields[$index]['value'] = (string) $amount;
-            }
-        }
-
-        if ([] !== $dates && !$hasFieldLike('/\b(date|jour|echeance|deadline)\b/i')) {
-            $fields[] = [
-                'key' => 'ai_date_souhaitee',
-                'label' => 'Date souhaitee',
-                'type' => 'date',
-                'required' => false,
-                'value' => $dates[0],
-            ];
-        }
-
-        if ('' !== $time && !$hasFieldLike('/\b(horaire|heure|time)\b/i')) {
-            $fields[] = [
-                'key' => 'ai_horaire_souhaite',
-                'label' => 'Horaire souhaite',
-                'type' => 'text',
-                'required' => false,
-                'value' => $time,
-            ];
-        }
-
-        if ('' !== $duration && !$hasFieldLike('/\b(duree|durée|duration|periode|période|delai|délai)\b/i')) {
-            $fields[] = [
-                'key' => 'ai_duree_souhaitee',
-                'label' => 'Duree souhaitee',
-                'type' => 'text',
-                'required' => false,
-                'value' => $duration,
-            ];
-        }
-
-        if ('' !== $period && !$hasFieldLike('/\b(periode|période|semaine|mois|intervalle|concern[ée]e?)\b/i')) {
-            $fields[] = [
-                'key' => 'ai_periode_concernee',
-                'label' => 'Periode concernee',
-                'type' => 'text',
-                'required' => false,
-                'value' => $period,
-            ];
-        }
-
-        if ('' !== $location && !$hasFieldLike('/\b(lieu|localisation|adresse|destination|emplacement|ville)\b/i')) {
-            $fields[] = [
-                'key' => 'ai_lieu_souhaite',
-                'label' => 'Lieu souhaite',
-                'type' => 'text',
-                'required' => false,
-                'value' => $location,
-            ];
-        }
-
-        if (null !== $amount && $hasCurrencyToken && !$hasFieldLike('/\b(montant|prix|cout|budget)\b/i')) {
-            $fields[] = [
-                'key' => 'ai_montant',
-                'label' => 'Montant',
-                'type' => 'number',
-                'required' => false,
-                'value' => (string) $amount,
-            ];
-        }
-
-        return $this->dedupeAutreFieldsByKey($fields);
-    }
-
-    private function extractExplicitAutreLearningTime(string $sourceText): string
-    {
-        if (preg_match('/\b([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?\b/iu', $sourceText, $matches) === 1) {
-            $hour = (int) ($matches[1] ?? 0);
-            $minute = trim((string) ($matches[2] ?? ''));
-
-            return '' !== $minute ? sprintf('%02dh%s', $hour, $minute) : sprintf('%02dh', $hour);
-        }
-
-        if (preg_match('/\b([01]?\d|2[0-3])\s+heures?(?:\s+([0-5]\d))?\b/iu', $sourceText, $matches) === 1) {
-            $hour = (int) ($matches[1] ?? 0);
-            $minute = trim((string) ($matches[2] ?? ''));
-
-            return '' !== $minute ? sprintf('%02dh%s', $hour, $minute) : sprintf('%02dh', $hour);
-        }
-
-        return '';
-    }
-
-    private function extractExplicitAutreLearningDuration(string $sourceText): string
-    {
-        if (preg_match('/\b(\d+)\s*(minutes?|mins?|heures?|jours?|semaines?|mois)\b/iu', $sourceText, $matches) !== 1) {
-            return '';
-        }
-
-        $count = (int) ($matches[1] ?? 0);
-        if ($count <= 0) {
-            return '';
-        }
-
-        $unit = mb_strtolower(trim((string) ($matches[2] ?? '')), 'UTF-8');
-        $unit = match (true) {
-            str_starts_with($unit, 'min') => $count > 1 ? 'minutes' : 'minute',
-            str_starts_with($unit, 'heure') => $count > 1 ? 'heures' : 'heure',
-            str_starts_with($unit, 'jour') => $count > 1 ? 'jours' : 'jour',
-            str_starts_with($unit, 'semaine') => $count > 1 ? 'semaines' : 'semaine',
-            default => 'mois',
-        };
-
-        return sprintf('%d %s', $count, $unit);
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $existingFields
-     */
-    private function extractExplicitAutreLearningLocation(string $sourceText, array $existingFields): string
-    {
-        $patterns = [
-            '/\b(?:lieu|ville|adresse|destination|emplacement)\s*[:\-]?\s*(\p{L}[\p{L}\'’\- ]{2,70}?)(?=[\.,;:!?]|$)/iu',
-            '/\b(?:a|\x{00E0}|au|dans|vers)\s+(\p{Lu}[\p{L}\'’\- ]{1,70}?)(?=\s+(?:le|la|les|pour|afin|car|avec|avant|apres|apr\x{00E8}s|en|du|de|des|budget|montant|cout|co\x{00FB}t|prix)\b|[\.,;:!?]|$)/u',
-        ];
-
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $sourceText, $matches) !== 1) {
-                continue;
-            }
-
-            $candidate = $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
-            if ('' === $candidate || $this->isValueAlreadyRepresentedByLearnedField($candidate, $existingFields)) {
-                continue;
-            }
-
-            return $candidate;
-        }
-
-        return '';
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $fields
-     */
-    private function isValueAlreadyRepresentedByLearnedField(string $candidate, array $fields): bool
-    {
-        $normalizedCandidate = $this->normalizeForSearch($candidate);
-        if ('' === $normalizedCandidate) {
-            return true;
-        }
-
-        foreach ($fields as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            $value = $this->normalizeForSearch((string) ($field['value'] ?? ''));
-            if ('' !== $value && $value === $normalizedCandidate) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Keep custom field values aligned with the current prompt:
-     * - Apply freshly inferred values when possible.
-     * - Remove stale values for prompt-sensitive fields not supported by the prompt.
-     *
-     * @param array<int, array<string, mixed>> $customFields
-     * @param array<string, mixed> $suggestedDetails
-     * @return array{customFields: array<int, array<string, mixed>>, suggestedDetails: array<string, mixed>}
-     */
-    private function alignAutreCustomFieldsWithPrompt(string $sourceText, array $customFields, array $suggestedDetails): array
-    {
-        $alignedFields = [];
-
-        foreach ($customFields as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            $key = trim((string) ($field['key'] ?? ''));
-            if ('' === $key) {
-                continue;
-            }
-
-            $currentValue = isset($field['value']) && is_scalar($field['value'])
-                ? trim((string) $field['value'])
-                : '';
-            $inferredValue = trim($this->inferAutreCustomFieldValue($sourceText, $field));
-            $promptSensitive = $this->isPromptSensitiveLearnedAutreField($field);
-            $fieldCalledInPrompt = $this->isAutreFieldCalledInPrompt($sourceText, $field);
-
-            if ('' !== $inferredValue) {
-                $field['value'] = $inferredValue;
-                $suggestedDetails[$key] = $inferredValue;
-            } elseif ($promptSensitive && !$fieldCalledInPrompt) {
-                unset($suggestedDetails[$key]);
-                if (true !== ($field['required'] ?? false)) {
-                    continue;
-                }
-
-                $field['value'] = '';
-            } elseif ('' !== $currentValue) {
-                if (!isset($suggestedDetails[$key]) || '' === trim((string) $suggestedDetails[$key])) {
-                    $suggestedDetails[$key] = $currentValue;
-                }
-            }
-
-            $alignedFields[] = $field;
-        }
-
-        return [
-            'customFields' => $this->dedupeAutreFieldsByKey($alignedFields),
-            'suggestedDetails' => $suggestedDetails,
-        ];
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $fields
-     * @return array<int, array<string, mixed>>
-     */
-    private function dedupeAutreFieldsByKey(array $fields): array
-    {
-        $deduped = [];
-        $seen = [];
-
-        foreach ($fields as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            $key = trim((string) ($field['key'] ?? ''));
-            if ('' === $key || isset($seen[$key])) {
-                continue;
-            }
-
-            $seen[$key] = true;
-            $deduped[] = $field;
-        }
-
-        return $deduped;
     }
 
     private function acceptAutocorrectCandidate(string $original, string $candidate): string
@@ -5111,6 +4348,48 @@ class DemandeAiAssistant
         }
 
         return '';
+    }
+
+    private function extractExplicitAutreLearningTime(string $sourceText): string
+    {
+        if (preg_match('/\b([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?\b/iu', $sourceText, $matches) === 1) {
+            $hour = (int) ($matches[1] ?? 0);
+            $minute = trim((string) ($matches[2] ?? ''));
+
+            return '' !== $minute ? sprintf('%02dh%s', $hour, $minute) : sprintf('%02dh', $hour);
+        }
+
+        if (preg_match('/\b([01]?\d|2[0-3])\s+heures?(?:\s+([0-5]\d))?\b/iu', $sourceText, $matches) === 1) {
+            $hour = (int) ($matches[1] ?? 0);
+            $minute = trim((string) ($matches[2] ?? ''));
+
+            return '' !== $minute ? sprintf('%02dh%s', $hour, $minute) : sprintf('%02dh', $hour);
+        }
+
+        return '';
+    }
+
+    private function extractExplicitAutreLearningDuration(string $sourceText): string
+    {
+        if (preg_match('/\b(\d+)\s*(minutes?|mins?|heures?|jours?|semaines?|mois)\b/iu', $sourceText, $matches) !== 1) {
+            return '';
+        }
+
+        $count = (int) ($matches[1] ?? 0);
+        if ($count <= 0) {
+            return '';
+        }
+
+        $unit = mb_strtolower(trim((string) ($matches[2] ?? '')), 'UTF-8');
+        $unit = match (true) {
+            str_starts_with($unit, 'min') => $count > 1 ? 'minutes' : 'minute',
+            str_starts_with($unit, 'heure') => $count > 1 ? 'heures' : 'heure',
+            str_starts_with($unit, 'jour') => $count > 1 ? 'jours' : 'jour',
+            str_starts_with($unit, 'semaine') => $count > 1 ? 'semaines' : 'semaine',
+            default => 'mois',
+        };
+
+        return sprintf('%d %s', $count, $unit);
     }
 
     private function formatHourForAutre(int $hour, string $minute): string
