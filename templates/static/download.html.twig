@@ -1,0 +1,367 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Telechargement - Momentum{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .download-page {
+            background:
+                radial-gradient(circle at 10% 0%, rgba(59, 130, 246, 0.12), transparent 36%),
+                linear-gradient(180deg, #f7faff 0%, #ffffff 100%);
+            min-height: 100vh;
+        }
+
+        .download-hero {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 22px;
+            background:
+                radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.12), transparent 35%),
+                #fff;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
+        }
+
+        .download-title {
+            font-size: clamp(2rem, 4vw, 3rem);
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+        }
+
+        .download-subtitle {
+            color: #566074;
+            max-width: 62ch;
+        }
+
+        .download-panel {
+            padding: .25rem 0;
+        }
+
+        .download-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .6rem;
+            margin: 1rem 0 1.15rem;
+        }
+
+        .download-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            background: rgba(255, 255, 255, 0.85);
+            color: #334155;
+            font-size: .85rem;
+            font-weight: 700;
+            padding: .4rem .75rem;
+        }
+
+        .download-list {
+            display: grid;
+            gap: .55rem;
+            margin: .9rem 0 1.1rem;
+            padding: 0;
+            list-style: none;
+        }
+
+        .download-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: .55rem;
+            color: #334155;
+            font-size: .93rem;
+        }
+
+        .download-list i {
+            color: #2563eb;
+            margin-top: .12rem;
+        }
+
+        .download-note {
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.8);
+            color: #475569;
+            padding: .8rem .95rem;
+            font-size: .9rem;
+        }
+
+        .download-info-card {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 22px;
+            background: #fff;
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.05);
+        }
+
+        .download-secondary {
+            margin-top: 0;
+        }
+
+        .download-steps {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .download-steps li {
+            display: flex;
+            align-items: flex-start;
+            gap: .75rem;
+        }
+
+        .download-step-index {
+            width: 1.7rem;
+            height: 1.7rem;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .8rem;
+            font-weight: 700;
+            background: #1d4ed8;
+            color: #fff;
+            flex: 0 0 auto;
+        }
+
+        .download-step-title {
+            margin: .05rem 0 .2rem;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .download-step-desc {
+            margin: 0;
+            color: #566074;
+            font-size: .92rem;
+        }
+
+        .requirements-box {
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 14px;
+            background: #fff;
+            padding: .9rem;
+        }
+
+        .requirements-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: .5rem 0;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+            font-size: .9rem;
+        }
+
+        .requirements-item:last-child {
+            border-bottom: 0;
+        }
+
+        .requirements-label {
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .requirements-value {
+            color: #1f2937;
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .download-visual {
+            position: relative;
+            border-radius: 18px;
+            overflow: hidden;
+            min-height: 280px;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            background:
+                radial-gradient(circle at 20% 20%, rgba(79, 99, 248, 0.22), transparent 45%),
+                linear-gradient(145deg, #e8eefb 0%, #dde6f6 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .download-graphic {
+            position: relative;
+            width: min(300px, 78%);
+            aspect-ratio: 1 / 1;
+            display: grid;
+            place-items: center;
+        }
+
+        .download-graphic__orb {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.45);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+        }
+
+        .download-graphic__icon {
+            position: relative;
+            width: 104px;
+            height: 104px;
+            border-radius: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #4A5DEF;
+            color: #fff;
+            font-size: 3rem;
+            box-shadow: 0 18px 26px rgba(58, 86, 232, 0.3);
+            z-index: 1;
+        }
+
+        .download-graphic__plate {
+            position: absolute;
+            bottom: 12%;
+            padding: .45rem .75rem;
+            border-radius: 999px;
+            background: rgba(13, 21, 53, 0.88);
+            color: #fff;
+            font-size: .82rem;
+            font-weight: 700;
+            letter-spacing: .02em;
+            z-index: 1;
+        }
+
+        .download-badge {
+            position: absolute;
+            top: .9rem;
+            left: .9rem;
+            z-index: 2;
+            border-radius: 999px;
+            background: rgba(13, 21, 53, 0.88);
+            color: #fff;
+            padding: .42rem .72rem;
+            font-size: .78rem;
+            font-weight: 700;
+            letter-spacing: .02em;
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+        }
+
+        @media (max-width: 991.98px) {
+            .download-visual {
+                min-height: 220px;
+            }
+
+            .download-graphic {
+                width: min(240px, 74%);
+            }
+
+            .download-graphic__icon {
+                width: 86px;
+                height: 86px;
+                font-size: 2.4rem;
+            }
+
+            .requirements-item {
+                flex-direction: column;
+                gap: .2rem;
+            }
+
+            .requirements-value {
+                text-align: left;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+<div class="download-page">
+    {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'download' } %}
+
+    <section class="container-xl py-5">
+        <div class="download-hero p-4 p-md-5">
+            <div class="row g-4 align-items-center">
+                <div class="col-lg-6">
+                    <div class="download-panel">
+                        <h1 class="download-title mb-3">Telechargez l'application Desktop Momentum</h1>
+                        <p class="download-subtitle mb-0">
+                            Une application stable et rapide, pensee pour les equipes RH qui gerent un volume important de candidatures, d'offres et de collaborations.
+                        </p>
+
+                        <div class="download-chip-row">
+                            <span class="download-chip"><i class="ti ti-device-desktop"></i> Desktop</span>
+                            <span class="download-chip"><i class="ti ti-refresh"></i> Synchronisation continue</span>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="https://github.com/Nuruf/PI-3A-java/releases" target="_blank" class="btn btn-primary btn-md">Telecharger Desktop</a>
+                        </div>
+
+                        <div class="download-note mt-4">
+                            Besoin d'un deploiement entreprise ou d'un accompagnement technique ? Contactez notre equipe via la page Tarification.
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="download-visual">
+                        <img src="{{ asset('images/building3.jpeg') }}" style="position: absolute; top: 0; left: 0;" class="w-100 h-auto rounded-lg shadow-sm">
+                            <span class="download-graphic__icon"><i class="ti ti-download"></i></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="download-info-card p-4 p-md-5 mt-4">
+            <div class="download-secondary row g-2">
+                    <div class="col-lg-7">
+                    <h2 class="h4 fw-bold mb-3">Installation en 3 etapes</h2>
+                    <ul class="download-steps">
+                        <li>
+                            <span class="download-step-index">1</span>
+                            <div>
+                                <h3 class="download-step-title">Telechargez le package</h3>
+                                <p class="download-step-desc">Choisissez votre systeme et lancez le telechargement depuis l'un des boutons ci-dessus.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="download-step-index">2</span>
+                            <div>
+                                <h3 class="download-step-title">Installez l'application</h3>
+                                <p class="download-step-desc">Suivez les etapes d'installation proposees par votre systeme.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="download-step-index">3</span>
+                            <div>
+                                <h3 class="download-step-title">Connectez votre compte</h3>
+                                <p class="download-step-desc">Utilisez vos identifiants entreprise pour synchroniser vos donnees Momentum.</p>
+                            </div>
+                        </li>
+                    </ul>
+                    </div>
+                    <div class="col-lg-5">
+                        <h2 class="h4 fw-bold mb-3">Configuration recommandee</h2>
+                        <div class="requirements-box">
+                            <div class="requirements-item">
+                                <span class="requirements-label">Systeme</span>
+                                <span class="requirements-value">Windows 10+</span>
+                            </div>
+                            <div class="requirements-item">
+                                <span class="requirements-label">RAM</span>
+                                <span class="requirements-value">4 GB min, 8 GB recommande</span>
+                            </div>
+                            <div class="requirements-item">
+                                <span class="requirements-label">Stockage</span>
+                                <span class="requirements-value">500 MB disponibles</span>
+                            </div>
+                            <div class="requirements-item">
+                                <span class="requirements-label">Connexion</span>
+                                <span class="requirements-value">Internet requis pour l'authentification et les services</span>
+                            </div>
+                        </div>
+                    </div>
+            </div>
+        </div>
+
+    </section>
+
+    {% include 'components/front_footer.html.twig' %}
+</div>
+{% endblock %}

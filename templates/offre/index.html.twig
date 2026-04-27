@@ -3,6 +3,7 @@
 {% block title %}Offres d'emploi | Momentum{% endblock %}
 
 {% block stylesheets %}
+    {{ parent() }}
     <style>
         .offres-page {
             background: #f5f7fb;
@@ -10,15 +11,127 @@
             padding-bottom: 2rem;
         }
 
+        .offres-carousel {
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: #ffffff;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+        }
+
         .offres-carousel .carousel-item {
-            min-height: 220px;
+            min-height: 380px;
         }
 
         .offres-carousel .carousel-panel {
-            border-radius: 10px;
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            background: #fff;
-            min-height: 220px;
+            min-height: 380px;
+            position: relative;
+            overflow: hidden;
+            color: #fff;
+            padding: 2rem;
+            background-size: cover;
+            background-position: center;
+            isolation: isolate;
+        }
+
+        .offres-carousel .carousel-panel::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(110deg, rgba(19, 26, 56, 0.86) 20%, rgba(15, 107, 183, 0.45) 100%);
+            z-index: -2;
+        }
+
+        .offres-carousel .carousel-panel::after {
+            content: "";
+            position: absolute;
+            width: 380px;
+            height: 380px;
+            right: -120px;
+            top: -140px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.28), transparent 70%);
+            z-index: -1;
+        }
+
+        .offres-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            background: rgba(255, 255, 255, 0.12);
+            padding: .35rem .8rem;
+            font-size: .75rem;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: .9rem;
+        }
+
+        .offres-carousel-title {
+            font-size: clamp(1.7rem, 2.7vw, 2.4rem);
+            margin-bottom: .8rem;
+            line-height: 1.2;
+            max-width: 640px;
+        }
+
+        .offres-carousel-subtitle {
+            max-width: 620px;
+            margin-bottom: 1.15rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.02rem;
+        }
+
+        .offres-carousel-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+        }
+
+        .offres-carousel-badges .badge {
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.14);
+            color: #fff;
+            font-weight: 600;
+            padding: .45rem .65rem;
+            backdrop-filter: blur(2px);
+        }
+
+        .offres-carousel .carousel-caption {
+            position: absolute;
+            right: auto;
+            left: 2rem;
+            bottom: 2.4rem;
+            text-align: left;
+            padding: 0;
+            width: min(92%, 800px);
+        }
+
+        .offres-carousel .carousel-indicators {
+            margin-bottom: 1rem;
+        }
+
+        .offres-carousel .carousel-indicators [data-bs-target] {
+            width: 26px;
+            height: 5px;
+            border-radius: 999px;
+        }
+
+        .offres-carousel .carousel-control-prev,
+        .offres-carousel .carousel-control-next {
+            width: 52px;
+            opacity: 1;
+        }
+
+        .offres-carousel .carousel-control-prev-icon,
+        .offres-carousel .carousel-control-next-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            background-color: rgba(15, 23, 42, 0.38);
+            border-radius: 999px;
+            background-size: 1.2rem;
+            backdrop-filter: blur(2px);
         }
 
         .offres-filter-bar {
@@ -148,6 +261,28 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        @media (max-width: 767.98px) {
+            .offres-carousel .carousel-item,
+            .offres-carousel .carousel-panel {
+                min-height: 430px;
+            }
+
+            .offres-carousel .carousel-caption {
+                left: 1.1rem;
+                bottom: 2.8rem;
+                width: calc(100% - 2.2rem);
+            }
+
+            .offres-carousel-title {
+                font-size: 1.45rem;
+            }
+
+            .offres-carousel-subtitle {
+                font-size: .95rem;
+                margin-bottom: .9rem;
+            }
+        }
     </style>
 {% endblock %}
 
@@ -183,7 +318,7 @@
     'Vente',
     'Finance',
     'Ressources Humaines',
-    'Santé',
+    'Sante',
     'Education',
     'Art et Design',
     'Autre'
@@ -197,7 +332,7 @@
     {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'offres', logged_user: true } %}
 
     <section class="container-xl mt-3">
-        <div id="offresCarousel" class="carousel slide offres-carousel" data-bs-ride="carousel">
+        <div id="offresCarousel" class="carousel slide carousel-fade offres-carousel" data-bs-ride="carousel" data-bs-interval="5200">
             <div class="carousel-indicators">
                 <button type="button" data-bs-target="#offresCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
                 <button type="button" data-bs-target="#offresCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
@@ -206,26 +341,44 @@
 
             <div class="carousel-inner">
                 <div class="carousel-item active">
-                    <div class="carousel-panel d-flex align-items-center p-4 p-md-5">
-                        <div>
-                            <h2 class="h1 mb-2">Trouvez l'offre qui vous correspond</h2>
-                            <p class="text-secondary mb-0">Parcourez les opportunites disponibles et postulez en quelques clics.</p>
+                    <div class="carousel-panel" style="background-image: url('https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1600&q=80');">
+                        <div class="carousel-caption">
+                            <div class="offres-kicker"><i class="ti ti-sparkles"></i> Decouverte intelligente</div>
+                            <h2 class="offres-carousel-title">Trouvez l'offre qui vous correspond vraiment</h2>
+                            <p class="offres-carousel-subtitle">Un moteur de recherche clair, des filtres utiles et une lecture rapide des postes les plus pertinents pour votre profil.</p>
+                            <div class="offres-carousel-badges">
+                                <span class="badge">Filtres rapides</span>
+                                <span class="badge">UI claire</span>
+                                <span class="badge">Postuler en quelques clics</span>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="carousel-item">
-                    <div class="carousel-panel d-flex align-items-center p-4 p-md-5">
-                        <div>
-                            <h2 class="h1 mb-2">Recrutement plus rapide pour les RH</h2>
-                            <p class="text-secondary mb-0">Filtrez les profils et suivez vos candidatures sur une interface unique.</p>
+                    <div class="carousel-panel" style="background-image: url('https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1600&q=80');">
+                        <div class="carousel-caption">
+                            <div class="offres-kicker"><i class="ti ti-users-group"></i> Focus RH</div>
+                            <h2 class="offres-carousel-title">Un recrutement plus rapide pour les equipes RH</h2>
+                            <p class="offres-carousel-subtitle">Passez de la publication d'offre au suivi candidat avec une experience unifiee et des composants Tabler coherents.</p>
+                            <div class="offres-carousel-badges">
+                                <span class="badge">Pipeline organise</span>
+                                <span class="badge">Score IA</span>
+                                <span class="badge">Suivi en direct</span>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="carousel-item">
-                    <div class="carousel-panel d-flex align-items-center p-4 p-md-5">
-                        <div>
-                            <h2 class="h1 mb-2">CDI, CDD, Stage ou CVP</h2>
-                            <p class="text-secondary mb-0">Explorez differents types de contrats selon vos objectifs professionnels.</p>
+                    <div class="carousel-panel" style="background-image: url('https://images.unsplash.com/photo-1573497491765-dccce02b29df?auto=format&fit=crop&w=1600&q=80');">
+                        <div class="carousel-caption">
+                            <div class="offres-kicker"><i class="ti ti-briefcase-2"></i> Carriere</div>
+                            <h2 class="offres-carousel-title">CDI, CDD, Stage ou CVP: avancez selon vos objectifs</h2>
+                            <p class="offres-carousel-subtitle">Comparez les opportunites par categorie, contrat et echeance pour accelerer votre prochaine etape professionnelle.</p>
+                            <div class="offres-carousel-badges">
+                                <span class="badge">8+ categories</span>
+                                <span class="badge">Contrats varies</span>
+                                <span class="badge">Descriptions detaillees</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -233,11 +386,11 @@
 
             <button class="carousel-control-prev" type="button" data-bs-target="#offresCarousel" data-bs-slide="prev">
                 <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Previous</span>
+                <span class="visually-hidden">Precedent</span>
             </button>
             <button class="carousel-control-next" type="button" data-bs-target="#offresCarousel" data-bs-slide="next">
                 <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Next</span>
+                <span class="visually-hidden">Suivant</span>
             </button>
         </div>
     </section>
@@ -333,7 +486,7 @@
                                                 <div class="modal-content">
                                                     <div class="modal-header">
                                                         <h5 class="modal-title" id="{{ applyModalId }}Label">Postuler - {{ offre.titrePoste }}</h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
                                                     </div>
                                                     <div class="modal-body">
                                                         {{ render(controller('App\\Controller\\CandidatController::postuler', {
@@ -349,7 +502,7 @@
                                     <div class="col-6 d-grid">
                                         <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
                                             data-bs-target="#{{ detailsModalId }}">
-                                            Détails
+                                            Details
                                         </button>
 
                                         <div class="modal fade" id="{{ detailsModalId }}" tabindex="-1" aria-labelledby="{{ detailsModalId }}Label" aria-hidden="true">
@@ -358,7 +511,7 @@
                                                     <div class="modal-header">
                                                         <h5 class="modal-title" id="{{ detailsModalId }}Label">Poste {{ offre.titrePoste }}</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                        aria-label="Close"></button>
+                                                        aria-label="Fermer"></button>
                                                     </div>
                                                     <div class="modal-body">
                                                         {% set safeDescription = (offre.description|default(''))
@@ -376,7 +529,7 @@
                                                     </div>
                                                     <div class="modal-footer">
                                                         <button type="button" class="btn me-auto"
-                                                        data-bs-dismiss="modal">Close</button>
+                                                        data-bs-dismiss="modal">Fermer</button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -409,5 +562,7 @@
             </div>
         {% endif %}
     </section>
+
+    {% include 'components/front_footer.html.twig' %}
 </div>
 {% endblock %}
