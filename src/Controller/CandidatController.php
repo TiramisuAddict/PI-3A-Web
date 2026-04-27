@@ -30,7 +30,7 @@ final class CandidatController extends AbstractController
             'controller_name' => 'CandidatController',
         ]);
     }
-    #[Route('/candidature/suivre', name: 'app_suivre_candidature')]
+    #[Route('/suivre', name: 'app_suivre_candidature')]
     public function suivre_candidature(CandidatRepository $candidat_repository): Response
     {
         $candidatures = $candidat_repository->findAll();

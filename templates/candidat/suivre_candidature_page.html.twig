@@ -145,17 +145,23 @@
 
 {% set trackingCode = app.request.query.get('code')|default('') %}
 
-{% set trackingJob = app.request.query.get('job')|default('UX / UI Designer') %}
-{% set trackingState = app.request.query.get('state')|default('submitted') %}
+{% set trackingJob = app.request.query.get('job')|default('Designer UX / UI') %}
+{% set trackingState = app.request.query.get('state')|default('en_attente') %}
 {% set trackingDate = app.request.query.get('date')|default('2024-06-01') %}
 {% set trackingEmail = app.request.query.get('email')|default('john.doe@example.com') %}
+{% set trackingStateKey = trackingState|lower|replace({' ':'_'}) %}
+{% set isPending = trackingStateKey starts with 'en_' %}
+{% set isPreselection = trackingStateKey starts with 'pre' or trackingStateKey starts with 'pr' %}
+{% set isInterview = trackingStateKey starts with 'entretien' %}
+{% set isAccepted = trackingStateKey starts with 'accept' %}
+{% set isRefused = trackingStateKey starts with 'refus' %}
 
 {% set hasTracking = trackingCode is not empty %}
 
-{% set submittedClass = hasTracking ? (trackingState == 'En attente' ? 'active' : 'completed') : '' %}
-{% set preselectionClass = hasTracking and trackingState in ['Présélectionné', 'Entretien', 'Accepté', 'Refusé'] ? (trackingState == 'preselection' ? 'active' : 'completed') : '' %}
-{% set interviewClass = hasTracking and trackingState in ['Entretien', 'Accepté', 'Refusé'] ? (trackingState == 'interview' ? 'active' : 'completed') : '' %}
-{% set decisionClass = hasTracking and trackingState in ['Accepté', 'Refusé'] ? 'active ' ~ (trackingState == 'accepted' ? 'is-accepted' : 'is-refused') : '' %}
+{% set submittedClass = hasTracking ? (isPending ? 'active' : 'completed') : '' %}
+{% set preselectionClass = hasTracking and (isPreselection or isInterview or isAccepted or isRefused) ? (isPreselection ? 'active' : 'completed') : '' %}
+{% set interviewClass = hasTracking and (isInterview or isAccepted or isRefused) ? (isInterview ? 'active' : 'completed') : '' %}
+{% set decisionClass = hasTracking and (isAccepted or isRefused) ? 'active ' ~ (isAccepted ? 'is-accepted' : 'is-refused') : '' %}
 
 {% for candidature in candidatures %}
 
@@ -165,17 +171,22 @@
     {% set trackingState = candidature.etat %}
     {% set trackingDate = candidature.dateCandidature %}
     {% set trackingEmail = candidature.visiteur.eMail %}
+    {% set trackingStateKey = trackingState|lower|replace({' ':'_'}) %}
+    {% set isPending = trackingStateKey starts with 'en_' %}
+    {% set isPreselection = trackingStateKey starts with 'pre' or trackingStateKey starts with 'pr' %}
+    {% set isInterview = trackingStateKey starts with 'entretien' %}
+    {% set isAccepted = trackingStateKey starts with 'accept' %}
+    {% set isRefused = trackingStateKey starts with 'refus' %}
 
     {% set hasTracking = true %}
-    {% set submittedClass = trackingState == 'En attente' ? 'active' : trackingState in ['Présélectionné', 'Entretien', 'Accepté', 'Refusé'] ? 'completed' : '' %}
-    {% set preselectionClass = trackingState == 'Présélectionné' ? 'active' : trackingState in ['Entretien', 'Accepté', 'Refusé'] ? 'completed' : '' %}
-    {% set interviewClass = trackingState == 'Entretien' ? 'active' : trackingState in ['Accepté', 'Refusé'] ? 'completed' : '' %}
-    {% set decisionClass = trackingState == 'Accepté' ? 'active is-accepted' : trackingState == 'Refusé' ? 'active is-refused' : '' %}
+    {% set submittedClass = isPending ? 'active' : (isPreselection or isInterview or isAccepted or isRefused ? 'completed' : '') %}
+    {% set preselectionClass = isPreselection ? 'active' : (isInterview or isAccepted or isRefused ? 'completed' : '') %}
+    {% set interviewClass = isInterview ? 'active' : (isAccepted or isRefused ? 'completed' : '') %}
+    {% set decisionClass = isAccepted ? 'active is-accepted' : (isRefused ? 'active is-refused' : '') %}
 {% endif %}
 
 {% endfor %}
 
-{% set isRefused = trackingState == 'Refusé' %}
 {% set refusedClass = isRefused ? ' is-refused' : '' %}
 {% if isRefused %}
     {% set submittedClass = submittedClass ~ refusedClass %}
@@ -234,10 +245,10 @@
                             <p class="text-secondary mb-0">Candidature pour le poste: {{ trackingJob }}</p>
                         </div>
 
-                        {% if trackingState == 'Accepté' %}
-                            <span class="badge bg-green-lt text-green">Acceptée</span>
-                        {% elseif trackingState == 'Refusé' %}
-                            <span class="badge bg-red-lt text-red">Refusée</span>
+                        {% if isAccepted %}
+                            <span class="badge bg-green-lt text-green">Acceptee</span>
+                        {% elseif isRefused %}
+                            <span class="badge bg-red-lt text-red">Refusee</span>
                         {% else %}
                             <span class="badge bg-blue-lt text-blue">En cours</span>
                         {% endif %}
@@ -249,25 +260,25 @@
                         <li class="step-item {{ interviewClass }}">Entretien</li>
                         <li class="step-item {{ decisionClass }}">
                             Decision
-                            {% if trackingState == 'Accepté' %}
+                            {% if isAccepted %}
                                 - Acceptee
-                            {% elseif trackingState == 'Refusé' %}
+                            {% elseif isRefused %}
                                 - Refusee
                             {% endif %}
                         </li>
                     </ul>
 
-                    <div class="tracking-state-box mt-4 {{ trackingState == 'Accepté' ? 'is-accepted' : trackingState == 'Refusé' ? 'is-refused' : 'is-review' }}">
-                        {% if trackingState == 'Accepté' %}
+                    <div class="tracking-state-box mt-4 {{ isAccepted ? 'is-accepted' : isRefused ? 'is-refused' : 'is-review' }}">
+                        {% if isAccepted %}
                             <div class="fw-bold text-success">Votre candidature a ete acceptee</div>
                             <div class="text-secondary mt-1">Votre dossier a termine le processus avec succes. Vous serez contacte prochainement.</div>
-                        {% elseif trackingState == 'Refusé' %}
+                        {% elseif isRefused %}
                             <div class="fw-bold text-danger">Votre candidature a ete refusee</div>
                             <div class="text-secondary mt-1">La derniere etape atteinte est la decision finale. Le dossier est ferme pour cette offre.</div>
-                        {% elseif trackingState == 'Entretien' %}
+                        {% elseif isInterview %}
                             <div class="fw-bold text-primary">Votre candidature est en entretien</div>
                             <div class="text-secondary mt-1">Verifier votre email pour les details.</div>
-                        {% elseif trackingState == 'Preselection' %}
+                        {% elseif isPreselection %}
                             <div class="fw-bold text-primary">Votre candidature est en preselection</div>
                             <div class="text-secondary mt-1">Votre dossier a passe la preselection et attend la prochaine etape.</div>
                         {% else %}
@@ -310,7 +321,7 @@
                         </div>
                         <div class="empty-title">Entrez votre code pour afficher le suivi</div>
                         <div class="empty-subtitle text-secondary">
-                            Une fois le code saisi, la progression de la candidature apparaîtra ici avec les étapes Tabler.
+                            Une fois le code saisi, la progression de la candidature apparaitra ici avec les etapes Tabler.
                         </div>
                     </div>
                 </div>

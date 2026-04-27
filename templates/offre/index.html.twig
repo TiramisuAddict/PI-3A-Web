@@ -318,7 +318,7 @@
     'Vente',
     'Finance',
     'Ressources Humaines',
-    'Santé',
+    'Sante',
     'Education',
     'Art et Design',
     'Autre'
@@ -386,11 +386,11 @@
 
             <button class="carousel-control-prev" type="button" data-bs-target="#offresCarousel" data-bs-slide="prev">
                 <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Previous</span>
+                <span class="visually-hidden">Precedent</span>
             </button>
             <button class="carousel-control-next" type="button" data-bs-target="#offresCarousel" data-bs-slide="next">
                 <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Next</span>
+                <span class="visually-hidden">Suivant</span>
             </button>
         </div>
     </section>
@@ -486,7 +486,7 @@
                                                 <div class="modal-content">
                                                     <div class="modal-header">
                                                         <h5 class="modal-title" id="{{ applyModalId }}Label">Postuler - {{ offre.titrePoste }}</h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
                                                     </div>
                                                     <div class="modal-body">
                                                         {{ render(controller('App\\Controller\\CandidatController::postuler', {
@@ -502,7 +502,7 @@
                                     <div class="col-6 d-grid">
                                         <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
                                             data-bs-target="#{{ detailsModalId }}">
-                                            Détails
+                                            Details
                                         </button>
 
                                         <div class="modal fade" id="{{ detailsModalId }}" tabindex="-1" aria-labelledby="{{ detailsModalId }}Label" aria-hidden="true">
@@ -511,7 +511,7 @@
                                                     <div class="modal-header">
                                                         <h5 class="modal-title" id="{{ detailsModalId }}Label">Poste {{ offre.titrePoste }}</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                        aria-label="Close"></button>
+                                                        aria-label="Fermer"></button>
                                                     </div>
                                                     <div class="modal-body">
                                                         {% set safeDescription = (offre.description|default(''))
@@ -529,7 +529,7 @@
                                                     </div>
                                                     <div class="modal-footer">
                                                         <button type="button" class="btn me-auto"
-                                                        data-bs-dismiss="modal">Close</button>
+                                                        data-bs-dismiss="modal">Fermer</button>
                                                     </div>
                                                 </div>
                                             </div>

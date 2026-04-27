@@ -35,7 +35,7 @@
             line-height: 1.05;
             letter-spacing: -0.05em;
             color: #0d1535;
-            max-width: 10.5ch;
+            max-width: 20.5ch;
         }
 
         .hero-subtitle {
@@ -411,19 +411,19 @@
             overflow: hidden;
             border: 1px solid rgba(15, 23, 42, 0.1);
             background: linear-gradient(180deg, #edf2fa 0%, #e7edf7 100%);
-            min-height: 320px;
+            min-height: 270px;
             display: flex;
-            align-items: flex-end;
+            align-items: stretch;
             justify-content: center;
-            padding: 1rem;
+            padding: 0;
         }
 
         .cross-platform-visual img {
-            width: 108%;
+            width: 100%;
             max-width: none;
-            height: auto;
+            height: 100%;
             display: block;
-            transform: translateY(8%);
+            object-fit: cover;
             filter: drop-shadow(0 18px 30px rgba(15, 23, 42, 0.18));
         }
 
@@ -431,6 +431,7 @@
             position: absolute;
             top: 1rem;
             left: 1rem;
+            z-index: 2;
             border-radius: 999px;
             background: rgba(13, 21, 53, 0.88);
             color: #fff;
@@ -445,12 +446,103 @@
 
         @media (max-width: 768px) {
             .cross-platform-visual {
-                min-height: 260px;
+                min-height: 215px;
             }
 
             .cross-platform-visual img {
-                width: 122%;
-                transform: translateY(10%);
+                width: 100%;
+                height: 100%;
+            }
+        }
+
+        .cta-section {
+            padding-top: 0.2rem;
+            padding-bottom: 2.5rem;
+        }
+
+        .cta-card {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 24px;
+            background:
+                radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.1), transparent 34%),
+                radial-gradient(circle at 100% 100%, rgba(13, 21, 53, 0.08), transparent 36%),
+                #ffffff;
+            box-shadow: 0 26px 45px rgba(15, 23, 42, 0.08);
+        }
+
+        .cta-card::after {
+            content: '';
+            position: absolute;
+            width: 280px;
+            height: 280px;
+            border-radius: 999px;
+            top: -160px;
+            right: -80px;
+            background: rgba(29, 78, 216, 0.1);
+            pointer-events: none;
+        }
+
+        .cta-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-title {
+            font-size: clamp(1.85rem, 3vw, 2.75rem);
+            line-height: 1.12;
+            letter-spacing: -0.02em;
+            margin-bottom: 1rem;
+        }
+
+        .cta-subtitle {
+            max-width: 700px;
+            margin: 0 auto 1.25rem;
+            color: #566074;
+            font-size: 1.03rem;
+        }
+
+        .cta-points {
+            list-style: none;
+            margin: 0 auto 1.4rem;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: .55rem;
+        }
+
+        .cta-points li {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            background: rgba(255, 255, 255, 0.75);
+            padding: .42rem .8rem;
+            color: #344054;
+            font-size: .88rem;
+            font-weight: 600;
+        }
+
+        .cta-points li i {
+            color: #2563eb;
+            font-size: .95rem;
+        }
+
+        .cta-actions .btn {
+            min-width: 200px;
+        }
+
+        @media (max-width: 576px) {
+            .cta-points {
+                justify-content: flex-start;
+            }
+
+            .cta-actions .btn {
+                width: 100%;
+                min-width: 0;
             }
         }
 
@@ -553,13 +645,13 @@
                 <section class="hero-section">
                     <div class="container-xl">
                         <div class="hero-content">
-                            <h1 class="hero-title">Build your dream team, faster.</h1>
+                            <h1 class="hero-title">Construisez votre equipe ideale, plus vite.</h1>
                             <p class="hero-subtitle">
-                                Momentum is the all-in-one platform that streamlines your hiring process, from sourcing candidates to sending offers. Stop juggling tools and start building momentum.
+                                Momentum est la plateforme tout-en-un qui simplifie votre recrutement,<br> de la recherche de candidats a l'envoi des offres.<br> Arretez de multiplier les outils et gagnez en efficacite.
                             </p>
                             <div class="hero-actions">
-                                <a href="#" class="btn btn-primary btn-md">Start Your Free Trial</a>
-                                <a href="#" class="btn btn-outline-primary btn-md">Request a Demo</a>
+                                <a href="#" class="btn btn-primary btn-md">Demarrer gratuitement</a>
+                                <a href="#" class="btn btn-outline-primary btn-md">Demander une demo</a>
                             </div>
                         </div>
                         <div class="hero-showcase" aria-hidden="true">
@@ -603,15 +695,15 @@
                                             <div class="feature-list-item">
                                                 <span class="avatar avatar-sm rounded"><i class="ti ti-checkup-list"></i></span>
                                                 <div>
-                                                    <strong>Pilotage des étapes</strong>
-                                                    <span>Gardez une lecture claire du pipeline et des décisions.</span>
+                                                    <strong>Pilotage des etapes</strong>
+                                                    <span>Gardez une lecture claire du pipeline et des decisions.</span>
                                                 </div>
                                             </div>
                                             <div class="feature-list-item">
                                                 <span class="avatar avatar-sm rounded"><i class="ti ti-send"></i></span>
                                                 <div>
                                                     <strong>Offres plus fluides</strong>
-                                                    <span>Centralisez les échanges jusqu'à la validation finale.</span>
+                                                    <span>Centralisez les echanges jusqu'a la validation finale.</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -619,7 +711,7 @@
                                         <div class="feature-metric-row">
                                             <div class="feature-metric">
                                                 <strong>+120</strong>
-                                                <span>actions pilotées</span>
+                                                <span>actions pilotees</span>
                                             </div>
                                             <div class="feature-metric">
                                                 <strong>24/7</strong>
@@ -627,7 +719,7 @@
                                             </div>
                                             <div class="feature-metric">
                                                 <strong>1</strong>
-                                                <span>plateforme unifiée</span>
+                                                <span>plateforme unifiee</span>
                                             </div>
                                         </div>
                                     </div>
@@ -705,28 +797,24 @@
                         <div class="cross-platform-shell">
                             <div class="row g-4 align-items-center">
                                 <div class="col-lg-6">
-                                    <div class="section-eyebrow">
-                                        <i class="ti ti-device-desktop"></i>
-                                        <span>Cross-platform</span>
-                                    </div>
-                                    <h2 class="section-title cross-platform-title">Momentum on Web and Desktop, with one seamless workflow.</h2>
+                                    <h2 class="section-title cross-platform-title">Momentum sur Web et Desktop, avec un flux de travail unique.</h2>
                                     <p class="cross-platform-subtitle mb-0">
-                                        Your teams can move between browser and desktop app without losing context. The same data, the same speed, and the same product logic everywhere.
+                                        Vos equipes passent du navigateur a l'application desktop sans perdre le contexte. Les memes donnees, la meme rapidite et la meme logique produit partout.
                                     </p>
                                     <ul class="cross-platform-points">
-                                        <li><i class="ti ti-check"></i><span>Real-time sync across offers, candidatures, projects and notifications.</span></li>
-                                        <li><i class="ti ti-check"></i><span>Desktop comfort for high-volume operations and daily HR workflows.</span></li>
-                                        <li><i class="ti ti-check"></i><span>A consistent experience for recruiters, managers and candidates.</span></li>
+                                        <li><i class="ti ti-check"></i><span>Synchronisation en temps reel des offres, candidatures, projets et notifications.</span></li>
+                                        <li><i class="ti ti-check"></i><span>Confort desktop pour les operations intensives et les flux RH quotidiens.</span></li>
+                                        <li><i class="ti ti-check"></i><span>Une experience coherente pour recruteurs, managers et candidats.</span></li>
                                     </ul>
                                     <div class="cross-platform-actions">
-                                        <a href="{{ path('compteEntreprise') }}" class="btn btn-primary btn-lg">Download the app</a>
-                                        <a href="{{ path('app_pricing') }}" class="btn btn-outline-primary btn-lg">View plans</a>
+                                        <a href="{{ path('compteEntreprise') }}" class="btn btn-primary btn-md">Telecharger l'application</a>
+                                        <a href="{{ path('app_pricing') }}" class="btn btn-outline-primary btn-md">Voir la tarification</a>
                                     </div>
                                 </div>
                                 <div class="col-lg-6">
                                     <div class="cross-platform-visual">
-                                        <span class="cross-platform-note"><i class="ti ti-world"></i> Web + Desktop sync</span>
-                                        <img src="{{ asset('images/mockuphero.png') }}" alt="Momentum app preview on desktop">
+                                        <span class="cross-platform-note"><i class="ti ti-device-desktop"></i> Cross-Platform </span>
+                                        <img src="{{ asset('images/macdeskimg.jpg') }}">
                                     </div>
                                 </div>
                             </div>
@@ -735,19 +823,21 @@
                 </section>
 
                 <!-- CTA SECTION -->
-                <section class="py-5">
+                <section class="cta-section">
                     <div class="container-xl">
-                        <div class="card shadow-sm border-0">
-                            <div class="card-body p-4 p-md-5 text-center">
-                                <div class="section-eyebrow justify-content-center">
-                                    <i class="ti ti-arrow-up-right"></i>
-                                    <span>Pret a aller plus loin</span>
-                                </div>
-                                <h2 class="section-title mb-3">Une plateforme unique pour recruter, organiser et faire grandir vos equipes</h2>
-                                <p class="text-secondary mb-4">Explorez les offres, le suivi des candidatures, les projets, les formations et toute la couche collaborative de Momentum.</p>
-                                <div class="d-flex flex-wrap justify-content-center gap-2">
-                                    <a href="{{ path('app_offre_list') }}" class="btn btn-primary btn-lg">Voir les offres</a>
-                                    <a href="{{ path('app_pricing') }}" class="btn btn-outline-primary btn-lg">Découvrir la tarification</a>
+                        <div class="card cta-card border-0">
+                            <div class="card-body cta-content p-4 p-md-5 text-center">
+                                <h2 class="section-title cta-title">Une plateforme unique pour recruter, organiser et faire grandir vos equipes.</h2>
+                                <p class="cta-subtitle">Explorez les offres, le suivi des candidatures, les projets, les formations et toute la couche collaborative de Momentum dans une seule experience fluide.</p>
+                                <ul class="cta-points">
+                                    <li><i class="ti ti-check"></i>Recrutement</li>
+                                    <li><i class="ti ti-check"></i>Projets & taches</li>
+                                    <li><i class="ti ti-check"></i>Formations</li>
+                                    <li><i class="ti ti-check"></i>Collaboration</li>
+                                </ul>
+                                <div class="cta-actions d-flex flex-wrap justify-content-center gap-2">
+                                    <a href="{{ path('app_offre_list') }}" class="btn btn-primary btn-md">Voir les offres</a>
+                                    <a href="{{ path('app_pricing') }}" class="btn btn-outline-primary btn-md">Decouvrir la tarification</a>
                                 </div>
                             </div>
                         </div>
