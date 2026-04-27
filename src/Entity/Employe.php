@@ -323,148 +323,6 @@ class Employe
             $projet->removeMembreEquipe($this);
         }
 
-    public function addProjet(Projet $projet): self
-    {
-        return $this->addProjetResponsable($projet);
-    }
-
-    public function removeProjet(Projet $projet): self
-    {
-        return $this->removeProjetResponsable($projet);
-    }
-
-    public function addProjetMembre(Projet $projet): self
-    {
-        return $this->addProjetEquipe($projet);
-    }
-
-    public function removeProjetMembre(Projet $projet): self
-    {
-        return $this->removeProjetEquipe($projet);
-    }
-
-    public function getProjetsMembre(): Collection
-    {
-        return $this->getProjetsEquipe();
-    }
-
-    public function getProjetsMembres(): Collection
-    {
-        return $this->getProjetsEquipe();
-    }
-
-    public function getProjetsEnEquipe(): Collection
-    {
-        return $this->getProjetsEquipe();
-    }
-
-    #[ORM\OneToMany(targetEntity: Tache::class, mappedBy: 'employe')]
-    private Collection $taches;
-
-    public function __construct()
-    {
-        $this->comptes = new ArrayCollection();
-        $this->projetsResponsables = new ArrayCollection();
-        $this->projetsEquipe = new ArrayCollection();
-        $this->taches = new ArrayCollection();
-    }
-
-    /**
-     * @return Collection<int, Tache>
-     */
-    public function getTaches(): Collection
-    {
-        if (!$this->taches instanceof Collection) {
-            $this->taches = new ArrayCollection();
-        }
-        return $this->taches;
-    }
-
-    public function addTache(Tache $tache): self
-    {
-        if (!$this->getTaches()->contains($tache)) {
-            $this->getTaches()->add($tache);
-        }
-        return $this;
-    }
-
-    public function removeTache(Tache $tache): self
-    {
-        $this->getTaches()->removeElement($tache);
-        return $this;
-    }
-
-    #[ORM\ManyToMany(targetEntity: Projet::class, inversedBy: 'employés')]
-    #[ORM\JoinTable(
-        name: 'equipe_projet',
-        joinColumns: [
-            new ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')
-        ],
-        inverseJoinColumns: [
-            new ORM\JoinColumn(name: 'id_projet', referencedColumnName: 'id_projet')
-        ]
-    )]
-    private Collection $projets1;
-
-    /**
-     * @return Collection<int, Projet>
-     */
-    public function getProjets1(): Collection
-    {
-        if (!$this->projets instanceof Collection) {
-            $this->projets = new ArrayCollection();
-        }
-        return $this->projets;
-    }
-
-    public function addProjet1(Projet $projet): self
-    {
-        if (!$this->getProjets1()->contains($projet)) {
-            $this->getProjets1()->add($projet);
-        }
-        return $this;
-    }
-
-    public function removeProjet1(Projet $projet): self
-    {
-        $this->getProjets1()->removeElement($projet);
-        return $this;
-    }
-
-    #[ORM\ManyToMany(targetEntity: Post::class, inversedBy: 'employés')]
-    #[ORM\JoinTable(
-        name: 'like_post',
-        joinColumns: [
-            new ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe')
-        ],
-        inverseJoinColumns: [
-            new ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post')
-        ]
-    )]
-    private Collection $posts1;
-
-    /**
-     * @return Collection<int, Post>
-     */
-    public function getPosts1(): Collection
-    {
-        if (!$this->posts instanceof Collection) {
-            $this->posts = new ArrayCollection();
-        }
-        return $this->posts;
-    }
-
-    public function addPost1(Post $post): self
-    {
-        if (!$this->getPosts1()->contains($post)) {
-            $this->getPosts1()->add($post);
-        }
-        return $this;
-    }
-
-    public function removePost1(Post $post): self
-    {
-        $this->getPosts1()->removeElement($post);
         return $this;
     }
 
@@ -517,6 +375,8 @@ class Employe
         $this->projetsResponsables = new ArrayCollection();
         $this->projetsEquipe = new ArrayCollection();
         $this->taches = new ArrayCollection();
+        $this->projets1 = new ArrayCollection();
+        $this->posts1 = new ArrayCollection();
     }
 
     /**
@@ -564,7 +424,7 @@ class Employe
         if (!$this->projets1 instanceof Collection) {
             $this->projets1 = new ArrayCollection();
         }
-        return $this->projets;
+        return $this->projets1;
     }
 
     public function addProjet1(Projet $projet): self

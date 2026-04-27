@@ -8,17 +8,8 @@ use Doctrine\Common\Collections\Collection;
 
 use App\Repository\CandidatRepository;
 
-use App\Repository\CandidatRepository;
-
 #[ORM\Entity(repositoryClass: CandidatRepository::class)]
-#[ORM\Table(
-    name: 'candidat',
-    uniqueConstraints: [new ORM\UniqueConstraint(name: 'code_candidature', columns: ['code_candidature'])],
-    indexes: [
-        new ORM\Index(name: 'fk_offre', columns: ['id_offre']),
-        new ORM\Index(name: 'fk_v', columns: ['id_visiteur'])
-    ]
-)]
+#[ORM\Table(name: 'candidat')]
 class Candidat
 {
     #[ORM\Id]
