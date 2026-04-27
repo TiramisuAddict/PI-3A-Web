@@ -311,6 +311,8 @@
 {% set queryName = app.request.query.get('q')|default('') %}
 {% set queryCategory = app.request.query.get('category')|default('') %}
 {% set queryContract = app.request.query.get('contract')|default('') %}
+{% set is_visiteur_logged_in = app.session.get('visiteur_logged_in') == true %}
+{% set visiteur_id = app.session.get('visiteur_id') %}
 
 {% set categories = [
     'Informatique',
@@ -329,7 +331,7 @@
 
 {# navbar #}
 <div class="offres-page">
-    {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'offres', logged_user: true } %}
+    {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'offres', logged_user: is_visiteur_logged_in } %}
 
     <section class="container-xl mt-3">
         <div id="offresCarousel" class="carousel slide carousel-fade offres-carousel" data-bs-ride="carousel" data-bs-interval="5200">
@@ -476,27 +478,38 @@
 
                                 <div class="mt-3 pt-1 mt-auto row g-2">
                                     <div class="col-6 d-grid">
-                                        <button type="button" class="btn btn-primary" data-bs-toggle="modal"
-                                            data-bs-target="#{{ applyModalId }}">
+                                        <button
+                                            type="button"
+                                            class="btn btn-primary"
+                                            {% if is_visiteur_logged_in and visiteur_id %}
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#{{ applyModalId }}"
+                                            {% else %}
+                                                disabled
+                                                title="Connectez-vous pour postuler"
+                                            {% endif %}
+                                        >
                                             Postuler
                                         </button>
 
-                                        <div class="modal fade" id="{{ applyModalId }}" tabindex="-1" aria-labelledby="{{ applyModalId }}Label" aria-hidden="true">
-                                            <div class="modal-dialog modal-lg" role="document">
-                                                <div class="modal-content">
-                                                    <div class="modal-header">
-                                                        <h5 class="modal-title" id="{{ applyModalId }}Label">Postuler - {{ offre.titrePoste }}</h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-                                                    </div>
-                                                    <div class="modal-body">
-                                                        {{ render(controller('App\\Controller\\CandidatController::postuler', {
-                                                            'offreId': offre.id,
-                                                            'visiteurId': 8
-                                                        })) }}
+                                        {% if is_visiteur_logged_in and visiteur_id %}
+                                            <div class="modal fade" id="{{ applyModalId }}" tabindex="-1" aria-labelledby="{{ applyModalId }}Label" aria-hidden="true">
+                                                <div class="modal-dialog modal-lg" role="document">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title" id="{{ applyModalId }}Label">Postuler - {{ offre.titrePoste }}</h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            {{ render(controller('App\\Controller\\CandidatController::postuler', {
+                                                                'offreId': offre.id,
+                                                                'visiteurId': visiteur_id
+                                                            })) }}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        {% endif %}
                                     </div>
 
                                     <div class="col-6 d-grid">

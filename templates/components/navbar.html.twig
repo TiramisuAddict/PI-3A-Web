@@ -4,7 +4,16 @@
       <img src="/images/WKlogo.svg" height="150"  width="150" alt="Logo">
     </a>
     {% set avatarEmploye = employe is defined and employe ? employe : current_employe() %}
+    {% set google_session_linked = app.session.get('google_linked') == true and app.session.get('google_access_token') is not empty %}
+    {% set google_email = app.session.get('google_email') %}
     <div class="navbar-nav flex-row order-md-last ms-auto">
+      <div class="nav-item d-flex align-items-center me-2">
+        {% if google_session_linked %}
+          <span class="badge bg-green-lt text-green">Google: session liee</span>
+        {% else %}
+          <span class="badge bg-red-lt text-red">Google: non liee</span>
+        {% endif %}
+      </div>
       <div class="nav-item dropdown">
         <a href="#" class="nav-link d-flex lh-1 text-reset align-items-center gap-2"
           data-bs-toggle="dropdown">
@@ -25,6 +34,14 @@
           </div>
         </a>
         <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+          <span class="dropdown-item-text text-secondary small">
+            {% if google_session_linked %}
+              Session Google active{% if google_email %} ({{ google_email }}){% endif %}
+            {% else %}
+              Session Google inactive
+            {% endif %}
+          </span>
+          <div class="dropdown-divider"></div>
           <a href="{{ path('profil') }}" class="dropdown-item">Profil</a>
           <a href="#" class="dropdown-item">Paramètres</a>
 

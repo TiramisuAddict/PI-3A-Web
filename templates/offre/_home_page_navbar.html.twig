@@ -1,4 +1,4 @@
-{% set logged_user = logged_user|default(false) %}
+{% set logged_user = logged_user|default(app.session.get('visiteur_logged_in') == true) %}
 {% set active_nav = active_nav|default('home') %}
 {% set visiteur_nom = visiteur_nom|default(app.session.get('visiteur_nom')) %}
 {% set visiteur_prenom = visiteur_prenom|default(app.session.get('visiteur_prenom')) %}
