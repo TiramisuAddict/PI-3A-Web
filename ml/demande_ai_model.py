@@ -488,10 +488,24 @@ def _autre_clean_field_value(field_key, field_value, prompt, extractor):
         return extracted_type or value or "Place reservee"
     if key == "ai_type_conge":
         return extractor._infer_leave_type(prompt)
+    if key in {"ai_materiel_concerne", "ai_type_de_materiel"}:
+        extracted_material = _extract_material_object(prompt)
+        if extracted_material:
+            return extracted_material
+        material = extractor._extract_after_any(
+            prompt,
+            ["materiel", "matÃ©riel", "equipement", "Ã©quipement", "chaise", "ecran", "Ã©cran", "clavier", "souris", "ordinateur", "pc", "casque", "webcam"],
+        )
+        cleaned_material = dyn_extract.clean_entity_text(material or value)
+        return _sentence_case(cleaned_material) if cleaned_material else ""
     if key in {"ai_salle_souhaitee", "ai_localisation_souhaitee", "ai_poste_souhaite", "ai_materiel_concerne", "ai_type_contrat", "ai_equipement_concerne"}:
         cleaned = dyn_extract.clean_entity_text(value)
         return cleaned or value
-    if key in {"ai_justification_metier", "ai_description_probleme", "descriptionBesoin"}:
+    if (
+        key in {"ai_justification_metier", "ai_description_probleme", "descriptionBesoin"}
+        or _field_semantic_bucket(key) == "long_text"
+        or any(token in _norm(key).replace("_", " ") for token in ["usage", "justification", "motif", "contexte", "description", "besoin"])
+    ):
         return _normalize_ws(value)
     if "attestation" in _norm(key).replace("_", " "):
         return _extract_attestation_type(prompt) or _normalize_ws(value)
@@ -2179,6 +2193,13 @@ def _normalize_autre_learning_similarity_text(text):
     if not normalized:
         return ""
 
+    normalized = re.sub(
+        r"\b(?:professionnel|professionnelle|professionel|pro)\b",
+        " ",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+
     replacements = {
         r"\b(?:ecran|écran|moniteur|monitor)\b": "ecran",
         r"\b(?:ordinateur portable|laptop|portable)\b": "ordinateur portable",
@@ -2557,6 +2578,7 @@ def _source_supports_field_override(source, key):
         return False
 
     bucket = _field_semantic_bucket(key)
+    canonical_key = _canonical_field_key(key)
     normalized_source = _norm(source_text)
 
     leave_request_terms = ["conge", "congé", "arret", "arrêt", "absence", "repos"]
@@ -2564,27 +2586,33 @@ def _source_supports_field_override(source, key):
     expense_restaurant_terms = ["restaurant", "repas"]
     expense_transport_terms = ["taxi", "bus", "train", "avion", "vol"]
 
-    if _canonical_field_key(key) in {"type_transport_souhaite", "ai_type_transport"}:
+    if canonical_key in {"type_transport_souhaite", "ai_type_transport"}:
         return _has_any_word(normalized_source, ["taxi", "train", "bus", "autocar", "voiture", "vehicule", "navette", "avion", "vol"])
 
-    if _canonical_field_key(key) in {"type_acces", "ai_type_acces"}:
+    if canonical_key in {"type_acces", "ai_type_acces"}:
         return _has_any_phrase(normalized_source, ["lecture seule", "lecture ecriture", "administrateur", "admin", "ecriture", "consultation"])
 
-    if _canonical_field_key(key) in {"type_stationnement", "ai_type_stationnement"}:
+    if canonical_key in {"type_stationnement", "ai_type_stationnement"}:
         return _has_any_phrase(normalized_source, ["place reservee", "place reserve", "acces parking", "badge parking", "temporaire", "autorisation temporaire"])
 
-    if _canonical_field_key(key) in {"type_conge", "ai_type_conge"}:
+    if canonical_key in {"type_conge", "ai_type_conge"}:
         return _has_any_phrase(normalized_source, leave_request_terms)
 
-    if _canonical_field_key(key) in {"date_debut_conge", "ai_date_debut_conge", "date_fin_conge", "ai_date_fin_conge"}:
+    if canonical_key in {"date_debut_conge", "ai_date_debut_conge", "date_fin_conge", "ai_date_fin_conge"}:
         return _has_any_phrase(normalized_source, leave_request_terms)
 
-    if _canonical_field_key(key) in {"type_depense", "ai_type_depense"}:
+    if canonical_key in {"type_depense", "ai_type_depense"}:
         return (
             _has_any_phrase(normalized_source, expense_hotel_terms)
             or _has_any_phrase(normalized_source, expense_restaurant_terms)
             or _has_any_phrase(normalized_source, expense_transport_terms)
         )
+
+    if canonical_key in {"materiel_concerne", "ai_materiel_concerne", "type_de_materiel", "ai_type_de_materiel"}:
+        return bool(_extract_material_object(source_text))
+
+    if any(token in canonical_key for token in ["specification", "modele", "taille", "dimension", "version"]):
+        return bool(_extract_material_specification(source_text))
 
     if _is_constraint_like_field_key(key):
         return _has_constraint_evidence(source_text)
@@ -2635,6 +2663,18 @@ def _autre_can_apply_predicted_value(field_key, value, source):
 
     if key == "ai_type_depense":
         return _source_supports_field_override(source, "type_depense")
+
+    if key in {"ai_materiel_concerne", "ai_type_de_materiel"}:
+        prompt_material = _extract_material_object(source)
+        if not prompt_material:
+            return False
+        return _normalize_field_compare_value(prompt_material) == _normalize_field_compare_value(candidate)
+
+    if any(token in _canonical_field_key(key) for token in ["specification", "modele", "taille", "dimension", "version"]):
+        prompt_spec = _extract_material_specification(source)
+        if not prompt_spec:
+            return False
+        return _normalize_field_compare_value(prompt_spec) == _normalize_field_compare_value(candidate)
 
     if _is_constraint_like_field_key(key):
         return _source_supports_field_override(source, key) and _has_phrase(_norm(source), _norm(candidate))
@@ -2756,7 +2796,7 @@ def _feedback_custom_field_overrides(ranked_feedback, source="", regenerate_coun
             value = _normalize_ws(str(raw_value))
             if not value:
                 continue
-            value = _sanitize_value_for_field(key, value)
+            value = _sanitize_value_for_field(key, value, source)
             if not value:
                 continue
             weighted.setdefault(key, {})
@@ -2777,7 +2817,10 @@ def _feedback_custom_field_overrides(ranked_feedback, source="", regenerate_coun
             value = _normalize_ws(str(field.get("value", "")))
             if not value:
                 continue
-            value = _sanitize_value_for_field(key, value)
+            detail_value = _get_feedback_detail_value(details, key)
+            if detail_value and _normalize_field_compare_value(detail_value) != _normalize_field_compare_value(value):
+                continue
+            value = _sanitize_value_for_field(key, detail_value or value, source)
             if not value:
                 continue
             weighted.setdefault(key, {})
