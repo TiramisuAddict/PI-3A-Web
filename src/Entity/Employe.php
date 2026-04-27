@@ -174,7 +174,6 @@ class Employe
         return $this;
     }
 
-
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $cv_nom = null;
 
@@ -426,6 +425,8 @@ class Employe
         $this->projetsResponsables = new ArrayCollection();
         $this->projetsEquipe = new ArrayCollection();
         $this->taches = new ArrayCollection();
+        $this->projets1 = new ArrayCollection();
+        $this->posts1 = new ArrayCollection();
     }
 
     /**
@@ -473,7 +474,7 @@ class Employe
         if (!$this->projets1 instanceof Collection) {
             $this->projets1 = new ArrayCollection();
         }
-        return $this->projets;
+        return $this->projets1;
     }
 
     public function addProjet1(Projet $projet): self

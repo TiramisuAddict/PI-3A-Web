@@ -8,6 +8,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 final class ReasonAssistantService
 {
     private const LANGUAGE_TOOL_URL = 'https://api.languagetool.org/v2/check';
+    private const HF_CHAT_URL = 'https://router.huggingface.co/v1/chat/completions';
+    private const HF_DEFAULT_MODEL = 'meta-llama/Llama-3.1-8B-Instruct';
 
     public function __construct(private readonly HttpClientInterface $httpClient)
     {
@@ -53,6 +55,10 @@ final class ReasonAssistantService
             []
         );
     }
+
+    // =====================================================================
+    // LanguageTool methods — NOT TOUCHED
+    // =====================================================================
 
     private function checkText(string $text, string $language): array
     {
@@ -135,107 +141,106 @@ final class ReasonAssistantService
         return trim($corrected);
     }
 
+    // =====================================================================
+    // HuggingFace generation — FIXED
+    // =====================================================================
+
     private function generateWithHuggingFace(string $reason, string $context, string $language): string
     {
         if ($reason === '') {
             return '';
         }
 
-        $hfToken = trim((string) ($_ENV['HF_TOKEN'] ?? ''));
+        $hfToken = trim((string) ($_ENV['HF_TOKEN'] ?? $_SERVER['HF_TOKEN'] ?? getenv('HF_TOKEN') ?: ''));
         if ($hfToken === '') {
+            error_log('[HF] Missing HF_TOKEN');
             return '';
         }
 
+        $model = trim((string) ($_ENV['HF_MODEL'] ?? $_SERVER['HF_MODEL'] ?? getenv('HF_MODEL') ?: self::HF_DEFAULT_MODEL));
+
         $prompt = $language === 'fr'
-            ? 'Rédige une seule phrase professionnelle naturelle. Ne répète pas la consigne ni la phrase d origine. Raison: ' . $reason . ($context !== '' ? '. Contexte: ' . $context : '')
-            : 'Write one natural professional sentence. Do not repeat the prompt or the original sentence. Reason: ' . $reason . ($context !== '' ? '. Context: ' . $context : '');
+            ? 'Redige une seule phrase professionnelle naturelle en francais a partir de la raison suivante: ' . $reason . ($context !== '' ? '. Contexte: ' . $context : '')
+            : 'Write one natural professional sentence from the following reason: ' . $reason . ($context !== '' ? '. Context: ' . $context : '');
 
         try {
-            $response = $this->httpClient->request('POST', 'https://api-inference.huggingface.co/models/google/flan-t5-base', [
+            $response = $this->httpClient->request('POST', self::HF_CHAT_URL, [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $hfToken,
                     'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
                 ],
                 'json' => [
-                    'inputs' => $prompt,
-                    'parameters' => [
-                        'max_length' => 80,
-                        'temperature' => 0.7,
+                    'model' => $model,
+                    'messages' => [
+                        [
+                            'role' => 'user',
+                            'content' => $prompt,
+                        ],
                     ],
+                    'max_tokens' => 80,
+                    'temperature' => 0.7,
                 ],
             ]);
 
             $statusCode = $response->getStatusCode();
             if ($statusCode !== 200) {
-                error_log('[HF] HTTP ' . $statusCode . ' response');
+                error_log('[HF] HTTP ' . $statusCode . ' — body: ' . $response->getContent(false));
                 return '';
             }
 
             $data = $response->toArray(false);
             $generated = null;
 
-            if (isset($data['generated_text'])) {
+            if (isset($data['choices'][0]['message']['content'])) {
+                $generated = (string) $data['choices'][0]['message']['content'];
+            } elseif (isset($data['generated_text'])) {
                 $generated = (string) $data['generated_text'];
-            } elseif (isset($data[0]['generated_text'])) {
-                $generated = (string) $data[0]['generated_text'];
-            } elseif (isset($data[0][0]['generated_text'])) {
-                $generated = (string) $data[0][0]['generated_text'];
             }
 
-            if ($generated !== null && trim($generated) !== '') {
-                $clean = $this->normalizeGeneratedText($generated, $reason, $context, $language);
-                if ($clean === '') {
-                    return '';
-                }
-                if (!str_ends_with($clean, '.')) {
-                    $clean .= '.';
-                }
-                return $clean;
+            if ($generated === null || trim($generated) === '') {
+                error_log('[HF] Empty generated text. Full response: ' . json_encode($data));
+                return '';
             }
 
-            return '';
+            $clean = $this->normalizeGeneratedText($generated);
+            if ($clean === '') {
+                return '';
+            }
+
+            if (!str_ends_with($clean, '.') && !str_ends_with($clean, '!') && !str_ends_with($clean, '?')) {
+                $clean .= '.';
+            }
+
+            return $clean;
         } catch (\Throwable $e) {
             error_log('[HF] Exception: ' . $e->getMessage());
             return '';
         }
     }
 
-    private function normalizeGeneratedText(string $text, string $reason, string $context, string $language): string
+    private function normalizeGeneratedText(string $text): string
     {
         $clean = trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
+        $clean = trim($clean, "\"'`");
 
-        $clean = trim($clean, "\"'“”„` ");
+        // Remove repeated consecutive words
         $clean = preg_replace('/\b(\pL+)(\s+\1\b)+/iu', '$1', $clean) ?? $clean;
 
-        $segments = preg_split('/(?<=[.!?])\s+/u', $clean, -1, PREG_SPLIT_NO_EMPTY);
-        if (is_array($segments) && $segments !== []) {
-            $uniqueSegments = [];
-            foreach ($segments as $segment) {
-                $segment = trim($segment);
-                if ($segment === '') {
-                    continue;
-                }
-
-                if (!in_array(mb_strtolower($segment), $uniqueSegments, true)) {
-                    $uniqueSegments[] = mb_strtolower($segment);
-                }
-            }
-
-            if ($uniqueSegments !== []) {
-                $clean = implode(' ', array_map(static fn (string $segment): string => $segment, array_unique(array_map('trim', $segments))));
-            }
+        // Take only the first sentence
+        if (preg_match('/^(.+?[.!?])\s/u', $clean, $matches)) {
+            $clean = $matches[1];
         }
 
-        $normalizedReason = mb_strtolower(trim($reason));
-        $normalizedContext = mb_strtolower(trim($context));
-        $normalizedClean = mb_strtolower($clean);
-
-        if ($normalizedClean === '' || $normalizedClean === $normalizedReason || ($normalizedContext !== '' && $normalizedClean === $normalizedContext)) {
-            return '';
-        }
+        // Strip any leftover template tokens just in case
+        $clean = preg_replace('/<\|.*?\|>|<\/s>/u', '', $clean) ?? $clean;
 
         return trim($clean);
     }
+
+    // =====================================================================
+    // Language detection — FIXED
+    // =====================================================================
 
     private function detectLanguage(string $text): string
     {
@@ -244,6 +249,7 @@ final class ReasonAssistantService
         }
 
         $lowerText = mb_strtolower($text);
+
         $frenchWords = ['je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'de', 'le', 'la', 'les', 'un', 'une', 'des', 'pour', 'dans', 'avec', 'est', 'sont', 'avoir', 'être'];
         $englishWords = ['i', 'you', 'he', 'she', 'we', 'they', 'the', 'a', 'an', 'is', 'are', 'have', 'has', 'with', 'for', 'to', 'of', 'in', 'on'];
 
@@ -251,13 +257,13 @@ final class ReasonAssistantService
         $englishCount = 0;
 
         foreach ($frenchWords as $word) {
-            if (str_contains($lowerText, $word)) {
+            if (preg_match('/\b' . preg_quote($word, '/') . '\b/u', $lowerText)) {
                 $frenchCount++;
             }
         }
 
         foreach ($englishWords as $word) {
-            if (str_contains($lowerText, $word)) {
+            if (preg_match('/\b' . preg_quote($word, '/') . '\b/u', $lowerText)) {
                 $englishCount++;
             }
         }
@@ -265,4 +271,3 @@ final class ReasonAssistantService
         return $frenchCount > $englishCount ? 'fr' : 'en-US';
     }
 }
-

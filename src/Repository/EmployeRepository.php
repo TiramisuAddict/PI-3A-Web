@@ -87,4 +87,5 @@ class EmployeRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleScalarResult();
     }
+
 }
