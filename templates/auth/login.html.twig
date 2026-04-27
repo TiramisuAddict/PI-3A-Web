@@ -67,7 +67,8 @@
             {{ form_errors(form.password) }}
           </div>
 
-          <div class="text-end mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <a href="{{ path('face_verify_page') }}" class="small fw-semibold" style="color:#4254D6;">Se connecter avec Face ID</a>
             <a href="{{ path('forgot_password') }}" class="small" style="color:#4254D6;">Mot de passe oublié ?</a>
           </div>
 
