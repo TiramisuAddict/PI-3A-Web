@@ -399,12 +399,13 @@
     var AUTRE_AI_ENDPOINT = "{{ path('demande_api_autre_generate') }}";
 
     var AUTRE_BASE_REQUIRED_KEYS = ["besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre"];
-    var AUTRE_HIDDEN_DUPLICATE_KEYS = ["besoinPersonnalise", "niveauUrgenceAutre", "pieceOuContexte"];
+    var AUTRE_HIDDEN_DUPLICATE_KEYS = ["besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre", "pieceOuContexte"];
     var AI_DYNAMIC_FIELDS = [];
     var aiModal = null;
     var aiModalEl = null;
     var AI_REMOVED_BASE_FIELDS = [];
     var AI_REPLACE_BASE_FIELDS = false;
+    var MANUAL_AUTRE_FIELD_MODE = false;
     var AUTO_FILLED_DETAIL_KEYS = {};
     var maps = {};
     var markers = {};
@@ -782,7 +783,7 @@
     }
 
     function normalizeAiFieldPlan(plan) {
-        var normalized = { add: [], remove: [], replaceBase: false };
+        var normalized = { add: [], remove: [], replaceBase: false, manualMode: false };
         if (!plan || typeof plan !== "object") return normalized;
 
         var removeRaw = Array.isArray(plan.remove) ? plan.remove : [];
@@ -805,6 +806,7 @@
         }
 
         normalized.replaceBase = true === plan.replaceBase;
+        normalized.manualMode = true === plan.manualMode;
 
         return normalized;
     }
@@ -815,7 +817,8 @@
         planInput.value = JSON.stringify({
             add: AI_DYNAMIC_FIELDS,
             remove: AI_REMOVED_BASE_FIELDS,
-            replaceBase: AI_REPLACE_BASE_FIELDS
+            replaceBase: AI_REPLACE_BASE_FIELDS,
+            manualMode: MANUAL_AUTRE_FIELD_MODE
         });
     }
 
@@ -824,6 +827,7 @@
         AI_DYNAMIC_FIELDS = normalized.add;
         AI_REMOVED_BASE_FIELDS = normalized.remove;
         AI_REPLACE_BASE_FIELDS = normalized.replaceBase;
+        MANUAL_AUTRE_FIELD_MODE = normalized.manualMode;
         saveAiFieldPlanInput();
     }
 
@@ -874,6 +878,17 @@
         if (key === "besoinPersonnalise") {
             var titreInput = document.getElementById("demande_titre");
             return String((titreInput || {}).value || "").trim();
+        }
+
+        if (key === "descriptionBesoin") {
+            var descriptionInput = document.getElementById("demande_description");
+            var descriptionValue = String((descriptionInput || {}).value || "").trim();
+            if (descriptionValue) {
+                return descriptionValue;
+            }
+
+            var autrePromptInput = document.getElementById("autreAiDescription");
+            return String((autrePromptInput || {}).value || "").trim();
         }
 
         if (key === "niveauUrgenceAutre") {
@@ -1090,7 +1105,7 @@
             });
         }
 
-        setAiFieldPlan({ add: fields, remove: [], replaceBase: true });
+        setAiFieldPlan({ add: fields, remove: [], replaceBase: true, manualMode: true });
 
         var currentType = String((typeSelect || {}).value || "");
         if (isAutreType(currentType)) {
@@ -1099,14 +1114,14 @@
             var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
             var regenerateBtn = document.getElementById("regenerateWithAiBtn");
 
-            if (aiGeneratedInput) aiGeneratedInput.value = "1";
-            if (aiConfirmedInput) aiConfirmedInput.value = "0";
+            if (aiGeneratedInput) aiGeneratedInput.value = "0";
+            if (aiConfirmedInput) aiConfirmedInput.value = "1";
             if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
-            if (regenerateBtn) regenerateBtn.style.display = "inline-block";
+            if (regenerateBtn) regenerateBtn.style.display = "none";
 
             setAutoFilledDetailKeys([]);
             loadDynamicFields(currentType, {}, dynamicFieldsContainer, dynamicFieldsCard);
-            setAiStatus(String(fields.length) + " champ(s) personnalise(s) appliques. Verifiez les valeurs puis confirmez la demande.", "success");
+            setAiStatus(String(fields.length) + " champ(s) personnalise(s) appliques. Vous pouvez remplir puis enregistrer la demande.", "success");
         }
     }
 
@@ -1992,6 +2007,10 @@
     }
 
     function shouldRequireAiConfirmation(typeSelect, aiGeneratedInput, regenerateWithAiBtn, aiTrustedLearningInput) {
+        if (MANUAL_AUTRE_FIELD_MODE) {
+            return false;
+        }
+
         if (aiGeneratedInput && aiGeneratedInput.value === "1") {
             return true;
         }
@@ -2069,6 +2088,7 @@
 
         general = collectGeneralContext();
         general.aiDescriptionPrompt = promptValue;
+        general.manualFieldMode = MANUAL_AUTRE_FIELD_MODE;
         var promptNormalized = normalizeUiLabel(promptValue);
         var promptChanged = !!lastAutrePromptNormalized && promptNormalized !== lastAutrePromptNormalized;
 
@@ -2083,12 +2103,13 @@
         general.regenerateMode = mode;
         general.regenerateCount = autreRegenerateCount;
 
-        var shouldClearExistingAutreState = promptChanged || forceFresh || mode === "regenerate";
-        var details = {};
+        var shouldClearExistingAutreState = !MANUAL_AUTRE_FIELD_MODE && (promptChanged || forceFresh || mode === "regenerate");
+        var details = MANUAL_AUTRE_FIELD_MODE ? collectCurrentDetails(dynamicFieldsContainer) : {};
         if (shouldClearExistingAutreState) {
             resetAiFieldPlan();
             setAutoFilledDetailKeys([]);
             clearDynamicFieldState(dynamicFieldsContainer);
+            general.manualFieldMode = MANUAL_AUTRE_FIELD_MODE;
         }
 
         if (generateBtn) {
@@ -2104,6 +2125,7 @@
             general: general,
             details: details,
             userPromptAutre: promptValue,
+            manualFieldMode: MANUAL_AUTRE_FIELD_MODE,
             fieldPlan: (function () {
                 var planInput = document.getElementById("aiFieldPlanInput");
                 if (!planInput) {
@@ -2156,7 +2178,18 @@
                     previousDynamicKeys[String(previousField.key)] = true;
                 }
 
-                var fieldPlan = normalizeAiFieldPlan(json.dynamicFieldPlan || { add: [], remove: [], replaceBase: false });
+                var fieldPlan;
+                if (MANUAL_AUTRE_FIELD_MODE) {
+                    fieldPlan = normalizeAiFieldPlan({
+                        add: AI_DYNAMIC_FIELDS,
+                        remove: AI_REMOVED_BASE_FIELDS,
+                        replaceBase: true,
+                        manualMode: true
+                    });
+                } else {
+                    fieldPlan = normalizeAiFieldPlan(json.dynamicFieldPlan || { add: [], remove: [], replaceBase: false });
+                    fieldPlan.manualMode = String(json.model || "").indexOf("manual-fields:") === 0;
+                }
                 setAiFieldPlan(fieldPlan);
 
                 var shouldReplaceBase = shouldClearExistingAutreState || true === fieldPlan.replaceBase;
@@ -2174,9 +2207,33 @@
                     }
                 }
 
-                var suggestionKeys = Object.keys(json.suggestedDetails || {});
+                var suggestedDetails = json.suggestedDetails && typeof json.suggestedDetails === "object"
+                    ? json.suggestedDetails
+                    : {};
+                if (fieldPlan.manualMode) {
+                    var allowedSuggestionKeys = {};
+                    for (var rk = 0; rk < AUTRE_BASE_REQUIRED_KEYS.length; rk++) {
+                        allowedSuggestionKeys[AUTRE_BASE_REQUIRED_KEYS[rk]] = true;
+                    }
+                    for (var ak = 0; ak < fieldPlan.add.length; ak++) {
+                        var allowedField = fieldPlan.add[ak];
+                        if (!allowedField || !allowedField.key) continue;
+                        allowedSuggestionKeys[String(allowedField.key)] = true;
+                    }
+
+                    var filteredSuggestedDetails = {};
+                    var suggestedKeys = Object.keys(suggestedDetails);
+                    for (var sk = 0; sk < suggestedKeys.length; sk++) {
+                        var suggestedKey = suggestedKeys[sk];
+                        if (!allowedSuggestionKeys[suggestedKey]) continue;
+                        filteredSuggestedDetails[suggestedKey] = suggestedDetails[suggestedKey];
+                    }
+                    suggestedDetails = filteredSuggestedDetails;
+                }
+
+                var suggestionKeys = Object.keys(suggestedDetails);
                 for (var j = 0; j < suggestionKeys.length; j++) {
-                    merged[suggestionKeys[j]] = json.suggestedDetails[suggestionKeys[j]];
+                    merged[suggestionKeys[j]] = suggestedDetails[suggestionKeys[j]];
                 }
 
                 var autoFilledKeys = suggestionKeys.slice();
@@ -2248,13 +2305,18 @@
                     loadDynamicFields(currentType, {}, dynamicFieldsContainer, dynamicFieldsCard);
                 }
 
-                if (aiGeneratedInput) aiGeneratedInput.value = "1";
-                if (aiConfirmedInput) aiConfirmedInput.value = "0";
+                if (fieldPlan.manualMode) {
+                    if (aiGeneratedInput) aiGeneratedInput.value = "0";
+                    if (aiConfirmedInput) aiConfirmedInput.value = "1";
+                } else {
+                    if (aiGeneratedInput) aiGeneratedInput.value = "1";
+                    if (aiConfirmedInput) aiConfirmedInput.value = "0";
+                }
                 if (aiTrustedLearningInput) {
                     aiTrustedLearningInput.value = json.skipConfirmationRestriction ? "1" : "0";
                 }
 
-                if (isStillAutre && regenerateBtn) regenerateBtn.style.display = "inline-block";
+                if (isStillAutre && regenerateBtn) regenerateBtn.style.display = fieldPlan.manualMode ? "none" : "inline-block";
                 if (isStillAutre) {
                     var confidenceStatus = buildAutreConfidenceMessage(json.dynamicFieldConfidence || null);
                     var baseMessage = correctedText

@@ -762,6 +762,45 @@ class DemandeFormationBoundaryTests(unittest.TestCase):
         self.assertEqual(model._norm((custom_fields.get("ai_specification_modele_souhaite") or {}).get("value")), "27 pouces")
         self.assertNotIn("ai_quantite", custom_fields)
 
+    def test_learned_attestation_schema_drops_uncalled_date_and_duplicate_banque_field(self):
+        feedback_samples = [
+            {
+                "prompt": "Attestation de salaire pour banque",
+                "general": {"typeDemande": "Autre", "categorie": "Autre"},
+                "details": {
+                    "ai_type_d_attestation": "Attestation de salaire",
+                    "ai_motif_contexte": "banque",
+                    "ai_organisme_destinataire": "banque",
+                    "ai_date_souhaitee": "2026-05-21",
+                },
+                "fieldPlan": {
+                    "add": [
+                        {"key": "ai_type_d_attestation", "label": "Type d attestation", "type": "text", "required": False, "value": "Attestation de salaire"},
+                        {"key": "ai_motif_contexte", "label": "Motif contexte", "type": "text", "required": False, "value": "banque"},
+                        {"key": "ai_organisme_destinataire", "label": "Organisme destinataire", "type": "text", "required": False, "value": "banque"},
+                        {"key": "ai_date_souhaitee", "label": "Date souhaitee", "type": "date", "required": False, "value": "2026-05-21"},
+                    ],
+                    "remove": ["ALL"],
+                    "replaceBase": True,
+                },
+            }
+        ]
+
+        response = model._build_autre_response(
+            {
+                "text": "Attestation de salaire pour banque",
+                "general": {"typeDemande": "Autre", "categorie": "Autre"},
+                "acceptedAutreFeedback": feedback_samples,
+            },
+            "",
+        )
+        custom_fields = {field.get("key"): field for field in response.get("custom_fields", [])}
+
+        self.assertEqual((custom_fields.get("ai_type_d_attestation") or {}).get("value"), "Attestation de salaire")
+        self.assertEqual((custom_fields.get("ai_organisme_destinataire") or {}).get("value"), "Banque")
+        self.assertNotIn("ai_motif_contexte", custom_fields)
+        self.assertNotIn("ai_date_souhaitee", custom_fields)
+
     def test_parking_zone_extraction_stops_before_duration_and_medical_reason(self):
         prompt = "parking pres de l entree seulement 2 semaines entorse"
         response = model._build_autre_response(

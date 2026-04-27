@@ -26,8 +26,8 @@ class DemandeAiAssistant
      * @param array<string, mixed> $generalContext
      * @param array<string, mixed> $currentDetails
      * @param array<int, array<string, mixed>> $autreFields
-     * Returns the Autre payload from the local ML model.
-     * PHP does not enrich/override the model decisions.
+    * Returns the Autre payload from the local ML model.
+    * PHP applies light prompt-driven enrichment to keep values aligned with user edits.
      * @return array<string, mixed>
      */
     public function generateAutreSuggestions(array $generalContext, array $currentDetails, array $autreFields): array
@@ -125,6 +125,21 @@ class DemandeAiAssistant
         $detailsPayload = isset($parsed['details']) && is_array($parsed['details']) ? $parsed['details'] : [];
         $customPayload = isset($parsed['custom_fields']) && is_array($parsed['custom_fields']) ? $parsed['custom_fields'] : [];
         $removePayload = isset($parsed['remove_fields']) && is_array($parsed['remove_fields']) ? $parsed['remove_fields'] : [];
+
+        if (!$manualFieldMode) {
+            $customPayload = $this->augmentLearnedAutreFieldsFromPrompt(
+                $sourceText,
+                array_values(array_filter($customPayload, static fn ($item): bool => is_array($item)))
+            );
+
+            $alignedPromptPayload = $this->alignAutreCustomFieldsWithPrompt(
+                $sourceText,
+                $customPayload,
+                $detailsPayload
+            );
+            $customPayload = $alignedPromptPayload['customFields'];
+            $detailsPayload = $alignedPromptPayload['suggestedDetails'];
+        }
 
         $manualFieldsByKey = [];
         foreach ($manualFields as $manualField) {
@@ -1060,8 +1075,12 @@ class DemandeAiAssistant
         $location = $this->extractExplicitAutreLearningLocation($sourceText, $fields);
         $amount = $this->extractAmountFromText($this->normalizeForSearch($sourceText));
         $hasCurrencyToken = preg_match('/\b(?:dt|tnd|dinar|dinars)\b/i', $sourceText) === 1;
-        $time = $this->extractExplicitAutreLearningTime($sourceText);
+        $time = $this->firstNonEmpty(
+            $this->extractFlexibleTimeWindow($sourceText),
+            $this->extractExplicitAutreLearningTime($sourceText)
+        );
         $duration = $this->extractExplicitAutreLearningDuration($sourceText);
+        $period = $this->extractRelativePeriodLabel($sourceText);
 
         foreach ($fields as $index => $field) {
             if (!is_array($field)) {
@@ -1090,6 +1109,11 @@ class DemandeAiAssistant
 
             if ('' === $value && '' !== $duration && preg_match('/\b(duree|durée|duration|periode|période|delai|délai)\b/i', $haystack) === 1) {
                 $fields[$index]['value'] = $duration;
+                continue;
+            }
+
+            if ('' === $value && '' !== $period && preg_match('/\b(periode|période|semaine|mois|intervalle|concern[ée]e?)\b/i', $haystack) === 1) {
+                $fields[$index]['value'] = $period;
                 continue;
             }
 
@@ -1130,6 +1154,16 @@ class DemandeAiAssistant
                 'type' => 'text',
                 'required' => false,
                 'value' => $duration,
+            ];
+        }
+
+        if ('' !== $period && !$hasFieldLike('/\b(periode|période|semaine|mois|intervalle|concern[ée]e?)\b/i')) {
+            $fields[] = [
+                'key' => 'ai_periode_concernee',
+                'label' => 'Periode concernee',
+                'type' => 'text',
+                'required' => false,
+                'value' => $period,
             ];
         }
 
@@ -1246,6 +1280,61 @@ class DemandeAiAssistant
         }
 
         return false;
+    }
+
+    /**
+     * Keep custom field values aligned with the current prompt:
+     * - Apply freshly inferred values when possible.
+     * - Remove stale values for prompt-sensitive fields not supported by the prompt.
+     *
+     * @param array<int, array<string, mixed>> $customFields
+     * @param array<string, mixed> $suggestedDetails
+     * @return array{customFields: array<int, array<string, mixed>>, suggestedDetails: array<string, mixed>}
+     */
+    private function alignAutreCustomFieldsWithPrompt(string $sourceText, array $customFields, array $suggestedDetails): array
+    {
+        $alignedFields = [];
+
+        foreach ($customFields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' === $key) {
+                continue;
+            }
+
+            $currentValue = isset($field['value']) && is_scalar($field['value'])
+                ? trim((string) $field['value'])
+                : '';
+            $inferredValue = trim($this->inferAutreCustomFieldValue($sourceText, $field));
+            $promptSensitive = $this->isPromptSensitiveLearnedAutreField($field);
+            $fieldCalledInPrompt = $this->isAutreFieldCalledInPrompt($sourceText, $field);
+
+            if ('' !== $inferredValue) {
+                $field['value'] = $inferredValue;
+                $suggestedDetails[$key] = $inferredValue;
+            } elseif ($promptSensitive && !$fieldCalledInPrompt) {
+                unset($suggestedDetails[$key]);
+                if (true !== ($field['required'] ?? false)) {
+                    continue;
+                }
+
+                $field['value'] = '';
+            } elseif ('' !== $currentValue) {
+                if (!isset($suggestedDetails[$key]) || '' === trim((string) $suggestedDetails[$key])) {
+                    $suggestedDetails[$key] = $currentValue;
+                }
+            }
+
+            $alignedFields[] = $field;
+        }
+
+        return [
+            'customFields' => $this->dedupeAutreFieldsByKey($alignedFields),
+            'suggestedDetails' => $suggestedDetails,
+        ];
     }
 
     /**
@@ -4826,6 +4915,7 @@ class DemandeAiAssistant
         $label = $this->normalizeForSearch((string) ($field['label'] ?? ''));
         $key = $this->normalizeForSearch((string) ($field['key'] ?? ''));
         $haystack = trim($label . ' ' . $key);
+        $normalizedText = $this->normalizeForSearch($text);
 
         if ('' === $haystack) {
             return '';
@@ -4853,6 +4943,25 @@ class DemandeAiAssistant
 
         if (preg_match('/\b(type)\b/i', $haystack) === 1 && preg_match('/\b(materiel|materiau|equipement|outil|article|produit)\b/i', $haystack) === 1) {
             return $this->extractRequestedObjectFromPrompt($text);
+        }
+
+        if (preg_match('/\b(shift|poste|tour|plage\s*horaire|horaire\s*souhaite|horaire\s*souhaites|creneau)\b/i', $haystack) === 1) {
+            $timeWindow = $this->extractFlexibleTimeWindow($text);
+            if ('' !== $timeWindow && preg_match('/\b(horaire|creneau|plage)\b/i', $haystack) === 1) {
+                return $timeWindow;
+            }
+
+            if (preg_match('/\b(nuit|nocturne)\b/i', $normalizedText) === 1) {
+                return 'Nuit';
+            }
+
+            if (preg_match('/\b(soir|soiree)\b/i', $normalizedText) === 1) {
+                return 'Soir';
+            }
+
+            if (preg_match('/\b(jour|journee|matin|diurne)\b/i', $normalizedText) === 1) {
+                return 'Jour';
+            }
         }
 
         if (preg_match('/\b(salle|room)\b/i', $haystack) === 1) {
@@ -4913,7 +5022,24 @@ class DemandeAiAssistant
             return $dates[0] ?? '';
         }
 
+        if (preg_match('/\b(periode|p[ée]riode|semaine|mois|intervalle|concern[ée]e?)\b/i', $haystack) === 1) {
+            $period = $this->extractRelativePeriodLabel($text);
+            if ('' !== $period) {
+                return $period;
+            }
+
+            $dates = $this->extractAllFrenchDates($text);
+            if ([] !== $dates) {
+                return $dates[0];
+            }
+        }
+
         if (preg_match('/\b(horaire|heure|time)\b/i', $haystack) === 1) {
+            $window = $this->extractFlexibleTimeWindow($text);
+            if ('' !== $window) {
+                return $window;
+            }
+
             return $this->extractExplicitAutreLearningTime($text);
         }
 
@@ -4949,6 +5075,88 @@ class DemandeAiAssistant
 
         if (preg_match('/\b(telephone|mobile|numero|t[ée]l[ée]phone)\b/i', $haystack) === 1) {
             return $this->extractPhoneNumber($text);
+        }
+
+        if (in_array($type, ['text', 'textarea'], true)) {
+            $named = $this->extractNamedValueFromPrompt($text, array_values(array_filter([
+                trim((string) ($field['label'] ?? '')),
+                trim((string) ($field['key'] ?? '')),
+            ], static fn (string $item): bool => '' !== $item)));
+            if ('' !== $named) {
+                return $named;
+            }
+        }
+
+        return '';
+    }
+
+    private function extractFlexibleTimeWindow(string $text): string
+    {
+        $patterns = [
+            '/\b([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?\s*(?:-|a|à|to|jusqu(?:\'|e)?a|jusqu(?:\'|e)?à)\s*([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?\b/iu',
+            '/\bde\s*([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?\s*(?:a|à|jusqu(?:\'|e)?a|jusqu(?:\'|e)?à)\s*([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?\b/iu',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $text, $matches) !== 1) {
+                continue;
+            }
+
+            $fromHour = (int) ($matches[1] ?? 0);
+            $fromMinute = trim((string) ($matches[2] ?? ''));
+            $toHour = (int) ($matches[3] ?? 0);
+            $toMinute = trim((string) ($matches[4] ?? ''));
+
+            return $this->formatHourForAutre($fromHour, $fromMinute) . '-' . $this->formatHourForAutre($toHour, $toMinute);
+        }
+
+        return '';
+    }
+
+    private function formatHourForAutre(int $hour, string $minute): string
+    {
+        $hour = max(0, min(23, $hour));
+        $normalizedMinute = trim($minute);
+        if ('' === $normalizedMinute || '00' === $normalizedMinute) {
+            return sprintf('%dh', $hour);
+        }
+
+        return sprintf('%dh%s', $hour, str_pad(preg_replace('/\D+/', '', $normalizedMinute) ?? '', 2, '0', STR_PAD_LEFT));
+    }
+
+    private function extractRelativePeriodLabel(string $text): string
+    {
+        $normalized = $this->normalizeForSearch($text);
+        if ('' === $normalized) {
+            return '';
+        }
+
+        if (preg_match('/\bsemaine\s+prochaine\b/u', $normalized) === 1) {
+            return 'Semaine prochaine';
+        }
+
+        if (preg_match('/\bsemaine\s+en\s+cours\b/u', $normalized) === 1) {
+            return 'Semaine en cours';
+        }
+
+        if (preg_match('/\bmois\s+prochain\b/u', $normalized) === 1) {
+            return 'Mois prochain';
+        }
+
+        if (preg_match('/\bmois\s+en\s+cours\b/u', $normalized) === 1) {
+            return 'Mois en cours';
+        }
+
+        if (preg_match('/\baujourd(?:\'|’)?hui\b/u', $normalized) === 1) {
+            return "Aujourd'hui";
+        }
+
+        if (preg_match('/\bapres\s+demain\b/u', $normalized) === 1) {
+            return 'Apres-demain';
+        }
+
+        if (preg_match('/\bdemain\b/u', $normalized) === 1) {
+            return 'Demain';
         }
 
         return '';

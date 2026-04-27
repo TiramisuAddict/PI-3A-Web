@@ -493,6 +493,8 @@ def _autre_clean_field_value(field_key, field_value, prompt, extractor):
         return cleaned or value
     if key in {"ai_justification_metier", "ai_description_probleme", "descriptionBesoin"}:
         return _normalize_ws(value)
+    if "attestation" in _norm(key).replace("_", " "):
+        return _extract_attestation_type(prompt) or _normalize_ws(value)
     if _is_objet_field_key(key):
         explicit_reason = _extract_explicit_reason_clause(prompt)
         if explicit_reason:
@@ -1317,38 +1319,6 @@ def _is_likely_proper_noun(word):
     return True
 
 
-def _extract_location_pair(corrected_text):
-    """
-    Dynamic location extraction: finds "de X vers Y" patterns
-    and applies proper noun heuristics. No hardcoded city list.
-    """
-    lowered = _norm(corrected_text)
-
-    patterns = [
-        r"\bde\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\b",
-        r"\bdepuis\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\b",
-        r"\bdepart\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b.*?\b(?:destination|arrivee)\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b",
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, lowered, flags=re.IGNORECASE)
-        if match:
-            raw_dep = _normalize_ws(match.group(1))
-            raw_dest = _normalize_ws(match.group(2))
-
-            # Check both are likely proper nouns
-            dep_words = raw_dep.split()
-            dest_words = raw_dest.split()
-
-            dep_valid = any(_is_likely_proper_noun(w) for w in dep_words)
-            dest_valid = any(_is_likely_proper_noun(w) for w in dest_words)
-
-            if dep_valid and dest_valid and _norm(raw_dep) != _norm(raw_dest):
-                dep = _capitalize_entity(raw_dep)
-                dest = _capitalize_entity(raw_dest)
-                return dep, dest
-
-    return None, None
 
 
 def _extract_destination_hint(corrected_text):
@@ -1607,29 +1577,6 @@ def _clean_entity_text(value):
     return _normalize_ws(text).strip(" ,;:-")
 
 
-def _extract_subject_name(corrected_text, subject_keyword):
-    """
-    Dynamic subject name extraction.
-    Given keyword (e.g. 'formation'), extracts the name that follows it.
-    """
-    lowered = _norm(corrected_text)
-    stop_tail = r"\s+(?:le|du|de|vers|pour|a|à|dans|qui|que|debut|debute|commence|a\s+partir|depuis|jusqu|demain|aujourd'hui|aujourdhui|matin|soir|taxi|transport|deplacement|déplacement)\b"
-    patterns = [
-        rf"\b{re.escape(subject_keyword)}\s+(?:en\s+)?([a-z][a-z0-9\s\-\./+#]+?)(?={stop_tail}|$)",
-        rf"\bpour\s+(?:une?\s+)?{re.escape(subject_keyword)}\s+(?:en\s+)?([a-z][a-z0-9\s\-\./+#]+?)(?={stop_tail}|$)",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, lowered, flags=re.IGNORECASE)
-        if match:
-            raw = match.group(1).strip()
-            cleaned = _clean_entity_text(raw)
-            if cleaned and any(token in _norm(cleaned) for token in ["demande", "transport", "taxi", "formation", "deplacement", "déplacement"]):
-                continue
-            if cleaned and len(cleaned) >= 2 and _is_likely_proper_noun(cleaned.split()[0]):
-                return _capitalize_entity(cleaned)
-            elif cleaned and len(cleaned) >= 2:
-                return cleaned[:1].upper() + cleaned[1:]
-    return None
 
 
 def _extract_amount(text):
@@ -3089,6 +3036,26 @@ def _extract_material_object(source):
     return ""
 
 
+def _extract_attestation_type(source):
+    text = _normalize_ws(source)
+    if not text:
+        return ""
+
+    match = re.search(
+        r"\b(attestation(?:\s+(?:de|du|des|d['’]))?\s+[^\W\d_][^\W\d_'\- ]{1,70}?)(?=\s+(?:pour|chez|a|au|aux|destinataire|organisme|le|la|les|du|de\s+\d|afin|car|avec)\b|[.,;:!?]|$)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        value = _normalize_ws(match.group(1)).strip(" ,;:-")
+        return _sentence_case(value)
+
+    if _has_word(_norm(text), "attestation"):
+        return "Attestation"
+
+    return ""
+
+
 def _coerce_select_value_to_options(value, options):
     candidate = _normalize_ws(value)
     if not candidate or not isinstance(options, list) or not options:
@@ -3171,14 +3138,7 @@ def _extract_learned_field_value_from_prompt(key, definition, source, extractor)
             return "Visa"
 
     if "attestation" in haystack and _has_word(lowered, "attestation"):
-        match = re.search(
-            r"\b(attestation(?:\s+(?:de|du|des|d'))?\s+[^\W\d_][^\W\d_'\- ]{0,50}(?:[ '\-][^\W\d_][^\W\d_'\- ]{0,50}){0,5}?)(?=\s+(?:pour|chez|a|au|aux|afin|car|avec)\b|[.,;:!?]|$)",
-            source_text,
-            flags=re.IGNORECASE,
-        )
-        if match:
-            return _sentence_case(dyn_extract.clean_entity_text(match.group(1)))
-        return "Attestation"
+        return _extract_attestation_type(source_text)
 
     if any(token in haystack for token in ["lieu", "zone", "destination", "depart", "adresse", "localisation"]):
         if "depart" in haystack:
@@ -3282,6 +3242,9 @@ def _build_learned_autre_schema_fields(ranked_feedback, source, extractor, inten
         field_options = definition.get("options") if isinstance(definition.get("options"), list) else []
         if (definition.get("type") or _infer_feedback_field_type(key, value or learned_value)) == "select":
             value = _coerce_select_value_to_options(value, field_options)
+
+        if not value and _is_prompt_sensitive_learned_field(key, definition):
+            continue
 
         selected.append({
             "key": key,
@@ -4706,6 +4669,20 @@ def _is_objet_field_key(field_key):
     return bool(re.search(r"\bobjet\b", normalized))
 
 
+def _learned_duplicate_preference(field):
+    key = _normalize_field_compare_value((field or {}).get("key", "")).replace("_", " ")
+    label = _normalize_field_compare_value((field or {}).get("label", "")).replace("_", " ")
+    haystack = f"{key} {label}"
+
+    if any(token in haystack for token in ["organisme", "destinataire", "recipient"]):
+        return 0
+    if "attestation" in haystack:
+        return 1
+    if any(token in haystack for token in ["motif", "contexte", "justification", "usage"]):
+        return 3
+    return 2
+
+
 def _is_too_generic_objet(value):
     token = _normalize_field_compare_value(value)
     generic = {
@@ -4737,6 +4714,68 @@ def _value_has_prompt_support(prompt_text, value):
         return False
     overlap_ratio = len(prompt_tokens & value_tokens) / float(len(value_tokens))
     return overlap_ratio >= 0.6
+
+
+def _dedupe_learned_fields_by_current_value(fields):
+    if not isinstance(fields, list):
+        return []
+
+    grouped = {}
+    passthrough = []
+    for index, field in enumerate(fields):
+        if not isinstance(field, dict):
+            continue
+        value_norm = _normalize_field_compare_value(field.get("value", ""))
+        if not value_norm or _normalize_ws(field.get("source", "")) != "learned":
+            passthrough.append((index, field))
+            continue
+        grouped.setdefault(value_norm, []).append((index, field))
+
+    kept = []
+    for value_norm, items in grouped.items():
+        if len(items) == 1:
+            kept.extend(items)
+            continue
+        items.sort(key=lambda item: (_learned_duplicate_preference(item[1]), item[0]))
+        kept.append(items[0])
+
+    kept.extend(passthrough)
+    kept.sort(key=lambda item: item[0])
+    return [field for _, field in kept]
+
+
+def _drop_generated_duplicates_of_learned_fields(fields):
+    if not isinstance(fields, list):
+        return []
+
+    learned_signatures = set()
+    for field in fields:
+        if not isinstance(field, dict) or _normalize_ws(field.get("source", "")) != "learned":
+            continue
+        value_norm = _normalize_field_compare_value(field.get("value", ""))
+        if not value_norm:
+            continue
+        learned_signatures.add((_field_semantic_bucket(field.get("key", "")), value_norm))
+
+    if not learned_signatures:
+        return fields
+
+    deduped = []
+    for field in fields:
+        if not isinstance(field, dict):
+            continue
+        value_norm = _normalize_field_compare_value(field.get("value", ""))
+        signature = (_field_semantic_bucket(field.get("key", "")), value_norm)
+        if (
+            _normalize_ws(field.get("source", "")) != "learned"
+            and value_norm
+            and signature in learned_signatures
+            and signature[0] in {"date", "time", "location", "long_text", "label"}
+        ):
+            continue
+        deduped.append(field)
+
+    return deduped
 
 
 def _limit_custom_fields_keep_explicit(custom_fields, max_fields=8):
@@ -4896,54 +4935,13 @@ def _dedupe_and_refine_custom_fields(custom_fields, context_fields, corrected_te
                 }
             )
 
+    filtered = _dedupe_learned_fields_by_current_value(filtered)
+    filtered = _drop_generated_duplicates_of_learned_fields(filtered)
     return _limit_custom_fields_keep_explicit(filtered, max_fields=8)
 
 
-def _extract_location_pair(corrected_text):
-    """
-    Dynamic location extraction with stop markers so route destinations
-    do not absorb trailing intent phrases like "pour une formation ...".
-    """
-    lowered = _norm(corrected_text)
-    patterns = [
-        r"\bde\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)(?=\s+(?:pour|afin|car|avec|le|la|une|un)\b|$)",
-        r"\bdepuis\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)(?=\s+(?:pour|afin|car|avec|le|la|une|un)\b|$)",
-        r"\bdepart\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b.*?\b(?:destination|arrivee)\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, lowered, flags=re.IGNORECASE)
-        if not match:
-            continue
-        raw_dep = _normalize_ws(match.group(1))
-        raw_dest = _normalize_ws(match.group(2))
-        dep_valid = any(_is_likely_proper_noun(w) for w in raw_dep.split())
-        dest_valid = any(_is_likely_proper_noun(w) for w in raw_dest.split())
-        if dep_valid and dest_valid and _norm(raw_dep) != _norm(raw_dest):
-            return _capitalize_entity(raw_dep), _capitalize_entity(raw_dest)
-    return None, None
 
 
-def _extract_subject_name(corrected_text, subject_keyword):
-    """
-    Extract subject names after phrases like "formation java", including
-    short tech labels and symbols such as C++, C#, UI/UX, Node.js.
-    """
-    lowered = _norm(corrected_text)
-    patterns = [
-        rf"\b{re.escape(subject_keyword)}\s+(?:en\s+|sur\s+|de\s+)?([a-z][a-z0-9\s\-\./+#]*[a-z0-9+#])(?=\s+le\b|\s+du\b|\s+de\b|\s+vers\b|\s+pour\b|\s+a\b|$)",
-        rf"\bpour\s+(?:une?\s+)?{re.escape(subject_keyword)}\s+(?:en\s+|sur\s+|de\s+)?([a-z][a-z0-9\s\-\./+#]*[a-z0-9+#])(?=\s+le\b|\s+du\b|\s+de\b|\s+vers\b|$)",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, lowered, flags=re.IGNORECASE)
-        if not match:
-            continue
-        raw = match.group(1).strip()
-        cleaned = _clean_entity_text(raw)
-        if cleaned and len(cleaned) >= 2 and _is_likely_proper_noun(cleaned.split()[0]):
-            return _capitalize_entity(cleaned)
-        if cleaned and len(cleaned) >= 2:
-            return cleaned[:1].upper() + cleaned[1:]
-    return None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -5608,24 +5606,6 @@ def _infer_mode(prompt, request_data):
 # ENTRY POINT
 # ═══════════════════════════════════════════════════════════════
 
-def _extract_location_pair(corrected_text):
-    lowered = _norm(corrected_text)
-    patterns = [
-        r"\bde\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)(?=\s+(?:pour|afin|car|avec|le|la|une|un)\b|$)",
-        r"\bdepuis\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)\s+vers\s+([a-zà-ÿ]{2,}(?:\s+[a-zà-ÿ]{2,})?)(?=\s+(?:pour|afin|car|avec|le|la|une|un)\b|$)",
-        r"\bdepart\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b.*?\b(?:destination|arrivee)\s*[:\-]?\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})?)\b",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, lowered, flags=re.IGNORECASE)
-        if not match:
-            continue
-        raw_dep = _normalize_ws(match.group(1))
-        raw_dest = _normalize_ws(match.group(2))
-        dep_valid = any(_is_likely_proper_noun(w) for w in raw_dep.split())
-        dest_valid = any(_is_likely_proper_noun(w) for w in raw_dest.split())
-        if dep_valid and dest_valid and _norm(raw_dep) != _norm(raw_dest):
-            return _capitalize_entity(raw_dep), _capitalize_entity(raw_dest)
-    return None, None
 
 
 def _extract_subject_name(corrected_text, subject_keyword):

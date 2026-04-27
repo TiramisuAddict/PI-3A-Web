@@ -140,6 +140,7 @@ class DemandeController extends AbstractController
         $submittedAiFieldPlan = ['add' => [], 'remove' => [], 'replaceBase' => false];
         $aiGenerated = false;
         $aiTrustedFromLearning = false;
+        $manualFieldMode = false;
 
         if ($form->isSubmitted()) {
             $formData      = $request->request->all();
@@ -157,7 +158,9 @@ class DemandeController extends AbstractController
                             ? array_values(array_map('strval', $decodedPlan['remove']))
                             : [],
                         'replaceBase' => true === ($decodedPlan['replaceBase'] ?? false),
+                        'manualMode' => true === ($decodedPlan['manualMode'] ?? false),
                     ];
+                    $manualFieldMode = true === $submittedAiFieldPlan['manualMode'];
                 }
             }
             $aiGenerated = '1' === (string) $request->request->get('ai_generated', '0');
@@ -177,7 +180,7 @@ class DemandeController extends AbstractController
             $demande->setEmploye($employe);
 
             if ($form->isValid() && empty($detailErrors)) {
-                if ($aiGenerated && !$aiConfirmed) {
+                if ($aiGenerated && !$aiConfirmed && !$manualFieldMode) {
                     $this->addFlash('warning', 'Veuillez confirmer la demande apres generation IA avant de creer la demande.');
                 } else {
                     $this->em->persist($demande);
@@ -185,9 +188,10 @@ class DemandeController extends AbstractController
 
                     if (!empty($submittedDetails)) {
                         $persistedDetails = $submittedDetails;
-                        if ('Autre' === $submittedType && $aiGenerated && $aiConfirmed) {
+                        if ('Autre' === $submittedType && (($aiGenerated && $aiConfirmed) || $manualFieldMode)) {
                             $trustedPrompt = trim('' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription);
-                            $persistedDetails['_ai_feedback_confirmed'] = true;
+                            $persistedDetails['_ai_feedback_confirmed'] = !$manualFieldMode;
+                            $persistedDetails['_ai_manual_fields'] = $manualFieldMode;
                             $persistedDetails['_ai_confirmed_at'] = (new \DateTimeImmutable())->format(DATE_ATOM);
                             $persistedDetails['_ai_field_plan'] = $submittedAiFieldPlan;
                             if ('' !== $trustedPrompt) {
