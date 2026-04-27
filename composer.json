@@ -11,7 +11,7 @@
         "doctrine/doctrine-bundle": "^2.18.2",
         "doctrine/doctrine-migrations-bundle": "^3.7",
         "doctrine/orm": "^3.6.3",
-        "endroid/installer": "^1.4",
+        "endroid/installer": "*",
         "endroid/qr-code-bundle": "^5.0",
         "google/apiclient": "^2.19",
         "knplabs/knp-paginator-bundle": "^6.10",
