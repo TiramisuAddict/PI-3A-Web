@@ -1,0 +1,4 @@
+nucleos_dompdf:
+    defaults:
+        isRemoteEnabled: true
+        defaultFont: DejaVu Sans

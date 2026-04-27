@@ -4,1141 +4,742 @@
 
 {% block stylesheets %}
     {{ parent() }}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
     <style>
-        .dashboard-inscription {
-            background: #f5f7fb;
-            min-height: 100vh;
-            padding: 1.25rem 0 2rem;
-        }
-
-        .inscription-shell {
-            max-width: 1320px;
-            margin: 0 auto;
-            padding: 0 .75rem;
-        }
-
-        .inscription-hero {
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            border-radius: 10px;
-            background: #fff;
-            padding: 1.25rem;
-            margin-bottom: 1rem;
-        }
-
-        .surface-card {
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            border-radius: 10px;
-            background: #fff;
-            overflow: hidden;
-        }
-
-        .surface-card .card-header {
-            padding: 1rem 1.25rem;
-            background: #fff;
-            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-        }
-
-        .surface-card .card-title {
-            margin: 0;
-            font-size: 1.02rem;
-            font-weight: 700;
-            color: #0f172a;
-            letter-spacing: .01em;
-        }
-
-        .filter-toolbar {
-            background: #fff;
-            padding: 1rem 1.25rem;
-        }
-
-        .filter-toolbar .form-label {
-            font-size: .78rem;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            color: #64748b;
-            margin-bottom: .35rem;
-        }
-
-        .rating-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .3rem;
-            border-radius: 999px;
-            padding: .2rem .55rem;
-            font-size: .78rem;
-            background: rgba(13, 110, 253, 0.10);
-            color: #0d6efd;
-            font-weight: 700;
-        }
-
-        .rating-pill .ti {
-            font-size: .85rem;
-        }
-
-        .table-clean thead th {
-            background: rgba(248, 250, 255, 0.95);
-            color: #64748b;
-            font-size: .74rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            border-bottom: 1px solid rgba(228, 233, 242, 0.95);
-        }
-
-        .table-clean tbody td {
-            vertical-align: middle;
-        }
-
-        .table-clean tbody tr:hover {
-            background: rgba(13, 110, 253, 0.02);
-        }
-
-        .section-spacer {
-            padding: 1.25rem 1.25rem 0;
-        }
-
-        .employee-table .btn {
-            min-width: 6.2rem;
-        }
-
-        .status-badge {
-            font-weight: 700;
-            letter-spacing: .01em;
-        }
-
-        .status-badge.pending {
-            background: #f59e0b;
-            color: #fff;
-        }
-
-        .status-badge.accepted {
-            background: #16a34a;
-            color: #fff;
-        }
-
-        .status-badge.refused {
-            background: #dc2626;
-            color: #fff;
-        }
-
-        .review-count-badge {
-            min-width: 1.5rem;
-        }
-
-        .formation-layout {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 1rem;
-            padding: 1rem 1.25rem 1.25rem;
-        }
-
-        .formation-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: .9rem;
-        }
-
-        .formation-item {
-            border: 1px solid rgba(15, 23, 42, 0.1);
-            border-radius: 10px;
-            background: #fff;
-            padding: .9rem;
-            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
-            transition: transform .15s ease, box-shadow .15s ease;
-        }
-
-        .formation-item:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-            border-color: rgba(31, 111, 235, 0.32);
-        }
-
-        .formation-item.is-selected {
-            border-color: rgba(31, 111, 235, 0.65);
-            box-shadow: 0 0 0 1px rgba(31, 111, 235, 0.25);
-        }
-
-        .formation-meta {
-            font-size: .78rem;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-        }
-
-        .formation-score {
+        .reason-quality-wrap {
             display: flex;
             align-items: center;
-            gap: .45rem;
-            margin-bottom: .55rem;
+            gap: 1rem;
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            border: 1px solid rgba(13, 110, 253, 0.18);
+            border-radius: 0.75rem;
+            background: linear-gradient(135deg, rgba(13, 110, 253, 0.07), rgba(25, 135, 84, 0.06));
         }
 
-        .score-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-            border-radius: 999px;
-            padding: .2rem .55rem;
-            font-size: .78rem;
+        .reason-quality-ring {
+            --score-color: #dc3545;
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            background: conic-gradient(var(--score-color) calc(var(--score, 0) * 1%), #e9ecef 0);
+            transition: background 0.25s ease;
+        }
+
+        .reason-quality-ring::before {
+            content: '';
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: #ffffff;
+            position: absolute;
+        }
+
+        .reason-quality-value {
+            position: relative;
+            z-index: 1;
             font-weight: 700;
-            letter-spacing: .01em;
+            font-size: 0.9rem;
+            color: #1f2937;
         }
 
-        .score-pill.rating {
-            color: #0b57d0;
-            background: rgba(13, 110, 253, 0.14);
+        .reason-quality-feedback {
+            margin: 0;
+            color: #334155;
+            font-size: 0.9rem;
+            line-height: 1.35;
         }
 
-        .score-pill.rating::before {
-            content: '★';
-            font-size: .82rem;
-            line-height: 1;
-        }
-
-        .score-pill.reviews {
-            color: #0f766e;
-            background: rgba(13, 148, 136, 0.13);
-        }
-
-        .score-pill.reviews::before {
-            content: '👤';
-            font-size: .8rem;
-            line-height: 1;
-        }
-
-        .score-pill.empty {
+        .reason-quality-label {
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
             color: #64748b;
-            background: rgba(148, 163, 184, 0.15);
+            font-weight: 600;
+            margin-bottom: 0.15rem;
         }
 
-        .formation-item h4 {
-            margin: .2rem 0 .45rem;
-            font-size: 1.08rem;
-            line-height: 1.25;
-            color: #0f172a;
-        }
-
-        .formation-item .formation-dates {
-            font-size: .86rem;
-            color: #475569;
-            margin-bottom: .45rem;
-        }
-
-        .formation-item .formation-note {
-            border-top: 1px dashed #c9d5e7;
-            margin-top: .55rem;
-            padding-top: .55rem;
-        }
-
-        .formation-sidepanel {
-            border: 1px solid rgba(15, 23, 42, 0.1);
-            border-radius: 10px;
-            background: #fff;
-            overflow: hidden;
-            height: fit-content;
-            position: sticky;
-            top: 5.75rem;
-        }
-
-        .formation-sidepanel-header {
-            padding: .9rem 1rem;
-            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-            background: rgba(31, 111, 235, 0.07);
-        }
-
-        .formation-sidepanel-body {
-            padding: .9rem 1rem;
-        }
-
-        .formation-no-results {
-            grid-column: 1 / -1;
-            margin-bottom: 0;
-        }
-
-        @media (max-width: 991.98px) {
-            .formation-layout {
-                grid-template-columns: 1fr;
+        @media (max-width: 575.98px) {
+            .reason-quality-wrap {
+                gap: 0.75rem;
+                padding: 0.65rem;
             }
 
-            .formation-grid {
-                grid-template-columns: 1fr;
+            .reason-quality-ring {
+                width: 58px;
+                height: 58px;
             }
 
-            .formation-sidepanel {
-                position: static;
+            .reason-quality-ring::before {
+                width: 44px;
+                height: 44px;
+            }
+
+            .reason-quality-value {
+                font-size: 0.8rem;
             }
         }
     </style>
 {% endblock %}
 
 {% block body %}
-    <div class="dashboard-inscription">
-     {{ include('components/navbar.html.twig') }}
+<div class="dashboard-inscription">
+    {{ include('components/navbar.html.twig') }}
     <div class="d-flex" style="min-height:calc(100vh - 56px);">
         {{ include('components/sidebar.html.twig', {'active_page': 'formations','sidebar_role': role}) }}
- 
-    <div class="inscription-shell">
-    <div class="inscription-hero">
-        <div class="row align-items-center g-4 position-relative">
-            <div class="col-lg-8">
-                <div class="text-secondary text-uppercase small fw-bold mb-2">Espace Employe</div>
-                <h2 class="h2 mb-2">Inscription formation</h2>
-                <p class="text-secondary mb-0">Consultez les formations, lisez les avis et envoyez vos demandes dans une interface claire et uniforme.</p>
-            </div>
-            <div class="col-lg-4 text-lg-end">
-                {% if employee_logged %}
-                    <div class="stat-card p-3 d-inline-flex flex-column align-items-end">
-                        <span class="mini-muted">Connecte en tant que</span>
-                        <div class="fw-bold">{{ app.session.get('employe_email') }}</div>
+
+        <div class="container-fluid py-3">
+            <div class="card mb-3">
+                <div class="card-body d-flex justify-content-between flex-wrap gap-3">
+                    <div>
+                        <div class="text-secondary text-uppercase small fw-bold mb-1">Espace Employe</div>
+                        <h2 class="h3 mb-1">Inscription formation</h2>
+                        <div class="text-secondary">Consultez les formations et envoyez vos demandes.</div>
                     </div>
-                {% endif %}
+                    {% if employee_logged %}
+                        <div class="text-end">
+                            <div class="text-secondary">Connecte en tant que</div>
+                            <div class="fw-bold">{{ app.session.get('employe_email') }}</div>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-        </div>
-    </div>
 
-    {% for message in app.flashes('success') %}
-        <div class="alert alert-success" role="alert">{{ message }}</div>
-    {% endfor %}
-    {% for message in app.flashes('error') %}
-        <div class="alert alert-danger" role="alert">{{ message }}</div>
-    {% endfor %}
+            {% for message in app.flashes('success') %}
+                <div class="alert alert-success" role="alert">{{ message }}</div>
+            {% endfor %}
+            {% for message in app.flashes('error') %}
+                <div class="alert alert-danger" role="alert">{{ message }}</div>
+            {% endfor %}
 
-    <div class="surface-card mb-3">
-        <div class="card-header">
-            <h3 class="card-title">Formations disponibles</h3>
-        </div>
-        <div class="card-body border-bottom filter-toolbar">
-            <form method="get" action="{{ path('app_inscription_employe') }}" class="row g-3 align-items-end" id="formation-filter-form">
-                <input type="hidden" name="formation" value="{{ selected_formation ? selected_formation.id : '' }}">
-                <div class="col-lg-4 col-md-6">
-                    <label class="form-label" for="q">Recherche</label>
-                    <div class="input-icon">
-                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                        <input id="q" name="q" class="form-control" type="text" value="{{ q|default('') }}" placeholder="Titre, organisme, lieu...">
+            {% set summary = formation_summary ?? {'total': 0, 'available': 0, 'full': 0, 'finished': 0} %}
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3 col-6">
+                    <div class="card h-100 border-0 shadow-sm bg-white">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <div class="rounded-3 bg-primary-lt text-primary d-inline-flex align-items-center justify-content-center" style="width:3rem;height:3rem;">
+                                <i class="ti ti-layout-grid"></i>
+                            </div>
+                            <div>
+                                <div class="text-secondary small">Formations</div>
+                                <div class="h3 mb-0">{{ summary.total }}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6">
-                    <label class="form-label" for="sort">Tri</label>
-                    <select id="sort" name="sort" class="form-select">
-                        <option value="date_desc" {{ sort == 'date_desc' ? 'selected' : '' }}>Plus recentes</option>
-                        <option value="rating_desc" {{ sort == 'rating_desc' ? 'selected' : '' }}>Meilleure note</option>
-                        <option value="reviews_desc" {{ sort == 'reviews_desc' ? 'selected' : '' }}>Plus d'avis</option>
-                        <option value="title_asc" {{ sort == 'title_asc' ? 'selected' : '' }}>Titre A-Z</option>
-                    </select>
+                <div class="col-md-3 col-6">
+                    <div class="card h-100 border-0 shadow-sm bg-white">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <div class="rounded-3 bg-success-lt text-success d-inline-flex align-items-center justify-content-center" style="width:3rem;height:3rem;">
+                                <i class="ti ti-checks"></i>
+                            </div>
+                            <div>
+                                <div class="text-secondary small">Disponibles</div>
+                                <div class="h3 mb-0">{{ summary.available }}</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-lg-2 col-md-6">
-                    <label class="form-label" for="min_rating">Note minimale</label>
-                    <select id="min_rating" name="min_rating" class="form-select">
-                        <option value="0" {{ min_rating == 0 ? 'selected' : '' }}>Toutes</option>
-                        <option value="1" {{ min_rating == 1 ? 'selected' : '' }}>1+</option>
-                        <option value="2" {{ min_rating == 2 ? 'selected' : '' }}>2+</option>
-                        <option value="3" {{ min_rating == 3 ? 'selected' : '' }}>3+</option>
-                        <option value="4" {{ min_rating == 4 ? 'selected' : '' }}>4+</option>
-                        <option value="5" {{ min_rating == 5 ? 'selected' : '' }}>5</option>
-                    </select>
+                <div class="col-md-3 col-6">
+                    <div class="card h-100 border-0 shadow-sm bg-white">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <div class="rounded-3 bg-danger-lt text-danger d-inline-flex align-items-center justify-content-center" style="width:3rem;height:3rem;">
+                                <i class="ti ti-alert-circle"></i>
+                            </div>
+                            <div>
+                                <div class="text-secondary small">Completes</div>
+                                <div class="h3 mb-0">{{ summary.full }}</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-lg-2 col-md-6">
-                    <label class="form-label" for="min_reviews">Avis minimum</label>
-                    <input id="min_reviews" name="min_reviews" class="form-control" type="number" min="0" value="{{ min_reviews }}">
-                </div>
-            </form>
-        </div>
-        <div class="formation-layout">
-            <div>
-                <div class="formation-grid">
-                    {% for formation in formations %}
-                        {% set state = inscription_by_formation[formation.id] ?? null %}
-                        {% set reviews = review_stats_by_formation[formation.id] ?? {'reviews_count': 0, 'average_note': 0} %}
-                        {% set formationQuery = app.request.query.all|merge({'formation': formation.id}) %}
-                        <article
-                            class="formation-item {{ selected_formation and selected_formation.id == formation.id ? 'is-selected' : '' }}"
-                            data-formation-id="{{ formation.id }}"
-                            data-title="{{ formation.titre }}"
-                            data-organisme="{{ formation.organisme }}"
-                            data-lieu="{{ formation.lieu }}"
-                            data-date-debut="{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}"
-                            data-rating="{{ reviews.average_note|default(0) }}"
-                            data-reviews="{{ reviews.reviews_count|default(0) }}"
-                        >
-                            <div class="formation-score">
-                                {% if reviews.reviews_count > 0 %}
-                                    <span class="score-pill rating">{{ reviews.average_note }}/5</span>
-                                    <span class="score-pill reviews">{{ reviews.reviews_count }} avis</span>
-                                {% else %}
-                                    <span class="score-pill empty"><i class="ti ti-sparkles"></i>Pas encore d'avis</span>
-                                {% endif %}
+                <div class="col-md-3 col-6">
+                    <div class="card h-100 border-0 shadow-sm bg-white">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <div class="rounded-3 bg-secondary-lt text-secondary d-inline-flex align-items-center justify-content-center" style="width:3rem;height:3rem;">
+                                <i class="ti ti-archive"></i>
                             </div>
-
-                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                                <div class="formation-meta">{{ formation.dateDebut ? formation.dateDebut|date('d M Y') : '' }}</div>
-                                {% if state and state.statut == 'EN_ATTENTE' %}
-                                    <span class="badge status-badge pending">En attente</span>
-                                {% elseif state and state.statut == 'ACCEPTEE' %}
-                                    <span class="badge status-badge accepted">Acceptee</span>
-                                {% elseif state and state.statut == 'REFUSEE' %}
-                                    <span class="badge status-badge refused">Refusee</span>
-                                {% else %}
-                                    <span class="badge bg-azure-lt text-azure">Disponible</span>
-                                {% endif %}
+                            <div>
+                                <div class="text-secondary small">Terminees</div>
+                                <div class="h3 mb-0">{{ summary.finished }}</div>
                             </div>
-
-                            <h4>{{ formation.titre }}</h4>
-                            <div class="mini-muted mb-2">{{ formation.organisme }}</div>
-                            <div class="formation-dates">{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }} - {{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}</div>
-
-                            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-                                <span class="badge bg-secondary-lt text-secondary">{{ formation.lieu }}</span>
-                                <span class="badge bg-indigo-lt text-indigo">Capacite {{ formation.capacite }}</span>
-                            </div>
-
-                            <div class="formation-note">
-                                {% if employee_logged %}
-                                    {% if state and state.statut == 'EN_ATTENTE' %}
-                                        <div class="d-flex flex-wrap gap-2 align-items-center">
-                                            <a class="btn btn-sm btn-outline-primary" href="{{ path('app_inscription_employe', formationQuery) }}">Modifier raison</a>
-                                            <form method="post" action="{{ path('app_inscription_employe') }}">
-                                                <input type="hidden" name="action" value="annuler">
-                                                <input type="hidden" name="inscription_id" value="{{ state.id }}">
-                                                <button class="btn btn-sm btn-outline-danger" type="submit">Annuler</button>
-                                            </form>
-                                        </div>
-                                    {% elseif state and state.statut == 'ACCEPTEE' %}
-                                        <div class="d-flex flex-wrap gap-2 align-items-center">
-                                            <a class="btn btn-sm btn-outline-primary" href="{{ path('app_inscription_employe', formationQuery) }}">Evaluer</a>
-                                            {% set existingEvaluation = evaluation_by_formation[formation.id] ?? null %}
-                                            {% if existingEvaluation %}
-                                                <span class="mini-muted">Note: {{ existingEvaluation.note }}/5</span>
-                                            {% endif %}
-                                        </div>
-                                    {% elseif state and state.statut == 'REFUSEE' %}
-                                        <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe', formationQuery) }}">Voir details</a>
-                                    {% else %}
-                                        <a class="btn btn-sm btn-success" href="{{ path('app_inscription_employe', formationQuery) }}">Inscription</a>
-                                    {% endif %}
-                                {% else %}
-                                    <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe', formationQuery) }}">Voir avis</a>
-                                {% endif %}
-                            </div>
-                        </article>
-                    {% else %}
-                        <div class="alert alert-secondary mb-0">Aucune formation disponible.</div>
-                    {% endfor %}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <aside class="formation-sidepanel">
-                <div class="formation-sidepanel-header">
-                    <div class="mini-muted">Formation selectionnee</div>
-                    <div class="fw-bold">{{ selected_formation ? selected_formation.titre : 'Aucune selection' }}</div>
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span class="fw-bold">Formations disponibles</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="open-calendar-btn">
+                        <i class="ti ti-calendar-month me-1"></i>Calendrier
+                    </button>
                 </div>
-                <div class="formation-sidepanel-body">
-                    {% if selected_formation %}
-                        <div class="mini-muted mb-2">{{ selected_formation.organisme }}</div>
-                        <div class="mb-3">{{ selected_formation.dateDebut ? selected_formation.dateDebut|date('Y-m-d') : '' }} - {{ selected_formation.dateFin ? selected_formation.dateFin|date('Y-m-d') : '' }}</div>
-
-                        {% if formation_reviews is not empty %}
-                            <div class="stat-card p-3 mb-3">
-                                <div class="mini-muted mb-2">Analyse des avis</div>
-                                <div class="d-flex flex-wrap gap-2">
-                                    <span class="badge bg-green-lt text-green">Positifs: {{ formation_review_summary.positive|default(0) }}</span>
-                                    <span class="badge bg-yellow-lt text-yellow">Mitigés: {{ formation_review_summary.neutral|default(0) }}</span>
-                                    <span class="badge bg-red-lt text-red">Negatifs: {{ formation_review_summary.negative|default(0) }}</span>
-                                    {% if formation_review_summary.problem|default(0) > 0 %}
-                                        <span class="badge bg-orange-lt text-orange">Problemes: {{ formation_review_summary.problem }}</span>
-                                    {% endif %}
+                <div class="card-body border-bottom">
+                    <form method="get" action="{{ path('app_inscription_employe') }}" class="row g-3 align-items-end" id="formation-filter-form">
+                        <input type="hidden" name="formation" value="{{ selected_formation ? selected_formation.id : '' }}">
+                        <div class="col-lg-4 col-md-6">
+                            <label class="form-label" for="q">Recherche</label>
+                            <input id="q" name="q" class="form-control" type="text" value="{{ q|default('') }}" placeholder="Titre, organisme, lieu...">
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label" for="sort">Tri</label>
+                            <select id="sort" name="sort" class="form-select">
+                                <option value="date_desc" {{ sort == 'date_desc' ? 'selected' : '' }}>Plus recentes</option>
+                                <option value="rating_desc" {{ sort == 'rating_desc' ? 'selected' : '' }}>Meilleure note</option>
+                                <option value="reviews_desc" {{ sort == 'reviews_desc' ? 'selected' : '' }}>Plus d'avis</option>
+                                <option value="title_asc" {{ sort == 'title_asc' ? 'selected' : '' }}>Titre A-Z</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label" for="min_rating">Note minimale</label>
+                            <select id="min_rating" name="min_rating" class="form-select">
+                                <option value="0" {{ min_rating == 0 ? 'selected' : '' }}>Toutes</option>
+                                <option value="1" {{ min_rating == 1 ? 'selected' : '' }}>1+</option>
+                                <option value="2" {{ min_rating == 2 ? 'selected' : '' }}>2+</option>
+                                <option value="3" {{ min_rating == 3 ? 'selected' : '' }}>3+</option>
+                                <option value="4" {{ min_rating == 4 ? 'selected' : '' }}>4+</option>
+                                <option value="5" {{ min_rating == 5 ? 'selected' : '' }}>5</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label" for="min_reviews">Avis minimum</label>
+                            <input id="min_reviews" name="min_reviews" class="form-control" type="number" min="0" value="{{ min_reviews }}">
+                        </div>
+                    </form>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 formation-grid">
+                        {% for formation in formations %}
+                            {% set state = inscription_by_formation[formation.id] ?? null %}
+                            {% set reviews = review_stats_by_formation[formation.id] ?? {'reviews_count': 0, 'average_note': 0} %}
+                            {% set remainingPlaces = formation.capacite ?? 0 %}
+                            {% set isFull = remainingPlaces <= 0 %}
+                            {% set isFinished = formation.dateFin and formation.dateFin|date('U') < 'now'|date('U') %}
+                            {% set formationQuery = app.request.query.all|merge({'formation': formation.id}) %}
+                            <div class="col-lg-4 col-md-6 formation-item" data-title="{{ formation.titre }}" data-organisme="{{ formation.organisme }}" data-lieu="{{ formation.lieu }}" data-date-debut="{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}" data-date-fin="{{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}" data-rating="{{ reviews.average_note|default(0) }}" data-reviews="{{ reviews.reviews_count|default(0) }}" data-formation-id="{{ formation.id }}" data-enrolled="{{ state ? 1 : 0 }}" data-status="{{ state ? state.statut : '' }}">
+                                <div class="border rounded p-3 h-100 formation-card-clickable {{ selected_formation and selected_formation.id == formation.id ? 'border-primary' : '' }}" data-select-url="{{ path('app_inscription_employe', formationQuery) }}" role="link" tabindex="0" style="cursor: pointer;">
+                                    <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
+                                        <div class="d-flex flex-column gap-2">
+                                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                                <span class="badge rounded-pill bg-primary-lt text-primary d-inline-flex align-items-center gap-1 px-2 py-1" title="Note moyenne">
+                                                    <i class="ti ti-star-filled"></i>
+                                                    <span>{{ reviews.reviews_count > 0 ? reviews.average_note ~ '/5' : 'Pas encore d\'avis' }}</span>
+                                                </span>
+                                                <span class="badge rounded-pill bg-teal-lt text-teal d-inline-flex align-items-center gap-1 px-2 py-1" title="Nombre d avis">
+                                                    <i class="ti ti-users"></i>
+                                                    <span>{{ reviews.reviews_count }} avis</span>
+                                                </span>
+                                            </div>
+                                            <small class="text-secondary">{{ formation.dateDebut ? formation.dateDebut|date('d M Y') : '' }}</small>
+                                        </div>
+                                        {% if state and state.statut == 'EN_ATTENTE' %}<span class="badge bg-warning text-dark">En attente</span>
+                                        {% elseif state and state.statut == 'ACCEPTEE' %}<span class="badge bg-success text-white">Acceptée</span>
+                                        {% elseif state and state.statut == 'REFUSEE' %}<span class="badge bg-danger text-white">Refusée</span>
+                                        {% elseif isFinished %}<span class="badge bg-secondary text-white">Terminée</span>
+                                        {% elseif isFull %}<span class="badge bg-danger text-white">Complet</span>
+                                        {% else %}<span class="badge bg-primary text-white">Disponible</span>{% endif %}
+                                    </div>
+                                    <div class="fw-bold">{{ formation.titre }}</div>
+                                    <div class="text-secondary small mb-1">{{ formation.organisme }}</div>
+                                    <div class="small mb-2">{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }} - {{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}</div>
+                                    <div class="small mb-2">{{ formation.lieu }} | Places restantes {{ remainingPlaces }}</div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        {% if state and state.statut == 'EN_ATTENTE' %}
+                                            <form method="post" action="{{ path('app_inscription_employe') }}"><input type="hidden" name="action" value="annuler"><input type="hidden" name="inscription_id" value="{{ state.id }}"><button class="btn btn-sm btn-outline-danger" type="submit">Annuler</button></form>
+                                        {% elseif state and state.statut == 'ACCEPTEE' and isFinished %}
+                                            {% set certPath = path('app_inscription_employe_certificate', {'formationId': formation.id}) %}
+                                            {% set certQrPath = certificate_qr_path_by_formation[formation.id] ?? certPath %}
+                                            {% set certUrl = qr_public_base_url ? qr_public_base_url ~ certQrPath : absolute_url(certQrPath) %}
+                                            <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe_certificate', {'formationId': formation.id}) }}">
+                                                <i class="ti ti-file-download me-1"></i>Certificat PDF
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary open-certificate-qr" data-qr-url="{{ qr_code_data_uri(certUrl) }}">
+                                                <i class="ti ti-qrcode me-1"></i>QR
+                                            </button>
+                                        {% elseif not state and not isFull and not isFinished %}
+                                            <a class="btn btn-sm btn-success" href="{{ path('app_inscription_employe', formationQuery) }}">Inscription</a>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
+                        {% else %}
+                            <div class="col-12"><div class="alert alert-secondary mb-0">Aucune formation disponible.</div></div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
 
-                            <div class="d-flex flex-column gap-2">
-                                {% for review in formation_reviews|slice(0, 4) %}
-                                    <div class="stat-card p-2">
-                                        <div class="d-flex justify-content-between align-items-start mb-1">
-                                            <div class="fw-bold small">{{ review.prenom }} {{ review.nom }}</div>
-                                            <span class="badge {{ review.analysis.label == 'positive' ? 'bg-green-lt text-green' : (review.analysis.label == 'negative' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow') }}">{{ review.note }}/5</span>
+            {% if employee_logged and selected_formation %}
+                {% set selectedState = inscription_by_formation[selected_formation.id] ?? null %}
+                <div class="card mt-3">
+                    <div class="card-header fw-bold">Demande d'inscription - {{ selected_formation.titre }}</div>
+                    <div class="card-body">
+                        {% if selectedState and selectedState.statut == 'EN_ATTENTE' %}
+                            <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <span>Votre demande est en attente. Vous pouvez modifier la raison ou annuler.</span>
+                                <form method="post" action="{{ path('app_inscription_employe') }}">
+                                    <input type="hidden" name="action" value="annuler">
+                                    <input type="hidden" name="inscription_id" value="{{ selectedState.id }}">
+                                    <button class="btn btn-outline-danger btn-sm" type="submit">Annuler</button>
+                                </form>
+                            </div>
+                        {% elseif selectedState and selectedState.statut == 'ACCEPTEE' %}
+                            {% set selectedEvaluation = evaluation_by_formation[selected_formation.id] ?? null %}
+                            {% set selectedFinished = selected_formation.dateFin and selected_formation.dateFin|date('U') < 'now'|date('U') %}
+                            <div class="alert alert-success d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <span>Inscription acceptée. Vous pouvez évaluer la formation.</span>
+                                {% if selectedFinished %}
+                                    {% set selectedCertPath = path('app_inscription_employe_certificate', {'formationId': selected_formation.id}) %}
+                                    {% set selectedCertQrPath = certificate_qr_path_by_formation[selected_formation.id] ?? selectedCertPath %}
+                                    {% set selectedCertUrl = qr_public_base_url ? qr_public_base_url ~ selectedCertQrPath : absolute_url(selectedCertQrPath) %}
+                                    <div class="d-flex flex-wrap gap-2">
+                                    <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe_certificate', {'formationId': selected_formation.id}) }}">
+                                        <i class="ti ti-file-download me-1"></i>Télécharger certificat
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-primary open-certificate-qr" data-qr-url="{{ qr_code_data_uri(selectedCertUrl) }}">
+                                        <i class="ti ti-qrcode me-1"></i>Voir QR
+                                    </button>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <form method="post" action="{{ path('app_inscription_employe') }}">
+                                <input type="hidden" name="action" value="evaluer">
+                                <input type="hidden" name="formation_id" value="{{ selected_formation.id }}">
+                                <div class="mb-3">
+                                    <label class="form-label d-block">Note</label>
+                                    {% for i in 1..5 %}
+                                        <label class="form-check form-check-inline m-0 me-2">
+                                            <input class="form-check-input" type="radio" name="note" value="{{ i }}" {{ selectedEvaluation and selectedEvaluation.note == i ? 'checked' : (not selectedEvaluation and i == 5 ? 'checked' : '') }}>
+                                            <span class="form-check-label">{{ i }}/5</span>
+                                        </label>
+                                    {% endfor %}
+                                </div>
+                                <div class="mb-3">
+                                    <label for="commentaire" class="form-label">Commentaire</label>
+                                    <textarea id="commentaire" name="commentaire" class="form-control" rows="4">{{ selectedEvaluation.commentaire|default('') }}</textarea>
+                                </div>
+                                <button class="btn btn-primary" type="submit">Enregistrer évaluation</button>
+                            </form>
+                        {% elseif selectedState and selectedState.statut == 'REFUSEE' %}
+                            <div class="alert alert-danger mb-0">Cette inscription est refusée.</div>
+                        {% elseif selected_formation.dateFin and selected_formation.dateFin|date('U') < 'now'|date('U') %}
+                            <div class="alert alert-secondary mb-0">Cette formation est terminée. Les inscriptions sont fermées.</div>
+                        {% elseif (selected_formation.capacite ?? 0) <= 0 %}
+                            <div class="alert alert-danger mb-0">Cette formation est complete. Aucune place disponible.</div>
+                        {% else %}
+                            <form method="post" action="{{ path('app_inscription_employe') }}" id="reason-form" data-analyze-url="{{ path('app_inscription_employe_analyze') }}" data-generate-url="{{ path('app_inscription_employe_generate') }}">
+                                <input type="hidden" name="formation_id" value="{{ selected_formation.id }}">
+                                <div class="mb-3">
+                                    <label for="raison" class="form-label">Raison</label>
+                                    <textarea id="raison" name="raison" class="form-control" rows="5" placeholder="Expliquez pourquoi vous voulez suivre cette formation...">{{ typed_reason|default('') }}</textarea>
+                                    <div class="reason-quality-wrap" id="reason-quality-wrap" aria-live="polite">
+                                        <div class="reason-quality-ring" id="reason-quality-ring" style="--score: 0; --score-color: #dc3545;">
+                                            <span class="reason-quality-value" id="reason-quality-value">0%</span>
                                         </div>
-                                        <div class="small text-secondary">{{ review.commentaire ?: 'Aucun commentaire.' }}</div>
-                                        <div class="mt-1">
-                                            <span class="badge {{ review.analysis.label == 'positive' ? 'bg-green-lt text-green' : (review.analysis.label == 'negative' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow') }}">
-                                                {{ review.analysis.label == 'positive' ? 'Positif' : (review.analysis.label == 'negative' ? 'Negatif' : 'Mitige') }}
+                                        <div>
+                                            <span class="reason-quality-label">Qualite de la raison</span>
+                                            <p class="reason-quality-feedback" id="reason-quality-feedback">Saisissez votre raison pour afficher le score.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button class="btn btn-outline-primary" type="button" data-action="analyze">Corriger LanguageTool</button>
+                                    <button class="btn btn-primary" type="button" data-action="generate">Generer avec IA</button>
+                                    <button class="btn btn-success" type="submit" name="action" value="inscrire">Envoyer la demande</button>
+                                </div>
+                                <div id="assistant-notice" class="alert alert-info mt-3 mb-0 d-none"></div>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header fw-bold d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span>Avis des participants</span>
+                        <span class="badge bg-secondary-lt text-secondary">{{ formation_reviews|length }} avis</span>
+                    </div>
+                    <div class="card-body">
+                        {% if formation_reviews is not empty %}
+                            <div class="d-grid gap-3">
+                                {% for review in formation_reviews %}
+                                    <div class="border rounded p-3 bg-body-tertiary">
+                                        <div class="d-flex justify-content-between align-items-start gap-3 mb-2 flex-wrap">
+                                            <div>
+                                                <div class="fw-bold d-flex align-items-center gap-2">
+                                                    <i class="ti ti-user-circle"></i>
+                                                    <span>{{ review.prenom|default('') }} {{ review.nom|default('')|trim ?: 'Anonyme' }}</span>
+                                                </div>
+                                                <div class="text-secondary small">{{ review.commentaire ? review.commentaire|length > 0 ? 'Commentaire partagé' : 'Sans commentaire' : 'Sans commentaire' }}</div>
+                                            </div>
+                                            <span class="badge rounded-pill bg-primary-lt text-primary d-inline-flex align-items-center gap-1 px-2 py-1">
+                                                <i class="ti ti-star-filled"></i>
+                                                <span>{{ review.note }}/5</span>
                                             </span>
-                                            {% if review.analysis.problems is not empty %}
-                                                <span class="badge bg-red-lt text-red ms-1">Probleme detecte</span>
-                                            {% endif %}
                                         </div>
+                                        {% if review.commentaire %}
+                                            <div class="text-body">{{ review.commentaire }}</div>
+                                        {% else %}
+                                            <div class="text-secondary fst-italic">Aucun commentaire écrit.</div>
+                                        {% endif %}
                                     </div>
                                 {% endfor %}
                             </div>
                         {% else %}
-                            <div class="text-secondary">Aucun avis pour cette formation.</div>
+                            <div class="text-secondary">Aucun avis pour cette formation pour le moment.</div>
                         {% endif %}
-                    {% else %}
-                        <div class="text-secondary">Choisissez une formation pour afficher ses details.</div>
-                    {% endif %}
+                    </div>
                 </div>
-            </aside>
+            {% endif %}
         </div>
     </div>
+</div>
 
-    <script>
-        (function () {
-            const filterForm = document.getElementById('formation-filter-form');
-            if (!filterForm) {
+<div class="modal fade" id="formationCalendarModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-0">Calendrier des formations</h5>
+                    <small class="text-secondary">Vos inscriptions (acceptee, en attente, refusee)</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="calendar-holder" style="min-height: 620px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="certificateQrModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">QR Certificat</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="certificate-qr-image" src="" alt="QR certificat" class="img-fluid border rounded p-2 bg-white" style="max-width: 240px;">
+                <div class="small text-secondary mt-2">Scannez ce QR pour ouvrir le certificat.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script>
+(function () {
+    const filterForm = document.getElementById('formation-filter-form');
+    if (!filterForm) return;
+
+    const formationGrid = document.querySelector('.formation-grid');
+    const cards = Array.from(document.querySelectorAll('.formation-item'));
+    const searchInput = filterForm.querySelector('input[name="q"]');
+    const sortSelect = filterForm.querySelector('select[name="sort"]');
+    const minRatingSelect = filterForm.querySelector('select[name="min_rating"]');
+    const minReviewsInput = filterForm.querySelector('input[name="min_reviews"]');
+    const calendarButton = document.getElementById('open-calendar-btn');
+
+    const calendarModal = document.getElementById('formationCalendarModal');
+    const calendarHolder = document.getElementById('calendar-holder');
+    let fullCalendar = null;
+
+    const addOneDay = (dateString) => {
+        if (!dateString) return null;
+        const date = new Date(dateString + 'T00:00:00');
+        if (Number.isNaN(date.getTime())) return null;
+        date.setDate(date.getDate() + 1);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+    };
+
+    const resolveEventColor = (status) => {
+        switch ((status || '').toUpperCase()) {
+            case 'ACCEPTEE':
+                return '#198754';
+            case 'EN_ATTENTE':
+                return '#f59f00';
+            case 'REFUSEE':
+                return '#dc3545';
+            default:
+                return '#0d6efd';
+        }
+    };
+
+    const localEnrolledEvents = cards
+        .filter((card) => card.dataset.enrolled === '1' && (card.dataset.dateDebut || '') !== '')
+        .map((card) => {
+            const status = card.dataset.status || '';
+            const color = resolveEventColor(status);
+            return {
+                title: card.dataset.title || 'Formation',
+                start: card.dataset.dateDebut,
+                end: addOneDay(card.dataset.dateFin || card.dataset.dateDebut || ''),
+                allDay: true,
+                backgroundColor: color,
+                borderColor: color,
+                textColor: '#ffffff',
+                extendedProps: {
+                    statut: status,
+                    organisme: card.dataset.organisme || '',
+                    lieu: card.dataset.lieu || '',
+                },
+            };
+        });
+
+    const initCalendar = () => {
+        if (!calendarHolder || fullCalendar || typeof FullCalendar === 'undefined') return;
+
+        fullCalendar = new FullCalendar.Calendar(calendarHolder, {
+            initialView: 'dayGridMonth',
+            locale: 'fr',
+            height: 580,
+            firstDay: 1,
+            headerToolbar: {
+                start: 'prev,next today',
+                center: 'title',
+                end: 'dayGridMonth,timeGridWeek,listWeek',
+            },
+            events: localEnrolledEvents,
+            eventDidMount: function (info) {
+                const props = info.event.extendedProps || {};
+                const parts = [];
+                if (props.statut) parts.push('Statut: ' + props.statut);
+                if (props.organisme) parts.push('Organisme: ' + props.organisme);
+                if (props.lieu) parts.push('Lieu: ' + props.lieu);
+                if (parts.length > 0) {
+                    info.el.setAttribute('title', parts.join(' | '));
+                }
+            },
+        });
+
+        fullCalendar.render();
+    };
+
+    if (calendarButton && calendarModal) {
+        calendarModal.addEventListener('shown.bs.modal', () => {
+            initCalendar();
+            if (!fullCalendar) return;
+
+            requestAnimationFrame(() => {
+                fullCalendar.updateSize();
+                fullCalendar.render();
+            });
+        });
+
+        calendarButton.addEventListener('click', () => {
+            initCalendar();
+            const modal = bootstrap.Modal.getOrCreateInstance(calendarModal);
+            modal.show();
+        });
+    }
+
+    const certificateQrModalEl = document.getElementById('certificateQrModal');
+    const certificateQrImage = document.getElementById('certificate-qr-image');
+    document.querySelectorAll('.open-certificate-qr').forEach((button) => {
+        button.addEventListener('click', () => {
+            if (!certificateQrModalEl || !certificateQrImage) return;
+            certificateQrImage.src = button.dataset.qrUrl || '';
+            const qrModal = bootstrap.Modal.getOrCreateInstance(certificateQrModalEl);
+            qrModal.show();
+        });
+    });
+
+    const applyClientFilters = () => {
+        const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+        const sort = sortSelect ? sortSelect.value : 'date_desc';
+        const minRating = Math.max(0, parseFloat(minRatingSelect ? minRatingSelect.value : '0') || 0);
+        const minReviews = Math.max(0, parseInt(minReviewsInput ? minReviewsInput.value : '0', 10) || 0);
+
+        cards.forEach((card) => {
+            const title = (card.dataset.title || '').toLowerCase();
+            const organisme = (card.dataset.organisme || '').toLowerCase();
+            const lieu = (card.dataset.lieu || '').toLowerCase();
+            const rating = parseFloat(card.dataset.rating || '0') || 0;
+            const reviews = parseInt(card.dataset.reviews || '0', 10) || 0;
+            const matchesQuery = query === '' || (title + ' ' + organisme + ' ' + lieu).includes(query);
+            const matchesMinReviews = reviews >= minReviews;
+            const matchesMinRating = minRating <= 0 || (reviews > 0 && rating >= minRating);
+            card.classList.toggle('d-none', !(matchesQuery && matchesMinReviews && matchesMinRating));
+        });
+
+        const parseDate = (value) => {
+            if (!value) return 0;
+            const timestamp = Date.parse(value + 'T00:00:00');
+            return Number.isNaN(timestamp) ? 0 : timestamp;
+        };
+
+        const sortedCards = [...cards].sort((left, right) => {
+            const leftRating = parseFloat(left.dataset.rating || '0') || 0;
+            const rightRating = parseFloat(right.dataset.rating || '0') || 0;
+            const leftReviews = parseInt(left.dataset.reviews || '0', 10) || 0;
+            const rightReviews = parseInt(right.dataset.reviews || '0', 10) || 0;
+            const leftTitle = (left.dataset.title || '').toLowerCase();
+            const rightTitle = (right.dataset.title || '').toLowerCase();
+            const leftDate = parseDate(left.dataset.dateDebut || '');
+            const rightDate = parseDate(right.dataset.dateDebut || '');
+
+            switch (sort) {
+                case 'rating_desc':
+                    return (rightRating - leftRating)
+                        || (rightReviews - leftReviews)
+                        || leftTitle.localeCompare(rightTitle, 'fr');
+                case 'reviews_desc':
+                    return (rightReviews - leftReviews)
+                        || (rightRating - leftRating)
+                        || leftTitle.localeCompare(rightTitle, 'fr');
+                case 'title_asc':
+                    return leftTitle.localeCompare(rightTitle, 'fr');
+                case 'date_desc':
+                default:
+                    return (rightDate - leftDate)
+                        || leftTitle.localeCompare(rightTitle, 'fr');
+            }
+        });
+
+        if (formationGrid) {
+            sortedCards.forEach((card) => formationGrid.appendChild(card));
+        }
+    };
+
+    [searchInput, sortSelect, minRatingSelect, minReviewsInput].forEach((el) => {
+        if (el) {
+            el.addEventListener('input', applyClientFilters);
+            el.addEventListener('change', applyClientFilters);
+        }
+    });
+
+    applyClientFilters();
+
+    document.querySelectorAll('.formation-card-clickable').forEach((card) => {
+        card.addEventListener('click', (event) => {
+            if (event.target.closest('a, button, form, input, textarea, select, label')) return;
+            const targetUrl = card.dataset.selectUrl;
+            if (targetUrl) {
+                window.location.href = targetUrl;
+            }
+        });
+
+        card.addEventListener('keydown', (event) => {
+            if (event.target.closest('a, button, form, input, textarea, select, label')) return;
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                const targetUrl = card.dataset.selectUrl;
+                if (targetUrl) {
+                    window.location.href = targetUrl;
+                }
+            }
+        });
+    });
+
+    const reasonForm = document.getElementById('reason-form');
+    if (reasonForm) {
+        const reasonField = document.getElementById('raison');
+        const noticeBox = document.getElementById('assistant-notice');
+        const qualityRing = document.getElementById('reason-quality-ring');
+        const qualityValue = document.getElementById('reason-quality-value');
+        const qualityFeedback = document.getElementById('reason-quality-feedback');
+        const analyzeUrl = reasonForm.dataset.analyzeUrl;
+        const generateUrl = reasonForm.dataset.generateUrl;
+
+        const setNotice = (message, variant) => {
+            if (!noticeBox) return;
+            noticeBox.classList.remove('d-none', 'alert-info', 'alert-danger');
+            noticeBox.classList.add(variant === 'error' ? 'alert-danger' : 'alert-info');
+            noticeBox.textContent = message;
+        };
+
+        const evaluateReasonQuality = () => {
+            if (!reasonField || !qualityRing || !qualityValue || !qualityFeedback) return;
+
+            const text = (reasonField.value || '').trim();
+            if (text === '') {
+                qualityRing.style.setProperty('--score', '0');
+                qualityRing.style.setProperty('--score-color', '#dc3545');
+                qualityValue.textContent = '0%';
+                qualityFeedback.textContent = 'Saisissez votre raison pour afficher le score.';
                 return;
             }
 
-            const grid = document.querySelector('.formation-grid');
-            const cards = Array.from(document.querySelectorAll('.formation-item'));
-            const searchInput = filterForm.querySelector('input[name="q"]');
-            const sortSelect = filterForm.querySelector('select[name="sort"]');
-            const minRatingSelect = filterForm.querySelector('select[name="min_rating"]');
-            const minReviewsInput = filterForm.querySelector('input[name="min_reviews"]');
-            let noResults = document.getElementById('formation-no-results');
+            const words = text.split(/\s+/).filter(Boolean);
+            const sentences = text
+                .split(/[.!?]+/)
+                .map((part) => part.trim())
+                .filter(Boolean);
+            const uniqueWords = new Set(words.map((word) => word.toLowerCase()));
 
-            if (!noResults && grid) {
-                noResults = document.createElement('div');
-                noResults.id = 'formation-no-results';
-                noResults.className = 'alert alert-secondary formation-no-results d-none';
-                noResults.textContent = 'Aucune formation ne correspond a vos filtres.';
-                grid.appendChild(noResults);
+            let score = 0;
+            score += Math.min(35, Math.round((text.length / 220) * 35));
+            score += Math.min(30, Math.round((words.length / 40) * 30));
+            score += Math.min(15, Math.round((sentences.length / 4) * 15));
+            score += Math.min(10, Math.round((uniqueWords.size / Math.max(words.length, 1)) * 10));
+
+            const hasMotivation = /(objectif|motivation|progresser|ameliorer|competence|carriere|equipe|projet|entreprise)/i.test(text);
+            if (hasMotivation) score += 10;
+
+            if (words.length < 8) score -= 10;
+            score = Math.max(0, Math.min(100, score));
+
+            let color = '#dc3545';
+            let feedback = 'Ajoutez plus de details concrets pour renforcer votre demande.';
+
+            if (score >= 75) {
+                color = '#198754';
+                feedback = 'Excellente raison. Le message est detaille et convaincant.';
+            } else if (score >= 45) {
+                color = '#f59f00';
+                feedback = 'Bonne base. Precisez l objectif et l impact attendu pour monter le score.';
             }
 
-            const parseDate = (dateValue) => {
-                if (!dateValue) {
-                    return null;
-                }
-                const parsed = new Date(dateValue + 'T00:00:00');
-                return Number.isNaN(parsed.getTime()) ? null : parsed;
-            };
+            qualityRing.style.setProperty('--score', String(score));
+            qualityRing.style.setProperty('--score-color', color);
+            qualityValue.textContent = score + '%';
+            qualityFeedback.textContent = feedback;
+        };
 
-            const applyClientFilters = () => {
-                const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
-                const sort = sortSelect ? sortSelect.value : 'date_desc';
-                const minRating = Math.max(0, parseFloat(minRatingSelect ? minRatingSelect.value : '0') || 0);
-                const minReviews = Math.max(0, parseInt(minReviewsInput ? minReviewsInput.value : '0', 10) || 0);
+        if (reasonField) {
+            reasonField.addEventListener('input', evaluateReasonQuality);
+            evaluateReasonQuality();
+        }
 
-                const visibleCards = [];
-                cards.forEach((card) => {
-                    const title = (card.dataset.title || '').toLowerCase();
-                    const organisme = (card.dataset.organisme || '').toLowerCase();
-                    const lieu = (card.dataset.lieu || '').toLowerCase();
-                    const rating = parseFloat(card.dataset.rating || '0') || 0;
-                    const reviews = parseInt(card.dataset.reviews || '0', 10) || 0;
-
-                    const matchesQuery = query === '' || (title + ' ' + organisme + ' ' + lieu).includes(query);
-                    const matchesMinReviews = reviews >= minReviews;
-                    const matchesMinRating = minRating <= 0 || (reviews > 0 && rating >= minRating);
-
-                    const isVisible = matchesQuery && matchesMinReviews && matchesMinRating;
-                    card.classList.toggle('d-none', !isVisible);
-                    if (isVisible) {
-                        visibleCards.push(card);
-                    }
-                });
-
-                visibleCards.sort((a, b) => {
-                    const dateA = parseDate(a.dataset.dateDebut || '');
-                    const dateB = parseDate(b.dataset.dateDebut || '');
-                    const ratingA = parseFloat(a.dataset.rating || '0') || 0;
-                    const ratingB = parseFloat(b.dataset.rating || '0') || 0;
-                    const reviewsA = parseInt(a.dataset.reviews || '0', 10) || 0;
-                    const reviewsB = parseInt(b.dataset.reviews || '0', 10) || 0;
-                    const titleA = (a.dataset.title || '').toLowerCase();
-                    const titleB = (b.dataset.title || '').toLowerCase();
-
-                    if (sort === 'rating_desc') {
-                        if (ratingB !== ratingA) {
-                            return ratingB - ratingA;
-                        }
-                        return reviewsB - reviewsA;
-                    }
-
-                    if (sort === 'reviews_desc') {
-                        if (reviewsB !== reviewsA) {
-                            return reviewsB - reviewsA;
-                        }
-                        return ratingB - ratingA;
-                    }
-
-                    if (sort === 'title_asc') {
-                        return titleA.localeCompare(titleB);
-                    }
-
-                    return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
-                });
-
-                if (grid) {
-                    visibleCards.forEach((card) => grid.appendChild(card));
-                    if (noResults) {
-                        grid.appendChild(noResults);
-                    }
-                }
-
-                if (noResults) {
-                    noResults.classList.toggle('d-none', visibleCards.length > 0);
-                }
-            };
-
-            if (searchInput) {
-                searchInput.addEventListener('input', applyClientFilters);
-                searchInput.addEventListener('keydown', (event) => {
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        applyClientFilters();
-                    }
-                });
+        const postAction = async (url, mode) => {
+            const formData = new FormData();
+            formData.append('formation_id', reasonForm.querySelector('input[name="formation_id"]').value || '');
+            formData.append('raison', reasonField ? reasonField.value : '');
+            const response = await fetch(url, { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || !payload || !payload.ok) {
+                setNotice(payload && payload.message ? payload.message : 'Une erreur est survenue.', 'error');
+                return;
             }
+            if (reasonField && payload.text) {
+                reasonField.value = payload.text;
+                evaluateReasonQuality();
+            }
+            setNotice(payload.message || (mode === 'analyze' ? 'Correction terminee.' : 'Generation terminee.'), 'info');
+        };
 
-            [sortSelect, minRatingSelect, minReviewsInput].forEach((control) => {
-                if (control) {
-                    control.addEventListener('input', applyClientFilters);
-                    control.addEventListener('change', applyClientFilters);
+        reasonForm.querySelectorAll('button[data-action]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const mode = button.dataset.action;
+                const url = mode === 'analyze' ? analyzeUrl : generateUrl;
+                if (!reasonField || reasonField.value.trim() === '') {
+                    setNotice('Veuillez saisir une raison avant de lancer l action.', 'error');
+                    if (reasonField) reasonField.focus();
+                    return;
                 }
+                setNotice(mode === 'analyze' ? 'Correction en cours...' : 'Generation en cours...', 'info');
+                postAction(url, mode).catch(() => setNotice('Impossible de contacter le service IA.', 'error'));
             });
-
-            const resetLink = filterForm.querySelector('a[title="Reinitialiser filtres"]');
-            if (resetLink && searchInput && sortSelect && minRatingSelect && minReviewsInput) {
-                resetLink.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    searchInput.value = '';
-                    sortSelect.value = 'date_desc';
-                    minRatingSelect.value = '0';
-                    minReviewsInput.value = '0';
-                    applyClientFilters();
-                });
-            }
-
-            applyClientFilters();
-
-            // Card selection handler - load reviews via AJAX without page refresh
-            if (grid) {
-                grid.addEventListener('click', (event) => {
-                    const clickInsideButton = event.target.closest('a, button, form, input, select, textarea');
-                    if (clickInsideButton) {
-                        return;
-                    }
-
-                    const card = event.target.closest('.formation-item');
-                    if (!card) {
-                        return;
-                    }
-
-                    const formationId = card.dataset.formationId;
-                    if (!formationId) {
-                        return;
-                    }
-
-                    console.log('Formation card clicked:', card.dataset.title);
-                    
-                    // Remove selection from all cards
-                    document.querySelectorAll('.formation-item').forEach((item) => item.classList.remove('is-selected'));
-                    card.classList.add('is-selected');
-
-                    // Update URL without reload
-                    const url = new URL(window.location.href);
-                    url.searchParams.set('formation', formationId);
-                    window.history.replaceState({}, '', url.toString());
-
-                    // Fetch reviews data via AJAX
-                    const reviewsUrl = '{{ path("app_inscription_employe_reviews", {id: 0}) }}'.replace('/0', '/' + formationId);
-                    
-                    fetch(reviewsUrl)
-                        .then(response => response.json())
-                        .then(data => {
-                            const panelHeader = document.querySelector('.formation-sidepanel-header');
-                            const panelBody = document.querySelector('.formation-sidepanel-body');
-
-                            if (!panelHeader || !panelBody) return;
-
-                            // Update header
-                            panelHeader.innerHTML = '<div class="mini-muted">Formation selectionnee</div><div class="fw-bold">' + (data.formation.titre || 'Aucune selection') + '</div>';
-
-                            // Build reviews HTML
-                            let reviewsHTML = '<div class="mini-muted mb-2">' + (data.formation.organisme || '') + '</div>';
-                            reviewsHTML += '<div class="mb-3">' + (data.formation.dateDebut || '') + ' - ' + (data.formation.dateFin || '') + '</div>';
-
-                            if (data.reviews && data.reviews.length > 0) {
-                                reviewsHTML += '<div class="stat-card p-3 mb-3">';
-                                reviewsHTML += '<div class="mini-muted mb-2">Analyse des avis</div>';
-                                reviewsHTML += '<div class="d-flex flex-wrap gap-2">';
-                                reviewsHTML += '<span class="badge bg-green-lt text-green">Positifs: ' + (data.summary.positive || 0) + '</span>';
-                                reviewsHTML += '<span class="badge bg-yellow-lt text-yellow">Mitigés: ' + (data.summary.neutral || 0) + '</span>';
-                                reviewsHTML += '<span class="badge bg-red-lt text-red">Negatifs: ' + (data.summary.negative || 0) + '</span>';
-                                if ((data.summary.problem || 0) > 0) {
-                                    reviewsHTML += '<span class="badge bg-orange-lt text-orange">Problemes: ' + data.summary.problem + '</span>';
-                                }
-                                reviewsHTML += '</div></div>';
-
-                                reviewsHTML += '<div class="d-flex flex-column gap-2">';
-                                data.reviews.slice(0, 4).forEach((review) => {
-                                    const labelClass = review.label === 'positive' ? 'bg-green-lt text-green' : (review.label === 'negative' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow');
-                                    const labelText = review.label === 'positive' ? 'Positif' : (review.label === 'negative' ? 'Negatif' : 'Mitige');
-                                    
-                                    reviewsHTML += '<div class="stat-card p-2">';
-                                    reviewsHTML += '<div class="d-flex justify-content-between align-items-start mb-1">';
-                                    reviewsHTML += '<div class="fw-bold small">' + review.prenom + ' ' + review.nom + '</div>';
-                                    reviewsHTML += '<span class="badge ' + labelClass + '">' + review.note + '/5</span>';
-                                    reviewsHTML += '</div>';
-                                    reviewsHTML += '<div class="small text-secondary">' + (review.commentaire || 'Aucun commentaire.') + '</div>';
-                                    reviewsHTML += '<div class="mt-1">';
-                                    reviewsHTML += '<span class="badge ' + labelClass + '">' + labelText + '</span>';
-                                    if (review.problems && review.problems.length > 0) {
-                                        reviewsHTML += '<span class="badge bg-red-lt text-red ms-1">Probleme detecte</span>';
-                                    }
-                                    reviewsHTML += '</div></div>';
-                                });
-                                reviewsHTML += '</div>';
-                            } else {
-                                reviewsHTML += '<div class="text-secondary">Aucun avis pour cette formation.</div>';
-                            }
-
-                            panelBody.innerHTML = reviewsHTML;
-                        })
-                        .catch(error => {
-                            console.error('Error loading reviews:', error);
-                            const panelBody = document.querySelector('.formation-sidepanel-body');
-                            if (panelBody) {
-                                panelBody.innerHTML = '<div class="alert alert-danger">Erreur lors du chargement des avis.</div>';
-                            }
-                        });
-                });
-            }
-        })();
-    </script>
-
-    {% if employee_logged and selected_formation %}
-        {% set selectedState = inscription_by_formation[selected_formation.id] ?? null %}
-        <div class="surface-card">
-            <div class="card-header">
-                <h3 class="card-title">Demande d'inscription - {{ selected_formation.titre }}</h3>
-            </div>
-            <div class="card-body">
-                {% if selectedState and selectedState.statut == 'EN_ATTENTE' %}
-                    <div class="alert alert-warning mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <span>Votre demande est en attente. Vous pouvez modifier la raison ou annuler.</span>
-                        <form method="post" action="{{ path('app_inscription_employe') }}" class="ms-0 ms-md-3">
-                            <input type="hidden" name="action" value="annuler">
-                            <input type="hidden" name="inscription_id" value="{{ selectedState.id }}">
-                            <button class="btn btn-outline-danger btn-sm" type="submit">Annuler</button>
-                        </form>
-                    </div>
-
-                    <form method="post" action="{{ path('app_inscription_employe') }}" id="reason-form" data-analyze-url="{{ path('app_inscription_employe_analyze') }}" data-generate-url="{{ path('app_inscription_employe_generate') }}">
-                        <input type="hidden" name="action" value="modifier_raison">
-                        <input type="hidden" name="inscription_id" value="{{ selectedState.id }}">
-                        <input type="hidden" name="formation_id" value="{{ selected_formation.id }}">
-
-                        <div class="mb-3">
-                            <label for="raison" class="form-label">Raison</label>
-                            <textarea id="raison" name="raison" class="form-control" rows="5" placeholder="Expliquez pourquoi vous voulez suivre cette formation...">{{ selectedState.raison|default('') }}</textarea>
-                        </div>
-
-                        <div class="d-flex flex-wrap gap-2">
-                            <button class="btn btn-outline-primary" type="button" data-action="analyze">
-                                <i class="ti ti-scan me-1"></i>
-                                Corriger LanguageTool
-                            </button>
-                            <button class="btn btn-primary" type="button" data-action="generate">
-                                <i class="ti ti-sparkles me-1"></i>
-                                Generer avec IA
-                            </button>
-                            <button class="btn btn-success" type="submit">Modifier la demande</button>
-                        </div>
-
-                        <div id="assistant-notice" class="alert alert-info mt-3 mb-0 d-none"></div>
-                    </form>
-
-                    <div id="analysis-panel" class="d-none">
-                        <div class="row g-3 mt-4">
-                            <div class="col-lg-4">
-                                <div class="stat-card p-3 h-100">
-                                    <div class="mini-muted">Langue detectee</div>
-                                    <div id="analysis-language" class="h4 mb-0 text-capitalize"></div>
-                                </div>
-                            </div>
-                            <div class="col-lg-4">
-                                <div class="stat-card p-3 h-100">
-                                    <div class="mini-muted">Corrections LanguageTool</div>
-                                    <div id="analysis-count" class="h4 mb-0"></div>
-                                </div>
-                            </div>
-                            <div class="col-lg-4">
-                                <div class="stat-card p-3 h-100">
-                                    <div class="mini-muted">Texte fourni</div>
-                                    <div id="analysis-length" class="h4 mb-0"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row g-3 mt-3">
-                            <div class="col-lg-6">
-                                <div class="stat-card p-3 h-100">
-                                    <div class="mini-muted mb-2">Version corrigee</div>
-                                    <div id="analysis-corrected"></div>
-                                </div>
-                            </div>
-                            <div class="col-lg-6">
-                                <div class="stat-card p-3 h-100">
-                                    <div class="mini-muted mb-2">Version amelioree par l'IA</div>
-                                    <div id="analysis-generated"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="analysis-messages" class="stat-card p-3 mt-3 d-none">
-                            <div class="mini-muted mb-2">Détails des corrections</div>
-                            <ul class="mb-0 ps-3" id="analysis-messages-list"></ul>
-                        </div>
-                    </div>
-
-                    <script>
-                        (function () {
-                            const form = document.getElementById('reason-form');
-                            if (!form) {
-                                return;
-                            }
-
-                            const reasonField = document.getElementById('raison');
-                            const noticeBox = document.getElementById('assistant-notice');
-                            const analysisPanel = document.getElementById('analysis-panel');
-                            const analysisLanguage = document.getElementById('analysis-language');
-                            const analysisCount = document.getElementById('analysis-count');
-                            const analysisLength = document.getElementById('analysis-length');
-                            const analysisCorrected = document.getElementById('analysis-corrected');
-                            const analysisGenerated = document.getElementById('analysis-generated');
-                            const analysisMessages = document.getElementById('analysis-messages');
-                            const analysisMessagesList = document.getElementById('analysis-messages-list');
-                            const analyzeUrl = form.dataset.analyzeUrl;
-                            const generateUrl = form.dataset.generateUrl;
-
-                            const setNotice = (message, variant) => {
-                                if (!noticeBox) {
-                                    return;
-                                }
-
-                                noticeBox.classList.remove('d-none', 'alert-info', 'alert-danger');
-                                noticeBox.classList.add(variant === 'error' ? 'alert-danger' : 'alert-info');
-                                noticeBox.textContent = message;
-                            };
-
-                            const renderAnalysis = (payload, mode) => {
-                                const analysis = payload.analysis || {};
-                                const text = payload.text || '';
-
-                                if (reasonField && text) {
-                                    reasonField.value = text;
-                                }
-
-                                if (analysisPanel) {
-                                    analysisPanel.classList.remove('d-none');
-                                }
-
-                                if (analysisLanguage) {
-                                    analysisLanguage.textContent = analysis.language || '';
-                                }
-
-                                if (analysisCount) {
-                                    analysisCount.textContent = Array.isArray(analysis.grammarMessages) ? String(analysis.grammarMessages.length) : '0';
-                                }
-
-                                if (analysisLength) {
-                                    analysisLength.textContent = analysis.originalText ? String(analysis.originalText.length) : '0';
-                                }
-
-                                if (analysisCorrected) {
-                                    analysisCorrected.textContent = analysis.correctedText || (mode === 'analyze' ? 'Aucune correction proposee.' : '');
-                                }
-
-                                if (analysisGenerated) {
-                                    analysisGenerated.textContent = analysis.generatedText || (mode === 'generate' ? 'Aucune suggestion IA disponible.' : '');
-                                }
-
-                                if (analysisMessages && analysisMessagesList) {
-                                    analysisMessagesList.innerHTML = '';
-
-                                    if (Array.isArray(analysis.grammarMessages) && analysis.grammarMessages.length > 0) {
-                                        analysisMessages.classList.remove('d-none');
-                                        analysis.grammarMessages.forEach((message) => {
-                                            const item = document.createElement('li');
-                                            item.textContent = message;
-                                            analysisMessagesList.appendChild(item);
-                                        });
-                                    } else {
-                                        analysisMessages.classList.add('d-none');
-                                    }
-                                }
-
-                                setNotice(payload.message || (mode === 'analyze' ? 'LanguageTool a propose une version corrigee.' : 'Hugging Face a genere un paragraphe complet.'), 'info');
-                            };
-
-                            const postAction = async (url, mode) => {
-                                const formData = new FormData();
-                                formData.append('formation_id', form.querySelector('input[name="formation_id"]').value || '');
-                                formData.append('raison', reasonField ? reasonField.value : '');
-
-                                const response = await fetch(url, {
-                                    method: 'POST',
-                                    body: formData,
-                                    headers: {
-                                        'X-Requested-With': 'XMLHttpRequest',
-                                        'Accept': 'application/json',
-                                    },
-                                });
-
-                                const payload = await response.json().catch(() => null);
-                                if (!response.ok || !payload || !payload.ok) {
-                                    setNotice(payload && payload.message ? payload.message : 'Une erreur est survenue.', 'error');
-                                    return;
-                                }
-
-                                renderAnalysis(payload, mode);
-                            };
-
-                            form.querySelectorAll('button[data-action]').forEach((button) => {
-                                button.addEventListener('click', () => {
-                                    const mode = button.dataset.action;
-                                    const url = mode === 'analyze' ? analyzeUrl : generateUrl;
-
-                                    if (!reasonField || reasonField.value.trim() === '') {
-                                        setNotice('Veuillez saisir une raison avant de lancer l action.', 'error');
-                                        if (reasonField) {
-                                            reasonField.focus();
-                                        }
-                                        return;
-                                    }
-
-                                    setNotice(mode === 'analyze' ? 'Correction en cours...' : 'Generation en cours...', 'info');
-                                    postAction(url, mode).catch(() => {
-                                        setNotice('Impossible de contacter le service IA.', 'error');
-                                    });
-                                });
-                            });
-                        })();
-                    </script>
-                {% elseif selectedState and selectedState.statut == 'ACCEPTEE' %}
-                    {% set selectedEvaluation = evaluation_by_formation[selected_formation.id] ?? null %}
-                    <div class="alert alert-success mb-3">Cette inscription est acceptee. Vous pouvez evaluer la formation.</div>
-
-                    <form method="post" action="{{ path('app_inscription_employe') }}">
-                        <input type="hidden" name="action" value="evaluer">
-                        <input type="hidden" name="formation_id" value="{{ selected_formation.id }}">
-
-                        <div class="mb-3">
-                            <label class="form-label d-block">Note</label>
-                            <div class="d-flex flex-wrap gap-3">
-                                {% for i in 1..5 %}
-                                    <label class="form-check form-check-inline m-0">
-                                        <input class="form-check-input" type="radio" name="note" value="{{ i }}" {{ selectedEvaluation and selectedEvaluation.note == i ? 'checked' : (not selectedEvaluation and i == 5 ? 'checked' : '') }}>
-                                        <span class="form-check-label">{{ i }}/5</span>
-                                    </label>
-                                {% endfor %}
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="commentaire" class="form-label">Commentaire</label>
-                            <textarea id="commentaire" name="commentaire" class="form-control" rows="4" placeholder="Partagez votre avis sur cette formation...">{{ selectedEvaluation.commentaire|default('') }}</textarea>
-                        </div>
-
-                        <button class="btn btn-primary" type="submit">Enregistrer evaluation</button>
-                    </form>
-                {% elseif selectedState and selectedState.statut == 'REFUSEE' %}
-                    <div class="alert alert-danger mb-0">Cette inscription est refusee.</div>
-                {% else %}
-                    <form method="post" action="{{ path('app_inscription_employe') }}" id="reason-form" data-analyze-url="{{ path('app_inscription_employe_analyze') }}" data-generate-url="{{ path('app_inscription_employe_generate') }}">
-                        <input type="hidden" name="formation_id" value="{{ selected_formation.id }}">
-
-                        <div class="mb-3">
-                            <label for="raison" class="form-label">Raison</label>
-                            <textarea id="raison" name="raison" class="form-control" rows="5" placeholder="Expliquez pourquoi vous voulez suivre cette formation...">{{ typed_reason|default('') }}</textarea>
-                        </div>
-
-                        <div class="d-flex flex-wrap gap-2">
-                            <button class="btn btn-outline-primary" type="button" data-action="analyze">
-                                <i class="ti ti-scan me-1"></i>
-                                Corriger LanguageTool
-                            </button>
-                            <button class="btn btn-primary" type="button" data-action="generate">
-                                <i class="ti ti-sparkles me-1"></i>
-                                Generer avec IA
-                            </button>
-                            <button class="btn btn-success" type="submit" name="action" value="inscrire">
-                                Envoyer la demande
-                            </button>
-                        </div>
-
-                        <div id="assistant-notice" class="alert alert-info mt-3 mb-0 d-none"></div>
-                    </form>
-
-                    <div id="analysis-panel" class="d-none">
-                        <div class="row g-3 mt-4">
-                            <div class="col-lg-4">
-                                <div class="stat-card p-3 h-100">
-                                    <div class="mini-muted">Langue detectee</div>
-                                    <div id="analysis-language" class="h4 mb-0 text-capitalize"></div>
-                                </div>
-                            </div>
-                            <div class="col-lg-4">
-                                <div class="stat-card p-3 h-100">
-                                    <div class="mini-muted">Corrections LanguageTool</div>
-                                    <div id="analysis-count" class="h4 mb-0"></div>
-                                </div>
-                            </div>
-                            <div class="col-lg-4">
-                                <div class="stat-card p-3 h-100">
-                                    <div class="mini-muted">Texte fourni</div>
-                                    <div id="analysis-length" class="h4 mb-0"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row g-3 mt-3">
-                            <div class="col-lg-6">
-                                <div class="stat-card p-3 h-100">
-                                    <div class="mini-muted mb-2">Version corrigee</div>
-                                    <div id="analysis-corrected"></div>
-                                </div>
-                            </div>
-                            <div class="col-lg-6">
-                                <div class="stat-card p-3 h-100">
-                                    <div class="mini-muted mb-2">Version amelioree par l'IA</div>
-                                    <div id="analysis-generated"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="analysis-messages" class="stat-card p-3 mt-3 d-none">
-                            <div class="mini-muted mb-2">Détails des corrections</div>
-                            <ul class="mb-0 ps-3" id="analysis-messages-list"></ul>
-                        </div>
-                    </div>
-
-                    <script>
-                        (function () {
-                            const form = document.getElementById('reason-form');
-                            if (!form) {
-                                return;
-                            }
-
-                            const reasonField = document.getElementById('raison');
-                            const noticeBox = document.getElementById('assistant-notice');
-                            const analysisPanel = document.getElementById('analysis-panel');
-                            const analysisLanguage = document.getElementById('analysis-language');
-                            const analysisCount = document.getElementById('analysis-count');
-                            const analysisLength = document.getElementById('analysis-length');
-                            const analysisCorrected = document.getElementById('analysis-corrected');
-                            const analysisGenerated = document.getElementById('analysis-generated');
-                            const analysisMessages = document.getElementById('analysis-messages');
-                            const analysisMessagesList = document.getElementById('analysis-messages-list');
-                            const analyzeUrl = form.dataset.analyzeUrl;
-                            const generateUrl = form.dataset.generateUrl;
-
-                            const setNotice = (message, variant) => {
-                                if (!noticeBox) {
-                                    return;
-                                }
-
-                                noticeBox.classList.remove('d-none', 'alert-info', 'alert-danger');
-                                noticeBox.classList.add(variant === 'error' ? 'alert-danger' : 'alert-info');
-                                noticeBox.textContent = message;
-                            };
-
-                            const renderAnalysis = (payload, mode) => {
-                                const analysis = payload.analysis || {};
-                                const text = payload.text || '';
-
-                                if (reasonField && text) {
-                                    reasonField.value = text;
-                                }
-
-                                if (analysisPanel) {
-                                    analysisPanel.classList.remove('d-none');
-                                }
-
-                                if (analysisLanguage) {
-                                    analysisLanguage.textContent = analysis.language || '';
-                                }
-
-                                if (analysisCount) {
-                                    analysisCount.textContent = Array.isArray(analysis.grammarMessages) ? String(analysis.grammarMessages.length) : '0';
-                                }
-
-                                if (analysisLength) {
-                                    analysisLength.textContent = analysis.originalText ? String(analysis.originalText.length) : '0';
-                                }
-
-                                if (analysisCorrected) {
-                                    analysisCorrected.textContent = analysis.correctedText || (mode === 'analyze' ? 'Aucune correction proposee.' : '');
-                                }
-
-                                if (analysisGenerated) {
-                                    analysisGenerated.textContent = analysis.generatedText || (mode === 'generate' ? 'Aucune suggestion IA disponible.' : '');
-                                }
-
-                                if (analysisMessages && analysisMessagesList) {
-                                    analysisMessagesList.innerHTML = '';
-
-                                    if (Array.isArray(analysis.grammarMessages) && analysis.grammarMessages.length > 0) {
-                                        analysisMessages.classList.remove('d-none');
-                                        analysis.grammarMessages.forEach((message) => {
-                                            const item = document.createElement('li');
-                                            item.textContent = message;
-                                            analysisMessagesList.appendChild(item);
-                                        });
-                                    } else {
-                                        analysisMessages.classList.add('d-none');
-                                    }
-                                }
-
-                                setNotice(payload.message || (mode === 'analyze' ? 'LanguageTool a propose une version corrigee.' : 'Hugging Face a genere un paragraphe complet.'), 'info');
-                            };
-
-                            const postAction = async (url, mode) => {
-                                const formData = new FormData();
-                                formData.append('formation_id', form.querySelector('input[name="formation_id"]').value || '');
-                                formData.append('raison', reasonField ? reasonField.value : '');
-
-                                const response = await fetch(url, {
-                                    method: 'POST',
-                                    body: formData,
-                                    headers: {
-                                        'X-Requested-With': 'XMLHttpRequest',
-                                        'Accept': 'application/json',
-                                    },
-                                });
-
-                                const payload = await response.json().catch(() => null);
-                                if (!response.ok || !payload || !payload.ok) {
-                                    setNotice(payload && payload.message ? payload.message : 'Une erreur est survenue.', 'error');
-                                    return;
-                                }
-
-                                renderAnalysis(payload, mode);
-                            };
-
-                            form.querySelectorAll('button[data-action]').forEach((button) => {
-                                button.addEventListener('click', () => {
-                                    const mode = button.dataset.action;
-                                    const url = mode === 'analyze' ? analyzeUrl : generateUrl;
-
-                                    if (!reasonField || reasonField.value.trim() === '') {
-                                        setNotice('Veuillez saisir une raison avant de lancer l action.', 'error');
-                                        if (reasonField) {
-                                            reasonField.focus();
-                                        }
-                                        return;
-                                    }
-
-                                    setNotice(mode === 'analyze' ? 'Correction en cours...' : 'Generation en cours...', 'info');
-                                    postAction(url, mode).catch(() => {
-                                        setNotice('Impossible de contacter le service IA.', 'error');
-                                    });
-                                });
-                            });
-                        })();
-                    </script>
-                {% endif %}
-            </div>
-        </div>
-    {% endif %}
-    </div>
-    </div>
-     </div>
+        });
+    }
+})();
+</script>
 {% endblock %}

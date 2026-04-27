@@ -57,7 +57,6 @@ class Participation
     public function setPost(?Post $post): self
     {
         $this->post = $post;
-
         return $this;
     }
 
@@ -74,7 +73,6 @@ class Participation
     public function setStatut(string $statut): self
     {
         $this->statut = $statut;
-
         return $this;
     }
 

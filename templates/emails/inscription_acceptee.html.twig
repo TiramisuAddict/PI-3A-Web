@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Inscription acceptee</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #1f2937;">
+    <h2 style="margin-bottom: 12px;">Bonjour {{ employee_name }},</h2>
+
+    <p>Votre demande d'inscription a la formation <strong>{{ formation.titre }}</strong> a ete <strong>acceptee</strong>.</p>
+
+    <p>
+        <strong>Organisme :</strong> {{ formation.organisme }}<br>
+        <strong>Periode :</strong>
+        {{ formation.dateDebut ? formation.dateDebut|date('d/m/Y') : '-' }}
+        -
+        {{ formation.dateFin ? formation.dateFin|date('d/m/Y') : '-' }}<br>
+        <strong>Lieu :</strong> {{ formation.lieu }}
+    </p>
+
+    <p>Vous pouvez consulter les details depuis votre espace employe.</p>
+
+    <p style="margin-top: 20px;">Cordialement,<br>Equipe RH</p>
+</body>
+</html>

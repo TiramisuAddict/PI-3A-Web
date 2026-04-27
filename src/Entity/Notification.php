@@ -57,7 +57,6 @@ class Notification
     public function setTitre(string $titre): self
     {
         $this->titre = $titre;
-
         return $this;
     }
 
@@ -74,7 +73,6 @@ class Notification
     public function setMessage(string $message): self
     {
         $this->message = $message;
-
         return $this;
     }
 
