@@ -1,0 +1,208 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Mon profil{% endblock %}
+
+{% block body %}
+  {{ include('components/navbar.html.twig')}}
+  <div class="d-flex overflow-hidden" style="height:calc(100vh - 56px);">
+    {{ include('components/sidebar.html.twig',{'sidebar_role': role}) }}
+
+  <div class="flex-fill overflow-y-auto p-4" style="min-width:0;">
+    
+
+    <div class="flex-fill overflow-y-auto p-4" style="min-width:0;">
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+          <h1 class="mb-1">Mon profil</h1>
+          <div class="text-muted">Consultez vos informations personnelles et professionnelles</div>
+        </div>
+      </div>
+
+      {% for message in app.flashes('success') %}
+        <div class="alert alert-success alert-dismissible mb-3" role="alert">
+          <div class="alert-description">{{ message }}</div>
+          <a class="btn-close" data-bs-dismiss="alert"></a>
+        </div>
+      {% endfor %}
+      {% for message in app.flashes('error') %}
+        <div class="alert alert-danger alert-dismissible mb-3" role="alert">
+          <div class="alert-description">{{ message }}</div>
+          <a class="btn-close" data-bs-dismiss="alert"></a>
+        </div>
+      {% endfor %}
+
+      <div class="row g-4">
+        <div class="col-lg-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-body text-center p-4">
+              <div class="position-relative d-inline-block mb-3 avatar-container" style="cursor: pointer;">
+                {% if profile_type == 'employee' and employe.getImage_profil() %}
+                  <img src="{{ employe.getImage_profil() }}" alt="Avatar" class="avatar avatar-xl text-white fw-bold" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover;">
+                {% else %}
+                  <div class="avatar avatar-xl text-white fw-bold" style="background:#4254D6; font-size:1.3rem;">
+                    {% if profile_type == 'employee' %}
+                      {{ employe.getPrenom()|first }}{{ employe.getNom()|first }}
+                    {% else %}
+                      AD
+                    {% endif %}
+                  </div>
+                {% endif %}
+                <div class="avatar-overlay d-flex align-items-center justify-content-center" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); border-radius: 50%; opacity: 0; transition: opacity 0.3s ease; display: none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                </div>
+                <input type="file" id="avatarInput" accept="image/*" style="display: none;" />
+              </div>
+              <h3 class="mb-1">
+                {% if profile_type == 'employee' %}
+                  {{ employe.getPrenom() }} {{ employe.getNom() }}
+                {% else %}
+                  Administrateur système
+                {% endif %}
+              </h3>
+              <div class="text-muted mb-3">{{ role }}</div>
+              <div class="badge bg-blue-lt text-blue">{{ email }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-8">
+          <div class="card shadow-sm mb-4">
+            <div class="card-header">
+              <h3 class="card-title mb-0">Informations du compte</h3>
+            </div>
+            <div class="card-body">
+              {% if profile_type == 'employee' %}
+                {{ form_start(profile_form, {'attr': {'class': 'row g-3', 'novalidate': 'novalidate'}}) }}
+                  {{ include('components/controleSaisieAlert.html.twig', {'form': profile_form}) }}
+                  <div class="col-md-6">
+                    <div class="text-muted small mb-1">Nom</div>
+                    {{ form_widget(profile_form.nom, {'attr': {'class': 'form-control'}}) }}
+                  </div>
+                  <div class="col-md-6">
+                    <div class="text-muted small mb-1">Prénom</div>
+                    {{ form_widget(profile_form.prenom, {'attr': {'class': 'form-control'}}) }}
+                  </div>
+                  <div class="col-md-6">
+                    <div class="text-muted small mb-1">Email</div>
+                    {{ form_widget(profile_form.e_mail, {'attr': {'class': 'form-control'}}) }}
+                  </div>
+                  <div class="col-md-6">
+                    <div class="text-muted small mb-1">Téléphone</div>
+                    {{ form_widget(profile_form.telephone, {'attr': {'class': 'form-control'}}) }}
+                  </div>
+                  <div class="col-md-6"><div class="text-muted small mb-1">Poste</div><div class="form-control bg-light">{{ employe.getPoste() }}</div></div>
+                  <div class="col-md-6"><div class="text-muted small mb-1">Rôle</div><div class="form-control bg-light">{{ employe.getRole() }}</div></div>
+                  <div class="col-md-6"><div class="text-muted small mb-1">Date d'embauche</div><div class="form-control bg-light">{{ employe.getDateEmbauche() ? employe.getDateEmbauche()|date('d/m/Y') : 'Non renseignée' }}</div></div>
+                  <div class="col-md-6">
+                    <div class="text-muted small mb-1">CV (PDF)</div>
+                    {{ form_widget(profile_form.cv_data, {'attr': {'class': 'form-control', 'accept': '.pdf,application/pdf'}}) }}
+                    <div class="form-text">
+                      {% if employe.getCv_nom() %}
+                        CV actuel: {{ employe.getCv_nom() }}
+                      {% else %}
+                        Aucun CV importe.
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <button type="submit" class="btn text-white" style="background:#4254D6;">Enregistrer les modifications</button>
+                  </div>
+                {{ form_end(profile_form) }}
+              {% else %}
+                <div class="row g-3">
+                  <div class="col-md-6"><div class="text-muted small mb-1">Email</div><div class="form-control bg-light">{{ email }}</div></div>
+                  <div class="col-md-6"><div class="text-muted small mb-1">Type de compte</div><div class="form-control bg-light">Administrateur système</div></div>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          {% if profile_type == 'employee' %}
+            <div class="card shadow-sm mb-4">
+              <div class="card-header">
+                <h3 class="card-title mb-0">Compétences</h3>
+              </div>
+              <div class="card-body">
+                <form method="post" action="{{ path('profil_competence_add') }}" class="d-flex gap-2 mb-3" novalidate>
+                  <input type="hidden" name="_token" value="{{ csrf_token('profil_competence_add') }}">
+                  <input type="text" name="skill" class="form-control" placeholder="Ajouter une compétence (ex: Symfony)">
+                  <button type="submit" class="btn btn-primary">Ajouter</button>
+                </form>
+
+                <div class="d-flex flex-wrap gap-2">
+                  {% if skills|default([])|length > 0 %}
+                    {% for skill in skills %}
+                      <form method="post" action="{{ path('profil_competence_remove') }}" class="d-inline-flex" novalidate>
+                        <input type="hidden" name="_token" value="{{ csrf_token('profil_competence_remove') }}">
+                        <input type="hidden" name="skill" value="{{ skill }}">
+                        <button type="submit" class="badge bg-blue-lt text-blue border-0 px-3 py-2" title="Supprimer {{ skill }}">
+                          {{ skill }}
+                          <span class="ms-1">x</span>
+                        </button>
+                      </form>
+                    {% endfor %}
+                  {% else %}
+                    <div class="text-muted">Aucune compétence enregistrée.</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endif %}
+
+          
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <style>
+    .avatar-container:hover .avatar-overlay {
+      opacity: 1 !important;
+      display: flex !important;
+    }
+  </style>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const avatarContainer = document.querySelector('.avatar-container');
+      const avatarInput = document.getElementById('avatarInput');
+      const avatarOverlay = document.querySelector('.avatar-overlay');
+
+      if (avatarContainer && avatarInput) {
+        avatarContainer.addEventListener('click', function() {
+          avatarInput.click();
+        });
+
+        avatarInput.addEventListener('change', function(e) {
+          const file = e.target.files[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append('image', file);
+
+            fetch('{{ path("profil_upload_image") }}', {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+              }
+            })
+            .then(response => response.json())
+            .then(data => {
+              if (data.success) {
+                // Rechargs la page pour voir la nouvelle image
+                location.reload();
+              } else {
+                alert('Erreur: ' + (data.error || 'Impossible d\'uploader l\'image'));
+              }
+            })
+            .catch(error => {
+              console.error('Erreur:', error);
+              alert('Une erreur est survenue lors de l\'upload');
+            });
+          }
+        });
+      }
+    });
+  </script>
+{% endblock %}

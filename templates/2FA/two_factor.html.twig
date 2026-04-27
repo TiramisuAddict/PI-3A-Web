@@ -1,0 +1,101 @@
+<div class="modal fade show" id="twoFactorModal" tabindex="-1" style="display:block;">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header mt-2">
+        <div>
+          <h2 class="h2 modal-title">Vérification à deux facteurs</h2>
+          <small class="text-muted">Nous vous avons envoyé un code par SMS{% if destination is not empty %} à {{ destination }}{% endif %}.</small>
+        </div>
+        <a href="{{ otp_close_url|default(path('login', {'cancel_2fa': 1})) }}" class="btn-close" aria-label="Fermer"></a>
+      </div>
+
+      <div class="modal-body p-4">
+        {% for message in app.flashes('error') %}
+          <div class="alert alert-danger" role="alert">{{ message }}</div>
+        {% endfor %}
+
+        {% for message in app.flashes('success') %}
+          <div class="alert alert-success" role="alert">{{ message }}</div>
+        {% endfor %}
+
+        {{ form_start(otp_form, {'attr': {'novalidate': 'novalidate'}}) }}
+          <div class="mb-3">
+            {{ form_widget(otp_form.code, {'attr': {'class': 'form-control', 'placeholder': 'Entrez le code OTP'}}) }}
+            {{ form_errors(otp_form.code) }}
+          </div>
+
+          <div class="bg-white px-0 mt-3" style="border-top:none;">
+            {{ form_widget(otp_form.verify, {'attr': {'class': 'btn w-100  fw-bold text-white', 'style': 'background:#4A5DEF; border:none;'}}) }}
+          </div>
+        {{ form_end(otp_form) }}
+
+        <div class="text-muted small mt-2">
+          Si vous n'avez rien reçu, reconnectez-vous pour demander un nouveau code.
+        </div>
+
+        <form method="post" action="{{ path(otp_resend_route|default('two_factor_resend')) }}" class="mt-3" novalidate>
+          <input type="hidden" name="_token" value="{{ csrf_token(otp_resend_csrf_id|default('two_factor_resend')) }}">
+          {% set showCountdown = not (otp_simple_resend|default(false)) %}
+          {% set resendRemaining = otp_resend_remaining_seconds|default(two_factor_resend_remaining_seconds|default(30)) %}
+
+          <div class="d-flex align-items-center justify-content-between w-100">
+            <small id="resendOtpCountdown" class="text-muted" {% if showCountdown %}data-remaining="{{ resendRemaining }}"{% endif %}>
+              {% if showCountdown and resendRemaining > 0 %}
+                Renvoyer dans {{ resendRemaining }}s
+              {% endif %}
+            </small>
+            <button
+              type="submit"
+              id="resendOtpButton"
+              class="btn btn-sm {{ (showCountdown and resendRemaining > 0) ? 'btn-secondary' : 'btn-primary' }}"
+              style="{{ (showCountdown and resendRemaining > 0) ? 'border:none;' : 'background:#4A5DEF; border:none;' }}"
+              {{ (showCountdown and resendRemaining > 0) ? 'disabled' : '' }}
+            >
+              Renvoyer le code
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show"></div>
+
+<script>
+(function () {
+  var countdownEl = document.getElementById('resendOtpCountdown');
+  var buttonEl = document.getElementById('resendOtpButton');
+
+  if (!countdownEl || !buttonEl || !countdownEl.hasAttribute('data-remaining')) {
+    return;
+  }
+
+  var remaining = parseInt(countdownEl.getAttribute('data-remaining') || '0', 10);
+  if (isNaN(remaining)) {
+    remaining = 0;
+  }
+
+  function setEnabledState() {
+    buttonEl.disabled = false;
+    buttonEl.classList.remove('btn-secondary');
+    buttonEl.classList.add('btn-primary');
+    buttonEl.style.background = '#4A5DEF';
+    buttonEl.style.border = 'none';
+    countdownEl.textContent = '';
+  }
+
+  function tick() {
+    if (remaining <= 0) {
+      setEnabledState();
+      return;
+    }
+
+    buttonEl.disabled = true;
+    countdownEl.textContent = 'Renvoyer dans ' + remaining + 's';
+    remaining -= 1;
+    window.setTimeout(tick, 1000);
+  }
+
+  tick();
+})();
+</script>

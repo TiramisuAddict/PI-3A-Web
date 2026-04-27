@@ -638,7 +638,7 @@
 <div class="page">
     <div class="page-wrapper">
         <div class="momentum-home">
-            {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'home' } %}
+            {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'home', logged_user: app.session.get('visiteur_logged_in') == true } %}
 
             <main class="content">
                 <!-- HERO SECTION -->

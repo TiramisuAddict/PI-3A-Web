@@ -1,0 +1,166 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Accueil administration{% endblock %}
+
+{% block body %}
+<div class="d-flex overflow-hidden" style="height:100vh;">
+
+  {# ── Sidebar ── #}
+  <aside class="d-flex flex-column border-end bg-white px-2 py-3" style="width:220px; min-width:220px; overflow-y:auto;">
+
+    <div class="px-3 mb-4 mt-2">
+      <img src="/images/WKlogo.svg" height="24" alt="Logo">
+    </div>
+
+    <ul class="list-unstyled d-flex flex-column gap-1 mb-0 flex-fill">
+      <li>
+        <a href="{{ path('admin_home') }}" class="d-flex align-items-center gap-2 px-3 py-2 rounded text-decoration-none fw-medium bg-blue-lt text-blue">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="5 12 3 12 12 3 21 12 19 12"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+          <span style="font-size:0.875rem;">Accueil</span>
+        </a>
+      </li>
+
+      <li>
+        <a href="{{ path('admin_dashboard') }}" class="d-flex align-items-center gap-2 px-3 py-2 rounded text-secondary text-decoration-none">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1-2-2v-14a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/></svg>
+          <span style="font-size:0.875rem;">Demandes</span>
+        </a>
+      </li>
+    </ul>
+
+    <div class="px-2 pb-2 mt-auto">
+      <a href="#" class="d-flex align-items-center gap-2 px-3 py-2 rounded text-secondary text-decoration-none"
+        data-bs-toggle="modal" data-bs-target="#logoutModal">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 8v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2"/><path d="M7 12h14l-3-3m0 6l3-3"/></svg>
+        <span style="font-size:0.875rem;">Se déconnecter</span>
+      </a>
+    </div>
+
+  </aside>
+
+  <div class="modal" id="logoutModal" tabindex="-1">
+    <div class="modal-dialog modal-sm" role="document">
+      <div class="modal-content">
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-status bg-danger"></div>
+        <div class="modal-body text-center py-4">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon mb-2 text-danger icon-lg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v2m0 4v.01"/><path d="M5 19h14a2 2 0 0 0 1.84-2.75l-7.1-12.25a2 2 0 0 0-3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75"/></svg>
+          <h3>Déconnexion</h3>
+          <div class="text-secondary">Êtes-vous sûr de vouloir vous déconnecter ?</div>
+        </div>
+        <div class="modal-footer">
+          <div class="w-100">
+            <div class="row">
+              <div class="col"><button class="btn w-100" data-bs-dismiss="modal">Annuler</button></div>
+              <div class="col"><a href="{{ path('logout') }}" class="btn btn-danger w-100">Se déconnecter</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex-fill overflow-y-auto p-4 d-flex flex-column" style=" min-width:0;">
+    <div class="flex-grow-1 d-flex flex-column">
+
+      <div class="page-header mb-4">
+        <div class="row align-items-center">
+          <div class="col">
+            <h2 class="page-title">Tableau de bord</h2>
+            <div class="text-muted mt-1">Vue globale des demandes entreprise</div>
+          </div>
+          <div class="col-auto">
+            <form method="get" class="d-flex align-items-center gap-2">
+              <label for="home-status-filter" class="text-muted mb-0">Statut:</label>
+              <select id="home-status-filter" name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="" {% if current_status is empty %}selected{% endif %}>Tous</option>
+                <option value="en attente" {% if current_status == 'en attente' %}selected{% endif %}>En attente</option>
+                <option value="acceptée" {% if current_status == 'acceptée' %}selected{% endif %}>Acceptée</option>
+                <option value="refusée" {% if current_status == 'refusée' %}selected{% endif %}>Refusée</option>
+              </select>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4 mb-4">
+        <div class="col-sm-6 col-xl-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted">Total demandes</div>
+              <div class="h2 mb-1">{{ total_requests }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted text-green">Acceptées</div>
+              <div class="h2 mb-1">{{ accepted_requests }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted text-yellow">En attente</div>
+              <div class="h2 mb-1">{{ pending_requests }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted text-red">Refusées</div>
+              <div class="h2 mb-1">{{ refused_requests }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-12 col-xl-7">
+          <div class="card h-100">
+            <div class="card-header">
+              <h3 class="card-title mb-0">Demandes par date</h3>
+            </div>
+            <div class="card-body">
+              <div id="line_chart_div" style="width:100%; height:340px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-5">
+          <div class="card h-100">
+            <div class="card-header">
+              <h3 class="card-title mb-0">Demandes par statut</h3>
+            </div>
+            <div class="card-body">
+              <div id="bar_chart_div" style="width:100%; height:340px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title mb-0">Top 5 pays demandeurs</h3>
+            </div>
+            <div class="card-body">
+              <div id="pie_chart_div" style="width:100%; height:360px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<script type="text/javascript">
+  {{ gc_draw(line_chart, 'line_chart_div')|raw }}
+  {{ gc_draw(bar_chart, 'bar_chart_div')|raw }}
+  {{ gc_draw(pie_chart, 'pie_chart_div')|raw }}
+</script>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% if pageCount > 1 %}
+  <ul class="pagination mb-0">
+    <li class="page-item {{ previous is not defined ? 'disabled' : '' }}">
+      {% if previous is defined %}
+        <a class="page-link" rel="prev" href="{{ path(route, knp_pagination_query(query, previous, options)) }}" aria-label="Précédent">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1"><path d="M15 6l-6 6l6 6" /></svg>
+        </a>
+      {% else %}
+        <span class="page-link" tabindex="-1" aria-disabled="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1"><path d="M15 6l-6 6l6 6" /></svg>
+        </span>
+      {% endif %}
+    </li>
+
+    {% for page in pagesInRange %}
+      <li class="page-item {{ page == current ? 'active' : '' }}">
+        {% if page == current %}
+          <span class="page-link">{{ page }}</span>
+        {% else %}
+          <a class="page-link" href="{{ path(route, knp_pagination_query(query, page, options)) }}">{{ page }}</a>
+        {% endif %}
+      </li>
+    {% endfor %}
+
+    <li class="page-item {{ next is not defined ? 'disabled' : '' }}">
+      {% if next is defined %}
+        <a class="page-link" rel="next" href="{{ path(route, knp_pagination_query(query, next, options)) }}" aria-label="Suivant">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1"><path d="M9 6l6 6l-6 6" /></svg>
+        </a>
+      {% else %}
+        <span class="page-link" tabindex="-1" aria-disabled="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1"><path d="M9 6l6 6l-6 6" /></svg>
+        </span>
+      {% endif %}
+    </li>
+  </ul>
+{% endif %}

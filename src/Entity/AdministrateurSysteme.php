@@ -56,27 +56,17 @@ class AdministrateurSysteme
         return $this;
     }
 
-    public function getEMail(): ?string
+    #[ORM\Column(type: 'string', nullable: true)]
+    private ?string $telephone = null;
+
+    public function getTelephone(): ?string
     {
-        return $this->e_mail;
+        return $this->telephone;
     }
 
-    public function setEMail(string $e_mail): static
+    public function setTelephone(?string $telephone): self
     {
-        $this->e_mail = $e_mail;
-
-        return $this;
-    }
-
-    public function getMotDePasse(): ?string
-    {
-        return $this->mot_de_passe;
-    }
-
-    public function setMotDePasse(string $mot_de_passe): static
-    {
-        $this->mot_de_passe = $mot_de_passe;
-
+        $this->telephone = $telephone;
         return $this;
     }
 
