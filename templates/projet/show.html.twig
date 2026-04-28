@@ -49,6 +49,11 @@
                         <i class="ti ti-layout-kanban me-1"></i>Voir les taches
                     </a>
                     {% if canManageProjects|default(false) %}
+                        <button type="button" class="btn btn-outline-warning" id="btn-risk-report"
+                                data-bs-toggle="modal" data-bs-target="#modal-risk-report"
+                                data-url="{{ path('app_projet_risk_report', {'id_projet': projet.idProjet}) }}">
+                            <i class="ti ti-shield-exclamation me-1"></i>Rapport de risques
+                        </button>
                         <a href="{{ path('app_projet_edit', {'id_projet': projet.idProjet}) }}" class="btn btn-primary">
                             <i class="ti ti-edit me-1"></i>Modifier
                         </a>
@@ -165,4 +170,277 @@
         </div>
     </div>
 </div>
+
+{# ── Modal rapport de risques IA ─────────────────────────────────────── #}
+<div class="modal modal-blur fade" id="modal-risk-report" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="ti ti-shield-exclamation me-2 text-warning"></i>Rapport de risques — {{ projet.nom }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+
+                {# Loading state #}
+                <div id="risk-loading" class="text-center py-5">
+                    <div class="spinner-border text-warning mb-3" role="status"></div>
+                    <p class="text-muted">Analyse IA en cours…</p>
+                </div>
+
+                {# Error state #}
+                <div id="risk-error" class="alert alert-danger d-none" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i><span id="risk-error-msg"></span>
+                </div>
+
+                {# Report content — visual charts #}
+                <div id="risk-content" class="d-none">
+
+                    {# ── Row 1 : KPI stat cards ── #}
+                    <div class="row g-3 mb-4" id="risk-kpi-row">
+                        <div class="col-6 col-md-3">
+                            <div class="card card-sm border-0 bg-blue-lt">
+                                <div class="card-body text-center">
+                                    <div class="text-blue fw-bold fs-2 mb-1" id="kpi-total">—</div>
+                                    <div class="text-muted small">Total tâches</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card card-sm border-0 bg-green-lt">
+                                <div class="card-body text-center">
+                                    <div class="text-green fw-bold fs-2 mb-1" id="kpi-completion">—</div>
+                                    <div class="text-muted small">Avancement</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card card-sm border-0 bg-red-lt">
+                                <div class="card-body text-center">
+                                    <div class="text-red fw-bold fs-2 mb-1" id="kpi-retard">—</div>
+                                    <div class="text-muted small">En retard</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card card-sm border-0 bg-yellow-lt">
+                                <div class="card-body text-center">
+                                    <div class="fw-bold fs-2 mb-1" id="kpi-days" style="color:#f59f00;">—</div>
+                                    <div class="text-muted small" id="kpi-days-label">Jours restants</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {# ── Row 2 : Status doughnut + Team workload bar ── #}
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-5">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0"><i class="ti ti-chart-donut me-2 text-blue"></i>Répartition des statuts</h6>
+                                </div>
+                                <div class="card-body d-flex align-items-center justify-content-center" style="min-height:240px;">
+                                    <canvas id="chart-status" style="max-height:220px;"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-7">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0"><i class="ti ti-users me-2 text-blue"></i>Charge de l'équipe</h6>
+                                </div>
+                                <div class="card-body" style="min-height:240px;">
+                                    <canvas id="chart-team" style="width:100%;"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {# ── Row 3 : AI conclusion ── #}
+                    <div class="alert alert-warning d-flex gap-3 align-items-start" role="alert">
+                        <i class="ti ti-robot fs-3 flex-shrink-0 mt-1 text-warning"></i>
+                        <div>
+                            <div class="fw-semibold mb-1 text-warning-emphasis">Analyse IA</div>
+                            <div id="risk-conclusion" class="text-body lh-lg small"></div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-outline-warning d-none" id="btn-risk-refresh">
+                    <i class="ti ti-refresh me-1"></i>Régénérer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+window.addEventListener('load', function () {
+    const btn        = document.getElementById('btn-risk-report');
+    const modal      = document.getElementById('modal-risk-report');
+    const loading    = document.getElementById('risk-loading');
+    const errBlock   = document.getElementById('risk-error');
+    const errMsg     = document.getElementById('risk-error-msg');
+    const content    = document.getElementById('risk-content');
+    const refreshBtn = document.getElementById('btn-risk-refresh');
+
+    if (!btn || !modal) { return; }
+
+    let chartStatus = null;
+    let chartTeam   = null;
+
+    /* Lazy-load Chart.js UMD (exposes window.Chart) only when needed */
+    function loadChartJs(cb) {
+        if (window.Chart) { cb(); return; }
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js';
+        s.onload = cb;
+        document.head.appendChild(s);
+    }
+
+    /* Destroy existing charts before re-rendering */
+    function destroyCharts() {
+        if (chartStatus) { chartStatus.destroy(); chartStatus = null; }
+        if (chartTeam)   { chartTeam.destroy();   chartTeam   = null; }
+    }
+
+    function renderCharts(data) {
+        const s = data.stats;
+        const team = data.team || [];
+
+        /* KPI cards */
+        document.getElementById('kpi-total').textContent      = s.total;
+        document.getElementById('kpi-completion').textContent = s.completionPct + '%';
+        document.getElementById('kpi-retard').textContent     = s.retard;
+
+        const daysEl    = document.getElementById('kpi-days');
+        const daysLabel = document.getElementById('kpi-days-label');
+        if (s.daysLeft === null || s.daysLeft === undefined) {
+            daysEl.textContent    = '—';
+            daysLabel.textContent = 'Jours restants';
+        } else if (s.daysLeft >= 0) {
+            daysEl.textContent    = s.daysLeft;
+            daysLabel.textContent = 'Jours restants';
+            daysEl.style.color    = s.daysLeft <= 7 ? '#d63939' : '#f59f00';
+        } else {
+            daysEl.textContent    = Math.abs(s.daysLeft) + 'j';
+            daysLabel.textContent = 'Jours de retard';
+            daysEl.style.color    = '#d63939';
+        }
+
+        destroyCharts();
+
+        /* Doughnut — status distribution */
+        const statusCtx = document.getElementById('chart-status').getContext('2d');
+        chartStatus = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['À faire', 'En cours', 'Bloquée', 'Terminée'],
+                datasets: [{
+                    data: [s.aFaire, s.enCours, s.bloquee, s.terminees],
+                    backgroundColor: ['#adb5bd', '#206bc4', '#d63939', '#2fb344'],
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 14, padding: 12 } }
+                }
+            }
+        });
+
+        /* Horizontal bar — team workload */
+        if (team.length > 0) {
+            const teamCtx = document.getElementById('chart-team').getContext('2d');
+            const statusColors = { 'disponible': '#2fb344', 'occupe': '#f59f00', 'surcharge': '#d63939' };
+            chartTeam = new Chart(teamCtx, {
+                type: 'bar',
+                data: {
+                    labels: team.map(m => m.prenom + ' ' + m.nom),
+                    datasets: [{
+                        label: 'Score de charge',
+                        data: team.map(m => m.score),
+                        backgroundColor: team.map(m => statusColors[m.statusKey] || '#adb5bd'),
+                        borderRadius: 4,
+                        barThickness: 22,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(ctx) {
+                                    const m = team[ctx.dataIndex];
+                                    return m.statusLabel + ' — ' + m.activeTasks + ' tâche(s) active(s)';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+            /* Adjust canvas height based on member count */
+            document.getElementById('chart-team').style.height = Math.max(180, team.length * 48) + 'px';
+        } else {
+            document.getElementById('chart-team').closest('.card-body').innerHTML =
+                '<p class="text-muted text-center my-4">Aucun membre dans l\'équipe.</p>';
+        }
+
+        /* AI conclusion */
+        document.getElementById('risk-conclusion').textContent = data.conclusion || '';
+
+        content.classList.remove('d-none');
+        refreshBtn.classList.remove('d-none');
+    }
+
+    async function fetchReport() {
+        loading.classList.remove('d-none');
+        errBlock.classList.add('d-none');
+        content.classList.add('d-none');
+        refreshBtn.classList.add('d-none');
+
+        try {
+            const res  = await fetch(btn.dataset.url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await res.json();
+
+            if (!res.ok || data.ok !== true) {
+                throw new Error(data.message || 'Erreur lors de la génération du rapport.');
+            }
+
+            loadChartJs(() => renderCharts(data));
+        } catch (err) {
+            errMsg.textContent = err.message;
+            errBlock.classList.remove('d-none');
+        } finally {
+            loading.classList.add('d-none');
+        }
+    }
+
+    /* Fetch only on first open; refresh button handles re-generation */
+    modal.addEventListener('show.bs.modal', function () {
+        if (content.classList.contains('d-none') && errBlock.classList.contains('d-none')) {
+            fetchReport();
+        }
+    });
+
+    refreshBtn.addEventListener('click', fetchReport);
+});
+</script>
 {% endblock %}

@@ -30,3 +30,21 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    App\Service\TaskDescriptionService:
+        arguments:
+            $apiKey: '%env(GROQ_API_KEY)%'
+            $apiUrl: '%env(GROQ_API_URL)%'
+            $model: '%env(GROQ_MODEL)%'
+
+    App\Service\ProjectRiskReportService:
+        arguments:
+            $apiKey: '%env(GROQ_API_KEY)%'
+            $apiUrl: '%env(GROQ_API_URL)%'
+            $model: '%env(GROQ_MODEL)%'
+
+    App\Services\CvExtractionService:
+        arguments:
+            $groqApiUrl: '%env(GROQ_API_URL)%'
+            $groqApiKey: '%env(GROQ_API_KEY)%'
+            $groqModel: '%env(GROQ_MODEL)%'
