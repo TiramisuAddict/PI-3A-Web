@@ -368,7 +368,7 @@
         }
 
         /* Bouton + ajouter tâche sur les cellules */
-        .fc-daygrid-day:not(.fc-day-other) .fc-daygrid-day-top {
+        .fc-daygrid-day .fc-daygrid-day-top {
             flex-direction: row;
             align-items: center;
             justify-content: space-between;
@@ -391,7 +391,7 @@
             text-decoration: none;
             flex-shrink: 0;
         }
-        .fc-daygrid-day:not(.fc-day-other):hover .fc-cell-add-btn {
+        .fc-daygrid-day:hover .fc-cell-add-btn {
             display: inline-flex;
         }
         .fc-cell-add-btn:hover {
@@ -1117,8 +1117,6 @@
                     },
                     dayCellDidMount: function(info) {
                         if (!canManageTasksCal || !newTaskBaseUrl) return;
-                        const isOther = info.el.classList.contains('fc-day-other');
-                        if (isOther) return;
                         const today = new Date(); today.setHours(0,0,0,0);
                         const cellDate = info.date;
                         if (cellDate < today) return;

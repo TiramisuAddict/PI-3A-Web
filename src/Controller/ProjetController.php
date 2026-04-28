@@ -19,6 +19,7 @@ use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Knp\Component\Pager\PaginatorInterface;
 use Symfony\UX\Chartjs\Builder\ChartBuilderInterface;
 use Symfony\UX\Chartjs\Model\Chart;
+use App\Service\ProjectRiskReportService;
 use App\Service\TaskDescriptionService;
 use App\Service\TaskNotificationService;
 use App\Repository\CompetenceEmployeRepository;
@@ -939,6 +940,153 @@ final class ProjetController extends AbstractController
         }
 
         return $this->json(['ok' => true, 'description' => $description]);
+    }
+
+    #[Route('/{id_projet}/risk-report', name: 'app_projet_risk_report', methods: ['GET'])]
+    public function riskReport(Projet $projet, SessionInterface $session, EmployeRepository $employeRepository, ProjectRiskReportService $riskReportService): JsonResponse
+    {
+        $rbac = $this->buildRbacContext($session, $employeRepository);
+
+        if (!$rbac['canManageProjects'] && !$rbac['canManageTasks']) {
+            return $this->json(['ok' => false, 'message' => 'Acces refuse.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $today          = new \DateTime('today');
+        $totalTasks     = 0;
+        $termineesCount = 0;
+        $enCoursCount   = 0;
+        $aFaireCount    = 0;
+        $bloqueeCount   = 0;
+        $retardCount    = 0;
+
+        foreach ($projet->getTaches() as $tache) {
+            ++$totalTasks;
+            $statut = $tache->getStatutTache();
+
+            match ($statut) {
+                Tache::STATUT_TERMINEE => ++$termineesCount,
+                Tache::STATUT_EN_COURS => ++$enCoursCount,
+                Tache::STATUT_BLOQUEE  => ++$bloqueeCount,
+                default                => ++$aFaireCount,
+            };
+
+            if ($statut !== Tache::STATUT_TERMINEE) {
+                $dateLimite = $tache->getDateLimite();
+                if ($dateLimite !== null && $dateLimite < $today) {
+                    ++$retardCount;
+                }
+            }
+        }
+
+        $completionPct = $totalTasks > 0 ? (int) round(($termineesCount / $totalTasks) * 100) : 0;
+
+        $dateFinPrevue = $projet->getDateFinPrevue();
+        $daysLeft      = null;
+        if ($dateFinPrevue !== null) {
+            $diff     = $today->diff($dateFinPrevue);
+            $daysLeft = $diff->invert === 1 ? -(int) $diff->days : (int) $diff->days;
+        }
+
+        // Build structured team workload array
+        $teamData  = [];
+        $teamParts = [];
+        foreach ($projet->getMembresEquipe() as $employe) {
+            $score       = 0.0;
+            $urgentCount = 0;
+            $activeTasks = 0;
+
+            foreach ($employe->getTaches() as $tache) {
+                if ($tache->getProjet()?->getId_projet() !== $projet->getId_projet()) {
+                    continue;
+                }
+                if ($tache->getStatutTache() === Tache::STATUT_TERMINEE) {
+                    continue;
+                }
+
+                ++$activeTasks;
+                $score += match ($tache->getPriorite()) {
+                    Tache::PRIORITE_HAUTE   => 3.0,
+                    Tache::PRIORITE_MOYENNE => 2.0,
+                    Tache::PRIORITE_BASSE   => 1.0,
+                    default                 => 0.0,
+                };
+
+                $dateLimite = $tache->getDateLimite();
+                if ($dateLimite !== null) {
+                    $diff = $today->diff($dateLimite);
+                    if ($diff->invert === 1 || (int) $diff->days <= 3) {
+                        $score += 2.0;
+                        ++$urgentCount;
+                    }
+                }
+            }
+
+            $statusKey = match (true) {
+                $score >= 15 || $urgentCount >= 3 => 'surcharge',
+                $score >= 8  || $urgentCount >= 1 => 'occupe',
+                default                           => 'disponible',
+            };
+            $statusLabel = match ($statusKey) {
+                'surcharge' => 'Surchargé',
+                'occupe'    => 'Occupé',
+                default     => 'Disponible',
+            };
+
+            $teamData[] = [
+                'nom'         => $employe->getNom(),
+                'prenom'      => $employe->getPrenom(),
+                'score'       => round($score, 1),
+                'statusKey'   => $statusKey,
+                'statusLabel' => $statusLabel,
+                'activeTasks' => $activeTasks,
+                'urgentTasks' => $urgentCount,
+            ];
+            $teamParts[] = sprintf('%s %s (%s, charge %.1f)',
+                $employe->getNom(), $employe->getPrenom(), $statusLabel, $score
+            );
+        }
+
+        $conclusionData = [
+            'name'           => $projet->getNom(),
+            'statut'         => $projet->getStatut() ?? 'inconnu',
+            'priorite'       => $projet->getPriorite(),
+            'dateDebut'      => $projet->getDateDebut()?->format('d/m/Y'),
+            'dateFinPrevue'  => $dateFinPrevue?->format('d/m/Y'),
+            'daysLeft'       => $daysLeft,
+            'totalTasks'     => $totalTasks,
+            'termineesCount' => $termineesCount,
+            'enCoursCount'   => $enCoursCount,
+            'aFaireCount'    => $aFaireCount,
+            'bloqueeCount'   => $bloqueeCount,
+            'retardCount'    => $retardCount,
+            'completionPct'  => $completionPct,
+            'teamSummary'    => implode(', ', $teamParts),
+        ];
+
+        try {
+            $conclusion = $riskReportService->generateConclusion($conclusionData);
+        } catch (\RuntimeException $e) {
+            return $this->json(['ok' => false, 'message' => $e->getMessage()], Response::HTTP_BAD_GATEWAY);
+        }
+
+        return $this->json([
+            'ok'         => true,
+            'stats'      => [
+                'total'         => $totalTasks,
+                'terminees'     => $termineesCount,
+                'enCours'       => $enCoursCount,
+                'aFaire'        => $aFaireCount,
+                'bloquee'       => $bloqueeCount,
+                'retard'        => $retardCount,
+                'completionPct' => $completionPct,
+                'daysLeft'      => $daysLeft,
+                'dateFinPrevue' => $dateFinPrevue?->format('d/m/Y'),
+                'projectName'   => $projet->getNom(),
+                'statut'        => $projet->getStatut() ?? 'inconnu',
+            ],
+            'team'       => $teamData,
+            'conclusion' => $conclusion,
+        ]);
     }
 
     private function isChefProjetRole(?string $role): bool
