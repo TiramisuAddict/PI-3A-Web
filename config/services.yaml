@@ -43,8 +43,4 @@ services:
             $apiUrl: '%env(GROQ_API_URL)%'
             $model: '%env(GROQ_MODEL)%'
 
-    App\Services\CvExtractionService:
-        arguments:
-            $groqApiUrl: '%env(GROQ_API_URL)%'
-            $groqApiKey: '%env(GROQ_API_KEY)%'
-            $groqModel: '%env(GROQ_MODEL)%'
+

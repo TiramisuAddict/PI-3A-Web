@@ -14,11 +14,10 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Knp\Component\Pager\PaginatorInterface;
-use Symfony\UX\Chartjs\Builder\ChartBuilderInterface;
-use Symfony\UX\Chartjs\Model\Chart;
 use App\Service\ProjectRiskReportService;
 use App\Service\TaskDescriptionService;
 use App\Service\TaskNotificationService;
@@ -243,7 +242,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}', name: 'app_projet_show', methods: ['GET'])]
-    public function show(Projet $projet, ProjetRepository $projetRepository, SessionInterface $session, EmployeRepository $employeRepository): Response
+    public function show(#[MapEntity(id: 'id_projet')] Projet $projet, ProjetRepository $projetRepository, SessionInterface $session, EmployeRepository $employeRepository): Response
     {
         $rbac = $this->buildRbacContext($session, $employeRepository);
 
@@ -261,7 +260,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/edit', name: 'app_projet_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, Projet $projet, EntityManagerInterface $entityManager, EmployeRepository $employeRepository, ProjetRepository $projetRepository, SessionInterface $session): Response
+    public function edit(Request $request, #[MapEntity(id: 'id_projet')] Projet $projet, EntityManagerInterface $entityManager, EmployeRepository $employeRepository, ProjetRepository $projetRepository, SessionInterface $session): Response
     {
         $rbac = $this->buildRbacContext($session, $employeRepository);
 
@@ -294,7 +293,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}', name: 'app_projet_delete', methods: ['POST'])]
-    public function delete(Request $request, Projet $projet, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): Response
+    public function delete(Request $request, #[MapEntity(id: 'id_projet')] Projet $projet, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): Response
     {
         $rbac = $this->buildRbacContext($session, $employeRepository);
 
@@ -311,7 +310,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/new', name: 'app_tache_new', methods: ['GET', 'POST'])]
-    public function newTask(Request $request, Projet $projet, ProjetRepository $projetRepository, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository, TaskNotificationService $notificationService): Response
+    public function newTask(Request $request, #[MapEntity(id: 'id_projet')] Projet $projet, ProjetRepository $projetRepository, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository, TaskNotificationService $notificationService): Response
     {
         $rbac = $this->buildRbacContext($session, $employeRepository);
 
@@ -375,7 +374,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/{id_tache}/edit', name: 'app_tache_edit', methods: ['GET', 'POST'])]
-    public function editTask(Request $request, Projet $projet, Tache $tache, ProjetRepository $projetRepository, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): Response
+    public function editTask(Request $request, #[MapEntity(id: 'id_projet')] Projet $projet, #[MapEntity(id: 'id_tache')] Tache $tache, ProjetRepository $projetRepository, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): Response
     {
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             throw $this->createNotFoundException('Tache introuvable pour ce projet.');
@@ -422,7 +421,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/{id_tache}', name: 'app_tache_show', methods: ['GET'])]
-    public function showTask(Projet $projet, Tache $tache, ProjetRepository $projetRepository, SessionInterface $session, EmployeRepository $employeRepository): Response
+    public function showTask(#[MapEntity(id: 'id_projet')] Projet $projet, #[MapEntity(id: 'id_tache')] Tache $tache, ProjetRepository $projetRepository, SessionInterface $session, EmployeRepository $employeRepository): Response
     {
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             throw $this->createNotFoundException('Tache introuvable pour ce projet.');
@@ -450,7 +449,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/{id_tache}/delete', name: 'app_tache_delete', methods: ['POST'])]
-    public function deleteTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): Response
+    public function deleteTask(Request $request, #[MapEntity(id: 'id_projet')] Projet $projet, #[MapEntity(id: 'id_tache')] Tache $tache, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): Response
     {
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             throw $this->createNotFoundException('Tache introuvable pour ce projet.');
@@ -471,7 +470,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/{id_tache}/move', name: 'app_tache_move', methods: ['POST'])]
-    public function moveTask(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): JsonResponse
+    public function moveTask(Request $request, #[MapEntity(id: 'id_projet')] Projet $projet, #[MapEntity(id: 'id_tache')] Tache $tache, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): JsonResponse
     {
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             return $this->json(['ok' => false, 'message' => 'Tache introuvable pour ce projet.'], Response::HTTP_NOT_FOUND);
@@ -520,7 +519,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/tache/{id_tache}/progress', name: 'app_tache_progress', methods: ['POST'])]
-    public function updateTaskProgress(Request $request, Projet $projet, Tache $tache, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): JsonResponse
+    public function updateTaskProgress(Request $request, #[MapEntity(id: 'id_projet')] Projet $projet, #[MapEntity(id: 'id_tache')] Tache $tache, EntityManagerInterface $entityManager, SessionInterface $session, EmployeRepository $employeRepository): JsonResponse
     {
         if ($tache->getProjet()?->getIdProjet() !== $projet->getIdProjet()) {
             return $this->json(['ok' => false, 'message' => 'Tache introuvable pour ce projet.'], Response::HTTP_NOT_FOUND);
@@ -731,7 +730,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/workload', name: 'app_projet_workload', methods: ['GET'])]
-    public function workloadAnalysis(Projet $projet, Request $request, SessionInterface $session, EmployeRepository $employeRepository, CompetenceEmployeRepository $competenceRepo): JsonResponse
+    public function workloadAnalysis(#[MapEntity(id: 'id_projet')] Projet $projet, Request $request, SessionInterface $session, EmployeRepository $employeRepository, CompetenceEmployeRepository $competenceRepo): JsonResponse
     {
         $rbac = $this->buildRbacContext($session, $employeRepository);
 
@@ -943,7 +942,7 @@ final class ProjetController extends AbstractController
     }
 
     #[Route('/{id_projet}/risk-report', name: 'app_projet_risk_report', methods: ['GET'])]
-    public function riskReport(Projet $projet, SessionInterface $session, EmployeRepository $employeRepository, ProjectRiskReportService $riskReportService): JsonResponse
+    public function riskReport(#[MapEntity(id: 'id_projet')] Projet $projet, SessionInterface $session, EmployeRepository $employeRepository, ProjectRiskReportService $riskReportService): JsonResponse
     {
         $rbac = $this->buildRbacContext($session, $employeRepository);
 
@@ -1134,7 +1133,7 @@ final class ProjetController extends AbstractController
      */
     #[Route('/calendar/sync/{id_projet}', name: 'app_calendar_sync', methods: ['POST'])]
     public function syncToCalendar(
-        Projet $projet,
+        #[MapEntity(id: 'id_projet')] Projet $projet,
         SessionInterface $session,
         EmployeRepository $employeRepository,
         GoogleCalendarService $calendarService,
