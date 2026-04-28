@@ -1,7 +1,7 @@
 import json
 import sys
 
-import demande_ai_model as core
+import demande_adaptive_model as adaptive
 
 
 def main():
@@ -26,7 +26,7 @@ def main():
         payload.setdefault("prompt", source)
 
     try:
-        result = core._build_autre_response(payload, "")
+        result = adaptive.generate_autre_response(payload)
     except Exception as exc:
         print(json.dumps({"ok": False, "error": str(exc)}))
         return

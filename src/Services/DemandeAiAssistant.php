@@ -96,10 +96,6 @@ class DemandeAiAssistant
         }
 
         $feedbackSamples = $this->loadAutreFeedbackSamples();
-        $exactSample = $this->findExactConfirmedAutreFeedbackSample($sourceText, $feedbackSamples);
-        if (!$manualFieldMode && null !== $exactSample) {
-            return $this->buildAutreSuggestionFromExactSample($sourceText, $exactSample);
-        }
 
         $parsed = $this->callLocalGenerationModel([
             'text' => $sourceText,
@@ -114,6 +110,21 @@ class DemandeAiAssistant
             'strictPromptOnly' => false,
             'manualOnlyMode' => $manualOnlyMode,
         ]);
+
+        if (!$manualFieldMode && $this->toBooleanFlag($parsed['needsLlmFallback'] ?? false)) {
+            $llmFallback = $this->tryGenerateAutreWithLlmFallback(
+                $generalContext,
+                $currentDetails,
+                array_values(array_unique($allowedKeys)),
+                $requiredKeys,
+                $fieldLabels,
+                $selectOptions
+            );
+
+            if (null !== $llmFallback) {
+                $parsed = $llmFallback;
+            }
+        }
 
         $generalPayload = isset($parsed['general']) && is_array($parsed['general']) ? $parsed['general'] : [];
         $detailsPayload = isset($parsed['details']) && is_array($parsed['details']) ? $parsed['details'] : [];
@@ -189,7 +200,7 @@ class DemandeAiAssistant
                 ? $parsed['dynamicFieldConfidence']
                 : ['score' => 0, 'label' => 'Faible', 'tone' => 'info', 'message' => 'Aucun apprentissage confirme similaire n a ete retrouve.'],
             'skipConfirmationRestriction' => $this->toBooleanFlag($parsed['skipConfirmationRestriction'] ?? false),
-            'model' => 'local-ml:demande_ai_model.py',
+            'model' => trim((string) ($parsed['_model'] ?? '')) ?: 'local-ml:demande_adaptive_model.py',
         ];
     }
 
@@ -1821,7 +1832,7 @@ class DemandeAiAssistant
         $lastError = '';
         foreach ($this->getPythonCommandCandidates() as $commandPrefix) {
             try {
-                $process = new Process(array_merge($commandPrefix, [$this->pythonScriptPath]));
+                $process = new Process(array_merge($commandPrefix, [$this->pythonScriptPath]), dirname(__DIR__, 2));
                 $encodedPayload = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
                 if (false === $encodedPayload) {
                     throw new \RuntimeException('Impossible d encoder le payload JSON pour le runner Python.');
@@ -1896,6 +1907,68 @@ class DemandeAiAssistant
     }
 
     /**
+     * @param array<string, mixed> $generalContext
+     * @param array<string, mixed> $currentDetails
+     * @param array<int, string> $allowedKeys
+     * @param array<string, bool> $requiredKeys
+     * @param array<string, string> $fieldLabels
+     * @param array<string, array<int, string>> $selectOptions
+     * @return array<string, mixed>|null
+     */
+    private function tryGenerateAutreWithLlmFallback(
+        array $generalContext,
+        array $currentDetails,
+        array $allowedKeys,
+        array $requiredKeys,
+        array $fieldLabels,
+        array $selectOptions
+    ): ?array {
+        if ('' === trim($this->apiKey) || '' === trim($this->model)) {
+            return null;
+        }
+
+        try {
+            $prompt = $this->buildPrompt(
+                $generalContext,
+                $currentDetails,
+                $allowedKeys,
+                $requiredKeys,
+                $fieldLabels,
+                $selectOptions
+            );
+            $rawResponse = $this->callHuggingFaceViaHttp($prompt, 0.15, 650);
+            $parsed = $this->parseJsonResponse($rawResponse);
+            if ([] === $parsed) {
+                return null;
+            }
+
+            $details = is_array($parsed['details'] ?? null) ? $parsed['details'] : [];
+            $customFields = is_array($parsed['custom_fields'] ?? null) ? $parsed['custom_fields'] : [];
+            if ([] === $details && [] === $customFields) {
+                return null;
+            }
+
+            $parsed['remove_fields'] = ['ALL'];
+            $parsed['replace_base'] = true;
+            $parsed['dynamicFieldConfidence'] = [
+                'score' => 42,
+                'label' => 'Faible',
+                'tone' => 'info',
+                'message' => 'Aucun historique similaire: champs proposes par LLM, confirmation requise.',
+            ];
+            $parsed['_model'] = 'llm-fallback:huggingface';
+
+            return $parsed;
+        } catch (\Throwable $e) {
+            $this->logger->warning('Fallback LLM Autre indisponible, conservation du modele adaptatif local.', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
@@ -1914,7 +1987,7 @@ class DemandeAiAssistant
         $lastError = '';
         foreach ($this->getPythonCommandCandidates() as $commandPrefix) {
             try {
-                $process = new Process(array_merge($commandPrefix, [$scriptPath]));
+                $process = new Process(array_merge($commandPrefix, [$scriptPath]), dirname(__DIR__, 2));
                 $process->setInput($encodedPayload);
                 $process->setTimeout($this->timeoutSeconds + 5);
                 $process->run();
@@ -1952,7 +2025,12 @@ class DemandeAiAssistant
             }
         }
 
-        throw new \RuntimeException('Le script ML local est indisponible. ' . ('' !== $lastError ? ('Details: ' . $lastError) : ''));
+        $commands = array_map(static fn(array $cmd): string => implode(' ', $cmd), $this->getPythonCommandCandidates());
+        throw new \RuntimeException(
+            'Le script ML local est indisponible. ' .
+            'Commandes testees: ' . implode(', ', $commands) . '. ' .
+            ('' !== $lastError ? ('Details: ' . $lastError) : '')
+        );
     }
 
     private function resolveMlScriptPath(string $scriptName): string
@@ -1974,14 +2052,15 @@ class DemandeAiAssistant
     private function getPythonCommandCandidates(): array
     {
         $candidates = [];
+        $root = dirname(__DIR__, 2);
         $configured = trim($this->pythonExecutable);
-
-        if ('' !== $configured) {
-            $candidates[] = [$configured];
-        }
 
         foreach ($this->getLocalProjectPythonExecutables() as $pythonPath) {
             $candidates[] = [$pythonPath];
+        }
+
+        foreach ($this->normalizeConfiguredPythonExecutable($configured, $root) as $commandPrefix) {
+            $candidates[] = $commandPrefix;
         }
 
         foreach ($this->getCommonWindowsPythonExecutables() as $pythonPath) {
@@ -2011,6 +2090,29 @@ class DemandeAiAssistant
         }
 
         return $unique;
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    private function normalizeConfiguredPythonExecutable(string $configured, string $projectRoot): array
+    {
+        if ('' === $configured) {
+            return [];
+        }
+
+        $normalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $configured);
+        $hasPathSeparator = str_contains($normalized, DIRECTORY_SEPARATOR);
+
+        if ($hasPathSeparator && !preg_match('/^[A-Za-z]:\\\\|^\//', $normalized)) {
+            $normalized = $projectRoot . DIRECTORY_SEPARATOR . ltrim($normalized, DIRECTORY_SEPARATOR);
+        }
+
+        if ($hasPathSeparator) {
+            return is_file($normalized) ? [[$normalized]] : [];
+        }
+
+        return [[$configured]];
     }
 
     /**
@@ -2083,6 +2185,7 @@ class DemandeAiAssistant
         $fileSamples = array_map(
             static function (array $sample): array {
                 $sample['_learningSource'] = 'file';
+                $sample['confirmed'] = $sample['confirmed'] ?? true;
 
                 return $sample;
             },
@@ -2131,6 +2234,9 @@ class DemandeAiAssistant
                 'details' => $details,
                 'createdAt' => trim((string) ($sample['createdAt'] ?? '')),
                 'fieldPlan' => $fieldPlan,
+                'confirmed' => $this->toBooleanFlag($sample['confirmed'] ?? true),
+                'manual' => $this->toBooleanFlag($sample['manual'] ?? false),
+                'employeId' => is_numeric((string) ($sample['employeId'] ?? '')) ? (int) $sample['employeId'] : null,
                 '_learningSource' => trim((string) ($sample['_learningSource'] ?? '')),
             ];
         }

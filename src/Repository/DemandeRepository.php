@@ -276,6 +276,9 @@ class DemandeRepository extends ServiceEntityRepository
             $isConfirmedAiFeedback = $this->toBooleanValue(
                 $details['_ai_feedback_confirmed'] ?? $details['__ai_feedback_confirmed'] ?? false
             );
+            $isManualFields = $this->toBooleanValue(
+                $details['_ai_manual_fields'] ?? $details['__ai_manual_fields'] ?? false
+            );
             if (!$isConfirmedAiFeedback && '' === $rawPrompt) {
                 continue;
             }
@@ -377,6 +380,7 @@ class DemandeRepository extends ServiceEntityRepository
                 'general' => $general,
                 'details' => $feedbackDetails,
                 'confirmed' => $isConfirmedAiFeedback,
+                'manual' => $isManualFields,
                 'createdAt' => $row['createdAt'] instanceof \DateTimeInterface
                     ? $row['createdAt']->format(DATE_ATOM)
                     : trim((string) ($row['createdAt'] ?? '')),

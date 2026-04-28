@@ -654,6 +654,15 @@ class DemandeController extends AbstractController
                 }
 
                 if (!empty($submittedDetails)) {
+                    if ('Autre' === (string) $submittedType && !empty($existingDetails)) {
+                        foreach ($existingDetails as $detailKey => $detailValue) {
+                            $detailKey = (string) $detailKey;
+                            if ($this->isTechnicalDetailKey($detailKey) && !array_key_exists($detailKey, $submittedDetails)) {
+                                $submittedDetails[$detailKey] = $detailValue;
+                            }
+                        }
+                    }
+
                     if ($demandeDetails->count() > 0) {
                         $detail = $demandeDetails->first();
                     } else {
