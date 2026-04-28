@@ -74,7 +74,8 @@ class DemandeAiAssistant
             ? $generalContext['manualFieldPlan']
             : [];
         $manualFields = $this->buildManualAutreFieldsFromPlan($manualFieldPlan);
-        $manualOnlyMode = [] !== $manualFields;
+        $manualFieldMode = $manualFieldMode && [] !== $manualFields;
+        $manualOnlyMode = $manualFieldMode;
 
         foreach ($manualFields as $manualField) {
             $manualKey = trim((string) ($manualField['key'] ?? ''));
@@ -96,8 +97,7 @@ class DemandeAiAssistant
         }
 
         $feedbackSamples = $this->loadAutreFeedbackSamples();
-
-        $parsed = $this->callLocalGenerationModel([
+        $modelPayload = [
             'text' => $sourceText,
             'general' => $generalContext,
             'details' => $currentDetails,
@@ -109,7 +109,9 @@ class DemandeAiAssistant
             'regenerateCount' => (int) ($generalContext['regenerateCount'] ?? 0),
             'strictPromptOnly' => false,
             'manualOnlyMode' => $manualOnlyMode,
-        ]);
+        ];
+
+        $parsed = $this->callLocalGenerationModel($modelPayload);
 
         if (!$manualFieldMode && $this->toBooleanFlag($parsed['needsLlmFallback'] ?? false)) {
             $llmFallback = $this->tryGenerateAutreWithLlmFallback(
@@ -422,10 +424,175 @@ class DemandeAiAssistant
             }
         }
 
+        $normalizedCustomFields = $this->cleanAutreDuplicateAndNoisyFields($normalizedCustomFields, $normalizedDetails);
+
         return [
             'suggestedDetails' => $normalizedDetails,
             'customFields' => $normalizedCustomFields,
         ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $customFields
+     * @param array<string, string> $details
+     * @return array<int, array<string, mixed>>
+     */
+    private function cleanAutreDuplicateAndNoisyFields(array $customFields, array &$details): array
+    {
+        $cleaned = [];
+        $seenDateValues = [];
+        $customKeys = [];
+
+        foreach ($customFields as $field) {
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' !== $key) {
+                $customKeys[$key] = true;
+            }
+        }
+
+        foreach ($details as $key => $value) {
+            if (isset($customKeys[(string) $key])) {
+                continue;
+            }
+
+            if ($this->isAutreDateField((string) $key, '', '') && '' !== trim((string) $value)) {
+                $seenDateValues[trim((string) $value)] = true;
+            }
+        }
+
+        foreach ($customFields as $field) {
+            $key = trim((string) ($field['key'] ?? ''));
+            $label = trim((string) ($field['label'] ?? ''));
+            $type = strtolower(trim((string) ($field['type'] ?? 'text')));
+            $value = trim((string) ($field['value'] ?? ''));
+            $required = true === ($field['required'] ?? false);
+
+            if ('' === $key) {
+                continue;
+            }
+
+            $badValue = $this->isNoisyAutreFieldValue($key, $label, $value, $details);
+            if (!$badValue && $this->isAutreDateField($key, $label, $type) && '' !== $value) {
+                if (isset($seenDateValues[$value]) && 'dateSouhaiteeAutre' !== $key) {
+                    $badValue = true;
+                } else {
+                    $seenDateValues[$value] = true;
+                }
+            }
+
+            if ($badValue) {
+                unset($details[$key]);
+                if (!$required) {
+                    continue;
+                }
+
+                $field['value'] = '';
+            }
+
+            $cleaned[] = $field;
+        }
+
+        return $cleaned;
+    }
+
+    /**
+     * @param array<string, string> $details
+     */
+    private function isNoisyAutreFieldValue(string $key, string $label, string $value, array $details): bool
+    {
+        $normalized = $this->normalizeForSearch($value);
+        if ('' === $normalized) {
+            return false;
+        }
+
+        $haystack = $this->normalizeForSearch($key . ' ' . $label);
+
+        if ($this->isAutreLocationField($haystack) && in_array($normalized, ['transport', 'demande transport', 'demande de transport'], true)) {
+            return true;
+        }
+
+        if ($this->isAutreGenericObjectField($haystack)) {
+            if ($this->isGenericAutreObjectValue($normalized)) {
+                return true;
+            }
+
+            if ($this->isRedundantAutreObjectValue($normalized, $details, $key)) {
+                return true;
+            }
+        }
+
+        if ($this->isAutreTransportTypeField($haystack) && $this->isGenericAutreObjectValue($normalized)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function isAutreDateField(string $key, string $label, string $type): bool
+    {
+        if ('date' === strtolower($type)) {
+            return true;
+        }
+
+        return str_contains($this->normalizeForSearch($key . ' ' . $label), 'date');
+    }
+
+    private function isAutreLocationField(string $haystack): bool
+    {
+        return preg_match('/\b(lieu|zone|destination|depart|arrivee|adresse)\b/i', $haystack) === 1;
+    }
+
+    private function isAutreGenericObjectField(string $haystack): bool
+    {
+        return preg_match('/\b(objet|object|custom objet)\b/i', $haystack) === 1;
+    }
+
+    private function isAutreTransportTypeField(string $haystack): bool
+    {
+        return preg_match('/\btype\b/i', $haystack) === 1 && $this->containsWord($haystack, 'transport');
+    }
+
+    private function isGenericAutreObjectValue(string $normalizedValue): bool
+    {
+        $value = preg_replace('/^(?:demande|besoin)\s+(?:de|d|du|des)\s+/i', '', $normalizedValue) ?? $normalizedValue;
+        $value = trim($value);
+
+        return in_array($value, ['a definir', 'autre', 'demande', 'transport', 'formation', 'deplacement', 'trajet', 'voyage'], true);
+    }
+
+    /**
+     * @param array<string, string> $details
+     */
+    private function isRedundantAutreObjectValue(string $normalizedValue, array $details, string $currentKey): bool
+    {
+        foreach ($details as $key => $value) {
+            $key = (string) $key;
+            if ($key === $currentKey) {
+                continue;
+            }
+
+            $other = $this->normalizeForSearch((string) $value);
+            if (strlen($other) < 3) {
+                continue;
+            }
+
+            if (
+                str_contains($this->normalizeForSearch($key), 'formation')
+                && $this->containsWord($normalizedValue, 'formation')
+                && str_contains($normalizedValue, $other)
+            ) {
+                return true;
+            }
+
+            if (
+                preg_match('/\b(lieu|depart|destination|souhaite)\b/i', $this->normalizeForSearch($key)) === 1
+                && $this->containsWord($normalizedValue, 'transport')
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -596,6 +763,7 @@ class DemandeAiAssistant
     private function inferManualSelectValue(string $sourceText, array $options): string
     {
         $normalizedSource = $this->normalizeForSearch($sourceText);
+        $normalizedOptions = [];
         foreach ($options as $option) {
             $optionText = trim((string) $option);
             if ('' === $optionText) {
@@ -603,7 +771,38 @@ class DemandeAiAssistant
             }
 
             $normalizedOption = $this->normalizeForSearch($optionText);
+            $normalizedOptions[] = [$optionText, $normalizedOption];
             if ('' !== $normalizedOption && str_contains($normalizedSource, $normalizedOption)) {
+                return $optionText;
+            }
+        }
+
+        $genericOptionTokens = array_fill_keys(['autre', 'demande', 'formation', 'type', 'categorie', 'category', 'nature', 'option'], true);
+        foreach ($normalizedOptions as [$optionText, $normalizedOption]) {
+            $tokens = preg_split('/\s+/', $normalizedOption) ?: [];
+            $meaningfulTokens = [];
+            foreach ($tokens as $token) {
+                $token = trim((string) $token);
+                if (strlen($token) < 3 || isset($genericOptionTokens[$token])) {
+                    continue;
+                }
+
+                $meaningfulTokens[] = $token;
+            }
+
+            if ([] === $meaningfulTokens) {
+                continue;
+            }
+
+            $allTokensPresent = true;
+            foreach ($meaningfulTokens as $token) {
+                if (!str_contains($normalizedSource, $token)) {
+                    $allTokensPresent = false;
+                    break;
+                }
+            }
+
+            if ($allTokensPresent) {
                 return $optionText;
             }
         }
@@ -2182,16 +2381,7 @@ class DemandeAiAssistant
      */
     private function loadAutreFeedbackSamples(): array
     {
-        $fileSamples = array_map(
-            static function (array $sample): array {
-                $sample['_learningSource'] = 'file';
-                $sample['confirmed'] = $sample['confirmed'] ?? true;
-
-                return $sample;
-            },
-            $this->loadAutreFeedbackSamplesFromFile()
-        );
-        $dbSamples = array_map(
+        $samples = array_map(
             static function (array $sample): array {
                 $sample['_learningSource'] = 'database';
 
@@ -2199,11 +2389,10 @@ class DemandeAiAssistant
             },
             $this->loadAutreFeedbackSamplesFromDatabase()
         );
-        $merged = array_merge($dbSamples, $fileSamples);
 
         $deduped = [];
         $seen = [];
-        foreach ($merged as $sample) {
+        foreach ($samples as $sample) {
             if (!is_array($sample)) {
                 continue;
             }
@@ -4018,6 +4207,25 @@ class DemandeAiAssistant
 
     private function extractTrainingName(string $text): string
     {
+        $typeMarkers = 'certification|certifiante|externe|interne|professionnel|professionnelle';
+        $typeAwarePatterns = [
+            '/\bformation\s+(?:(?:' . $typeMarkers . ')\s+)?(?:(?:de|d[\'\x{2019}]|en|sur)\s+)?([\p{L}0-9\/+().\'\x{2019}\-\s]{2,120}?)(?=\s+(?:cette\s+formation|formation\s+est|type\s+de\s+formation|pour|le|la|qui|avec|vers|a|\x{00E0})\b|[\.,;:"\']|$)/iu',
+            '/\bcours\s+(?:(?:' . $typeMarkers . ')\s+)?(?:(?:de|d[\'\x{2019}]|en|sur)\s+)?([\p{L}0-9\/+().\'\x{2019}\-\s]{2,120}?)(?=\s+(?:ce\s+cours|cours\s+est|pour|le|la|qui|avec|vers|a|\x{00E0})\b|[\.,;:"\']|$)/iu',
+        ];
+
+        foreach ($typeAwarePatterns as $pattern) {
+            if (preg_match_all($pattern, $text, $allMatches, PREG_SET_ORDER) < 1) {
+                continue;
+            }
+
+            foreach ($allMatches as $matches) {
+                $candidate = $this->cleanupTrainingNameCandidate((string) ($matches[1] ?? ''));
+                if ('' !== $candidate) {
+                    return $candidate;
+                }
+            }
+        }
+
         $patterns = [
             "/(?:nom(?:\\s+de)?\\s+la\\s+formation|intitule\\s+de\\s+formation|formation\\s+intitulee|formation\\s+intitulée|nom\\s+formation)\\s*[:\\-]?\\s*([A-Za-z0-9À-ÿ\\/+().'’\\-\\s]{2,120}?)(?=\\s+(?:pour|de|du|des|d['’]|vers|dans|sur|en|avec|car|afin|transport|deplacement|déplacement|bonjour|salut|slt|je\\b|j\\b|nous\\b|on\\b|type\\b|lieu\\b|date\\b)|[\\.,;:\"'»”]|$)/iu",
             "/(?:formation|certification)\\s*(?:en|sur|de|d['’])?\\s*([A-Za-z0-9À-ÿ\\/+().'’\\-\\s]{2,120}?)(?=\\s+(?:pour|de|du|des|d['’]|vers|dans|sur|en|avec|car|afin|transport|deplacement|déplacement|bonjour|salut|slt|je\\b|j\\b|nous\\b|on\\b|type\\b|lieu\\b|date\\b)|[\\.,;:\"'»”]|$)/iu",
@@ -4041,6 +4249,11 @@ class DemandeAiAssistant
     {
         $clean = trim($value);
         $clean = preg_replace('/[\.,;:]+$/', '', $clean) ?? $clean;
+        $typeMarkers = 'certification|certifiante|externe|interne|professionnel|professionnelle';
+        $clean = preg_replace('/^(?:une|un|la|le|l[\'\x{2019}])\s+(?:formation|cours|certification)\s+/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/^(?:formation|cours|certification)\s+/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/^(?:' . $typeMarkers . ')\s+(?:(?:de|d[\'\x{2019}]|en|sur)\s+)?/iu', '', $clean) ?? $clean;
+        $clean = preg_replace('/\b(?:cette\s+formation|ce\s+cours|formation\s+est|cours\s+est|type\s+de\s+formation|la\s+formation\s+est)\b.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\b(?:le|du|au|a\s+partir\s+du|à\s+partir\s+du)\s+\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\b(?:le|du|au|a\s+partir\s+du|à\s+partir\s+du)?\s*\d{1,2}\s+(?:janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)(?:\s+\d{4})?\b/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\b(?:je\s+reste\s+disponible|je\s+vous\s+remercie|merci|cordialement|avance\s+pour\s+votre\s+retour)\b.*$/iu', '', $clean) ?? $clean;
@@ -4062,6 +4275,10 @@ class DemandeAiAssistant
 
         $normalized = $this->normalizeForSearch($clean);
         if ('' === $normalized) {
+            return '';
+        }
+
+        if (in_array($normalized, ['formation', 'cours', 'certification', 'certifiante', 'externe', 'interne', 'professionnel', 'professionnelle'], true)) {
             return '';
         }
 
@@ -4220,11 +4437,7 @@ class DemandeAiAssistant
         }
 
         if ('select' === $type) {
-            foreach ($options as $option) {
-                if (str_contains($normalizedText, strtolower($option))) {
-                    return $option;
-                }
-            }
+            return $this->inferManualSelectValue($text, $options);
         }
 
         if ('textarea' === $type) {

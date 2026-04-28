@@ -76,6 +76,35 @@ MONTHS = {
     "decembre": 12,
 }
 
+GENERIC_REQUEST_OBJECTS = {
+    "deplacement",
+    "demande",
+    "demande transport",
+    "formation",
+    "trajet",
+    "transport",
+    "voyage",
+}
+
+LOCATION_NOISE_TERMS = {
+    "besoin",
+    "demande",
+    "formation",
+    "moyen",
+    "souhaite",
+    "trajet",
+    "transport",
+}
+
+FORMATION_TYPE_MARKERS = {
+    "certification",
+    "certifiante",
+    "externe",
+    "interne",
+    "professionnel",
+    "professionnelle",
+}
+
 
 @dataclass
 class LearnedField:
@@ -316,6 +345,60 @@ def sample_schema_text(fields: list[LearnedField]) -> str:
     return " ".join(f"{field.key} {field.label}" for field in fields)
 
 
+def contains_norm_term(clean: str, term: str) -> bool:
+    normalized_term = norm(term)
+    if not normalized_term:
+        return False
+    return re.search(rf"\b{re.escape(normalized_term)}\b", clean) is not None
+
+
+def schema_support_similarity(source: str, fields: list[LearnedField]) -> float:
+    roles = [field_role(field) for field in fields]
+    meaningful_roles = [role for role in roles if role != "generic"]
+    if not meaningful_roles:
+        return 0.0
+
+    schema_has_specification = "specification" in meaningful_roles
+    supported = 0
+    for role in meaningful_roles:
+        if source_supports_role(source, role, schema_has_specification):
+            supported += 1
+
+    return supported / max(1, len(meaningful_roles))
+
+
+def source_supports_role(source: str, role: str, schema_has_specification: bool = False) -> bool:
+    if role == "date":
+        return bool(first_date(source))
+    if role == "number":
+        return bool(first_number(source))
+    if role == "email":
+        return re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", source) is not None
+    if role == "phone":
+        return re.search(r"\b(?:\+?\d[\d .-]{6,}\d)\b", source) is not None
+    if role == "time":
+        return bool(extract_time_range(source)[2])
+    if role == "period":
+        return bool(extract_period(source))
+    if role == "location":
+        start, end = extract_route_locations(source)
+        return bool(start or end or clean_location_candidate(source))
+    if role == "training":
+        return bool(extract_training_name(source))
+    if role == "specification":
+        return bool(extract_specification(source) or extract_object_qualifier(source))
+    if role == "object":
+        value = extract_requested_object(source)
+        if schema_has_specification:
+            value = split_requested_object(source)[0] or value
+        return bool(value and not is_generic_request_object(value))
+    if role == "category":
+        return bool(shift_variant(source))
+    if role in {"reason", "attestation", "room", "organization"}:
+        return True
+    return False
+
+
 def structure_similarity(left: str, right: str) -> float:
     markers = [
         "je veux",
@@ -357,6 +440,7 @@ def text_similarity(source: str, sample: dict[str, Any], fields: list[LearnedFie
 
     schema_tokens = set(tokenize(sample_schema_text(fields), include_bigrams=False))
     schema_bridge = len(query_tokens & schema_tokens) / max(1, min(len(query_tokens), len(schema_tokens))) if schema_tokens else 0.0
+    schema_support = schema_support_similarity(source, fields)
 
     score = (
         jaccard * 0.34
@@ -365,6 +449,7 @@ def text_similarity(source: str, sample: dict[str, Any], fields: list[LearnedFie
         + sequence * 0.18
         + structure_similarity(source, prompt) * 0.06
         + schema_bridge * 0.02
+        + schema_support * 0.42
     )
 
     if norm(source) == norm(prompt):
@@ -545,6 +630,64 @@ def extract_specification(source: str) -> str:
     return ""
 
 
+def clean_location_candidate(value: str) -> str:
+    clean = normalize_ws(value).strip(" ,;:-")
+    if not clean:
+        return ""
+
+    clean = re.sub(r"^(?:de|du|des|d'|depuis|a|au|aux|dans|vers)\s+", "", clean, flags=re.IGNORECASE)
+    clean = re.split(
+        r"\b(?:pour|afin|car|avec|formation|certification|transport|trajet|deplacement|le\s+\d{1,2}|la\s+formation|type\s+de)\b",
+        clean,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    clean = normalize_ws(clean).strip(" ,;:-")
+    if not clean:
+        return ""
+
+    clean_norm = norm(clean)
+    if any(contains_norm_term(clean_norm, token) for token in LOCATION_NOISE_TERMS):
+        return ""
+    if re.search(r"\d", clean_norm):
+        return ""
+    if len(clean_norm) < 2:
+        return ""
+
+    return clean[:80]
+
+
+def extract_route_locations(source: str) -> tuple[str, str]:
+    clean = normalize_ws(source)
+
+    for vers_match in re.finditer(r"\bvers\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' -]{1,80}?)(?=\s+(?:le|la|les|pour|afin|car|avec|du|de|des|formation|certification)\b|[.,;:]|$)", clean, flags=re.IGNORECASE):
+        left_context = clean[:vers_match.start()]
+        end = clean_location_candidate(vers_match.group(1))
+        if not end:
+            continue
+
+        prepositions = list(re.finditer(r"(?:\bde|\bdu|\bdes|\bd'|\bdepuis|\bdepart\s+de)\s+", left_context, flags=re.IGNORECASE))
+        for from_match in reversed(prepositions):
+            start = clean_location_candidate(left_context[from_match.end():])
+            if start:
+                return start, end
+
+    patterns = [
+        r"\b(?:de|du|des|d'|depuis|depart\s+de)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' -]{1,80}?)\s+vers\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' -]{1,80}?)(?=\s+(?:le|la|les|pour|afin|car|avec|du|de|des|formation|certification)\b|[.,;:]|$)",
+        r"\b(?:de|du|des|d'|depuis|depart\s+de)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' -]{1,80}?)\s+(?:a|à|jusqu(?:'|e)?a|jusqu(?:'|e)?à)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' -]{1,80}?)(?=\s+(?:le|la|les|pour|afin|car|avec|du|de|des|formation|certification)\b|[.,;:]|$)",
+    ]
+
+    for pattern in patterns:
+        matches = list(re.finditer(pattern, clean, flags=re.IGNORECASE))
+        for match in reversed(matches):
+            start = clean_location_candidate(match.group(1))
+            end = clean_location_candidate(match.group(2))
+            if start and end:
+                return start, end
+
+    return "", ""
+
+
 def clause_after(source: str, keywords: list[str], max_len: int = 140) -> str:
     clean = normalize_ws(source)
     for keyword in keywords:
@@ -588,11 +731,63 @@ def extract_requested_object(source: str) -> str:
             continue
         value = normalize_ws(match.group(1))
         value = re.sub(r"^(?:un|une|du|de|des|d'|le|la|les)\s+", "", value, flags=re.IGNORECASE)
+        value = re.sub(r"^(?:demande|besoin)\s+(?:de|d'|du|des)\s+", "", value, flags=re.IGNORECASE)
         value = re.sub(r"\b(?:professionnel|professionnelle|nouveau|nouvelle)\b", "", value, flags=re.IGNORECASE)
         value = normalize_ws(value).strip(" ,;:-")
         if value and norm(value) not in {"demande", "besoin"}:
             return value[:90]
     return ""
+
+
+def is_generic_request_object(value: str) -> bool:
+    clean = norm(value)
+    clean = re.sub(r"^(?:demande|besoin)\s+(?:de|d|du|des)\s+", "", clean)
+    clean = normalize_ws(clean)
+    return clean in GENERIC_REQUEST_OBJECTS
+
+
+def extract_transport_mode(source: str, options: list[str] | None = None) -> str:
+    if not options:
+        return ""
+
+    clean = norm(source)
+    for option in options:
+        option_norm = norm(option)
+        if option_norm and contains_norm_term(clean, option_norm):
+            return option
+
+    return ""
+
+
+def split_requested_object(source: str) -> tuple[str, str]:
+    phrase = extract_requested_object(source)
+    if not phrase:
+        return "", ""
+
+    explicit_spec = extract_specification(phrase)
+    if explicit_spec:
+        object_part = re.sub(re.escape(explicit_spec), "", phrase, flags=re.IGNORECASE)
+        object_part = strip_candidate_noise(object_part, "object")
+        return object_part, explicit_spec
+
+    tokens = token_spans(phrase)
+    if len(tokens) <= 1:
+        return phrase, ""
+
+    head = strip_candidate_noise(raw_span_from_tokens(phrase, tokens, 0, len(tokens) - 1), "object")
+    tail = strip_candidate_noise(raw_span_from_tokens(phrase, tokens, len(tokens) - 1, len(tokens)), "specification")
+    if not head or norm(tail) in STOPWORDS:
+        return phrase, ""
+
+    return head, tail
+
+
+def extract_object_qualifier(source: str) -> str:
+    explicit = extract_specification(source)
+    if explicit:
+        return explicit
+
+    return split_requested_object(source)[1]
 
 
 def extract_attestation(source: str) -> str:
@@ -603,30 +798,64 @@ def extract_attestation(source: str) -> str:
 
 
 def extract_training_name(source: str) -> str:
+    type_marker = r"(?:certification|certifiante|externe|interne|professionnel|professionnelle)"
     patterns = [
-        r"\bformation\s+(?:de|d'|en|sur)\s+(.{2,80}?)(?=\s+(?:pour|le|la|qui|avec|a|\u00e0)\b|[.,;:]|$)",
-        r"\bcours\s+(?:de|d'|en|sur)\s+(.{2,80}?)(?=\s+(?:pour|le|la|qui|avec|a|\u00e0)\b|[.,;:]|$)",
+        rf"\bformation\s+(?:{type_marker}\s+)?(?:(?:de|d'|en|sur)\s+)?(.{{2,120}}?)(?=\s+(?:cette\s+formation|formation\s+est|type\s+de\s+formation|pour|le|la|qui|avec|a|\u00e0)\b|[.,;:]|$)",
+        rf"\bcours\s+(?:{type_marker}\s+)?(?:(?:de|d'|en|sur)\s+)?(.{{2,120}}?)(?=\s+(?:ce\s+cours|cours\s+est|pour|le|la|qui|avec|a|\u00e0)\b|[.,;:]|$)",
     ]
     for pattern in patterns:
-        match = re.search(pattern, source, flags=re.IGNORECASE)
-        if match:
-            return sentence_case(normalize_ws(match.group(1)).strip(" ,;:-")[:90])
+        for match in re.finditer(pattern, source, flags=re.IGNORECASE):
+            value = clean_training_name_candidate(match.group(1))
+            if value:
+                return sentence_case(value[:90])
     return ""
+
+
+def clean_training_name_candidate(value: str) -> str:
+    clean = normalize_ws(value).strip(" ,;:-")
+    if not clean:
+        return ""
+
+    candidate = re.sub(r"^(?:une|un|la|le|formation|cours|certification)\s+", "", clean, flags=re.IGNORECASE)
+    candidate = re.sub(
+        r"^(?:certification|certifiante|externe|interne|professionnel|professionnelle)\s+(?:(?:de|d'|en|sur)\s+)?",
+        "",
+        candidate,
+        flags=re.IGNORECASE,
+    )
+    candidate = re.sub(
+        r"\b(?:cette\s+formation|ce\s+cours|formation\s+est|cours\s+est|type\s+de\s+formation|la\s+formation\s+est)\b.*$",
+        "",
+        candidate,
+        flags=re.IGNORECASE,
+    )
+    candidate = re.sub(r"\b\d{1,2}\s+(?:janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)(?:\s+\d{4})?\b.*$", "", candidate, flags=re.IGNORECASE)
+    candidate = re.sub(r"\b(?:le|du|au)\s+\d{1,2}(?:[/-]\d{1,2})?(?:[/-]\d{2,4})?\b.*$", "", candidate, flags=re.IGNORECASE)
+    candidate = re.sub(r"\s+(?:de|du|des|d'|depuis)\s+[A-Za-zÀ-ÿ' -]{2,80}\s+vers\s+[A-Za-zÀ-ÿ' -]{2,80}\b.*$", "", candidate, flags=re.IGNORECASE)
+    candidate = re.sub(r"\s+vers\s+[A-Za-zÀ-ÿ' -]{2,80}\b.*$", "", candidate, flags=re.IGNORECASE)
+    candidate = re.split(r"\b(?:pour|afin|car|avec|transport|deplacement|trajet)\b", candidate, maxsplit=1, flags=re.IGNORECASE)[0]
+    candidate = normalize_ws(candidate).strip(" ,;:-")
+    return "" if norm(candidate) in {"formation", "cours", *FORMATION_TYPE_MARKERS} else candidate
 
 
 def extract_location(source: str, key_text: str) -> str:
     clean = normalize_ws(source)
     lowered_key = norm(key_text)
+    route_start, route_end = extract_route_locations(source)
     if any(token in lowered_key for token in ["depart", "origine"]):
+        if route_start:
+            return route_start
         match = re.search(r"\b(?:de|depuis|depart\s+de)\s+([\w' -]{2,70}?)(?=\s+(?:vers|a|\u00e0|pour)\b|[.,;:]|$)", clean, flags=re.IGNORECASE)
         if match:
-            return normalize_ws(match.group(1)).strip(" ,;:-")
+            return clean_location_candidate(match.group(1))
     if any(token in lowered_key for token in ["destination", "arrivee", "souhaite"]):
+        if route_end:
+            return route_end
         match = re.search(r"\b(?:vers|a|\u00e0|destination\s+de?)\s+([\w' -]{2,70}?)(?=\s+(?:pour|le|la|qui|avec)\b|[.,;:]|$)", clean, flags=re.IGNORECASE)
         if match:
-            return normalize_ws(match.group(1)).strip(" ,;:-")
+            return clean_location_candidate(match.group(1))
     match = re.search(r"\b(?:a|\u00e0|au|aux|dans|salle)\s+([\w' -]{2,70}?)(?=\s+(?:pour|le|la|qui|avec|debut|d\u00e9bute)\b|[.,;:]|$)", clean, flags=re.IGNORECASE)
-    return normalize_ws(match.group(1)).strip(" ,;:-") if match else ""
+    return clean_location_candidate(match.group(1)) if match else ""
 
 
 def extract_named_value(source: str, field: LearnedField) -> str:
@@ -897,16 +1126,34 @@ def coerce_select(value: str, options: list[str]) -> str:
     return ""
 
 
-def extract_value(source: str, field: LearnedField, examples: list[dict[str, Any]] | None = None) -> str:
+def extract_value(
+    source: str,
+    field: LearnedField,
+    examples: list[dict[str, Any]] | None = None,
+    schema_roles: set[str] | None = None,
+) -> str:
     haystack = norm(f"{field.key} {field.label}")
     options = field.options or []
     role = field_role(field)
+    schema_roles = schema_roles or set()
 
     if field.type == "select":
+        source_norm = norm(source)
         for option in options:
             option_norm = norm(option)
-            if option_norm and option_norm in norm(source):
+            if option_norm and option_norm in source_norm:
                 return option
+
+        generic_option_tokens = {"autre", "category", "categorie", "demande", "formation", "nature", "option", "type"}
+        for option in options:
+            tokens = [
+                token
+                for token in tokenize(option, include_bigrams=False)
+                if len(token) >= 3 and token not in generic_option_tokens
+            ]
+            if tokens and all(contains_norm_term(source_norm, token) for token in tokens):
+                return option
+
         learned = extract_from_learned_examples(source, field, examples or [])
         return coerce_select(learned, options)
 
@@ -925,7 +1172,13 @@ def extract_value(source: str, field: LearnedField, examples: list[dict[str, Any
         return normalize_ws(match.group(0)) if match else ""
 
     if role == "specification":
-        return extract_specification(source)
+        value = extract_specification(source)
+        if value:
+            return value
+        value = extract_object_qualifier(source)
+        if value:
+            return value
+        return ""
 
     if role == "attestation":
         return extract_attestation(source)
@@ -949,11 +1202,17 @@ def extract_value(source: str, field: LearnedField, examples: list[dict[str, Any
         return extract_location(source, haystack)
 
     if role == "object":
+        if "specification" in schema_roles:
+            value = split_requested_object(source)[0]
+            if value:
+                return value
         value = extract_requested_object(source)
-        if value:
+        if value and not is_generic_request_object(value):
             return value
 
     if role == "category":
+        if "transport" in haystack:
+            return extract_transport_mode(source, options)
         shift_value = extract_shift_category(source, field, examples or [])
         if shift_value:
             return shift_value
@@ -1001,9 +1260,79 @@ def prompt_sensitive(field: LearnedField) -> bool:
     return field_role(field) != "generic"
 
 
+def role_profile(fields: list[LearnedField]) -> set[str]:
+    return {field_role(field) for field in fields if field_role(field) != "generic"}
+
+
+def schemas_compatible(anchor: RankedSample, candidate: RankedSample) -> bool:
+    if candidate is anchor:
+        return True
+
+    anchor_roles = role_profile(anchor.fields)
+    candidate_roles = role_profile(candidate.fields)
+    if not anchor_roles or not candidate_roles:
+        return False
+
+    overlap = anchor_roles & candidate_roles
+    role_coverage = len(overlap) / max(1, min(len(anchor_roles), len(candidate_roles)))
+    if role_coverage < 0.5:
+        return False
+
+    if candidate.score < max(0.34, anchor.score * 0.72):
+        return False
+
+    return True
+
+
+def date_field_rank(field: LearnedField) -> int:
+    haystack = norm(f"{field.key} {field.label}")
+    if field.key == "dateSouhaiteeAutre":
+        return 0
+    if "metier" not in haystack and "extra" not in haystack:
+        return 1
+    return 2
+
+
+def dedupe_selected_fields(fields: list[LearnedField]) -> list[LearnedField]:
+    date_indexes: dict[str, int] = {}
+    cleaned: list[LearnedField] = []
+
+    for field in fields:
+        role = field_role(field)
+        value = normalize_ws(field.value)
+
+        if role == "object" and is_generic_request_object(value):
+            if field.required:
+                field = LearnedField(field.key, field.label, field.type, field.required, "", field.options or [], field.source)
+            else:
+                continue
+
+        if role == "category" and "transport" in norm(f"{field.key} {field.label}") and value and not extract_transport_mode(value):
+            if field.required:
+                field = LearnedField(field.key, field.label, field.type, field.required, "", field.options or [], field.source)
+            else:
+                continue
+
+        if role == "date" and value:
+            existing_index = date_indexes.get(value)
+            if existing_index is not None:
+                existing = cleaned[existing_index]
+                if date_field_rank(field) < date_field_rank(existing):
+                    cleaned[existing_index] = field
+                continue
+            date_indexes[value] = len(cleaned)
+
+        cleaned.append(field)
+
+    return cleaned
+
+
 def select_learned_fields(source: str, ranked: list[RankedSample], max_fields: int = 8) -> tuple[list[LearnedField], float, bool]:
     if not ranked:
         return [], 0.0, False
+
+    anchor = ranked[0]
+    ranked = [sample for sample in ranked if schemas_compatible(anchor, sample)]
 
     scores: dict[str, dict[str, Any]] = {}
     order: dict[str, tuple[int, int]] = {}
@@ -1043,6 +1372,7 @@ def select_learned_fields(source: str, ranked: list[RankedSample], max_fields: i
                 "score": ranked_sample.score,
             })
 
+    schema_roles = {field_role(data["field"]) for data in scores.values() if isinstance(data.get("field"), LearnedField)}
     selected: list[LearnedField] = []
     for key, data in scores.items():
         weight = float(data["weight"])
@@ -1051,7 +1381,7 @@ def select_learned_fields(source: str, ranked: list[RankedSample], max_fields: i
         if weight < minimum and ranked[0].score < 0.64:
             continue
 
-        value = extract_value(source, source_field, data.get("examples", []))
+        value = extract_value(source, source_field, data.get("examples", []), schema_roles)
         if not value and source_field.type == "select" and source_field.value:
             value = coerce_select(source_field.value, source_field.options or [])
 
@@ -1079,6 +1409,7 @@ def select_learned_fields(source: str, ranked: list[RankedSample], max_fields: i
             field.key,
         )
     )
+    selected = dedupe_selected_fields(selected)
     return selected[:max_fields], ranked[0].score, strongest_manual
 
 
