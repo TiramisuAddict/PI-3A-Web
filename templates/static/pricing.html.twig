@@ -1,0 +1,163 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Tarification - Momentum{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .pricing-hero {
+            background:
+                radial-gradient(circle at 15% 0%, rgba(59, 130, 246, 0.13), transparent 35%),
+                linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+            border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+        }
+
+        .pricing-title {
+            font-size: clamp(2rem, 4vw, 3rem);
+            letter-spacing: -0.02em;
+        }
+
+        .pricing-subtitle {
+            max-width: 720px;
+            color: #5b6474;
+            font-size: 1.05rem;
+        }
+
+        .plan-card {
+            height: 100%;
+            border-radius: 18px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: 0 14px 35px rgba(15, 23, 42, 0.05);
+        }
+
+        .plan-card.plan-enterprise {
+            border-color: rgba(59, 130, 246, 0.35);
+            box-shadow: 0 22px 48px rgba(29, 78, 216, 0.14);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .plan-card.plan-enterprise::before {
+            content: '';
+            position: absolute;
+            top: -120px;
+            right: -120px;
+            width: 260px;
+            height: 260px;
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.12);
+            pointer-events: none;
+        }
+
+        .plan-card .card-body {
+            position: relative;
+            z-index: 1;
+            padding: 1.5rem;
+        }
+
+        .plan-price {
+            font-size: clamp(1.85rem, 3vw, 2.5rem);
+            letter-spacing: -0.02em;
+            margin-bottom: 0;
+        }
+
+        .plan-note {
+            color: #637083;
+            margin-bottom: 1.25rem;
+        }
+
+        .plan-features {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .plan-features li {
+            display: flex;
+            align-items: flex-start;
+            gap: .6rem;
+            margin-bottom: .7rem;
+            color: #1f2937;
+        }
+
+        .plan-features li i {
+            color: #2563eb;
+            margin-top: 2px;
+            font-size: 1.05rem;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+<div class="page">
+    {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'pricing' } %}
+    <div>
+        <div class="page-header d-print-none pricing-hero py-5 ">
+            <div class="container-xl">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h1 class="page-title pricing-title mb-3">Des offres simples pour candidats et entreprises</h1>
+                        <p class="pricing-subtitle mb-0">
+                            Choisissez l'offre gratuite pour consulter les opportunites en tant que candidat, ou activez l'offre Entreprise avec l'experience Momentum complete.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="page-body">
+            <div class="container-xl py-5">
+                <div class="row row-cols-1 row-cols-lg-2 g-4">
+                    <div class="col">
+                        <div class="card plan-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <h2 class="card-title mb-0">Offre gratuite</h2>
+                                    <span class="badge bg-blue-lt text-blue">Candidat</span>
+                                </div>
+                                <p class="plan-price fw-bold">0 TND<span class="fs-4 text-secondary"> /mois</span></p>
+                                <p class="plan-note">Ideale pour les candidats qui veulent consulter et postuler aux offres.</p>
+
+                                <ul class="plan-features">
+                                    <li><i class="ti ti-check"></i> Consulter les offres disponibles</li>
+                                    <li><i class="ti ti-check"></i> Rechercher et filtrer par metier et entreprise</li>
+                                    <li><i class="ti ti-check"></i> Suivre l'avancement des candidatures</li>
+                                    <li><i class="ti ti-check"></i> Accessible sur application Web et Desktop</li>
+
+                                </ul>
+
+                                <a href="{{ path('app_offre_list') }}" class="btn btn-outline-primary w-100 mt-3">Commencer gratuitement</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card plan-card plan-enterprise">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <h2 class="card-title mb-0">Offre entreprise</h2>
+                                    <span class="badge bg-primary text-white">Tout inclus</span>
+                                </div>
+                                <p class="plan-price fw-bold">24 TND<span class="fs-4 text-secondary"> /mois [pour chaque utilisateur]</span></p>
+                                <p class="plan-note">Pour les entreprises qui veulent la plateforme Momentum complete sans limites.</p>
+
+                                <ul class="plan-features">
+                                    <li><i class="ti ti-check"></i> Publication et gestion complete des offres</li>
+                                    <li><i class="ti ti-check"></i> Suivi des candidatures de bout en bout</li>
+                                    <li><i class="ti ti-check"></i> Projets, taches, collaborations et notifications</li>
+                                    <li><i class="ti ti-check"></i> Formations, inscriptions et suivi de progression</li>
+                                    <li><i class="ti ti-check"></i> Reporting avance et tableaux de bord RH</li>
+                                    <li><i class="ti ti-check"></i> Support prioritaire et accompagnement dedie</li>
+                                    <li><i class="ti ti-check"></i> Accessible sur application Web et Desktop</li>
+
+                                </ul>
+
+                                <a href="{{ path('compteEntreprise') }}" class="btn btn-primary w-100 mt-3">Passer en entreprise</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% include 'components/front_footer.html.twig' %}
+    </div>
+</div>
+{% endblock %}

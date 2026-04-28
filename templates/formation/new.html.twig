@@ -1,0 +1,34 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Ajouter Formation{% endblock %}
+
+{% block body %}
+    {{ include('components/navbar.html.twig') }}
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+        {{ include('components/sidebar.html.twig', {'active_page': 'formations','sidebar_role': role}) }}
+        <div class="flex-fill overflow-y-auto p-4" style="background:#f5f7fb; min-width:0;">
+        <div class="container-xl">
+            <div class="page-header d-print-none mb-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">Ajouter une formation</h2>
+                        <div class="text-secondary">Renseignez les informations principales de la formation.</div>
+                    </div>
+                    <div class="col-auto ms-auto d-print-none">
+                        <a class="btn btn-outline-secondary" href="{{ path('app_formation_rh') }}">Retour liste</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Informations formation</h3>
+                </div>
+                <div class="card-body">
+                    {{ include('formation/_form.html.twig') }}
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+{% endblock %}

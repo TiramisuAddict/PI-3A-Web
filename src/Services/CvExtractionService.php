@@ -10,33 +10,27 @@ use Symfony\Component\HttpClient\HttpClient;
 
 final class CvExtractionService
 {
-    public function __construct(
-        private string $groqApiUrl,
-        private string $groqApiKey,
-        private string $groqModel,
-    ) {
-    }
-
     public function extractAndPersistForEmploye(Employe $employe, EntityManagerInterface $entityManager): array
     {
+        $groqApiUrl = $this->readEnv('GROQ_API_URL');
+        $groqApiKey = $this->readEnv('GROQ_API_KEY');
+        $groqModel = $this->readEnv('GROQ_MODEL');
+
+        if ($groqApiUrl === '' || $groqApiKey === '' || $groqModel === '') {
+            return [
+                'success' => false,
+                'error' => 'Configuration Groq manquante (GROQ_API_URL, GROQ_API_KEY ou GROQ_MODEL).',
+            ];
+        }
+
         $cvBinary = $employe->getCvData();
-        if ($cvBinary === null || trim($cvBinary) === '') {
-            return ['success' => false, 'error' => 'Aucun CV disponible pour cet employé.'];
-        }
-
-        if ($this->groqApiKey === '') {
-            return ['success' => false, 'error' => 'GROQ_API_KEY non configurée.'];
-        }
-
         $cvText = $this->extractTextFromCvBinary($cvBinary);
-        if ($cvText === null || trim($cvText) === '') {
-            return ['success' => false, 'error' => 'Impossible d\'extraire le texte du CV (PDF vide ou non lisible).'];
-        }
-
-        $extracted = $this->extractWithGroq($cvText, $this->groqApiUrl, $this->groqApiKey, $this->groqModel);
-
+        $extracted = $this->extractWithGroq($cvText, $groqApiUrl, $groqApiKey, $groqModel);
         if (isset($extracted['error'])) {
-            return ['success' => false, 'error' => $extracted['error']];
+            return [
+                'success' => false,
+                'error' => (string) $extracted['error'],
+            ];
         }
 
         $skills = is_array($extracted['skills'] ?? null) ? $extracted['skills'] : [];
@@ -181,6 +175,17 @@ final class CvExtractionService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function readEnv(string $name): string
+    {
+        $value = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
+
+        if (!is_string($value)) {
+            return '';
+        }
+
+        return trim($value);
     }
 
 }

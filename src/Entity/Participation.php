@@ -2,11 +2,9 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-
 use App\Repository\ParticipationRepository;
+use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: ParticipationRepository::class)]
 #[ORM\Table(name: 'participation')]
@@ -17,34 +15,38 @@ class Participation
     #[ORM\Column(type: 'integer')]
     private ?int $id_participation = null;
 
-    public function getId_participation(): ?int
+    public function getIdParticipation(): ?int
     {
         return $this->id_participation;
     }
 
-    public function setId_participation(int $id_participation): self
+    public function setIdParticipation(int $id_participation): self
     {
         $this->id_participation = $id_participation;
+
         return $this;
     }
 
-    #[ORM\OneToOne(targetEntity: Employe::class, inversedBy: 'participation')]
-    #[ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe', unique: true)]
-    private ?Employe $employé = null;
+    #[ORM\Column(type: 'integer', nullable: false)]
+    #[Assert\NotNull(message: 'L’identifiant utilisateur est obligatoire.')]
+    #[Assert\Type(type: 'integer', message: 'L’identifiant utilisateur doit être un entier.')]
+    private ?int $utilisateur_id = null;
 
-    public function getEmployé(): ?Employe
+    public function getUtilisateurId(): ?int
     {
-        return $this->employé;
+        return $this->utilisateur_id;
     }
 
-    public function setEmployé(?Employe $employé): self
+    public function setUtilisateurId(int $utilisateur_id): self
     {
-        $this->employé = $employé;
+        $this->utilisateur_id = $utilisateur_id;
+
         return $this;
     }
 
     #[ORM\OneToOne(targetEntity: Post::class, inversedBy: 'participation')]
-    #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post', unique: true)]
+    #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post', unique: true, nullable: false)]
+    #[Assert\NotNull(message: 'Le post associé est obligatoire.')]
     private ?Post $post = null;
 
     public function getPost(): ?Post
@@ -59,6 +61,8 @@ class Participation
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Assert\NotBlank(message: 'Le statut est obligatoire.')]
+    #[Assert\Length(min: 2, max: 64, minMessage: 'Le statut doit contenir au moins {{ limit }} caractères.')]
     private ?string $statut = null;
 
     public function getStatut(): ?string
@@ -73,17 +77,20 @@ class Participation
     }
 
     #[ORM\Column(type: 'datetime', nullable: false)]
+    #[Assert\NotNull(message: 'La date d’action est obligatoire.')]
+    #[Assert\Type(\DateTimeInterface::class)]
+    #[Assert\DateTime(message: 'La date d’action doit être valide.')]
     private ?\DateTimeInterface $date_action = null;
 
-    public function getDate_action(): ?\DateTimeInterface
+    public function getDateAction(): ?\DateTimeInterface
     {
         return $this->date_action;
     }
 
-    public function setDate_action(\DateTimeInterface $date_action): self
+    public function setDateAction(\DateTimeInterface $date_action): self
     {
         $this->date_action = $date_action;
+
         return $this;
     }
-
 }

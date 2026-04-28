@@ -1,0 +1,231 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Statistiques | Dashboard RH{% endblock %}
+
+{% block stylesheets %}
+	{{ parent() }}
+	<style>
+		.stats-dashboard {
+			background: #f5f7fb;
+			min-height: 100vh;
+			padding: 1.25rem 0 2rem;
+		}
+
+		.stats-card {
+			border: 1px solid rgba(15, 23, 42, 0.08);
+			border-radius: 10px;
+			background: #fff;
+		}
+
+		.stat-label {
+			font-size: .875rem;
+			color: #64748b;
+			margin-bottom: .25rem;
+		}
+
+		.stat-value {
+			font-size: 1.8rem;
+			line-height: 1.1;
+			font-weight: 700;
+			color: #111827;
+		}
+
+		.stats-chart {
+			height: 280px;
+		}
+	</style>
+{% endblock %}
+
+{% block body %}
+	{{ include('components/navbar.html.twig') }}
+	<div class="d-flex" style="min-height:calc(100vh - 56px);">
+		{{ include('components/sidebar.html.twig', {'active_page': 'offres','sidebar_role': role}) }}
+
+		<div class="stats-dashboard flex-grow-1">
+			<div class="container-xl">
+				{{ include('offre/_navigation_tab.html.twig') }}
+
+				<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+					<div>
+						<h1 class="h2 mb-1">Statistiques de recrutement</h1>
+						<p class="text-secondary mb-0">Vue rapide et simple des offres et candidatures.</p>
+					</div>
+					<form method="get" action="{{ path('app_recrutement_statistiques') }}" class="d-flex gap-2 align-items-end">
+						<div>
+							<label for="offreId" class="form-label mb-1">Offre</label>
+							<select id="offreId" name="offreId" class="form-select" onchange="this.form.submit()">
+								{% if offres is empty %}
+									<option value="">Aucune offre</option>
+								{% else %}
+									{% for offre in offres %}
+										<option value="{{ offre.id }}" {{ selectedOffreId == offre.id ? 'selected' : '' }}>
+											{{ offre.titrePoste }}
+										</option>
+									{% endfor %}
+								{% endif %}
+							</select>
+						</div>
+					</form>
+				</div>
+
+				<div class="row g-3 mb-3">
+					<div class="col-12 col-md-6 col-xl-3">
+						<div class="stats-card p-3 h-100">
+							<div class="stat-label">Total offres</div>
+							<div class="stat-value">{{ totalOffres }}</div>
+						</div>
+					</div>
+
+					<div class="col-12 col-md-6 col-xl-3">
+						<div class="stats-card p-3 h-100">
+							<div class="stat-label">Offres ouvertes</div>
+							<div class="stat-value">{{ offresOuvertes }}</div>
+						</div>
+					</div>
+
+					<div class="col-12 col-md-6 col-xl-3">
+						<div class="stats-card p-3 h-100">
+							<div class="stat-label">Total candidats</div>
+							<div class="stat-value">{{ totalCandidats }}</div>
+						</div>
+					</div>
+
+					<div class="col-12 col-md-6 col-xl-3">
+						<div class="stats-card p-3 h-100">
+							<div class="stat-label">Candidats traites</div>
+							<div class="stat-value">{{ totalCandidats - statsEtat['En attente'] }}</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="card stats-card">
+					<div class="card-body">
+						<h3 class="card-title mb-3">Repartition par etat</h3>
+
+						<div class="row g-2">
+							<div class="col-12 col-md-6 col-xl-4">
+								<div class="d-flex justify-content-between align-items-center p-2 border rounded">
+									<span>En attente</span>
+									<span class="badge bg-yellow-lt text-yellow">{{ statsEtat['En attente'] }}</span>
+								</div>
+							</div>
+							<div class="col-12 col-md-6 col-xl-4">
+								<div class="d-flex justify-content-between align-items-center p-2 border rounded">
+									<span>Preselectionnes</span>
+									<span class="badge bg-blue-lt text-blue">{{ statsEtat['Preselectionne'] }}</span>
+								</div>
+							</div>
+							<div class="col-12 col-md-6 col-xl-4">
+								<div class="d-flex justify-content-between align-items-center p-2 border rounded">
+									<span>Acceptees</span>
+									<span class="badge bg-green-lt text-green">{{ statsEtat['Acceptee'] }}</span>
+								</div>
+							</div>
+							<div class="col-12 col-md-6 col-xl-4">
+								<div class="d-flex justify-content-between align-items-center p-2 border rounded">
+									<span>Refuses</span>
+									<span class="badge bg-red-lt text-red">{{ statsEtat['Refuse'] }}</span>
+								</div>
+							</div>
+							<div class="col-12 col-md-6 col-xl-4">
+								<div class="d-flex justify-content-between align-items-center p-2 border rounded">
+									<span>Autres</span>
+									<span class="badge bg-secondary-lt text-secondary">{{ statsEtat['Autres'] }}</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="row g-3 mt-1">
+					<div class="col-12 col-xl-6">
+						<div class="card stats-card h-100">
+							<div class="card-body">
+								<h3 class="card-title mb-3">Candidatures dans le temps</h3>
+								<div id="chart-candidatures-time" class="stats-chart"></div>
+							</div>
+						</div>
+					</div>
+
+					<div class="col-12 col-xl-6">
+						<div class="card stats-card h-100">
+							<div class="card-body">
+								<h3 class="card-title mb-3">Repartition des scores de matching</h3>
+								<div id="chart-scores-distribution" class="stats-chart"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+{% endblock %}
+
+{% block javascripts %}
+	{{ parent() }}
+	<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+	<script>
+		document.addEventListener('DOMContentLoaded', function () {
+			const candidatureLabels = {{ chartCandidatureLabels|json_encode|raw }};
+			const candidatureValues = {{ chartCandidatureValues|json_encode|raw }};
+			const scoreDistributionLabels = {{ chartScoreDistributionLabels|json_encode|raw }};
+			const scoreDistributionValues = {{ chartScoreDistributionValues|json_encode|raw }};
+
+			new ApexCharts(document.querySelector('#chart-candidatures-time'), {
+				chart: {
+					type: 'line',
+					height: 280,
+					toolbar: { show: false },
+					fontFamily: 'inherit'
+				},
+				series: [{
+					name: 'Candidatures',
+					data: candidatureValues
+				}],
+				xaxis: {
+					categories: candidatureLabels
+				},
+				stroke: {
+					width: 3,
+					curve: 'smooth'
+				},
+				markers: {
+					size: 4
+				},
+				colors: ['#1f6feb'],
+				noData: {
+					text: 'Pas de donnees pour cette offre'
+				}
+			}).render();
+
+			new ApexCharts(document.querySelector('#chart-scores-distribution'), {
+				chart: {
+					type: 'bar',
+					height: 280,
+					toolbar: { show: false },
+					fontFamily: 'inherit'
+				},
+				series: [{
+					name: 'Nb. candidats',
+					data: scoreDistributionValues
+				}],
+				xaxis: {
+					categories: scoreDistributionLabels
+				},
+				plotOptions: {
+					bar: {
+						borderRadius: 4,
+						columnWidth: '45%'
+					}
+				},
+				dataLabels: {
+					enabled: false
+				},
+				colors: ['#0ca678'],
+				noData: {
+					text: 'Pas de scores disponibles pour cette offre'
+				}
+			}).render();
+		});
+	</script>
+{% endblock %}

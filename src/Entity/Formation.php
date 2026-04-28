@@ -2,114 +2,141 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-
 use App\Repository\FormationRepository;
+use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity(repositoryClass: FormationRepository::class)]
-#[ORM\Table(name: 'formation')]
 class Formation
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'integer')]
-    private ?int $id_formation = null;
+    #[ORM\Column(name: 'id_formation')]
+    private ?int $id = null;
 
-    public function getId_formation(): ?int
-    {
-        return $this->id_formation;
-    }
-
-    public function setId_formation(int $id_formation): self
-    {
-        $this->id_formation = $id_formation;
-        return $this;
-    }
-
-    #[ORM\Column(type: 'string', nullable: false)]
+    #[ORM\Column(length: 50)]
+    #[Assert\NotBlank(message: 'Le titre est obligatoire.')]
     private ?string $titre = null;
+
+    #[ORM\Column(length: 50)]
+    #[Assert\NotBlank(message: 'L\'organisme est obligatoire.')]
+    private ?string $organisme = null;
+
+    #[ORM\Column(name: 'date_debut', type: 'date_immutable')]
+    #[Assert\NotNull(message: 'La date de debut est obligatoire.')]
+    private ?\DateTimeImmutable $dateDebut = null;
+
+    #[ORM\Column(name: 'date_fin', type: 'date_immutable')]
+    #[Assert\NotNull(message: 'La date de fin est obligatoire.')]
+    private ?\DateTimeImmutable $dateFin = null;
+
+    #[ORM\Column(length: 30)]
+    #[Assert\NotBlank(message: 'Le lieu est obligatoire.')]
+    private ?string $lieu = null;
+
+    #[ORM\Column(type: 'integer')]
+    #[Assert\PositiveOrZero(message: 'La capacite doit etre un nombre positif.')]
+    private ?int $capacite = null;
+
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
 
     public function getTitre(): ?string
     {
         return $this->titre;
     }
 
-    public function setTitre(string $titre): self
+    public function setTitre(string $titre): static
     {
         $this->titre = $titre;
+
         return $this;
     }
-
-    #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $organisme = null;
 
     public function getOrganisme(): ?string
     {
         return $this->organisme;
     }
 
-    public function setOrganisme(string $organisme): self
+    public function setOrganisme(string $organisme): static
     {
         $this->organisme = $organisme;
+
         return $this;
     }
 
-    #[ORM\Column(type: 'date', nullable: false)]
-    private ?\DateTimeInterface $date_debut = null;
-
-    public function getDate_debut(): ?\DateTimeInterface
+    public function getDateDebut(): ?\DateTimeImmutable
     {
-        return $this->date_debut;
+        return $this->dateDebut;
     }
 
-    public function setDate_debut(\DateTimeInterface $date_debut): self
+    public function setDateDebut(?\DateTimeImmutable $dateDebut): static
     {
-        $this->date_debut = $date_debut;
+        $this->dateDebut = $dateDebut;
+
         return $this;
     }
 
-    #[ORM\Column(type: 'date', nullable: false)]
-    private ?\DateTimeInterface $date_fin = null;
-
-    public function getDate_fin(): ?\DateTimeInterface
+    public function getDateFin(): ?\DateTimeImmutable
     {
-        return $this->date_fin;
+        return $this->dateFin;
     }
 
-    public function setDate_fin(\DateTimeInterface $date_fin): self
+    public function setDateFin(?\DateTimeImmutable $dateFin): static
     {
-        $this->date_fin = $date_fin;
+        $this->dateFin = $dateFin;
+
         return $this;
     }
-
-    #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $lieu = null;
 
     public function getLieu(): ?string
     {
         return $this->lieu;
     }
 
-    public function setLieu(string $lieu): self
+    public function setLieu(?string $lieu): static
     {
         $this->lieu = $lieu;
+
         return $this;
     }
-
-    #[ORM\Column(type: 'integer', nullable: false)]
-    private ?int $capacite = null;
 
     public function getCapacite(): ?int
     {
         return $this->capacite;
     }
 
-    public function setCapacite(int $capacite): self
+    public function setCapacite(?int $capacite): static
     {
         $this->capacite = $capacite;
+
         return $this;
     }
 
+    #[Assert\Callback]
+    public function validateDates(ExecutionContextInterface $context): void
+    {
+        $today = new \DateTimeImmutable('today');
+
+        if ($this->dateDebut !== null && $this->dateDebut < $today) {
+            $context->buildViolation('La date de debut ne peut pas etre dans le passe.')
+                ->atPath('dateDebut')
+                ->addViolation();
+        }
+
+        if ($this->dateFin !== null && $this->dateFin < $today) {
+            $context->buildViolation('La date de fin ne peut pas etre dans le passe.')
+                ->atPath('dateFin')
+                ->addViolation();
+        }
+
+        if ($this->dateDebut !== null && $this->dateFin !== null && $this->dateFin < $this->dateDebut) {
+            $context->buildViolation('La date de fin doit etre apres la date de debut.')
+                ->atPath('dateFin')
+                ->addViolation();
+        }
+    }
 }

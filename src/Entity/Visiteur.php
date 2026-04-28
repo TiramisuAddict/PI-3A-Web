@@ -5,30 +5,31 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 
 use App\Repository\VisiteurRepository;
 
 #[ORM\Entity(repositoryClass: VisiteurRepository::class)]
 #[ORM\Table(name: 'visiteur')]
-class Visiteur
+class Visiteur implements PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id_visiteur = null;
 
-    public function getIdVisiteur(): ?int
+    public function getId_visiteur(): ?int
     {
         return $this->id_visiteur;
     }
 
-    public function setIdVisiteur(int $id_visiteur): self
+    public function setId_visiteur(int $id_visiteur): self
     {
         $this->id_visiteur = $id_visiteur;
         return $this;
     }
 
-    #[ORM\Column(type: 'string', length: 30, nullable: false)]
+    #[ORM\Column(type: 'string', nullable: false)]
     private ?string $nom = null;
 
     public function getNom(): ?string
@@ -42,7 +43,7 @@ class Visiteur
         return $this;
     }
 
-    #[ORM\Column(type: 'string', length: 30, nullable: false)]
+    #[ORM\Column(type: 'string', nullable: false)]
     private ?string $prenom = null;
 
     public function getPrenom(): ?string
@@ -56,32 +57,41 @@ class Visiteur
         return $this;
     }
 
-    #[ORM\Column(type: 'string', length: 30, nullable: false)]
+    #[ORM\Column(type: 'string', nullable: false)]
     private ?string $e_mail = null;
 
-    public function getEMail(): ?string
+    public function getEmail(): ?string
     {
         return $this->e_mail;
     }
 
-    public function setEMail(string $e_mail): self
+    public function setEmail(string $e_mail): self
     {
         $this->e_mail = $e_mail;
         return $this;
     }
 
-    #[ORM\Column(type: 'string', length: 100, nullable: false)]
+    #[ORM\Column(type: 'string', nullable: false)]
     private ?string $mot_de_passe = null;
 
-    public function getMotDePasse(): ?string
+    public function getMotdepasse(): ?string
     {
         return $this->mot_de_passe;
     }
 
-    public function setMotDePasse(string $mot_de_passe): self
+    public function setMotdepasse(string $mot_de_passe): self
     {
         $this->mot_de_passe = $mot_de_passe;
         return $this;
+    }
+
+    public function getPassword(): ?string
+    {
+        return $this->mot_de_passe;
+    }
+
+    public function eraseCredentials(): void
+    {
     }
 
     #[ORM\Column(type: 'integer', nullable: false)]
@@ -100,11 +110,6 @@ class Visiteur
 
     #[ORM\OneToMany(targetEntity: Candidat::class, mappedBy: 'visiteur')]
     private Collection $candidats;
-
-    public function __construct()
-    {
-        $this->candidats = new ArrayCollection();
-    }
 
     /**
      * @return Collection<int, Candidat>

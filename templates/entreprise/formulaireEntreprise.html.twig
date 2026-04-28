@@ -80,22 +80,22 @@
             </div>
 <div class="col-12">
   {{ form_label(form.logo, null, {'label_attr': {'class': 'form-label small mb-1'}}) }}
+  {% set logoInputId = form.logo.vars.id %}
 
   {# INPUT FILE caché #}
   {{ form_widget(form.logo, {
     'attr': {
       'accept': 'image/*',
-      'style': 'display:none;',
-      'id': 'logo-input'
+      'style': 'display:none;'
     }
   }) }}
 
   {# BOUTON qui ouvre l'explorateur #}
-  <label for="logo-input" class="btn btn-sm btn-outline-secondary">
+  <label for="{{ logoInputId }}" class="btn btn-sm btn-outline-secondary">
     Choisir une image
   </label>
 
-  <div class="form-text mt-1">
+  <div class="form-text mt-1" id="logo-file-name">
     Aucun fichier sélectionné
   </div>
 </div>
@@ -122,5 +122,24 @@
     </div>
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var logoInput = document.getElementById('{{ logoInputId }}');
+  var logoFileName = document.getElementById('logo-file-name');
+
+  if (!logoInput || !logoFileName) {
+    return;
+  }
+
+  logoInput.addEventListener('change', function () {
+    if (logoInput.files && logoInput.files[0]) {
+      logoFileName.textContent = logoInput.files[0].name;
+    } else {
+      logoFileName.textContent = 'Aucun fichier sélectionné';
+    }
+  });
+});
+</script>
 
 {% endblock %}

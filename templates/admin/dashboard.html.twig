@@ -1,0 +1,174 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Tableau de bord admin{% endblock %}
+
+{% block body %}
+{{ include('components/navbar.html.twig') }}
+  <div class="d-flex overflow-hidden" style="height:calc(100vh - 56px);">
+    {{ include('components/sidebar.html.twig', {'active_page': 'accueil','sidebar_role': role}) }}
+<div class="flex-fill overflow-y-auto p-4" style="background:#F6F7FF; min-width:0;">
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Tableau de bord</h2>
+                    <p class="text-secondary small mb-0">Statistiques et gestion du backend. <a href="{{ path('app_employe_feed') }}">Voir le fil d'actualité</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <!-- Stats Cards -->
+            <div class="row row-cards mb-4">
+                <div class="col-sm-6 col-lg-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-baseline">
+                                <div>
+                                    <div class="text-secondary small">Posts</div>
+                                    <div class="h2 mb-0">{{ stats.posts }}</div>
+                                </div>
+                                <div class="ms-auto lh-1"><i class="ti ti-file-text text-blue" style="font-size: 2.5rem; opacity: 0.15;"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-baseline">
+                                <div>
+                                    <div class="text-secondary small">Commentaires</div>
+                                    <div class="h2 mb-0">{{ stats.comments }}</div>
+                                </div>
+                                <div class="ms-auto lh-1"><i class="ti ti-message text-azure" style="font-size: 2.5rem; opacity: 0.15;"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-baseline">
+                                <div>
+                                    <div class="text-secondary small">Likes</div>
+                                    <div class="h2 mb-0">{{ stats.likes }}</div>
+                                </div>
+                                <div class="ms-auto lh-1"><i class="ti ti-thumb-up text-pink" style="font-size: 2.5rem; opacity: 0.15;"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-baseline">
+                                <div>
+                                    <div class="text-secondary small">Participations</div>
+                                    <div class="h2 mb-0">{{ stats.participations }}</div>
+                                </div>
+                                <div class="ms-auto lh-1"><i class="ti ti-users text-teal" style="font-size: 2.5rem; opacity: 0.15;"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header pb-0">
+                            <h4 class="card-title">Annonces vs Événements</h4>
+                        </div>
+                        <div class="card-body pt-2">
+                            <div style="position: relative; height: 200px;">
+                                <canvas id="chartPieTypes" 
+                                        data-pie-annonces="{{ pieAnnonces|default(0) }}"
+                                        data-pie-evenements="{{ pieEvenements|default(0) }}"
+                                        aria-label="Répartition des types de posts"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header pb-0">
+                            <h4 class="card-title">Engagement par publication</h4>
+                        </div>
+                        <div class="card-body pt-2">
+                            <div style="position: relative; height: 200px;">
+                                <canvas id="chartBarEngagement" 
+                                        data-labels="{{ chartEngagementLabels|default([]) | json_encode }}"
+                                        data-values="{{ chartEngagementValues|default([]) | json_encode }}"
+                                        aria-label="Engagement par publication"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header pb-0">
+                            <h4 class="card-title">Participations aux événements (par jour)</h4>
+                        </div>
+                        <div class="card-body pt-2">
+                            <div style="position: relative; height: 220px;">
+                                <canvas id="chartLineParticipation"
+                                        data-labels="{{ chartParticipationLabels|default([]) | json_encode }}"
+                                        data-values="{{ chartParticipationValues|default([]) | json_encode }}"
+                                        aria-label="Participations par date"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Access -->
+            <h3 class="my-4">Gestion</h3>
+            <div class="row g-3">
+                <div class="col-md-6 col-xl-3">
+                    <a href="{{ path('app_post_index') }}" class="card" style="text-decoration: none; color: inherit;">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="avatar avatar-lg" style="background-color: #4A5DEF; color: white; flex-shrink: 0;">
+                                    <i class="ti ti-file-text"></i>
+                                </div>
+                                <div>
+                                    <h3 class="card-title">Publications</h3>
+                                    <p class="text-secondary small mb-0">Gestion des posts</p>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                
+                <div class="col-md-6 col-xl-3">
+                    <a href="{{ path('app_notification_index') }}" class="card" style="text-decoration: none; color: inherit;">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="avatar avatar-lg" style="background-color: #f59f00; color: white; flex-shrink: 0;">
+                                    <i class="ti ti-bell"></i>
+                                </div>
+                                <div>
+                                    <h3 class="card-title">Notifications</h3>
+                                    <p class="text-secondary small mb-0">Messages</p>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+    <script src="{{ asset('js/dashboard-charts.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Commentaires — Momentum{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Commentaires</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                            <tr>
+                                <th>Contenu</th>
+                                <th>Date</th>
+                                <th>Publication</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for commentaire in commentaires %}
+                            <tr>
+                                <td>{{ commentaire.contenu|length > 60 ? commentaire.contenu|slice(0, 60) ~ '…' : commentaire.contenu }}</td>
+                                <td class="text-secondary small">{{ commentaire.dateCommentaire ? commentaire.dateCommentaire|date('d/m/Y H:i') : '—' }}</td>
+                                <td>{% if commentaire.post %}<a href="{{ path('app_post_show', {id_post: commentaire.post.idPost}) }}" class="btn btn-ghost-primary">{{ commentaire.post.titre|length > 25 ? commentaire.post.titre|slice(0, 25) ~ '…' : commentaire.post.titre }}</a>{% else %}—{% endif %}</td>
+                                <td class="text-end text-nowrap">
+                                    <div class="d-flex align-items-center justify-content-end gap-2">
+                                        <form class="d-inline" method="post" action="{{ path('app_commentaire_delete', { id_commentaire: commentaire.idCommentaire }) }}" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce commentaire ?');">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ commentaire.idCommentaire) }}">
+                                            <button type="submit" class="btn btn-icon btn-ghost-danger" title="Supprimer"><i class="ti ti-trash" style="font-size: 1.25rem;"></i></button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4">
+                                    <div class="text-secondary small">Aucun commentaire trouvé</div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

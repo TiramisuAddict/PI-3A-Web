@@ -10,6 +10,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use App\Entity\Offre;
 use App\Form\OffreType;
 
+use App\Repository\EmployeRepository;
 use App\Repository\OffreRepository;
 
 use Doctrine\Persistence\ManagerRegistry;
@@ -27,7 +28,7 @@ final class OffreController extends AbstractController
     }
     
     //Offres
-    #[Route('/offre/home', name: 'app_offre_home')]
+    #[Route('/accueil', name: 'app_offre_home')]
     public function home(OffreRepository $offre_repository){
         $offres = $offre_repository->findAll();
         return $this->render('offre/home_page.html.twig' , [ //page
@@ -36,13 +37,13 @@ final class OffreController extends AbstractController
     }
 
     //Liste des offres
-    #[Route('/offre/list', name: 'app_offre_list')]
+    #[Route('/offres', name: 'app_offre_list')]
     public function listOffres(Request $request, OffreRepository $offre_repository){
         $q = $request->query->get('q');
         $category = $request->query->get('category');
         $contract = $request->query->get('contract');
 
-        $offres = $offre_repository->findByFilters($q, $category, $contract, null);
+        $offres = $offre_repository->findByFilters($q, $category, $contract, 'OUVERT');
 
         return $this->render('offre/index.html.twig' , [ //page
             'offres' => $offres
@@ -51,7 +52,7 @@ final class OffreController extends AbstractController
 
     // dashboard_offre_hr
     #[Route('/offre/dashboard', name: 'app_offre_dashboard')]
-    public function dashboard(Request $request, OffreRepository $offre_repository, SessionInterface $session): Response
+    public function dashboard(Request $request, OffreRepository $offre_repository, EmployeRepository $employeRepository, SessionInterface $session): Response
     {
         $q = $request->query->get('q');
         $contract = $request->query->get('contract');
@@ -59,10 +60,21 @@ final class OffreController extends AbstractController
         $category = $request->query->get('category');
 
         $offres = $offre_repository->findByFilters($q, $category, $contract, $etat);
+        $creatorIds = array_values(array_unique(array_filter(array_map(static fn (Offre $offre): ?int => $offre->getIdEmployer(), $offres), static fn (?int $id): bool => is_int($id) && $id > 0)));
+        $creatorNames = [];
+
+        if ($creatorIds !== []) {
+            foreach ($employeRepository->findBy(['id_employe' => $creatorIds]) as $employe) {
+                $fullName = trim(($employe->getPrenom() ?? '') . ' ' . ($employe->getNom() ?? ''));
+                $creatorNames[$employe->getId_employe()] = $fullName !== '' ? $fullName : ('Employe #' . $employe->getId_employe());
+            }
+        }
+
         $form = $this->createForm(OffreType::class, new Offre());
 
         return $this->render('offre/dashboard_offre_hr.html.twig', [
             'offres' => $offres,
+            'creatorNames' => $creatorNames,
             'form' => $form->createView(),
             'filters' => [
                 'q' => $q,
@@ -84,8 +96,14 @@ final class OffreController extends AbstractController
         $form->handleRequest($request);
         if($form->isSubmitted() && $form->isValid()){
             $offre = $form->getData();
+            $idEmploye = $session->get('employe_id');
 
-            $offre->setIdEmployer(139);
+            if (!is_int($idEmploye) || $idEmploye <= 0) {
+                $this->addFlash('error', 'Session employe invalide. Veuillez vous reconnecter.');
+                return $this->redirectToRoute('login');
+            }
+
+            $offre->setIdEmployer($idEmploye);
 
             $doctrine->getManager()->persist($offre);
             $doctrine->getManager()->flush();
@@ -118,7 +136,12 @@ final class OffreController extends AbstractController
         if($form->isSubmitted() && $form->isValid()){
             $offre = $form->getData();
 
-            $offre->setIdEmployer(139);
+            if ($offre->getIdEmployer() === null) {
+                $idEmploye = $session->get('employe_id');
+                if (is_int($idEmploye) && $idEmploye > 0) {
+                    $offre->setIdEmployer($idEmploye);
+                }
+            }
 
             $doctrine->getManager()->persist($offre);
             $doctrine->getManager()->flush();

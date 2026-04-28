@@ -1,230 +1,852 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Momentum | Plateforme RH et Carriere{% endblock %}
+{% block title %}Momentum | Plateforme RH et projets{% endblock %}
 
 {% block stylesheets %}
-	{{ parent() }}
-	
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('fonts/mont/stylesheet.css') }}">
     <style>
+        .momentum-home {
+            background:
+                radial-gradient(circle at top left, rgba(30, 64, 175, 0.06), transparent 30%),
+                linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+        }
 
-		.momentum-home {
-			background: #f5f7fb;
-			min-height: 100vh;
-			padding-bottom: 2.5rem;
-		}
+        .hero-section {
+            position: relative;
+            overflow: hidden;
+            padding: clamp(2.4rem, 4.2vw, 3.9rem) 0 clamp(7.4rem, 12vw, 9.8rem);
+            background:
+                radial-gradient(110% 80% at 8% 0%, rgba(255, 255, 255, 0.55), transparent 58%),
+                linear-gradient(180deg, #e7ebf2 0%, #e2e6ee 100%);
+        }
 
-		.momentum-hero {
-			padding-top: 1rem;
-		}
+        .hero-content {
+            position: relative;
+            z-index: 3;
+            max-width: 680px;
+        }
 
-		.momentum-hero-content {
-			max-width: 680px;
-		}
+        .hero-title {
+            margin: 0;
+            font-size: clamp(2rem, 4.2vw, 3.6rem);
+            font-family: 'Mont';
+            font-weight: 700;
+            line-height: 1.05;
+            letter-spacing: -0.05em;
+            color: #0d1535;
+            max-width: 20.5ch;
+        }
 
-		.momentum-hero-visual {
-			border: 1px solid rgba(15, 23, 42, 0.08);
-			border-radius: 10px;
-			background: #fff;
-			overflow: hidden;
-		}
+        .hero-subtitle {
+            margin-top: 1.2rem;
+            margin-bottom: 0;
+            max-width: 700px;
+            font-size: clamp(1rem, 1.15vw, 1.28rem);
+            line-height: 1.42;
+            letter-spacing: -0.01em;
+            color: #4c5565;
+        }
 
-		.momentum-hero-visual-top {
-			padding: .75rem 1rem;
-			border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-			background: linear-gradient(90deg, rgba(31, 111, 235, 0.08), rgba(14, 116, 144, 0.08));
-		}
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .75rem;
+            margin-top: 1.35rem;
+        }
 
-		.momentum-hero-visual-body {
-			padding: 1rem;
-		}
+        .hero-showcase {
+            pointer-events: none;
+            position: absolute;
+            left: 50%;
+            bottom: -4%;
+            width: min(1080px, 72vw);
+            z-index: 2;
+            transform: translateX(-6%);
+            transform-origin: center;
+            filter: drop-shadow(0 26px 35px rgba(20, 31, 57, 0.18));
+        }
 
-		.momentum-preview-card {
-			border: 1px solid rgba(15, 23, 42, 0.08);
-			border-radius: 8px;
-			padding: .75rem;
-			background: #ffffff;
-		}
+        .hero-showcase img {
+            width: 100%;
+            height: auto;
+            display: block;
+            opacity: 0.94;
+        }
 
-		.momentum-preview-card + .momentum-preview-card {
-			margin-top: .75rem;
-		}
+        @media (max-width: 992px) {
+            .hero-section {
+                padding-bottom: clamp(6rem, 24vw, 8rem);
+            }
 
-		.momentum-logo-hero {
-			height: 34px;
-			width: auto;
-		}
+            .hero-subtitle {
+                max-width: 560px;
+            }
 
-		.momentum-dual-card {
-			border: 1px solid rgba(15, 23, 42, 0.08);
-			border-radius: 10px;
-			background: #fff;
-			height: 100%;
-		}
+            .hero-showcase {
+                width: min(860px, 126vw);
+                left: 48%;
+                bottom: -3%;
+                transform: translateX(-8%);
+            }
+        }
 
-		.momentum-home .card {
-			border-radius: 10px;
-			border: 1px solid rgba(15, 23, 42, 0.08);
-		}
+        @media (max-width: 576px) {
+            .hero-section {
+                padding-top: 2.2rem;
+                padding-bottom: 4.8rem;
+            }
 
-		.momentum-audience-label {
-			font-size: .75rem;
-			letter-spacing: .05em;
-			text-transform: uppercase;
-			font-weight: 700;
-			color: #64748b;
-		}
+            .hero-actions {
+                gap: .75rem;
+            }
 
-		.momentum-list {
-			margin: 0;
-			padding-left: 1rem;
-			color: #334155;
-		}
+            .hero-actions .btn {
+                width: 100%;
+                text-align: center;
+            }
 
-		.momentum-list li + li {
-			margin-top: .5rem;
-		}
+            .hero-showcase {
+                width: 165vw;
+                left: 32%;
+                bottom: -4%;
+                transform: translateX(-8%);
+            }
+        }
 
-		@media (max-width: 991.98px) {
-			.momentum-hero-content {
-				max-width: 100%;
-			}
-		}
-	</style>
+        .section-title {
+            font-size: clamp(1.9rem, 3vw, 2.6rem);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            font-family: 'Mont';
+        }
+
+        .features-section {
+            position: relative;
+            overflow: hidden;
+            padding: 1rem 0 1.5rem;
+        }
+
+        .features-section::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at top right, rgba(79, 92, 255, 0.07), transparent 34%),
+                radial-gradient(circle at bottom left, rgba(29, 78, 216, 0.05), transparent 30%);
+            pointer-events: none;
+        }
+
+        .features-header {
+            position: relative;
+            z-index: 1;
+        }
+
+        .features-overview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .65rem;
+            justify-content: flex-end;
+        }
+
+        .feature-meta-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            border-radius: 999px;
+            background: rgba(30, 64, 175, 0.08);
+            color: #153b95;
+            padding: .55rem .85rem;
+            font-size: .82rem;
+            font-weight: 700;
+            letter-spacing: .01em;
+        }
+
+        .feature-spotlight,
+        .feature-tile {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 22px;
+            background: #fff;
+            height: 100%;
+        }
+
+        .feature-spotlight {
+            min-height: 100%;
+            background:
+                linear-gradient(180deg, rgba(13, 21, 53, 0.08) 0%, rgba(13, 21, 53, 0.72) 100%),
+                #0f172a;
+            box-shadow: 0 24px 48px rgba(15, 23, 42, 0.08);
+        }
+
+        .feature-spotlight-image {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            transform: scale(1.04);
+            opacity: .26;
+        }
+
+        .feature-spotlight-body {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            min-height: 100%;
+            padding: 1.75rem;
+            color: #fff;
+        }
+
+        .feature-spotlight .feature-icon {
+            background: rgba(255, 255, 255, 0.14);
+            color: #fff;
+        }
+
+        .feature-spotlight .card-title,
+        .feature-spotlight .text-secondary {
+            color: rgba(255, 255, 255, 0.86) !important;
+        }
+
+        .feature-list {
+            display: grid;
+            gap: .7rem;
+            margin-top: 1.25rem;
+        }
+
+        .feature-list-item {
+            display: flex;
+            align-items: center;
+            gap: .7rem;
+            padding: .75rem .9rem;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(8px);
+        }
+
+        .feature-list-item .avatar {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            background: rgba(255, 255, 255, 0.16);
+            color: #fff;
+        }
+
+        .feature-list-item .avatar i {
+            display: block;
+            line-height: 1;
+        }
+
+        .feature-list-item strong {
+            display: block;
+            font-size: .95rem;
+            line-height: 1.2;
+        }
+
+        .feature-list-item span {
+            display: block;
+            color: rgba(255, 255, 255, 0.76);
+            font-size: .84rem;
+        }
+
+        .feature-tile {
+            box-shadow: 0 16px 32px rgba(15, 23, 42, 0.05);
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+
+        .feature-tile:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 24px 38px rgba(15, 23, 42, 0.08);
+            border-color: rgba(77, 96, 255, 0.18);
+        }
+
+        .feature-tile__top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-tile__icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, rgba(80, 98, 255, 0.14) 0%, rgba(29, 78, 216, 0.08) 100%);
+            color: #2848d2;
+            font-size: 1.45rem;
+            flex: 0 0 auto;
+        }
+
+        .feature-tile__body {
+            padding: 1.35rem;
+        }
+
+        .feature-tile--accent {
+            background:
+                linear-gradient(180deg, rgba(59, 130, 246, 0.06), rgba(255, 255, 255, 0.98) 58%),
+                #fff;
+        }
+
+        .feature-tile--accent .feature-tile__icon {
+            background: linear-gradient(180deg, rgba(59, 130, 246, 0.18) 0%, rgba(37, 99, 235, 0.1) 100%);
+            color: #1d4ed8;
+        }
+
+        .feature-metric-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: .75rem;
+            margin-top: 1.15rem;
+        }
+
+        .feature-metric {
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            padding: .85rem .95rem;
+        }
+
+        .feature-metric strong {
+            display: block;
+            font-size: 1.05rem;
+            font-family: 'Mont';
+            font-weight: 700;
+            color: #0d1535;
+        }
+
+        .feature-metric span {
+            color: #667085;
+            font-size: .82rem;
+        }
+
+        @media (max-width: 992px) {
+            .feature-spotlight-body {
+                padding: 1.5rem;
+            }
+
+            .features-overview {
+                justify-content: flex-start;
+            }
+
+            .feature-metric-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .feature-tile__body,
+            .feature-spotlight-body {
+                padding: 1.15rem;
+            }
+
+            .feature-tile__top {
+                align-items: flex-start;
+            }
+        }
+
+        .cross-platform-section {
+            position: relative;
+        }
+
+        .cross-platform-shell {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 24px;
+            padding: clamp(1.2rem, 2vw, 2rem);
+            background:
+                radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.12), transparent 36%),
+                #fff;
+            box-shadow: 0 20px 38px rgba(15, 23, 42, 0.06);
+        }
+
+        .cross-platform-title {
+            font-size: clamp(1.8rem, 3vw, 2.4rem);
+            line-height: 1.12;
+            letter-spacing: -0.02em;
+            margin-bottom: .9rem;
+        }
+
+        .cross-platform-subtitle {
+            color: #566074;
+            max-width: 60ch;
+        }
+
+        .cross-platform-points {
+            list-style: none;
+            margin: 1.1rem 0 0;
+            padding: 0;
+            display: grid;
+            gap: .7rem;
+        }
+
+        .cross-platform-points li {
+            display: flex;
+            align-items: flex-start;
+            gap: .7rem;
+            color: #1f2937;
+        }
+
+        .cross-platform-points i {
+            color: #2563eb;
+            margin-top: .1rem;
+            font-size: 1rem;
+        }
+
+        .cross-platform-actions {
+            margin-top: 1.35rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: .6rem;
+        }
+
+        .cross-platform-visual {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            background: linear-gradient(180deg, #edf2fa 0%, #e7edf7 100%);
+            min-height: 270px;
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .cross-platform-visual img {
+            width: 100%;
+            max-width: none;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            filter: drop-shadow(0 18px 30px rgba(15, 23, 42, 0.18));
+        }
+
+        .cross-platform-note {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            z-index: 2;
+            border-radius: 999px;
+            background: rgba(13, 21, 53, 0.88);
+            color: #fff;
+            padding: .45rem .75rem;
+            font-size: .78rem;
+            font-weight: 700;
+            letter-spacing: .02em;
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+        }
+
+        @media (max-width: 768px) {
+            .cross-platform-visual {
+                min-height: 215px;
+            }
+
+            .cross-platform-visual img {
+                width: 100%;
+                height: 100%;
+            }
+        }
+
+        .cta-section {
+            padding-top: 0.2rem;
+            padding-bottom: 2.5rem;
+        }
+
+        .cta-card {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 24px;
+            background:
+                radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.1), transparent 34%),
+                radial-gradient(circle at 100% 100%, rgba(13, 21, 53, 0.08), transparent 36%),
+                #ffffff;
+            box-shadow: 0 26px 45px rgba(15, 23, 42, 0.08);
+        }
+
+        .cta-card::after {
+            content: '';
+            position: absolute;
+            width: 280px;
+            height: 280px;
+            border-radius: 999px;
+            top: -160px;
+            right: -80px;
+            background: rgba(29, 78, 216, 0.1);
+            pointer-events: none;
+        }
+
+        .cta-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-title {
+            font-size: clamp(1.85rem, 3vw, 2.75rem);
+            line-height: 1.12;
+            letter-spacing: -0.02em;
+            margin-bottom: 1rem;
+        }
+
+        .cta-subtitle {
+            max-width: 700px;
+            margin: 0 auto 1.25rem;
+            color: #566074;
+            font-size: 1.03rem;
+        }
+
+        .cta-points {
+            list-style: none;
+            margin: 0 auto 1.4rem;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: .55rem;
+        }
+
+        .cta-points li {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            background: rgba(255, 255, 255, 0.75);
+            padding: .42rem .8rem;
+            color: #344054;
+            font-size: .88rem;
+            font-weight: 600;
+        }
+
+        .cta-points li i {
+            color: #2563eb;
+            font-size: .95rem;
+        }
+
+        .cta-actions .btn {
+            min-width: 200px;
+        }
+
+        @media (max-width: 576px) {
+            .cta-points {
+                justify-content: flex-start;
+            }
+
+            .cta-actions .btn {
+                width: 100%;
+                min-width: 0;
+            }
+        }
+
+        .feature-card,
+        .story-card,
+        .stats-card,
+        .gallery-card {
+            height: 100%;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 14px;
+            background: #fff;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #dbeafe;
+            color: #1d4ed8;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .section-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            border-radius: 999px;
+            background: rgba(30, 64, 175, 0.08);
+            color: #1d4ed8;
+            padding: .35rem .85rem;
+            font-size: .78rem;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            margin-bottom: .85rem;
+            font-family: 'Mont';
+        }
+
+        .feature-cover {
+            height: 180px;
+            background-size: cover;
+            background-position: center;
+            border-top-left-radius: 14px;
+            border-top-right-radius: 14px;
+        }
+
+        .metric-value {
+            font-size: 1.7rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .metric-label {
+            color: #6b7280;
+            font-size: .9rem;
+        }
+
+        .module-list .list-group-item {
+            border-color: rgba(148, 163, 184, 0.18);
+            padding-top: .9rem;
+            padding-bottom: .9rem;
+        }
+
+        .module-list .avatar {
+            background: rgba(30, 64, 175, 0.08);
+            color: #1d4ed8;
+        }
+
+        .spotlight-image {
+            min-height: 260px;
+            background-size: cover;
+            background-position: center;
+            border-radius: 14px;
+        }
+
+        .punch-line {
+            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);
+            color: #fff;
+        }
+    </style>
 {% endblock %}
 
 {% block body %}
-	<div class="momentum-home">
-		{# include navbar #}
-		{% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'home', logged_user: false } %}
+<div class="page">
+    <div class="page-wrapper">
+        <div class="momentum-home">
+            {% include 'offre/_home_page_navbar.html.twig' with { active_nav: 'home', logged_user: app.session.get('visiteur_logged_in') == true } %}
 
-		<section class="container-xl momentum-hero">
-			<div class="row align-items-center g-4 g-xl-5">
-				<div class="col-12 col-lg-7">
-					<div class="momentum-hero-content">
-						<h1 class="display-5 fw-bold mb-3">Une seule plateforme pour recruter, collaborer et evoluer</h1>
-						<p class="text-secondary fs-4 mb-4">
-							Momentum connecte entreprises et candidats avec l'IA, la gestion RH moderne,
-							le suivi des projets en Kanban et un espace social professionnel.
-                            Recrutez plus intelligemment, travaillez plus efficacement et avancez dans votre carriere.
-						</p>
-					</div>
-				</div>
+            <main class="content">
+                <!-- HERO SECTION -->
+                <section class="hero-section">
+                    <div class="container-xl">
+                        <div class="hero-content">
+                            <h1 class="hero-title">Construisez votre equipe ideale, plus vite.</h1>
+                            <p class="hero-subtitle">
+                                Momentum est la plateforme tout-en-un qui simplifie votre recrutement,<br> de la recherche de candidats a l'envoi des offres.<br> Arretez de multiplier les outils et gagnez en efficacite.
+                            </p>
+                            <div class="hero-actions">
+                                <a href="#" class="btn btn-primary btn-md">Demarrer gratuitement</a>
+                                <a href="#" class="btn btn-outline-primary btn-md">Demander une demo</a>
+                            </div>
+                        </div>
+                        <div class="hero-showcase" aria-hidden="true">
+                            <img src="{{ asset('images/mockuphero.png') }}" alt="">
+                        </div>
+                    </div>
+                </section>
+                <!-- END HERO SECTION -->
 
-				<div class="col-12 col-lg-5">
-					<div class="momentum-hero-visual">
-						
-						<div class="momentum-hero-visual-body">
-							<div class="momentum-preview-card">
-								<div class="d-flex justify-content-between align-items-center mb-1">
-									<strong class="text-dark">Pipeline recrutement</strong>
-									<span class="badge bg-azure-lt text-azure">18 candidats</span>
-								</div>
-								<p class="text-secondary mb-0 small">Tri IA des profils et suivi des candidatures en temps reel.</p>
-							</div>
-							<div class="momentum-preview-card">
-								<div class="d-flex justify-content-between align-items-center mb-1">
-									<strong class="text-dark">Projet Kanban</strong>
-									<span class="badge bg-teal-lt text-teal">8 taches</span>
-								</div>
-								<p class="text-secondary mb-0 small">Organisation equipe, priorites visibles et collaboration fluide.</p>
-							</div>
-							<div class="momentum-preview-card">
-								<div class="d-flex justify-content-between align-items-center mb-1">
-									<strong class="text-dark">Espace communaute</strong>
-									<span class="badge bg-indigo-lt text-indigo">Nouveau post</span>
-								</div>
-								<p class="text-secondary mb-0 small">Actualites, evenements et interactions professionnelles.</p>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
+                <!-- FEATURES SECTION -->
+                <section class="features-section py-5">
+                    <div class="container-xl">
+                        <div class="features-header d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-4 mb-lg-5">
+                            <div class="pe-lg-5">
+                                <h2 class="section-title mb-2">Tout ce qui rend Momentum utile au quotidien</h2>
+                                <p class="text-secondary mb-0">Une seule base, mais plusieurs experiences metiers bien reelles.</p>
+                            </div>
+                        </div>
 
-			<div class="row g-3 mt-1">
-				<div class="col-12 col-lg-6" id="hr-zone">
-					<div class="card momentum-dual-card">
-						<div class="card-body p-4 p-xl-5">
-							<span class="momentum-audience-label">Pour les RH et entreprises</span>
-							<h2 class="h2 mt-2">Pilotez le recrutement et vos equipes avec clarte</h2>
-							<p class="text-secondary mb-4">
-								Centralisez offres d'emploi, suivi des candidats, aide a la decision par IA
-								et organisation des equipes dans un espace de travail unique.
-							</p>
+                        <div class="row g-4 align-items-stretch">
+                            <div class="col-lg-5">
+                                <div class="feature-spotlight">
+                                    <div class="feature-spotlight-image" style="background-image:url('{{ asset('images/building1.jpg') }}')"></div>
+                                    <div class="feature-spotlight-body">
+                                        <div class="feature-icon mb-3"><i class="ti ti-users"></i></div>
+                                        <div class="d-flex justify-content-between align-items-start gap-3">
+                                            <div>
+                                                <h3 class="card-title mb-2 text-white">Recrutement RH</h3>
+                                                <p class="text-secondary mb-0">Publiez des offres, suivez les candidatures, classez les profils et pilotez vos decisions de recrutement.</p>
+                                            </div>
+                                        </div>
 
-							<ul class="momentum-list mb-4">
-								<li>Gestion des offres et pipeline de candidatures</li>
-								<li>Recommandations IA pour accelerer le tri des profils</li>
-								<li>Espace collaboratif pour les equipes</li>
-							</ul>
+                                        <div class="feature-list">
+                                            <div class="feature-list-item">
+                                                <span class="avatar avatar-sm rounded"><i class="ti ti-search"></i></span>
+                                                <div>
+                                                    <strong>Sourcing plus rapide</strong>
+                                                    <span>Reperez et comparez les meilleurs profils en quelques clics.</span>
+                                                </div>
+                                            </div>
+                                            <div class="feature-list-item">
+                                                <span class="avatar avatar-sm rounded"><i class="ti ti-checkup-list"></i></span>
+                                                <div>
+                                                    <strong>Pilotage des etapes</strong>
+                                                    <span>Gardez une lecture claire du pipeline et des decisions.</span>
+                                                </div>
+                                            </div>
+                                            <div class="feature-list-item">
+                                                <span class="avatar avatar-sm rounded"><i class="ti ti-send"></i></span>
+                                                <div>
+                                                    <strong>Offres plus fluides</strong>
+                                                    <span>Centralisez les echanges jusqu'a la validation finale.</span>
+                                                </div>
+                                            </div>
+                                        </div>
 
-							<div class="d-flex flex-wrap gap-2">
-								<a href="{{ path('app_offre_list') }}" class="btn btn-primary">Voir les offres publiees</a>
-								<a href="#" class="btn btn-outline-primary">Demander une demo</a>
-							</div>
-						</div>
-					</div>
-				</div>
+                                        <div class="feature-metric-row">
+                                            <div class="feature-metric">
+                                                <strong>+120</strong>
+                                                <span>actions pilotees</span>
+                                            </div>
+                                            <div class="feature-metric">
+                                                <strong>24/7</strong>
+                                                <span>suivi continu</span>
+                                            </div>
+                                            <div class="feature-metric">
+                                                <strong>1</strong>
+                                                <span>plateforme unifiee</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-7">
+                                <div class="row g-4 h-100">
+                                    <div class="col-md-6">
+                                        <div class="feature-tile">
+                                            <div class="feature-tile__body">
+                                                <div class="feature-tile__top">
+                                                    <div class="feature-tile__icon"><i class="ti ti-briefcase"></i></div>
+                                                </div>
+                                                <h3 class="card-title mb-2">Projets & taches</h3>
+                                                <p class="text-secondary mb-0">Creez des projets, assignez des taches et suivez la progression avec une vue claire pour chaque equipe.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="feature-tile">
+                                            <div class="feature-tile__body">
+                                                <div class="feature-tile__top">
+                                                    <div class="feature-tile__icon"><i class="ti ti-school"></i></div>
+                                                </div>
+                                                <h3 class="card-title mb-2">Formations</h3>
+                                                <p class="text-secondary mb-0">Proposez des formations, gerez les inscriptions et accompagnez la montee en competences.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="feature-tile">
+                                            <div class="feature-tile__body">
+                                                <div class="feature-tile__top">
+                                                    <div class="feature-tile__icon"><i class="ti ti-message-circle-2"></i></div>
+                                                </div>
+                                                <h3 class="card-title mb-2">Communaute & posts</h3>
+                                                <p class="text-secondary mb-0">Animez votre espace interne avec des publications, des commentaires et des likes.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="feature-tile">
+                                            <div class="feature-tile__body">
+                                                <div class="feature-tile__top">
+                                                    <div class="feature-tile__icon"><i class="ti ti-bell"></i></div>
+                                                </div>
+                                                <h3 class="card-title mb-2">Notifications & alertes</h3>
+                                                <p class="text-secondary mb-0">Gardez un suivi actif des actions importantes et des evenements qui comptent.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="feature-tile">
+                                            <div class="feature-tile__body d-md-flex align-items-center justify-content-between gap-4">
+                                                <div class="d-flex align-items-start gap-3">
+                                                    <div class="feature-tile__icon"><i class="ti ti-chart-bar"></i></div>
+                                                    <div>
+                                                        <h3 class="card-title mb-2">Reporting RH</h3>
+                                                        <p class="text-secondary mb-0">Visualisez l'activite avec des indicateurs clairs pour mieux decider et mieux prioriser.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <!-- END FEATURES SECTION -->
 
-				<div class="col-12 col-lg-6" id="candidate-zone">
-					<div class="card momentum-dual-card">
-						<div class="card-body p-4 p-xl-5">
-							<span class="momentum-audience-label">Pour les candidats</span>
-							<h2 class="h2 mt-2">Trouvez des opportunites et avancez dans votre carriere</h2>
-							<p class="text-secondary mb-4">
-								Explorez les offres, postulez facilement, suivez vos candidatures
-								et restez connecte aux entreprises et a la communaute Momentum.
-							</p>
+                <!-- CROSS-PLATFORM SECTION -->
+                <section class="cross-platform-section py-5">
+                    <div class="container-xl">
+                        <div class="cross-platform-shell">
+                            <div class="row g-4 align-items-center">
+                                <div class="col-lg-6">
+                                    <h2 class="section-title cross-platform-title">Momentum sur Web et Desktop, avec un flux de travail unique.</h2>
+                                    <p class="cross-platform-subtitle mb-0">
+                                        Vos equipes passent du navigateur a l'application desktop sans perdre le contexte. Les memes donnees, la meme rapidite et la meme logique produit partout.
+                                    </p>
+                                    <ul class="cross-platform-points">
+                                        <li><i class="ti ti-check"></i><span>Synchronisation en temps reel des offres, candidatures, projets et notifications.</span></li>
+                                        <li><i class="ti ti-check"></i><span>Confort desktop pour les operations intensives et les flux RH quotidiens.</span></li>
+                                        <li><i class="ti ti-check"></i><span>Une experience coherente pour recruteurs, managers et candidats.</span></li>
+                                    </ul>
+                                    <div class="cross-platform-actions">
+                                        <a href="{{ path('compteEntreprise') }}" class="btn btn-primary btn-md">Telecharger l'application</a>
+                                        <a href="{{ path('app_pricing') }}" class="btn btn-outline-primary btn-md">Voir la tarification</a>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="cross-platform-visual">
+                                        <span class="cross-platform-note"><i class="ti ti-device-desktop"></i> Cross-Platform </span>
+                                        <img src="{{ asset('images/macdeskimg.jpg') }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
-							<ul class="momentum-list mb-4">
-								<li>Recherche d'opportunites en quelques clics</li>
-								<li>Suivi transparent de vos candidatures</li>
-								<li>Acces web et desktop pour une continuite totale</li>
-							</ul>
-
-							<div class="d-flex flex-wrap gap-2">
-								<a href="{{ path('app_offre_list') }}" class="btn btn-primary">Explorer les offres</a>
-								<a href="#" class="btn btn-outline-primary">Creer mon compte</a>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</section>
-
-		<section class="container-xl mt-5">
-			<div class="row g-3 g-md-4">
-				<div class="col-12 col-md-4">
-					<div class="card h-100">
-						<div class="card-body">
-							<h3 class="h3 mb-2">Recrutement intelligent</h3>
-							<p class="text-secondary mb-0">
-								Des outils IA utiles pour mieux prioriser les candidatures et gagner du temps,
-								sans complexite.
-							</p>
-						</div>
-					</div>
-				</div>
-				<div class="col-12 col-md-4">
-					<div class="card h-100">
-						<div class="card-body">
-							<h3 class="h3 mb-2">Collaboration operationnelle</h3>
-							<p class="text-secondary mb-0">
-								Une organisation projet claire avec des workflows Kanban pour garder les equipes alignees.
-							</p>
-						</div>
-					</div>
-				</div>
-				<div class="col-12 col-md-4">
-					<div class="card h-100">
-						<div class="card-body">
-							<h3 class="h3 mb-2">Communaute professionnelle</h3>
-							<p class="text-secondary mb-0">
-								Un espace social integre pour publier, suivre des evenements et renforcer la marque employeur.
-							</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</section>
-	</div>
+                <!-- CTA SECTION -->
+                <section class="cta-section">
+                    <div class="container-xl">
+                        <div class="card cta-card border-0">
+                            <div class="card-body cta-content p-4 p-md-5 text-center">
+                                <h2 class="section-title cta-title">Une plateforme unique pour recruter, organiser et faire grandir vos equipes.</h2>
+                                <p class="cta-subtitle">Explorez les offres, le suivi des candidatures, les projets, les formations et toute la couche collaborative de Momentum dans une seule experience fluide.</p>
+                                <ul class="cta-points">
+                                    <li><i class="ti ti-check"></i>Recrutement</li>
+                                    <li><i class="ti ti-check"></i>Projets & taches</li>
+                                    <li><i class="ti ti-check"></i>Formations</li>
+                                    <li><i class="ti ti-check"></i>Collaboration</li>
+                                </ul>
+                                <div class="cta-actions d-flex flex-wrap justify-content-center gap-2">
+                                    <a href="{{ path('app_offre_list') }}" class="btn btn-primary btn-md">Voir les offres</a>
+                                    <a href="{{ path('app_pricing') }}" class="btn btn-outline-primary btn-md">Decouvrir la tarification</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <!-- END CTA SECTION -->
+            </main>
+        </div>
+        {% include 'components/front_footer.html.twig' %}
+    </div>
+</div>
 {% endblock %}

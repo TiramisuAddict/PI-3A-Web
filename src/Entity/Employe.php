@@ -140,7 +140,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Entreprise::class, inversedBy: 'employés')]
+    #[ORM\ManyToOne(targetEntity: Entreprise::class, inversedBy: 'employes')]
     #[ORM\JoinColumn(name: 'id_entreprise', referencedColumnName: 'id_entreprise')]
     private ?Entreprise $entreprise = null;
 
@@ -188,7 +188,8 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToMany(targetEntity: Commentaire::class, mappedBy: 'employé')]
+
+    #[ORM\OneToMany(targetEntity: Commentaire::class, mappedBy: 'employe')]
     private Collection $commentaires;
 
     /**
@@ -213,6 +214,20 @@ class Employe
     public function removeCommentaire(Commentaire $commentaire): self
     {
         $this->getCommentaires()->removeElement($commentaire);
+        return $this;
+    }
+
+    #[ORM\OneToOne(targetEntity: CompetenceEmploye::class, mappedBy: 'employe')]
+    private ?CompetenceEmploye $competenceEmploye = null;
+
+    public function getCompetenceEmploye(): ?CompetenceEmploye
+    {
+        return $this->competenceEmploye;
+    }
+
+    public function setCompetenceEmploye(?CompetenceEmploye $competenceEmploye): self
+    {
+        $this->competenceEmploye = $competenceEmploye;
         return $this;
     }
 
@@ -361,6 +376,8 @@ class Employe
         $this->projetsResponsables = new ArrayCollection();
         $this->projetsEquipe = new ArrayCollection();
         $this->taches = new ArrayCollection();
+        $this->projets1 = new ArrayCollection();
+        $this->posts1 = new ArrayCollection();
     }
 
     /**
@@ -388,7 +405,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\ManyToMany(targetEntity: Projet::class, inversedBy: 'employés')]
+    #[ORM\ManyToMany(targetEntity: Projet::class, inversedBy: 'employes')]
     #[ORM\JoinTable(
         name: 'equipe_projet',
         joinColumns: [
@@ -425,7 +442,7 @@ class Employe
         return $this;
     }
 
-    #[ORM\ManyToMany(targetEntity: Post::class, inversedBy: 'employés')]
+    #[ORM\ManyToMany(targetEntity: Post::class, inversedBy: 'employes')]
     #[ORM\JoinTable(
         name: 'like_post',
         joinColumns: [
@@ -462,17 +479,4 @@ class Employe
         return $this;
     }
 
-    #[ORM\OneToOne(targetEntity: CompetenceEmploye::class, mappedBy: 'employe')]
-    private ?CompetenceEmploye $competenceEmploye = null;
-
-    public function getCompetenceEmploye(): ?CompetenceEmploye
-    {
-        return $this->competenceEmploye;
-    }
-
-    public function setCompetenceEmploye(?CompetenceEmploye $competenceEmploye): self
-    {
-        $this->competenceEmploye = $competenceEmploye;
-        return $this;
-    }
 }

@@ -2,11 +2,8 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-
 use App\Repository\EvaluationFormationRepository;
+use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: EvaluationFormationRepository::class)]
 #[ORM\Table(name: 'evaluation_formation')]
@@ -14,88 +11,88 @@ class EvaluationFormation
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
+    #[ORM\Column(name: 'id_evaluation')]
+    private ?int $id = null;
+
+    #[ORM\ManyToOne(targetEntity: Formation::class)]
+    #[ORM\JoinColumn(name: 'id_formation', referencedColumnName: 'id_formation', nullable: false, onDelete: 'CASCADE')]
+    private ?Formation $formation = null;
+
+    #[ORM\ManyToOne(targetEntity: Employe::class)]
+    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe', nullable: false, onDelete: 'CASCADE')]
+    private ?Employe $employe = null;
+
     #[ORM\Column(type: 'integer')]
-    private ?int $id_evaluation = null;
+    private int $note = 0;
 
-    public function getId_evaluation(): ?int
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $commentaire = null;
+
+    #[ORM\Column(name: 'date_evaluation', type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $dateEvaluation = null;
+
+    public function getId(): ?int
     {
-        return $this->id_evaluation;
+        return $this->id;
     }
 
-    public function setId_evaluation(int $id_evaluation): self
+    public function getFormation(): ?Formation
     {
-        $this->id_evaluation = $id_evaluation;
+        return $this->formation;
+    }
+
+    public function setFormation(?Formation $formation): static
+    {
+        $this->formation = $formation;
+
         return $this;
     }
 
-    #[ORM\Column(type: 'integer', nullable: false)]
-    private ?int $id_formation = null;
-
-    public function getId_formation(): ?int
+    public function getEmploye(): ?Employe
     {
-        return $this->id_formation;
+        return $this->employe;
     }
 
-    public function setId_formation(int $id_formation): self
+    public function setEmploye(?Employe $employe): static
     {
-        $this->id_formation = $id_formation;
+        $this->employe = $employe;
+
         return $this;
     }
 
-    #[ORM\Column(type: 'integer', nullable: false)]
-    private ?int $id_employe = null;
-
-    public function getId_employe(): ?int
-    {
-        return $this->id_employe;
-    }
-
-    public function setId_employe(int $id_employe): self
-    {
-        $this->id_employe = $id_employe;
-        return $this;
-    }
-
-    #[ORM\Column(type: 'integer', nullable: false)]
-    private ?int $note = null;
-
-    public function getNote(): ?int
+    public function getNote(): int
     {
         return $this->note;
     }
 
-    public function setNote(int $note): self
+    public function setNote(int $note): static
     {
         $this->note = $note;
+
         return $this;
     }
-
-    #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $commentaire = null;
 
     public function getCommentaire(): ?string
     {
         return $this->commentaire;
     }
 
-    public function setCommentaire(?string $commentaire): self
+    public function setCommentaire(?string $commentaire): static
     {
         $this->commentaire = $commentaire;
+
         return $this;
     }
 
-    #[ORM\Column(type: 'datetime', nullable: true)]
-    private ?\DateTimeInterface $date_evaluation = null;
-
-    public function getDate_evaluation(): ?\DateTimeInterface
+    public function getDateEvaluation(): ?\DateTimeInterface
     {
-        return $this->date_evaluation;
+        return $this->dateEvaluation;
     }
 
-    public function setDate_evaluation(?\DateTimeInterface $date_evaluation): self
+    public function setDateEvaluation(?\DateTimeInterface $dateEvaluation): static
     {
-        $this->date_evaluation = $date_evaluation;
+        $this->dateEvaluation = $dateEvaluation;
+
         return $this;
     }
-
 }

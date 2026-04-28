@@ -1,0 +1,745 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Inscription Employe{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
+    <style>
+        .reason-quality-wrap {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            border: 1px solid rgba(13, 110, 253, 0.18);
+            border-radius: 0.75rem;
+            background: linear-gradient(135deg, rgba(13, 110, 253, 0.07), rgba(25, 135, 84, 0.06));
+        }
+
+        .reason-quality-ring {
+            --score-color: #dc3545;
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            background: conic-gradient(var(--score-color) calc(var(--score, 0) * 1%), #e9ecef 0);
+            transition: background 0.25s ease;
+        }
+
+        .reason-quality-ring::before {
+            content: '';
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: #ffffff;
+            position: absolute;
+        }
+
+        .reason-quality-value {
+            position: relative;
+            z-index: 1;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #1f2937;
+        }
+
+        .reason-quality-feedback {
+            margin: 0;
+            color: #334155;
+            font-size: 0.9rem;
+            line-height: 1.35;
+        }
+
+        .reason-quality-label {
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+        }
+
+        @media (max-width: 575.98px) {
+            .reason-quality-wrap {
+                gap: 0.75rem;
+                padding: 0.65rem;
+            }
+
+            .reason-quality-ring {
+                width: 58px;
+                height: 58px;
+            }
+
+            .reason-quality-ring::before {
+                width: 44px;
+                height: 44px;
+            }
+
+            .reason-quality-value {
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-inscription">
+    {{ include('components/navbar.html.twig') }}
+    <div class="d-flex" style="min-height:calc(100vh - 56px);">
+        {{ include('components/sidebar.html.twig', {'active_page': 'formations','sidebar_role': role}) }}
+
+        <div class="container-fluid py-3">
+            <div class="card mb-3">
+                <div class="card-body d-flex justify-content-between flex-wrap gap-3">
+                    <div>
+                        <div class="text-secondary text-uppercase small fw-bold mb-1">Espace Employe</div>
+                        <h2 class="h3 mb-1">Inscription formation</h2>
+                        <div class="text-secondary">Consultez les formations et envoyez vos demandes.</div>
+                    </div>
+                    {% if employee_logged %}
+                        <div class="text-end">
+                            <div class="text-secondary">Connecte en tant que</div>
+                            <div class="fw-bold">{{ app.session.get('employe_email') }}</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% for message in app.flashes('success') %}
+                <div class="alert alert-success" role="alert">{{ message }}</div>
+            {% endfor %}
+            {% for message in app.flashes('error') %}
+                <div class="alert alert-danger" role="alert">{{ message }}</div>
+            {% endfor %}
+
+            {% set summary = formation_summary ?? {'total': 0, 'available': 0, 'full': 0, 'finished': 0} %}
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3 col-6">
+                    <div class="card h-100 border-0 shadow-sm bg-white">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <div class="rounded-3 bg-primary-lt text-primary d-inline-flex align-items-center justify-content-center" style="width:3rem;height:3rem;">
+                                <i class="ti ti-layout-grid"></i>
+                            </div>
+                            <div>
+                                <div class="text-secondary small">Formations</div>
+                                <div class="h3 mb-0">{{ summary.total }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card h-100 border-0 shadow-sm bg-white">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <div class="rounded-3 bg-success-lt text-success d-inline-flex align-items-center justify-content-center" style="width:3rem;height:3rem;">
+                                <i class="ti ti-checks"></i>
+                            </div>
+                            <div>
+                                <div class="text-secondary small">Disponibles</div>
+                                <div class="h3 mb-0">{{ summary.available }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card h-100 border-0 shadow-sm bg-white">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <div class="rounded-3 bg-danger-lt text-danger d-inline-flex align-items-center justify-content-center" style="width:3rem;height:3rem;">
+                                <i class="ti ti-alert-circle"></i>
+                            </div>
+                            <div>
+                                <div class="text-secondary small">Completes</div>
+                                <div class="h3 mb-0">{{ summary.full }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card h-100 border-0 shadow-sm bg-white">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <div class="rounded-3 bg-secondary-lt text-secondary d-inline-flex align-items-center justify-content-center" style="width:3rem;height:3rem;">
+                                <i class="ti ti-archive"></i>
+                            </div>
+                            <div>
+                                <div class="text-secondary small">Terminees</div>
+                                <div class="h3 mb-0">{{ summary.finished }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span class="fw-bold">Formations disponibles</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="open-calendar-btn">
+                        <i class="ti ti-calendar-month me-1"></i>Calendrier
+                    </button>
+                </div>
+                <div class="card-body border-bottom">
+                    <form method="get" action="{{ path('app_inscription_employe') }}" class="row g-3 align-items-end" id="formation-filter-form">
+                        <input type="hidden" name="formation" value="{{ selected_formation ? selected_formation.id : '' }}">
+                        <div class="col-lg-4 col-md-6">
+                            <label class="form-label" for="q">Recherche</label>
+                            <input id="q" name="q" class="form-control" type="text" value="{{ q|default('') }}" placeholder="Titre, organisme, lieu...">
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label" for="sort">Tri</label>
+                            <select id="sort" name="sort" class="form-select">
+                                <option value="date_desc" {{ sort == 'date_desc' ? 'selected' : '' }}>Plus recentes</option>
+                                <option value="rating_desc" {{ sort == 'rating_desc' ? 'selected' : '' }}>Meilleure note</option>
+                                <option value="reviews_desc" {{ sort == 'reviews_desc' ? 'selected' : '' }}>Plus d'avis</option>
+                                <option value="title_asc" {{ sort == 'title_asc' ? 'selected' : '' }}>Titre A-Z</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label" for="min_rating">Note minimale</label>
+                            <select id="min_rating" name="min_rating" class="form-select">
+                                <option value="0" {{ min_rating == 0 ? 'selected' : '' }}>Toutes</option>
+                                <option value="1" {{ min_rating == 1 ? 'selected' : '' }}>1+</option>
+                                <option value="2" {{ min_rating == 2 ? 'selected' : '' }}>2+</option>
+                                <option value="3" {{ min_rating == 3 ? 'selected' : '' }}>3+</option>
+                                <option value="4" {{ min_rating == 4 ? 'selected' : '' }}>4+</option>
+                                <option value="5" {{ min_rating == 5 ? 'selected' : '' }}>5</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label" for="min_reviews">Avis minimum</label>
+                            <input id="min_reviews" name="min_reviews" class="form-control" type="number" min="0" value="{{ min_reviews }}">
+                        </div>
+                    </form>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 formation-grid">
+                        {% for formation in formations %}
+                            {% set state = inscription_by_formation[formation.id] ?? null %}
+                            {% set reviews = review_stats_by_formation[formation.id] ?? {'reviews_count': 0, 'average_note': 0} %}
+                            {% set remainingPlaces = formation.capacite ?? 0 %}
+                            {% set isFull = remainingPlaces <= 0 %}
+                            {% set isFinished = formation.dateFin and formation.dateFin|date('U') < 'now'|date('U') %}
+                            {% set formationQuery = app.request.query.all|merge({'formation': formation.id}) %}
+                            <div class="col-lg-4 col-md-6 formation-item" data-title="{{ formation.titre }}" data-organisme="{{ formation.organisme }}" data-lieu="{{ formation.lieu }}" data-date-debut="{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }}" data-date-fin="{{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}" data-rating="{{ reviews.average_note|default(0) }}" data-reviews="{{ reviews.reviews_count|default(0) }}" data-formation-id="{{ formation.id }}" data-enrolled="{{ state ? 1 : 0 }}" data-status="{{ state ? state.statut : '' }}">
+                                <div class="border rounded p-3 h-100 formation-card-clickable {{ selected_formation and selected_formation.id == formation.id ? 'border-primary' : '' }}" data-select-url="{{ path('app_inscription_employe', formationQuery) }}" role="link" tabindex="0" style="cursor: pointer;">
+                                    <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
+                                        <div class="d-flex flex-column gap-2">
+                                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                                <span class="badge rounded-pill bg-primary-lt text-primary d-inline-flex align-items-center gap-1 px-2 py-1" title="Note moyenne">
+                                                    <i class="ti ti-star-filled"></i>
+                                                    <span>{{ reviews.reviews_count > 0 ? reviews.average_note ~ '/5' : 'Pas encore d\'avis' }}</span>
+                                                </span>
+                                                <span class="badge rounded-pill bg-teal-lt text-teal d-inline-flex align-items-center gap-1 px-2 py-1" title="Nombre d avis">
+                                                    <i class="ti ti-users"></i>
+                                                    <span>{{ reviews.reviews_count }} avis</span>
+                                                </span>
+                                            </div>
+                                            <small class="text-secondary">{{ formation.dateDebut ? formation.dateDebut|date('d M Y') : '' }}</small>
+                                        </div>
+                                        {% if state and state.statut == 'EN_ATTENTE' %}<span class="badge bg-warning text-dark">En attente</span>
+                                        {% elseif state and state.statut == 'ACCEPTEE' %}<span class="badge bg-success text-white">Acceptée</span>
+                                        {% elseif state and state.statut == 'REFUSEE' %}<span class="badge bg-danger text-white">Refusée</span>
+                                        {% elseif isFinished %}<span class="badge bg-secondary text-white">Terminée</span>
+                                        {% elseif isFull %}<span class="badge bg-danger text-white">Complet</span>
+                                        {% else %}<span class="badge bg-primary text-white">Disponible</span>{% endif %}
+                                    </div>
+                                    <div class="fw-bold">{{ formation.titre }}</div>
+                                    <div class="text-secondary small mb-1">{{ formation.organisme }}</div>
+                                    <div class="small mb-2">{{ formation.dateDebut ? formation.dateDebut|date('Y-m-d') : '' }} - {{ formation.dateFin ? formation.dateFin|date('Y-m-d') : '' }}</div>
+                                    <div class="small mb-2">{{ formation.lieu }} | Places restantes {{ remainingPlaces }}</div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        {% if state and state.statut == 'EN_ATTENTE' %}
+                                            <form method="post" action="{{ path('app_inscription_employe') }}"><input type="hidden" name="action" value="annuler"><input type="hidden" name="inscription_id" value="{{ state.id }}"><button class="btn btn-sm btn-outline-danger" type="submit">Annuler</button></form>
+                                        {% elseif state and state.statut == 'ACCEPTEE' and isFinished %}
+                                            {% set certPath = path('app_inscription_employe_certificate', {'formationId': formation.id}) %}
+                                            {% set certQrPath = certificate_qr_path_by_formation[formation.id] ?? certPath %}
+                                            {% set certUrl = qr_public_base_url ? qr_public_base_url ~ certQrPath : absolute_url(certQrPath) %}
+                                            <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe_certificate', {'formationId': formation.id}) }}">
+                                                <i class="ti ti-file-download me-1"></i>Certificat PDF
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary open-certificate-qr" data-qr-url="{{ qr_code_data_uri(certUrl) }}">
+                                                <i class="ti ti-qrcode me-1"></i>QR
+                                            </button>
+                                        {% elseif not state and not isFull and not isFinished %}
+                                            <a class="btn btn-sm btn-success" href="{{ path('app_inscription_employe', formationQuery) }}">Inscription</a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="col-12"><div class="alert alert-secondary mb-0">Aucune formation disponible.</div></div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {% if employee_logged and selected_formation %}
+                {% set selectedState = inscription_by_formation[selected_formation.id] ?? null %}
+                <div class="card mt-3">
+                    <div class="card-header fw-bold">Demande d'inscription - {{ selected_formation.titre }}</div>
+                    <div class="card-body">
+                        {% if selectedState and selectedState.statut == 'EN_ATTENTE' %}
+                            <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <span>Votre demande est en attente. Vous pouvez modifier la raison ou annuler.</span>
+                                <form method="post" action="{{ path('app_inscription_employe') }}">
+                                    <input type="hidden" name="action" value="annuler">
+                                    <input type="hidden" name="inscription_id" value="{{ selectedState.id }}">
+                                    <button class="btn btn-outline-danger btn-sm" type="submit">Annuler</button>
+                                </form>
+                            </div>
+                        {% elseif selectedState and selectedState.statut == 'ACCEPTEE' %}
+                            {% set selectedEvaluation = evaluation_by_formation[selected_formation.id] ?? null %}
+                            {% set selectedFinished = selected_formation.dateFin and selected_formation.dateFin|date('U') < 'now'|date('U') %}
+                            <div class="alert alert-success d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <span>Inscription acceptée. Vous pouvez évaluer la formation.</span>
+                                {% if selectedFinished %}
+                                    {% set selectedCertPath = path('app_inscription_employe_certificate', {'formationId': selected_formation.id}) %}
+                                    {% set selectedCertQrPath = certificate_qr_path_by_formation[selected_formation.id] ?? selectedCertPath %}
+                                    {% set selectedCertUrl = qr_public_base_url ? qr_public_base_url ~ selectedCertQrPath : absolute_url(selectedCertQrPath) %}
+                                    <div class="d-flex flex-wrap gap-2">
+                                    <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_inscription_employe_certificate', {'formationId': selected_formation.id}) }}">
+                                        <i class="ti ti-file-download me-1"></i>Télécharger certificat
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-primary open-certificate-qr" data-qr-url="{{ qr_code_data_uri(selectedCertUrl) }}">
+                                        <i class="ti ti-qrcode me-1"></i>Voir QR
+                                    </button>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <form method="post" action="{{ path('app_inscription_employe') }}">
+                                <input type="hidden" name="action" value="evaluer">
+                                <input type="hidden" name="formation_id" value="{{ selected_formation.id }}">
+                                <div class="mb-3">
+                                    <label class="form-label d-block">Note</label>
+                                    {% for i in 1..5 %}
+                                        <label class="form-check form-check-inline m-0 me-2">
+                                            <input class="form-check-input" type="radio" name="note" value="{{ i }}" {{ selectedEvaluation and selectedEvaluation.note == i ? 'checked' : (not selectedEvaluation and i == 5 ? 'checked' : '') }}>
+                                            <span class="form-check-label">{{ i }}/5</span>
+                                        </label>
+                                    {% endfor %}
+                                </div>
+                                <div class="mb-3">
+                                    <label for="commentaire" class="form-label">Commentaire</label>
+                                    <textarea id="commentaire" name="commentaire" class="form-control" rows="4">{{ selectedEvaluation.commentaire|default('') }}</textarea>
+                                </div>
+                                <button class="btn btn-primary" type="submit">Enregistrer évaluation</button>
+                            </form>
+                        {% elseif selectedState and selectedState.statut == 'REFUSEE' %}
+                            <div class="alert alert-danger mb-0">Cette inscription est refusée.</div>
+                        {% elseif selected_formation.dateFin and selected_formation.dateFin|date('U') < 'now'|date('U') %}
+                            <div class="alert alert-secondary mb-0">Cette formation est terminée. Les inscriptions sont fermées.</div>
+                        {% elseif (selected_formation.capacite ?? 0) <= 0 %}
+                            <div class="alert alert-danger mb-0">Cette formation est complete. Aucune place disponible.</div>
+                        {% else %}
+                            <form method="post" action="{{ path('app_inscription_employe') }}" id="reason-form" data-analyze-url="{{ path('app_inscription_employe_analyze') }}" data-generate-url="{{ path('app_inscription_employe_generate') }}">
+                                <input type="hidden" name="formation_id" value="{{ selected_formation.id }}">
+                                <div class="mb-3">
+                                    <label for="raison" class="form-label">Raison</label>
+                                    <textarea id="raison" name="raison" class="form-control" rows="5" placeholder="Expliquez pourquoi vous voulez suivre cette formation...">{{ typed_reason|default('') }}</textarea>
+                                    <div class="reason-quality-wrap" id="reason-quality-wrap" aria-live="polite">
+                                        <div class="reason-quality-ring" id="reason-quality-ring" style="--score: 0; --score-color: #dc3545;">
+                                            <span class="reason-quality-value" id="reason-quality-value">0%</span>
+                                        </div>
+                                        <div>
+                                            <span class="reason-quality-label">Qualite de la raison</span>
+                                            <p class="reason-quality-feedback" id="reason-quality-feedback">Saisissez votre raison pour afficher le score.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button class="btn btn-outline-primary" type="button" data-action="analyze">Corriger LanguageTool</button>
+                                    <button class="btn btn-primary" type="button" data-action="generate">Generer avec IA</button>
+                                    <button class="btn btn-success" type="submit" name="action" value="inscrire">Envoyer la demande</button>
+                                </div>
+                                <div id="assistant-notice" class="alert alert-info mt-3 mb-0 d-none"></div>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header fw-bold d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span>Avis des participants</span>
+                        <span class="badge bg-secondary-lt text-secondary">{{ formation_reviews|length }} avis</span>
+                    </div>
+                    <div class="card-body">
+                        {% if formation_reviews is not empty %}
+                            <div class="d-grid gap-3">
+                                {% for review in formation_reviews %}
+                                    <div class="border rounded p-3 bg-body-tertiary">
+                                        <div class="d-flex justify-content-between align-items-start gap-3 mb-2 flex-wrap">
+                                            <div>
+                                                <div class="fw-bold d-flex align-items-center gap-2">
+                                                    <i class="ti ti-user-circle"></i>
+                                                    <span>{{ review.prenom|default('') }} {{ review.nom|default('')|trim ?: 'Anonyme' }}</span>
+                                                </div>
+                                                <div class="text-secondary small">{{ review.commentaire ? review.commentaire|length > 0 ? 'Commentaire partagé' : 'Sans commentaire' : 'Sans commentaire' }}</div>
+                                            </div>
+                                            <span class="badge rounded-pill bg-primary-lt text-primary d-inline-flex align-items-center gap-1 px-2 py-1">
+                                                <i class="ti ti-star-filled"></i>
+                                                <span>{{ review.note }}/5</span>
+                                            </span>
+                                        </div>
+                                        {% if review.commentaire %}
+                                            <div class="text-body">{{ review.commentaire }}</div>
+                                        {% else %}
+                                            <div class="text-secondary fst-italic">Aucun commentaire écrit.</div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-secondary">Aucun avis pour cette formation pour le moment.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="formationCalendarModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-0">Calendrier des formations</h5>
+                    <small class="text-secondary">Vos inscriptions (acceptee, en attente, refusee)</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="calendar-holder" style="min-height: 620px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="certificateQrModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">QR Certificat</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="certificate-qr-image" src="" alt="QR certificat" class="img-fluid border rounded p-2 bg-white" style="max-width: 240px;">
+                <div class="small text-secondary mt-2">Scannez ce QR pour ouvrir le certificat.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script>
+(function () {
+    const filterForm = document.getElementById('formation-filter-form');
+    if (!filterForm) return;
+
+    const formationGrid = document.querySelector('.formation-grid');
+    const cards = Array.from(document.querySelectorAll('.formation-item'));
+    const searchInput = filterForm.querySelector('input[name="q"]');
+    const sortSelect = filterForm.querySelector('select[name="sort"]');
+    const minRatingSelect = filterForm.querySelector('select[name="min_rating"]');
+    const minReviewsInput = filterForm.querySelector('input[name="min_reviews"]');
+    const calendarButton = document.getElementById('open-calendar-btn');
+
+    const calendarModal = document.getElementById('formationCalendarModal');
+    const calendarHolder = document.getElementById('calendar-holder');
+    let fullCalendar = null;
+
+    const addOneDay = (dateString) => {
+        if (!dateString) return null;
+        const date = new Date(dateString + 'T00:00:00');
+        if (Number.isNaN(date.getTime())) return null;
+        date.setDate(date.getDate() + 1);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+    };
+
+    const resolveEventColor = (status) => {
+        switch ((status || '').toUpperCase()) {
+            case 'ACCEPTEE':
+                return '#198754';
+            case 'EN_ATTENTE':
+                return '#f59f00';
+            case 'REFUSEE':
+                return '#dc3545';
+            default:
+                return '#0d6efd';
+        }
+    };
+
+    const localEnrolledEvents = cards
+        .filter((card) => card.dataset.enrolled === '1' && (card.dataset.dateDebut || '') !== '')
+        .map((card) => {
+            const status = card.dataset.status || '';
+            const color = resolveEventColor(status);
+            return {
+                title: card.dataset.title || 'Formation',
+                start: card.dataset.dateDebut,
+                end: addOneDay(card.dataset.dateFin || card.dataset.dateDebut || ''),
+                allDay: true,
+                backgroundColor: color,
+                borderColor: color,
+                textColor: '#ffffff',
+                extendedProps: {
+                    statut: status,
+                    organisme: card.dataset.organisme || '',
+                    lieu: card.dataset.lieu || '',
+                },
+            };
+        });
+
+    const initCalendar = () => {
+        if (!calendarHolder || fullCalendar || typeof FullCalendar === 'undefined') return;
+
+        fullCalendar = new FullCalendar.Calendar(calendarHolder, {
+            initialView: 'dayGridMonth',
+            locale: 'fr',
+            height: 580,
+            firstDay: 1,
+            headerToolbar: {
+                start: 'prev,next today',
+                center: 'title',
+                end: 'dayGridMonth,timeGridWeek,listWeek',
+            },
+            events: localEnrolledEvents,
+            eventDidMount: function (info) {
+                const props = info.event.extendedProps || {};
+                const parts = [];
+                if (props.statut) parts.push('Statut: ' + props.statut);
+                if (props.organisme) parts.push('Organisme: ' + props.organisme);
+                if (props.lieu) parts.push('Lieu: ' + props.lieu);
+                if (parts.length > 0) {
+                    info.el.setAttribute('title', parts.join(' | '));
+                }
+            },
+        });
+
+        fullCalendar.render();
+    };
+
+    if (calendarButton && calendarModal) {
+        calendarModal.addEventListener('shown.bs.modal', () => {
+            initCalendar();
+            if (!fullCalendar) return;
+
+            requestAnimationFrame(() => {
+                fullCalendar.updateSize();
+                fullCalendar.render();
+            });
+        });
+
+        calendarButton.addEventListener('click', () => {
+            initCalendar();
+            const modal = bootstrap.Modal.getOrCreateInstance(calendarModal);
+            modal.show();
+        });
+    }
+
+    const certificateQrModalEl = document.getElementById('certificateQrModal');
+    const certificateQrImage = document.getElementById('certificate-qr-image');
+    document.querySelectorAll('.open-certificate-qr').forEach((button) => {
+        button.addEventListener('click', () => {
+            if (!certificateQrModalEl || !certificateQrImage) return;
+            certificateQrImage.src = button.dataset.qrUrl || '';
+            const qrModal = bootstrap.Modal.getOrCreateInstance(certificateQrModalEl);
+            qrModal.show();
+        });
+    });
+
+    const applyClientFilters = () => {
+        const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+        const sort = sortSelect ? sortSelect.value : 'date_desc';
+        const minRating = Math.max(0, parseFloat(minRatingSelect ? minRatingSelect.value : '0') || 0);
+        const minReviews = Math.max(0, parseInt(minReviewsInput ? minReviewsInput.value : '0', 10) || 0);
+
+        cards.forEach((card) => {
+            const title = (card.dataset.title || '').toLowerCase();
+            const organisme = (card.dataset.organisme || '').toLowerCase();
+            const lieu = (card.dataset.lieu || '').toLowerCase();
+            const rating = parseFloat(card.dataset.rating || '0') || 0;
+            const reviews = parseInt(card.dataset.reviews || '0', 10) || 0;
+            const matchesQuery = query === '' || (title + ' ' + organisme + ' ' + lieu).includes(query);
+            const matchesMinReviews = reviews >= minReviews;
+            const matchesMinRating = minRating <= 0 || (reviews > 0 && rating >= minRating);
+            card.classList.toggle('d-none', !(matchesQuery && matchesMinReviews && matchesMinRating));
+        });
+
+        const parseDate = (value) => {
+            if (!value) return 0;
+            const timestamp = Date.parse(value + 'T00:00:00');
+            return Number.isNaN(timestamp) ? 0 : timestamp;
+        };
+
+        const sortedCards = [...cards].sort((left, right) => {
+            const leftRating = parseFloat(left.dataset.rating || '0') || 0;
+            const rightRating = parseFloat(right.dataset.rating || '0') || 0;
+            const leftReviews = parseInt(left.dataset.reviews || '0', 10) || 0;
+            const rightReviews = parseInt(right.dataset.reviews || '0', 10) || 0;
+            const leftTitle = (left.dataset.title || '').toLowerCase();
+            const rightTitle = (right.dataset.title || '').toLowerCase();
+            const leftDate = parseDate(left.dataset.dateDebut || '');
+            const rightDate = parseDate(right.dataset.dateDebut || '');
+
+            switch (sort) {
+                case 'rating_desc':
+                    return (rightRating - leftRating)
+                        || (rightReviews - leftReviews)
+                        || leftTitle.localeCompare(rightTitle, 'fr');
+                case 'reviews_desc':
+                    return (rightReviews - leftReviews)
+                        || (rightRating - leftRating)
+                        || leftTitle.localeCompare(rightTitle, 'fr');
+                case 'title_asc':
+                    return leftTitle.localeCompare(rightTitle, 'fr');
+                case 'date_desc':
+                default:
+                    return (rightDate - leftDate)
+                        || leftTitle.localeCompare(rightTitle, 'fr');
+            }
+        });
+
+        if (formationGrid) {
+            sortedCards.forEach((card) => formationGrid.appendChild(card));
+        }
+    };
+
+    [searchInput, sortSelect, minRatingSelect, minReviewsInput].forEach((el) => {
+        if (el) {
+            el.addEventListener('input', applyClientFilters);
+            el.addEventListener('change', applyClientFilters);
+        }
+    });
+
+    applyClientFilters();
+
+    document.querySelectorAll('.formation-card-clickable').forEach((card) => {
+        card.addEventListener('click', (event) => {
+            if (event.target.closest('a, button, form, input, textarea, select, label')) return;
+            const targetUrl = card.dataset.selectUrl;
+            if (targetUrl) {
+                window.location.href = targetUrl;
+            }
+        });
+
+        card.addEventListener('keydown', (event) => {
+            if (event.target.closest('a, button, form, input, textarea, select, label')) return;
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                const targetUrl = card.dataset.selectUrl;
+                if (targetUrl) {
+                    window.location.href = targetUrl;
+                }
+            }
+        });
+    });
+
+    const reasonForm = document.getElementById('reason-form');
+    if (reasonForm) {
+        const reasonField = document.getElementById('raison');
+        const noticeBox = document.getElementById('assistant-notice');
+        const qualityRing = document.getElementById('reason-quality-ring');
+        const qualityValue = document.getElementById('reason-quality-value');
+        const qualityFeedback = document.getElementById('reason-quality-feedback');
+        const analyzeUrl = reasonForm.dataset.analyzeUrl;
+        const generateUrl = reasonForm.dataset.generateUrl;
+
+        const setNotice = (message, variant) => {
+            if (!noticeBox) return;
+            noticeBox.classList.remove('d-none', 'alert-info', 'alert-danger');
+            noticeBox.classList.add(variant === 'error' ? 'alert-danger' : 'alert-info');
+            noticeBox.textContent = message;
+        };
+
+        const evaluateReasonQuality = () => {
+            if (!reasonField || !qualityRing || !qualityValue || !qualityFeedback) return;
+
+            const text = (reasonField.value || '').trim();
+            if (text === '') {
+                qualityRing.style.setProperty('--score', '0');
+                qualityRing.style.setProperty('--score-color', '#dc3545');
+                qualityValue.textContent = '0%';
+                qualityFeedback.textContent = 'Saisissez votre raison pour afficher le score.';
+                return;
+            }
+
+            const words = text.split(/\s+/).filter(Boolean);
+            const sentences = text
+                .split(/[.!?]+/)
+                .map((part) => part.trim())
+                .filter(Boolean);
+            const uniqueWords = new Set(words.map((word) => word.toLowerCase()));
+
+            let score = 0;
+            score += Math.min(35, Math.round((text.length / 220) * 35));
+            score += Math.min(30, Math.round((words.length / 40) * 30));
+            score += Math.min(15, Math.round((sentences.length / 4) * 15));
+            score += Math.min(10, Math.round((uniqueWords.size / Math.max(words.length, 1)) * 10));
+
+            const hasMotivation = /(objectif|motivation|progresser|ameliorer|competence|carriere|equipe|projet|entreprise)/i.test(text);
+            if (hasMotivation) score += 10;
+
+            if (words.length < 8) score -= 10;
+            score = Math.max(0, Math.min(100, score));
+
+            let color = '#dc3545';
+            let feedback = 'Ajoutez plus de details concrets pour renforcer votre demande.';
+
+            if (score >= 75) {
+                color = '#198754';
+                feedback = 'Excellente raison. Le message est detaille et convaincant.';
+            } else if (score >= 45) {
+                color = '#f59f00';
+                feedback = 'Bonne base. Precisez l objectif et l impact attendu pour monter le score.';
+            }
+
+            qualityRing.style.setProperty('--score', String(score));
+            qualityRing.style.setProperty('--score-color', color);
+            qualityValue.textContent = score + '%';
+            qualityFeedback.textContent = feedback;
+        };
+
+        if (reasonField) {
+            reasonField.addEventListener('input', evaluateReasonQuality);
+            evaluateReasonQuality();
+        }
+
+        const postAction = async (url, mode) => {
+            const formData = new FormData();
+            formData.append('formation_id', reasonForm.querySelector('input[name="formation_id"]').value || '');
+            formData.append('raison', reasonField ? reasonField.value : '');
+            const response = await fetch(url, { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || !payload || !payload.ok) {
+                setNotice(payload && payload.message ? payload.message : 'Une erreur est survenue.', 'error');
+                return;
+            }
+            if (reasonField && payload.text) {
+                reasonField.value = payload.text;
+                evaluateReasonQuality();
+            }
+            setNotice(payload.message || (mode === 'analyze' ? 'Correction terminee.' : 'Generation terminee.'), 'info');
+        };
+
+        reasonForm.querySelectorAll('button[data-action]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const mode = button.dataset.action;
+                const url = mode === 'analyze' ? analyzeUrl : generateUrl;
+                if (!reasonField || reasonField.value.trim() === '') {
+                    setNotice('Veuillez saisir une raison avant de lancer l action.', 'error');
+                    if (reasonField) reasonField.focus();
+                    return;
+                }
+                setNotice(mode === 'analyze' ? 'Correction en cours...' : 'Generation en cours...', 'info');
+                postAction(url, mode).catch(() => setNotice('Impossible de contacter le service IA.', 'error'));
+            });
+        });
+    }
+})();
+</script>
+{% endblock %}

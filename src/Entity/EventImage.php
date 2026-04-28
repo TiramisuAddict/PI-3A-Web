@@ -2,11 +2,9 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-
 use App\Repository\EventImageRepository;
+use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: EventImageRepository::class)]
 #[ORM\Table(name: 'event_image')]
@@ -17,19 +15,21 @@ class EventImage
     #[ORM\Column(type: 'integer')]
     private ?int $id_image = null;
 
-    public function getId_image(): ?int
+    public function getIdImage(): ?int
     {
         return $this->id_image;
     }
 
-    public function setId_image(int $id_image): self
+    public function setIdImage(int $id_image): self
     {
         $this->id_image = $id_image;
+
         return $this;
     }
 
     #[ORM\ManyToOne(targetEntity: Post::class, inversedBy: 'eventImages')]
-    #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post')]
+    #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post', nullable: false)]
+    #[Assert\NotNull(message: 'Le post associé est obligatoire.')]
     private ?Post $post = null;
 
     public function getPost(): ?Post
@@ -44,20 +44,25 @@ class EventImage
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Assert\NotBlank(message: 'Le chemin de l’image est obligatoire.')]
+    #[Assert\Length(min: 3, max: 512, minMessage: 'Le chemin doit contenir au moins {{ limit }} caractères.')]
     private ?string $image_path = null;
 
-    public function getImage_path(): ?string
+    public function getImagePath(): ?string
     {
         return $this->image_path;
     }
 
-    public function setImage_path(string $image_path): self
+    public function setImagePath(string $image_path): self
     {
         $this->image_path = $image_path;
+
         return $this;
     }
 
     #[ORM\Column(type: 'integer', nullable: true)]
+    #[Assert\Type(type: 'integer', message: 'L’ordre doit être un entier.')]
+    #[Assert\PositiveOrZero(message: 'L’ordre doit être positif ou zéro.')]
     private ?int $ordre = null;
 
     public function getOrdre(): ?int
@@ -68,7 +73,7 @@ class EventImage
     public function setOrdre(?int $ordre): self
     {
         $this->ordre = $ordre;
+
         return $this;
     }
-
 }

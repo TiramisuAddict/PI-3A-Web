@@ -1,41 +1,100 @@
 {% set currentRoute = app.request.attributes.get('_route') %}
-<div class="card mb-4 border-0 shadow-sm">
-    <div class="card-body p-2 p-md-3">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+<style>
+    .rh-nav-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 12px;
+        background: #ffffff;
+    }
+
+    .rh-nav-title {
+        font-size: .95rem;
+        font-weight: 600;
+        color: #1f2937;
+        line-height: 1.2;
+    }
+
+    .rh-nav-subtitle {
+        font-size: .78rem;
+        color: #64748b;
+        margin-top: .1rem;
+    }
+
+    .rh-nav-track {
+        background: #f6f8fc;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 10px;
+        padding: .25rem;
+        display: inline-flex;
+        gap: .25rem;
+        flex-wrap: wrap;
+    }
+
+    .rh-nav-link {
+        min-height: 36px;
+        border-radius: 8px;
+        border: 0;
+        padding: .45rem .85rem;
+        font-weight: 600;
+        color: #526075;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color .2s ease, color .2s ease;
+    }
+
+    .rh-nav-link:hover {
+        color: #1f2937;
+        background: rgba(31, 111, 235, 0.08);
+    }
+
+    .rh-nav-link.is-active {
+        background: #1f6feb;
+        color: #fff;
+    }
+
+    @media (max-width: 767.98px) {
+        .rh-nav-track {
+            width: 100%;
+        }
+
+        .rh-nav-link {
+            flex: 1 1 calc(50% - .25rem);
+            text-align: center;
+        }
+    }
+</style>
+
+<div class="card mb-4 border-0">
+    <div class="card-body p-2 p-md-3 rh-nav-card">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-2 ms-1">
                 <span class="badge bg-blue-lt text-blue">Espace RH</span>
-                <span class="text-secondary small">Navigation recrutement</span>
             </div>
 
-            <div class="nav nav-pills bg-light rounded-pill p-1" role="tablist" aria-label="Navigation recrutement">
+            <div class="rh-nav-track" role="tablist" aria-label="Navigation recrutement">
                 <a
-                    class="nav-link rounded-pill px-3 d-inline-flex align-items-center gap-2 {{ currentRoute == 'app_offre_dashboard' ? 'active bg-primary text-white shadow-sm' : 'text-secondary' }}"
+                    class="rh-nav-link {{ currentRoute == 'app_offre_dashboard' ? 'is-active' : '' }}"
                     href="{{ path('app_offre_dashboard') }}"
                     {% if currentRoute == 'app_offre_dashboard' %}aria-current="page"{% endif %}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                        <path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2z"/>
-                        <path d="M10 8h4"/>
-                        <path d="M9 12h6"/>
-                        <path d="M10 16h4"/>
-                    </svg>
                     Offres
                 </a>
 
                 <a
-                    class="nav-link rounded-pill px-3 d-inline-flex align-items-center gap-2 {{ currentRoute == 'app_candidat_dashboard' ? 'active bg-primary text-white shadow-sm' : 'text-secondary' }}"
+                    class="rh-nav-link {{ currentRoute == 'app_candidat_dashboard' ? 'is-active' : '' }}"
                     href="{{ path('app_candidat_dashboard') }}"
                     {% if currentRoute == 'app_candidat_dashboard' %}aria-current="page"{% endif %}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                        <path d="M9 7a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/>
-                        <path d="M17 21v-2a4 4 0 0 0 -4 -4h-2a4 4 0 0 0 -4 4v2"/>
-                        <path d="M21 21v-2a4 4 0 0 0 -3 -3.87"/>
-                        <path d="M3 21v-2a4 4 0 0 1 3 -3.87"/>
-                    </svg>
                     Candidats
+                </a>
+
+                <a
+                    class="rh-nav-link {{ currentRoute == 'app_recrutement_statistiques' ? 'is-active' : '' }}"
+                    href="{{ path('app_recrutement_statistiques') }}"
+                    {% if currentRoute == 'app_recrutement_statistiques' %}aria-current="page"{% endif %}
+                >
+                    Statistiques
                 </a>
             </div>
         </div>
