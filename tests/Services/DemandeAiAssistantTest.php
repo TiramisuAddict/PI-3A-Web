@@ -585,6 +585,130 @@ final class DemandeAiAssistantTest extends TestCase
         self::assertSame('badge visiteur', $result['suggestedDetails']['ai_objet_demande'] ?? null);
     }
 
+    public function testGenerateAutreSuggestionsUsesLlmWhenDatabaseMatchIsWeak(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'je veux un ecran 32 pouces',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-04-27T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Materiel ecran',
+                        'description' => 'je veux un ecran 32 pouces',
+                        'priorite' => 'NORMALE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_materiel_concerne' => 'ecran',
+                        'ai_specification' => '32 pouces',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_materiel_concerne',
+                                'label' => 'Materiel concerne',
+                                'type' => 'text',
+                                'required' => true,
+                            ],
+                            [
+                                'key' => 'ai_specification',
+                                'label' => 'Specification',
+                                'type' => 'text',
+                                'required' => false,
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $response = $this->createMock(ResponseInterface::class);
+        $response
+            ->expects(self::once())
+            ->method('toArray')
+            ->with(false)
+            ->willReturn([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'correctedText' => 'Demande d un transport par taxi pour une formation externe de HTML',
+                                'general' => [
+                                    'titre' => 'Transport pour formation HTML',
+                                    'description' => 'Demande de transport par taxi pour participer a une formation externe de HTML.',
+                                    'priorite' => 'NORMALE',
+                                ],
+                                'details' => [
+                                    'ai_type_transport' => 'taxi',
+                                    'ai_objet_deplacement' => 'formation externe de HTML',
+                                ],
+                                'custom_fields' => [
+                                    [
+                                        'key' => 'ai_type_transport',
+                                        'label' => 'Type de transport',
+                                        'type' => 'text',
+                                        'required' => true,
+                                        'value' => 'taxi',
+                                    ],
+                                    [
+                                        'key' => 'ai_objet_deplacement',
+                                        'label' => 'Objet du deplacement',
+                                        'type' => 'text',
+                                        'required' => true,
+                                        'value' => 'formation externe de HTML',
+                                    ],
+                                ],
+                                'remove_fields' => ['ALL'],
+                                'replace_base' => true,
+                            ], JSON_THROW_ON_ERROR),
+                        ],
+                    ],
+                ],
+            ])
+        ;
+
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient
+            ->expects(self::once())
+            ->method('request')
+            ->with(
+                'POST',
+                'https://router.huggingface.co/v1/chat/completions',
+                self::anything()
+            )
+            ->willReturn($response)
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $httpClient,
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            'test-key',
+            'test-model'
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'demande d un transport par taxi pour une formation externe de html',
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('llm-fallback:huggingface', $result['model']);
+        self::assertSame('taxi', $result['suggestedDetails']['ai_type_transport'] ?? null);
+        self::assertSame('formation externe de HTML', $result['suggestedDetails']['ai_objet_deplacement'] ?? null);
+        self::assertArrayNotHasKey('ai_materiel_concerne', $result['suggestedDetails']);
+    }
+
     public function testGenerateAutreSuggestionsDoesNotBlockLlmForEmptyManualPlan(): void
     {
         $repository = $this->createMock(DemandeRepository::class);
@@ -1301,5 +1425,734 @@ final class DemandeAiAssistantTest extends TestCase
         self::assertSame('Nuit', $result['suggestedDetails']['ai_shift_souhaite'] ?? null);
         self::assertSame('22h-7h', $result['suggestedDetails']['ai_horaire_souhaite'] ?? null);
         self::assertSame('Semaine prochaine', $result['suggestedDetails']['ai_periode_concernee'] ?? null);
+    }
+
+    public function testManualAutreFieldsNeverCallLearningOrLlm(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->expects(self::never())
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+        ;
+
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient
+            ->expects(self::never())
+            ->method('request')
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $httpClient,
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            'test-key',
+            'test-model',
+            20,
+            'python-does-not-exist'
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'je veux un badge visiteur demain',
+                'manualFieldMode' => true,
+                'manualFieldPlan' => [
+                    'add' => [
+                        [
+                            'key' => 'ai_nature_badge',
+                            'label' => 'Nature badge',
+                            'type' => 'select',
+                            'required' => false,
+                            'value' => '',
+                            'options' => ['Visiteur', 'Permanent'],
+                        ],
+                    ],
+                    'remove' => [],
+                    'replaceBase' => true,
+                ],
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('manual-fields:autre-configured', $result['model']);
+        self::assertSame([], $result['suggestedDetails']);
+        self::assertTrue($result['dynamicFieldPlan']['replaceBase']);
+        self::assertSame('select', $result['dynamicFieldPlan']['add'][0]['type'] ?? null);
+        self::assertSame(['Visiteur', 'Permanent'], $result['dynamicFieldPlan']['add'][0]['options'] ?? null);
+    }
+
+    public function testRequiredSelectFieldIsRenderedEmptyWhenPromptDoesNotMentionAnOption(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'demande de formation externe java',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-04-27T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Formation Java',
+                        'description' => 'Demande de formation externe Java',
+                        'priorite' => 'NORMALE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_nom_formation' => 'Java',
+                        'ai_type_formation' => 'Formation externe',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_nom_formation',
+                                'label' => 'Nom de la formation',
+                                'type' => 'text',
+                                'required' => true,
+                            ],
+                            [
+                                'key' => 'ai_type_formation',
+                                'label' => 'Type de formation',
+                                'type' => 'select',
+                                'required' => true,
+                                'options' => ['Formation interne', 'Formation externe', 'Certification'],
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient
+            ->expects(self::never())
+            ->method('request')
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $httpClient,
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            'test-key',
+            'test-model'
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'demande de formation java',
+            ],
+            [],
+            []
+        );
+
+        $fieldsByKey = [];
+        foreach ($result['dynamicFieldPlan']['add'] as $field) {
+            $fieldsByKey[(string) ($field['key'] ?? '')] = $field;
+        }
+
+        self::assertSame('Java', $result['suggestedDetails']['ai_nom_formation'] ?? null);
+        self::assertArrayHasKey('ai_type_formation', $fieldsByKey);
+        self::assertSame('select', $fieldsByKey['ai_type_formation']['type'] ?? null);
+        self::assertSame('', $fieldsByKey['ai_type_formation']['value'] ?? '');
+        self::assertArrayNotHasKey('ai_type_formation', $result['suggestedDetails']);
+    }
+
+    public function testOptionalLearnedFieldWithoutPromptEvidenceIsNotGenerated(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'je veux un badge visiteur pour banque avec justification dossier bancaire',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-04-27T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Badge visiteur',
+                        'description' => 'je veux un badge visiteur pour banque avec justification dossier bancaire',
+                        'priorite' => 'NORMALE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_objet_demande' => 'badge visiteur',
+                        'ai_justification_metier' => 'dossier bancaire',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_objet_demande',
+                                'label' => 'Objet de la demande',
+                                'type' => 'text',
+                                'required' => true,
+                            ],
+                            [
+                                'key' => 'ai_justification_metier',
+                                'label' => 'Justification metier',
+                                'type' => 'textarea',
+                                'required' => false,
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            '',
+            ''
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'je veux un badge visiteur',
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('badge visiteur', $result['suggestedDetails']['ai_objet_demande'] ?? null);
+        self::assertArrayNotHasKey('ai_justification_metier', $result['suggestedDetails']);
+    }
+
+    public function testDeletedGeneratedFieldSuppressesThatFieldFamilyOnNextMatch(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'je veux un badge visiteur pour banque',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-04-27T09:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Badge visiteur',
+                        'description' => 'je veux un badge visiteur pour banque',
+                        'priorite' => 'NORMALE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_objet_demande' => 'badge visiteur',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_objet_demande',
+                                'label' => 'Objet de la demande',
+                                'type' => 'text',
+                                'required' => true,
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                    'generatedSnapshot' => [
+                        'suggestedDetails' => [
+                            'ai_objet_demande' => 'badge visiteur',
+                            'ai_justification_metier' => 'banque',
+                        ],
+                        'dynamicFieldPlan' => [
+                            'add' => [
+                                [
+                                    'key' => 'ai_objet_demande',
+                                    'label' => 'Objet de la demande',
+                                    'type' => 'text',
+                                    'required' => true,
+                                    'value' => 'badge visiteur',
+                                ],
+                                [
+                                    'key' => 'ai_justification_metier',
+                                    'label' => 'Justification metier',
+                                    'type' => 'textarea',
+                                    'required' => false,
+                                    'value' => 'banque',
+                                ],
+                            ],
+                            'remove' => ['ALL'],
+                            'replaceBase' => true,
+                        ],
+                    ],
+                ],
+                [
+                    'prompt' => 'je veux un badge visiteur pour banque avec justification banque',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-04-27T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Badge visiteur',
+                        'description' => 'je veux un badge visiteur pour banque avec justification banque',
+                        'priorite' => 'NORMALE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_objet_demande' => 'badge visiteur',
+                        'ai_justification_metier' => 'banque',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_objet_demande',
+                                'label' => 'Objet de la demande',
+                                'type' => 'text',
+                                'required' => true,
+                            ],
+                            [
+                                'key' => 'ai_justification_metier',
+                                'label' => 'Justification metier',
+                                'type' => 'textarea',
+                                'required' => false,
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            '',
+            ''
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'je veux un badge visiteur pour banque',
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('badge visiteur', $result['suggestedDetails']['ai_objet_demande'] ?? null);
+        self::assertArrayNotHasKey('ai_justification_metier', $result['suggestedDetails']);
+        $fieldKeys = array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add']);
+        self::assertNotContains('ai_justification_metier', $fieldKeys);
+    }
+
+    public function testExactDatabaseMatchGeneratesFieldsWhoseValuesAreInPrompt(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'demande nettoyage urgent apres degat (cafe renverse sur moquette)',
+                    'confirmed' => true,
+                    'manual' => false,
+                    'createdAt' => '2026-04-26T21:54:59+02:00',
+                    'general' => [
+                        'titre' => 'demande nettoyage urgent apres degat (cafe renverse sur moquette)',
+                        'description' => 'demande nettoyage urgent apres degat (cafe renverse sur moquette)',
+                        'priorite' => 'HAUTE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_type_d_intervention' => 'Nettoyage',
+                        'ai_nature_du_degat_incident' => 'Cafe renverse',
+                        'ai_surface_element_concerne' => 'Moquette',
+                        'besoinPersonnalise' => 'demande nettoyage urgent apres degat (cafe renverse sur moquette)',
+                        'descriptionBesoin' => 'demande nettoyage urgent apres degat (cafe renverse sur moquette)',
+                        'niveauUrgenceAutre' => 'Urgente',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_type_d_intervention',
+                                'label' => 'Type intervention',
+                                'type' => 'text',
+                                'required' => false,
+                            ],
+                            [
+                                'key' => 'ai_nature_du_degat_incident',
+                                'label' => 'Nature du degat incident',
+                                'type' => 'text',
+                                'required' => false,
+                            ],
+                            [
+                                'key' => 'ai_surface_element_concerne',
+                                'label' => 'Surface element concerne',
+                                'type' => 'text',
+                                'required' => false,
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                    '_learningSource' => 'database',
+                ],
+            ])
+        ;
+
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient
+            ->expects(self::never())
+            ->method('request')
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $httpClient,
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            'test-key',
+            'test-model'
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'demande nettoyage urgent apres degat (cafe renverse sur moquette)',
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('Nettoyage', $result['suggestedDetails']['ai_type_d_intervention'] ?? null);
+        self::assertSame('Cafe renverse', $result['suggestedDetails']['ai_nature_du_degat_incident'] ?? null);
+        self::assertSame('Moquette', $result['suggestedDetails']['ai_surface_element_concerne'] ?? null);
+        self::assertSame(
+            ['ai_type_d_intervention', 'ai_nature_du_degat_incident', 'ai_surface_element_concerne'],
+            array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add'])
+        );
+        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+    }
+
+    public function testManualFeedbackDoesNotLearnServiceGeneratedFields(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'demande casque urgent',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-04-27T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Demande casque',
+                        'description' => 'demande casque urgent',
+                        'priorite' => 'HAUTE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_type_materiel' => 'Casque',
+                        'ai_extra_infos' => 'urgent',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_type_materiel',
+                                'label' => 'Type materiel',
+                                'type' => 'text',
+                                'required' => true,
+                                'source' => 'manual',
+                            ],
+                            [
+                                'key' => 'ai_extra_infos',
+                                'label' => 'Extra infos',
+                                'type' => 'textarea',
+                                'required' => true,
+                                'source' => 'generated',
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            '',
+            ''
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'demande casque urgent',
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('Casque', $result['suggestedDetails']['ai_type_materiel'] ?? null);
+        self::assertArrayNotHasKey('ai_extra_infos', $result['suggestedDetails']);
+        self::assertSame(
+            ['ai_type_materiel'],
+            array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add'])
+        );
+    }
+
+    public function testLearnedFeedbackDoesNotUseStaleFieldPlanValueMissingFromFinalDetails(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'demande casque urgent',
+                    'confirmed' => true,
+                    'manual' => false,
+                    'createdAt' => '2026-04-27T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Demande casque',
+                        'description' => 'demande casque urgent',
+                        'priorite' => 'HAUTE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_type_materiel' => 'Casque',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_type_materiel',
+                                'label' => 'Type materiel',
+                                'type' => 'text',
+                                'required' => true,
+                            ],
+                            [
+                                'key' => 'ai_extra_infos',
+                                'label' => 'Extra infos',
+                                'type' => 'textarea',
+                                'required' => false,
+                                'value' => 'urgent',
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            '',
+            ''
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'demande casque urgent',
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('Casque', $result['suggestedDetails']['ai_type_materiel'] ?? null);
+        self::assertArrayNotHasKey('ai_extra_infos', $result['suggestedDetails']);
+        self::assertSame(
+            ['ai_type_materiel'],
+            array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add'])
+        );
+    }
+
+    public function testBestMatchedSchemaPreventsCompatibleSamplesFromAddingFields(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'demande casque urgent',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-04-27T11:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Demande casque',
+                        'description' => 'demande casque urgent',
+                        'priorite' => 'HAUTE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_type_materiel' => 'Casque',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_type_materiel',
+                                'label' => 'Type materiel',
+                                'type' => 'text',
+                                'required' => true,
+                                'source' => 'manual',
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                ],
+                [
+                    'prompt' => 'demande casque urgent',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-04-27T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Demande casque',
+                        'description' => 'demande casque urgent',
+                        'priorite' => 'HAUTE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_type_materiel' => 'Casque',
+                        'ai_extra_infos' => 'Casque',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_type_materiel',
+                                'label' => 'Type materiel',
+                                'type' => 'text',
+                                'required' => true,
+                                'source' => 'manual',
+                            ],
+                            [
+                                'key' => 'ai_extra_infos',
+                                'label' => 'Extra infos',
+                                'type' => 'textarea',
+                                'required' => true,
+                                'source' => 'manual',
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            '',
+            ''
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'demande casque urgent',
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('Casque', $result['suggestedDetails']['ai_type_materiel'] ?? null);
+        self::assertArrayNotHasKey('ai_extra_infos', $result['suggestedDetails']);
+        self::assertSame(
+            ['ai_type_materiel'],
+            array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add'])
+        );
+    }
+
+    public function testPurposePhraseDoesNotFillOrganizationField(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'attestation de travail pour visa',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-04-27T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Attestation de travail',
+                        'description' => 'attestation de travail pour visa',
+                        'priorite' => 'NORMALE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_type_attestation' => 'attestation de travail',
+                        'ai_motif_contexte' => 'visa',
+                        'ai_organisme_destinataire' => 'visa',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_type_attestation',
+                                'label' => 'Type d attestation',
+                                'type' => 'text',
+                                'required' => true,
+                                'source' => 'manual',
+                            ],
+                            [
+                                'key' => 'ai_motif_contexte',
+                                'label' => 'Motif contexte',
+                                'type' => 'text',
+                                'required' => false,
+                                'source' => 'manual',
+                            ],
+                            [
+                                'key' => 'ai_organisme_destinataire',
+                                'label' => 'Organisme destinataire',
+                                'type' => 'text',
+                                'required' => false,
+                                'source' => 'manual',
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            '',
+            ''
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'attestation de travail pour visa',
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('attestation de travail', $result['suggestedDetails']['ai_type_attestation'] ?? null);
+        self::assertSame('visa', $result['suggestedDetails']['ai_motif_contexte'] ?? null);
+        self::assertArrayNotHasKey('ai_organisme_destinataire', $result['suggestedDetails']);
+        self::assertSame(
+            ['ai_type_attestation', 'ai_motif_contexte'],
+            array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add'])
+        );
     }
 }

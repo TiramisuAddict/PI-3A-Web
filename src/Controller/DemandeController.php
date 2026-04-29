@@ -138,6 +138,7 @@ class DemandeController extends AbstractController
         $submittedAiDescription = '';
         $submittedAiRawPrompt = '';
         $submittedAiFieldPlan = ['add' => [], 'remove' => [], 'replaceBase' => false];
+        $submittedAiGenerationSnapshot = [];
         $aiGenerated = false;
         $aiTrustedFromLearning = false;
         $manualFieldMode = false;
@@ -148,6 +149,13 @@ class DemandeController extends AbstractController
             $submittedDetails = $formData['details'] ?? [];
             $submittedAiDescription = trim((string) $request->request->get('autre_ai_description', ''));
             $submittedAiRawPrompt = trim((string) $request->request->get('autre_ai_raw_prompt', ''));
+            $aiGenerationSnapshotRaw = trim((string) $request->request->get('ai_generation_snapshot', ''));
+            if ('' !== $aiGenerationSnapshotRaw) {
+                $decodedSnapshot = json_decode($aiGenerationSnapshotRaw, true);
+                if (is_array($decodedSnapshot)) {
+                    $submittedAiGenerationSnapshot = $decodedSnapshot;
+                }
+            }
             $aiFieldPlanRaw = trim((string) $request->request->get('ai_field_plan', ''));
             if ('' !== $aiFieldPlanRaw) {
                 $decodedPlan = json_decode($aiFieldPlanRaw, true);
@@ -183,6 +191,10 @@ class DemandeController extends AbstractController
                 if ($aiGenerated && !$aiConfirmed && !$manualFieldMode) {
                     $this->addFlash('warning', 'Veuillez confirmer la demande apres generation IA avant de creer la demande.');
                 } else {
+                    if ('Autre' === $submittedType && $manualFieldMode) {
+                        $submittedDetails = $this->filterManualAutreSubmittedDetails($submittedDetails, $submittedAiFieldPlan);
+                    }
+
                     $this->em->persist($demande);
                     $this->em->flush();
 
@@ -194,6 +206,9 @@ class DemandeController extends AbstractController
                             $persistedDetails['_ai_manual_fields'] = $manualFieldMode;
                             $persistedDetails['_ai_confirmed_at'] = (new \DateTimeImmutable())->format(DATE_ATOM);
                             $persistedDetails['_ai_field_plan'] = $submittedAiFieldPlan;
+                            if ([] !== $submittedAiGenerationSnapshot) {
+                                $persistedDetails['_ai_generation_snapshot'] = $submittedAiGenerationSnapshot;
+                            }
                             if ('' !== $trustedPrompt) {
                                 $persistedDetails['_ai_raw_prompt'] = $trustedPrompt;
                             }
@@ -235,7 +250,8 @@ class DemandeController extends AbstractController
                                 ],
                                 $submittedDetails,
                                 $submittedAiFieldPlan,
-                                $employe->getId_employe()
+                                $employe->getId_employe(),
+                                $submittedAiGenerationSnapshot
                             );
                         }
                     }
@@ -855,6 +871,60 @@ class DemandeController extends AbstractController
         }
 
         return $labels;
+    }
+
+    /**
+     * Manual Autre mode is a schema decision made by the employee. Do not persist
+     * stale service-generated ai_* inputs that may still be present in the form.
+     *
+     * @param array<string, mixed> $details
+     * @param array<string, mixed> $fieldPlan
+     * @return array<string, mixed>
+     */
+    private function filterManualAutreSubmittedDetails(array $details, array $fieldPlan): array
+    {
+        $allowedKeys = array_fill_keys([
+            'besoinPersonnalise',
+            'descriptionBesoin',
+            'niveauUrgenceAutre',
+        ], true);
+
+        $customFields = is_array($fieldPlan['add'] ?? null) ? $fieldPlan['add'] : [];
+        foreach ($customFields as $field) {
+            if (!is_array($field) || $this->isGeneratedAutreFieldSource($field['source'] ?? null)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' !== $key) {
+                $allowedKeys[$key] = true;
+            }
+        }
+
+        $filtered = [];
+        foreach ($details as $key => $value) {
+            $detailKey = trim((string) $key);
+            if ('' === $detailKey || !isset($allowedKeys[$detailKey])) {
+                continue;
+            }
+
+            $filtered[$detailKey] = $value;
+        }
+
+        return $filtered;
+    }
+
+    private function isGeneratedAutreFieldSource(mixed $source): bool
+    {
+        $normalized = strtolower(trim((string) $source));
+        if ('' === $normalized || 'manual' === $normalized) {
+            return false;
+        }
+
+        return in_array($normalized, ['generated', 'learned'], true)
+            || str_starts_with($normalized, 'llm')
+            || str_starts_with($normalized, 'local-ml')
+            || str_contains($normalized, 'fallback');
     }
 
     private function validateDetails(string $typeDemande, array $details): array

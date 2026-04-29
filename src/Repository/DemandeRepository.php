@@ -317,6 +317,15 @@ class DemandeRepository extends ServiceEntityRepository
                 $storedFieldPlan = [];
             }
 
+            $generatedSnapshot = $details['_ai_generation_snapshot'] ?? $details['__ai_generation_snapshot'] ?? null;
+            if (is_string($generatedSnapshot) && '' !== trim($generatedSnapshot)) {
+                $decodedSnapshot = json_decode($generatedSnapshot, true);
+                $generatedSnapshot = is_array($decodedSnapshot) ? $decodedSnapshot : null;
+            }
+            if (!is_array($generatedSnapshot)) {
+                $generatedSnapshot = [];
+            }
+
             $planAdd = is_array($storedFieldPlan['add'] ?? null) ? array_values($storedFieldPlan['add']) : [];
             foreach ($planAdd as $index => $field) {
                 if (!is_array($field)) {
@@ -335,8 +344,16 @@ class DemandeRepository extends ServiceEntityRepository
                 }
             }
             $planAdd = array_values($planAdd);
+            $hadStoredPlanAdd = [] !== $planAdd;
 
-            if ([] === $planAdd) {
+            if ($isManualFields) {
+                $planAdd = array_values(array_filter(
+                    $planAdd,
+                    fn (array $field): bool => !$this->isGeneratedAutreFieldSource($field['source'] ?? null)
+                ));
+            }
+
+            if ([] === $planAdd && !$hadStoredPlanAdd) {
                 foreach ($feedbackDetails as $detailKey => $detailValue) {
                     $key = trim((string) $detailKey);
                     if ('' === $key || 0 !== strpos($key, 'ai_')) {
@@ -370,6 +387,26 @@ class DemandeRepository extends ServiceEntityRepository
                 }
             }
 
+            if ($isManualFields && [] !== $planAdd) {
+                $manualDetailKeys = [];
+                foreach ($planAdd as $field) {
+                    if (!is_array($field)) {
+                        continue;
+                    }
+
+                    $key = trim((string) ($field['key'] ?? ''));
+                    if ('' !== $key) {
+                        $manualDetailKeys[$key] = true;
+                    }
+                }
+
+                $feedbackDetails = array_filter(
+                    $feedbackDetails,
+                    static fn ($detailKey): bool => isset($manualDetailKeys[(string) $detailKey]),
+                    ARRAY_FILTER_USE_KEY
+                );
+            }
+
             $hasSignal = '' !== $prompt || [] !== $feedbackDetails || '' !== $general['description'] || '' !== $general['titre'];
             if (!$hasSignal) {
                 continue;
@@ -391,6 +428,7 @@ class DemandeRepository extends ServiceEntityRepository
                         : [],
                     'replaceBase' => [] !== $planAdd || true === ($storedFieldPlan['replaceBase'] ?? false),
                 ],
+                'generatedSnapshot' => $generatedSnapshot,
             ];
         }
 
@@ -428,5 +466,18 @@ class DemandeRepository extends ServiceEntityRepository
         $normalized = strtolower(trim((string) $value));
 
         return in_array($normalized, ['1', 'true', 'yes', 'oui', 'on'], true);
+    }
+
+    private function isGeneratedAutreFieldSource(mixed $source): bool
+    {
+        $normalized = strtolower(trim((string) $source));
+        if ('' === $normalized || 'manual' === $normalized) {
+            return false;
+        }
+
+        return in_array($normalized, ['generated', 'learned'], true)
+            || str_starts_with($normalized, 'llm')
+            || str_starts_with($normalized, 'local-ml')
+            || str_contains($normalized, 'fallback');
     }
 }

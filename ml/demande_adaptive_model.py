@@ -105,6 +105,8 @@ FORMATION_TYPE_MARKERS = {
     "professionnelle",
 }
 
+MIN_USABLE_MATCH_SCORE = 0.62
+
 
 @dataclass
 class LearnedField:
@@ -251,6 +253,13 @@ def normalize_options(value: Any) -> list[str]:
     return options
 
 
+def is_generated_field_source(value: Any) -> bool:
+    source = re.sub(r"[^a-z0-9]+", "-", normalize_ws(value).lower()).strip("-")
+    if not source or source == "manual":
+        return False
+    return source in {"generated", "learned"} or source.startswith("llm") or source.startswith("local-ml") or "fallback" in source
+
+
 def field_role(field: LearnedField) -> str:
     haystack = norm(f"{field.key} {field.label}")
     if field.type == "date" or any(token in haystack for token in ["date", "jour", "echeance", "deadline"]):
@@ -299,10 +308,12 @@ def sample_fields(sample: dict[str, Any]) -> list[LearnedField]:
         key = normalize_ws(item.get("key"))
         if not key or key in BASE_DETAIL_KEYS or key.startswith("_"):
             continue
+        if to_bool(sample.get("manual")) and is_generated_field_source(item.get("source")):
+            continue
         if key in seen:
             continue
         seen.add(key)
-        value = details.get(key, normalize_ws(item.get("value")))
+        value = details.get(key, "")
         label = normalize_ws(item.get("label")) or label_from_key(key)
         field_type = norm(item.get("type") or infer_field_type(key, label, value))
         if field_type not in {"text", "textarea", "select", "number", "date"}:
@@ -315,7 +326,7 @@ def sample_fields(sample: dict[str, Any]) -> list[LearnedField]:
                 required=to_bool(item.get("required")),
                 value=value,
                 options=normalize_options(item.get("options")),
-                source="manual" if to_bool(sample.get("manual")) else "learned",
+                source="manual" if to_bool(sample.get("manual")) else (norm(item.get("source")) or "learned"),
             )
         )
 
@@ -352,6 +363,43 @@ def contains_norm_term(clean: str, term: str) -> bool:
     return re.search(rf"\b{re.escape(normalized_term)}\b", clean) is not None
 
 
+def value_has_prompt_evidence(source: str, value: str) -> bool:
+    clean = norm(source)
+    value_norm = norm(value)
+    if not clean or not value_norm:
+        return False
+
+    if contains_norm_term(clean, value_norm):
+        return True
+
+    ignored = STOPWORDS | {
+        "ai",
+        "autre",
+        "besoin",
+        "champ",
+        "custom",
+        "demande",
+        "details",
+        "information",
+        "infos",
+        "urgent",
+        "urgence",
+        "valeur",
+    }
+    tokens = [
+        token
+        for token in tokenize(value_norm, include_bigrams=False)
+        if len(token) >= 3 and token not in ignored
+    ]
+    if not tokens:
+        return False
+
+    if len(tokens) == 1:
+        return contains_norm_term(clean, tokens[0])
+
+    return all(contains_norm_term(clean, token) for token in tokens)
+
+
 def schema_support_similarity(source: str, fields: list[LearnedField]) -> float:
     roles = [field_role(field) for field in fields]
     meaningful_roles = [role for role in roles if role != "generic"]
@@ -365,6 +413,23 @@ def schema_support_similarity(source: str, fields: list[LearnedField]) -> float:
             supported += 1
 
     return supported / max(1, len(meaningful_roles))
+
+
+def source_has_reason_evidence(source: str) -> bool:
+    clean = norm(source)
+    return re.search(
+        r"\b(?:motif|raison|raisons|justification|usage|car|parce que|afin de|pour cause|a cause de|suite a)\b"
+        r"|\bpour\s+(?:mission|projet|client|travail|intervention|deplacement|reunion|raisons?)\b",
+        clean,
+    ) is not None
+
+
+def source_has_organization_evidence(source: str) -> bool:
+    clean = norm(source)
+    return re.search(
+        r"\b(?:destinataire|organisme|beneficiaire|chez|societe|entreprise|client|fournisseur|ambassade|consulat|banque|ecole|universite)\b",
+        clean,
+    ) is not None
 
 
 def source_supports_role(source: str, role: str, schema_has_specification: bool = False) -> bool:
@@ -394,7 +459,11 @@ def source_supports_role(source: str, role: str, schema_has_specification: bool 
         return bool(value and not is_generic_request_object(value))
     if role == "category":
         return bool(shift_variant(source))
-    if role in {"reason", "attestation", "room", "organization"}:
+    if role == "reason":
+        return source_has_reason_evidence(source)
+    if role == "organization":
+        return source_has_organization_evidence(source)
+    if role in {"attestation", "room"}:
         return True
     return False
 
@@ -723,6 +792,7 @@ def extract_requested_object(source: str) -> str:
     clean = normalize_ws(source)
     patterns = [
         r"\b(?:je\s+veux|je\s+souhaite|j'ai\s+besoin\s+de|besoin\s+de|demande\s+de|demande\s+d'|obtenir|avoir)\s+(.{2,120}?)(?=\s+(?:pour|afin|car|parce que|avec|qui|le|la|les|a partir|urgent)\b|[.,;:]|$)",
+        r"\bdemande\s+(.{2,120}?)(?=\s+(?:apres|après|suite|pour|afin|car|parce que|avec|qui|le|la|les|a partir|urgent)\b|[.,;:]|$)",
         r"\b(?:un|une|des)\s+(.{2,80}?)(?=\s+(?:pour|afin|car|parce que|avec|qui|le|la|les|a partir|urgent)\b|[.,;:]|$)",
     ]
     for pattern in patterns:
@@ -791,7 +861,11 @@ def extract_object_qualifier(source: str) -> str:
 
 
 def extract_attestation(source: str) -> str:
-    match = re.search(r"\b(attestation(?:\s+de|\s+d')?\s+[\w' -]{2,60})", source, flags=re.IGNORECASE)
+    match = re.search(
+        r"\b(attestation(?:\s+de|\s+d')?\s+[\w' -]{2,60}?)(?=\s+(?:pour|afin|car|parce que|avec|qui|que)\b|[.,;:]|$)",
+        source,
+        flags=re.IGNORECASE,
+    )
     if match:
         return normalize_ws(match.group(1)).strip(" ,;:-")[:90]
     return ""
@@ -1053,6 +1127,9 @@ def extract_from_learned_examples(source: str, field: LearnedField, examples: li
         if not value:
             continue
 
+        if value_has_prompt_evidence(source, value):
+            return value[:220 if role in {"reason", "generic"} else 100]
+
         prompt_tokens = token_spans(prompt)
         value_tokens = [token["norm"] for token in token_spans(value)]
         if not prompt_tokens or not value_tokens:
@@ -1157,6 +1234,9 @@ def extract_value(
         learned = extract_from_learned_examples(source, field, examples or [])
         return coerce_select(learned, options)
 
+    if role != "organization" and value_has_prompt_evidence(source, field.value):
+        return field.value[:220 if role in {"reason", "generic"} else 100]
+
     if role == "date":
         return first_date(source)
 
@@ -1194,9 +1274,8 @@ def extract_value(
             return sentence_case(value)
 
     if role == "organization":
-        value = clause_after(source, ["pour", "destinataire", "organisme", "chez"], 80)
-        if value:
-            return value
+        value = clause_after(source, ["destinataire", "organisme", "beneficiaire", "chez"], 80)
+        return value
 
     if role == "location":
         return extract_location(source, haystack)
@@ -1258,6 +1337,61 @@ def extract_value(
 
 def prompt_sensitive(field: LearnedField) -> bool:
     return field_role(field) != "generic"
+
+
+def field_has_prompt_evidence(source: str, field: LearnedField) -> bool:
+    clean = norm(source)
+    if not clean:
+        return False
+
+    haystack = norm(f"{field.key} {field.label}")
+    role = field_role(field)
+
+    if field.type != "select" and role != "organization" and value_has_prompt_evidence(source, field.value):
+        return True
+
+    if field.type == "select":
+        options = field.options or []
+        generic_option_tokens = {"autre", "category", "categorie", "demande", "formation", "nature", "option", "type"}
+        for option in options:
+            option_norm = norm(option)
+            if option_norm and contains_norm_term(clean, option_norm):
+                return True
+            tokens = [
+                token
+                for token in tokenize(option, include_bigrams=False)
+                if len(token) >= 3 and token not in generic_option_tokens
+            ]
+            if tokens and all(contains_norm_term(clean, token) for token in tokens):
+                return True
+        return False
+
+    if role in {"date", "number", "email", "phone", "time", "period", "location", "training", "specification", "object"}:
+        return source_supports_role(source, role, "specification" in haystack)
+
+    if role == "category":
+        if "transport" in haystack:
+            return bool(extract_transport_mode(source, field.options or []))
+        return bool(shift_variant(source) or extract_requested_object(source) or value_has_prompt_evidence(source, field.value))
+
+    if role == "reason":
+        return source_has_reason_evidence(source)
+
+    if role == "attestation":
+        return contains_norm_term(clean, "attestation")
+
+    if role == "room":
+        return re.search(r"\b(?:salle|room|reservation)\b", clean) is not None
+
+    if role == "organization":
+        return source_has_organization_evidence(source)
+
+    key_tokens = [
+        token
+        for token in tokenize(f"{field.key} {field.label}", include_bigrams=False)
+        if token not in {"ai", "custom", "champ", "demande", "type", "autre"}
+    ]
+    return bool(key_tokens and any(contains_norm_term(clean, token) for token in key_tokens))
 
 
 def role_profile(fields: list[LearnedField]) -> set[str]:
@@ -1327,12 +1461,128 @@ def dedupe_selected_fields(fields: list[LearnedField]) -> list[LearnedField]:
     return cleaned
 
 
+def field_family(field: LearnedField) -> str:
+    role = field_role(field)
+    text = norm(f"{field.key} {field.label}")
+    tokens = [
+        token
+        for token in re.findall(r"[a-z0-9]+", text)
+        if token not in {"ai", "custom", "champ", "demande", "souhaite", "souhaitee", "type", "autre"}
+    ]
+    return f"{role}:{'_'.join(tokens[:4]) if tokens else norm(field.key)}"
+
+
+def field_from_payload(payload: dict[str, Any], fallback_key: str = "") -> LearnedField | None:
+    key = normalize_ws(payload.get("key") or fallback_key)
+    if not key:
+        return None
+    label = normalize_ws(payload.get("label")) or label_from_key(key)
+    field_type = norm(payload.get("type") or infer_field_type(key, label, normalize_ws(payload.get("value"))))
+    if field_type not in {"text", "textarea", "select", "number", "date"}:
+        field_type = infer_field_type(key, label, normalize_ws(payload.get("value")))
+    return LearnedField(
+        key=key,
+        label=label,
+        type=field_type,
+        required=to_bool(payload.get("required")),
+        value=normalize_ws(payload.get("value")),
+        options=normalize_options(payload.get("options")),
+        source=normalize_ws(payload.get("source")) or "generated",
+    )
+
+
+def suppression_signatures(field: LearnedField) -> set[str]:
+    role = field_role(field)
+    return {
+        f"key:{norm(field.key)}",
+        f"family:{field_family(field)}",
+        f"role:{role}:{norm(field.label)}",
+    }
+
+
+def field_is_explicitly_named(source: str, field: LearnedField) -> bool:
+    clean = norm(source)
+    if not clean:
+        return False
+
+    for option in field.options or []:
+        option_norm = norm(option)
+        if option_norm and contains_norm_term(clean, option_norm):
+            return True
+
+    tokens = [
+        token
+        for token in tokenize(f"{field.key} {field.label}", include_bigrams=False)
+        if token not in {"ai", "custom", "champ", "demande", "souhaite", "souhaitee", "type", "autre"}
+    ]
+    return bool(tokens and any(contains_norm_term(clean, token) for token in tokens))
+
+
+def extract_suppression_signals(samples: list[dict[str, Any]]) -> set[str]:
+    signals: set[str] = set()
+
+    for sample in samples:
+        if not isinstance(sample, dict):
+            continue
+
+        explicit = sample.get("suppressedFields")
+        if isinstance(explicit, list):
+            for item in explicit:
+                if not isinstance(item, dict):
+                    continue
+                field = field_from_payload(item)
+                if field:
+                    signals.update(suppression_signatures(field))
+
+        snapshot = sample.get("generatedSnapshot") if isinstance(sample.get("generatedSnapshot"), dict) else {}
+        plan = snapshot.get("dynamicFieldPlan") if isinstance(snapshot.get("dynamicFieldPlan"), dict) else {}
+        generated_fields = plan.get("add") if isinstance(plan.get("add"), list) else []
+        generated_details = snapshot.get("suggestedDetails") if isinstance(snapshot.get("suggestedDetails"), dict) else {}
+        final_details = sample_details(sample)
+        final_plan = sample.get("fieldPlan") if isinstance(sample.get("fieldPlan"), dict) else {}
+        final_add = final_plan.get("add") if isinstance(final_plan.get("add"), list) else []
+        kept_keys = {
+            normalize_ws(item.get("key"))
+            for item in final_add
+            if isinstance(item, dict) and normalize_ws(item.get("key"))
+        } | set(final_details.keys())
+
+        for item in generated_fields:
+            if not isinstance(item, dict):
+                continue
+            field = field_from_payload(item)
+            if not field or field.key in BASE_DETAIL_KEYS:
+                continue
+            generated_value = normalize_ws(generated_details.get(field.key) or field.value)
+            if field.key not in kept_keys:
+                signals.update(suppression_signatures(field))
+                continue
+
+            if generated_value and field.key not in final_details:
+                signals.update(suppression_signatures(field))
+
+    return signals
+
+
+def suppresses_field(field: LearnedField, signals: set[str], source: str) -> bool:
+    if not signals:
+        return False
+    if field_is_explicitly_named(source, field):
+        return False
+    return bool(suppression_signatures(field) & signals)
+
+
 def select_learned_fields(source: str, ranked: list[RankedSample], max_fields: int = 8) -> tuple[list[LearnedField], float, bool]:
     if not ranked:
         return [], 0.0, False
 
     anchor = ranked[0]
     ranked = [sample for sample in ranked if schemas_compatible(anchor, sample)]
+    anchor_keys = {
+        normalize_ws(field.key)
+        for field in anchor.fields
+        if normalize_ws(field.key) and normalize_ws(field.key) not in BASE_DETAIL_KEYS
+    }
 
     scores: dict[str, dict[str, Any]] = {}
     order: dict[str, tuple[int, int]] = {}
@@ -1344,6 +1594,8 @@ def select_learned_fields(source: str, ranked: list[RankedSample], max_fields: i
         for field_index, field in enumerate(ranked_sample.fields):
             key = normalize_ws(field.key)
             if not key or key in BASE_DETAIL_KEYS:
+                continue
+            if key not in anchor_keys:
                 continue
             weight = ranked_sample.score
             if ranked_sample.manual:
@@ -1381,19 +1633,23 @@ def select_learned_fields(source: str, ranked: list[RankedSample], max_fields: i
         if weight < minimum and ranked[0].score < 0.64:
             continue
 
-        value = extract_value(source, source_field, data.get("examples", []), schema_roles)
-        if not value and source_field.type == "select" and source_field.value:
-            value = coerce_select(source_field.value, source_field.options or [])
+        required = source_field.required or float(data["required"]) >= max(0.35, weight * 0.45)
+        has_prompt_evidence = field_has_prompt_evidence(source, source_field)
+        value = extract_value(source, source_field, data.get("examples", []), schema_roles) if has_prompt_evidence else ""
 
-        if not value and prompt_sensitive(source_field) and not source_field.required:
+        if not value and not has_prompt_evidence and not required:
             continue
+
+        field_type = source_field.type
+        if source_field.options and field_type != "select":
+            field_type = "select"
 
         selected.append(
             LearnedField(
                 key=source_field.key,
                 label=source_field.label,
-                type=source_field.type,
-                required=source_field.required or float(data["required"]) >= max(0.35, weight * 0.45),
+                type=field_type,
+                required=required,
                 value=value,
                 options=source_field.options or [],
                 source=source_field.source,
@@ -1536,10 +1792,15 @@ def generate_autre_response(request_data: dict[str, Any]) -> dict[str, Any]:
         general = request_data.get("general") if isinstance(request_data.get("general"), dict) else {}
         source = normalize_ws(general.get("aiDescriptionPrompt") or general.get("description") or general.get("titre"))
 
-    ranked = rank_feedback(source, extract_feedback_samples(request_data))
+    feedback_samples = extract_feedback_samples(request_data)
+    suppression_signals = extract_suppression_signals(feedback_samples)
+    ranked = rank_feedback(source, feedback_samples)
     learned_fields, match_score, manual_schema = select_learned_fields(source, ranked)
-    used_fallback = not learned_fields
-    fields = learned_fields if learned_fields else fallback_fields(source)
+    learned_fields = [field for field in learned_fields if not suppresses_field(field, suppression_signals, source)]
+    has_usable_match = bool(ranked) and match_score >= MIN_USABLE_MATCH_SCORE and bool(learned_fields)
+    used_fallback = not has_usable_match
+    fields = learned_fields if has_usable_match else fallback_fields(source)
+    fields = [field for field in fields if not suppresses_field(field, suppression_signals, source)]
 
     general_priority, urgency = priority(source)
     title = build_title(source, fields)
