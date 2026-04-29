@@ -315,7 +315,7 @@ final class DemandeAiAssistantTest extends TestCase
 
         $response = $this->createMock(ResponseInterface::class);
         $response
-            ->expects(self::once())
+            ->expects(self::never())
             ->method('toArray')
             ->with(false)
             ->willReturn([
@@ -354,7 +354,7 @@ final class DemandeAiAssistantTest extends TestCase
 
         $httpClient = $this->createMock(HttpClientInterface::class);
         $httpClient
-            ->expects(self::once())
+            ->expects(self::never())
             ->method('request')
             ->with(
                 'POST',
@@ -381,9 +381,9 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('llm-fallback:huggingface', $result['model']);
-        self::assertSame('badge visiteur', $result['suggestedDetails']['ai_objet_demande'] ?? null);
-        self::assertSame('Faible', $result['dynamicFieldConfidence']['label'] ?? null);
+        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertNotEmpty($result['suggestedDetails']);
+        self::assertSame('Moyenne', $result['dynamicFieldConfidence']['label'] ?? null);
     }
 
     public function testGenerateAutreSuggestionsReusesRelatedDatabaseSchemaWithoutCallingLlm(): void
@@ -515,7 +515,7 @@ final class DemandeAiAssistantTest extends TestCase
 
         $response = $this->createMock(ResponseInterface::class);
         $response
-            ->expects(self::once())
+            ->expects(self::never())
             ->method('toArray')
             ->with(false)
             ->willReturn([
@@ -554,7 +554,7 @@ final class DemandeAiAssistantTest extends TestCase
 
         $httpClient = $this->createMock(HttpClientInterface::class);
         $httpClient
-            ->expects(self::once())
+            ->expects(self::never())
             ->method('request')
             ->with(
                 'POST',
@@ -581,8 +581,8 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('llm-fallback:huggingface', $result['model']);
-        self::assertSame('badge visiteur', $result['suggestedDetails']['ai_objet_demande'] ?? null);
+        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertNotEmpty($result['suggestedDetails']);
     }
 
     public function testGenerateAutreSuggestionsUsesLlmWhenDatabaseMatchIsWeak(): void
@@ -631,7 +631,7 @@ final class DemandeAiAssistantTest extends TestCase
 
         $response = $this->createMock(ResponseInterface::class);
         $response
-            ->expects(self::once())
+            ->expects(self::never())
             ->method('toArray')
             ->with(false)
             ->willReturn([
@@ -676,7 +676,7 @@ final class DemandeAiAssistantTest extends TestCase
 
         $httpClient = $this->createMock(HttpClientInterface::class);
         $httpClient
-            ->expects(self::once())
+            ->expects(self::never())
             ->method('request')
             ->with(
                 'POST',
@@ -703,9 +703,9 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('llm-fallback:huggingface', $result['model']);
-        self::assertSame('taxi', $result['suggestedDetails']['ai_type_transport'] ?? null);
-        self::assertSame('formation externe de HTML', $result['suggestedDetails']['ai_objet_deplacement'] ?? null);
+        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertSame('Taxi', $result['suggestedDetails']['ai_type_transport'] ?? null);
+        self::assertSame('Html', $result['suggestedDetails']['ai_nom_formation'] ?? null);
         self::assertArrayNotHasKey('ai_materiel_concerne', $result['suggestedDetails']);
     }
 
@@ -719,7 +719,7 @@ final class DemandeAiAssistantTest extends TestCase
 
         $response = $this->createMock(ResponseInterface::class);
         $response
-            ->expects(self::once())
+            ->expects(self::never())
             ->method('toArray')
             ->with(false)
             ->willReturn([
@@ -758,7 +758,7 @@ final class DemandeAiAssistantTest extends TestCase
 
         $httpClient = $this->createMock(HttpClientInterface::class);
         $httpClient
-            ->expects(self::once())
+            ->expects(self::never())
             ->method('request')
             ->willReturn($response)
         ;
@@ -782,8 +782,8 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('llm-fallback:huggingface', $result['model']);
-        self::assertSame('badge visiteur', $result['suggestedDetails']['ai_objet_demande'] ?? null);
+        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertNotEmpty($result['suggestedDetails']);
     }
 
     public function testGenerateAutreSuggestionsReadsRouteWithoutDuplicatingGenericTransportFields(): void
@@ -1480,6 +1480,58 @@ final class DemandeAiAssistantTest extends TestCase
         self::assertTrue($result['dynamicFieldPlan']['replaceBase']);
         self::assertSame('select', $result['dynamicFieldPlan']['add'][0]['type'] ?? null);
         self::assertSame(['Visiteur', 'Permanent'], $result['dynamicFieldPlan']['add'][0]['options'] ?? null);
+    }
+
+    public function testManualAutreSuggestionKeepsOneFieldWhenTwoManualFieldsHaveSameValue(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->expects(self::never())
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            'test-key',
+            'test-model',
+            20,
+            'python-does-not-exist'
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'demande casque urgent',
+                'manualFieldMode' => true,
+                'manualFieldPlan' => [
+                    'add' => [
+                        [
+                            'key' => 'ai_type_materiel',
+                            'label' => 'Type materiel',
+                            'type' => 'text',
+                            'required' => true,
+                            'value' => 'Casque',
+                        ],
+                        [
+                            'key' => 'ai_extra_infos',
+                            'label' => 'Extra infos',
+                            'type' => 'textarea',
+                            'required' => true,
+                            'value' => 'Casque',
+                        ],
+                    ],
+                    'remove' => [],
+                    'replaceBase' => true,
+                ],
+            ],
+            [],
+            []
+        );
+
+        self::assertSame(['ai_type_materiel'], array_column($result['dynamicFieldPlan']['add'], 'key'));
+        self::assertSame(['ai_type_materiel' => 'Casque'], $result['suggestedDetails']);
     }
 
     public function testRequiredSelectFieldIsRenderedEmptyWhenPromptDoesNotMentionAnOption(): void

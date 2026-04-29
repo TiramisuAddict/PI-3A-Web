@@ -26,7 +26,10 @@ def main():
         payload.setdefault("prompt", source)
 
     try:
-        result = adaptive.generate_autre_response(payload)
+        if payload.get("validateLlmCandidate"):
+            result = adaptive.validate_autre_llm_candidate(payload)
+        else:
+            result = adaptive.generate_autre_response(payload)
     except Exception as exc:
         print(json.dumps({"ok": False, "error": str(exc)}))
         return

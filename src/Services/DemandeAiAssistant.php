@@ -168,33 +168,11 @@ class DemandeAiAssistant
     private function normalizeAutreModelPayload(array $detailsPayload, array $customPayload, array $allowedDetailKeys): array
     {
         $normalizedCustomFields = $this->normalizeCustomFields($customPayload, $allowedDetailKeys);
-        $customKeyMap = [];
-        foreach ($normalizedCustomFields as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            $key = trim((string) ($field['key'] ?? ''));
-            if ('' !== $key) {
-                $customKeyMap[$key] = true;
-            }
-        }
-
-        $allowedMap = [];
-        foreach ($allowedDetailKeys as $allowedKey) {
-            $key = trim((string) $allowedKey);
-            if ('' !== $key) {
-                $allowedMap[$key] = true;
-            }
-        }
-        foreach (array_keys($customKeyMap) as $customKey) {
-            $allowedMap[$customKey] = true;
-        }
 
         $normalizedDetails = [];
         foreach ($detailsPayload as $key => $value) {
             $detailKey = trim((string) $key);
-            if ('' === $detailKey || !isset($allowedMap[$detailKey])) {
+            if ('' === $detailKey) {
                 continue;
             }
 
@@ -205,23 +183,6 @@ class DemandeAiAssistant
             $clean = trim((string) $value);
             if ('' !== $clean) {
                 $normalizedDetails[$detailKey] = $clean;
-            }
-        }
-
-        foreach ($normalizedCustomFields as $index => $field) {
-            $key = trim((string) ($field['key'] ?? ''));
-            if ('' === $key) {
-                continue;
-            }
-
-            $fieldValue = trim((string) ($field['value'] ?? ''));
-            if (isset($normalizedDetails[$key]) && '' !== trim($normalizedDetails[$key])) {
-                $normalizedCustomFields[$index]['value'] = $normalizedDetails[$key];
-                continue;
-            }
-
-            if ('' !== $fieldValue) {
-                $normalizedDetails[$key] = $fieldValue;
             }
         }
 
@@ -242,6 +203,7 @@ class DemandeAiAssistant
     {
         $cleaned = [];
         $seenDateValues = [];
+        $seenComparableValues = [];
         $customKeys = [];
 
         foreach ($customFields as $field) {
@@ -288,12 +250,80 @@ class DemandeAiAssistant
                 }
 
                 $field['value'] = '';
+                $value = '';
+            }
+
+            $comparableValue = $this->duplicateAutreFieldValueKey($type, $value);
+            if ('' !== $comparableValue) {
+                $currentScore = $this->duplicateAutreFieldPreferenceScore($key, $label, $type, $required);
+                if (isset($seenComparableValues[$comparableValue])) {
+                    $previousIndex = $seenComparableValues[$comparableValue]['index'];
+                    $previousScore = $seenComparableValues[$comparableValue]['score'];
+                    if ($currentScore > $previousScore && isset($cleaned[$previousIndex])) {
+                        $previousKey = trim((string) ($cleaned[$previousIndex]['key'] ?? ''));
+                        if ('' !== $previousKey) {
+                            unset($details[$previousKey]);
+                        }
+                        $cleaned[$previousIndex] = $field;
+                        $seenComparableValues[$comparableValue] = [
+                            'index' => $previousIndex,
+                            'score' => $currentScore,
+                        ];
+                    } else {
+                        unset($details[$key]);
+                    }
+
+                    continue;
+                }
+
+                $seenComparableValues[$comparableValue] = [
+                    'index' => count($cleaned),
+                    'score' => $currentScore,
+                ];
             }
 
             $cleaned[] = $field;
         }
 
         return $cleaned;
+    }
+
+    private function duplicateAutreFieldValueKey(string $type, string $value): string
+    {
+        if (in_array($type, ['date', 'number'], true)) {
+            return '';
+        }
+
+        $normalized = $this->normalizeForSearch($value);
+        if (strlen($normalized) < 3 || is_numeric($normalized)) {
+            return '';
+        }
+
+        if (in_array($normalized, ['oui', 'non', 'autre', 'a definir', 'n/a'], true)) {
+            return '';
+        }
+
+        return $normalized;
+    }
+
+    private function duplicateAutreFieldPreferenceScore(string $key, string $label, string $type, bool $required): int
+    {
+        $haystack = $this->normalizeForSearch($key . ' ' . $label);
+        $score = $required ? 10 : 0;
+
+        if (preg_match('/\b(materiel|materiau|equipement|systeme|logiciel|type|nature|montant|lieu|destination|depart|arrivee|attestation|formation|conge|horaire|shift|zone|salle)\b/u', $haystack) === 1) {
+            $score += 40;
+        }
+
+        if (preg_match('/\b(extra|infos?|information|description|details?|commentaire|justification|motif|custom|champ)\b/u', $haystack) === 1) {
+            $score -= 25;
+        }
+
+        if ('textarea' === $type) {
+            $score -= 10;
+        }
+
+        return $score;
     }
 
     /**
@@ -518,6 +548,8 @@ class DemandeAiAssistant
 
             $customFields[] = $customField;
         }
+
+        $customFields = $this->cleanAutreDuplicateAndNoisyFields($customFields, $details);
 
         $title = $this->firstNonEmpty(
             trim((string) ($generalContext['titre'] ?? '')),
@@ -1873,14 +1905,23 @@ class DemandeAiAssistant
                 return null;
             }
 
-            $parsed['remove_fields'] = ['ALL'];
-            $parsed['replace_base'] = true;
-            $parsed['dynamicFieldConfidence'] = [
-                'score' => 42,
-                'label' => 'Faible',
-                'tone' => 'info',
-                'message' => 'Aucun historique similaire: champs proposes par LLM, confirmation requise.',
-            ];
+            $sourceText = $this->firstNonEmpty(
+                trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
+                trim((string) ($generalContext['description'] ?? '')),
+                trim((string) ($generalContext['titre'] ?? ''))
+            );
+
+            $parsed = $this->callLocalGenerationModel([
+                'text' => $sourceText,
+                'prompt' => $sourceText,
+                'validateLlmCandidate' => true,
+                'llmCandidate' => $parsed,
+            ]);
+
+            if ([] === (array) ($parsed['details'] ?? []) && [] === (array) ($parsed['custom_fields'] ?? [])) {
+                return null;
+            }
+
             $parsed['_model'] = 'llm-fallback:huggingface';
 
             return $parsed;
@@ -2167,7 +2208,7 @@ class DemandeAiAssistant
     private function loadAutreFeedbackSamplesFromDatabase(): array
     {
         try {
-            return $this->demandeRepository->fetchAutreFeedbackSamplesFromDatabase(900);
+            return $this->demandeRepository->fetchAutreFeedbackSamplesFromDatabase(2500);
         } catch (\Throwable $e) {
             $this->logger->warning('Impossible de charger les echantillons Autre depuis la base.', [
                 'exception' => $e->getMessage(),

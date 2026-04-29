@@ -247,13 +247,14 @@ class DemandeRepository extends ServiceEntityRepository
     /**
      * @return array<int, array{prompt:string,general:array<string,mixed>,details:array<string,mixed>,fieldPlan:array<string,mixed>}>
      */
-    public function fetchAutreFeedbackSamplesFromDatabase(int $limit = 800): array
+    public function fetchAutreFeedbackSamplesFromDatabase(int $limit = 2500): array
     {
         $rows = $this->createQueryBuilder('d')
             ->select('d.titre AS titre, d.description AS description, d.priorite AS priorite, d.categorie AS categorie, d.type_demande AS typeDemande, d.date_creation AS createdAt, dd.details AS detailsJson')
             ->leftJoin('d.demandeDetails', 'dd')
-            ->andWhere('d.type_demande = :typeDemande')
-            ->setParameter('typeDemande', 'Autre')
+            ->andWhere('dd.details LIKE :seedMarker OR dd.details LIKE :confirmedMarker')
+            ->setParameter('seedMarker', '%"_ai_seed_autre_ml":true%')
+            ->setParameter('confirmedMarker', '%"_ai_feedback_confirmed":true%')
             ->orderBy('d.date_creation', 'DESC')
             ->setMaxResults(max(100, $limit))
             ->getQuery()
@@ -279,7 +280,7 @@ class DemandeRepository extends ServiceEntityRepository
             $isManualFields = $this->toBooleanValue(
                 $details['_ai_manual_fields'] ?? $details['__ai_manual_fields'] ?? false
             );
-            if (!$isConfirmedAiFeedback && '' === $rawPrompt) {
+            if (!$isConfirmedAiFeedback) {
                 continue;
             }
 

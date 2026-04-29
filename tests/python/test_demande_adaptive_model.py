@@ -540,7 +540,7 @@ class DemandeAdaptiveModelTest(unittest.TestCase):
         self.assertNotIn("ai_organisme_destinataire", result["details"])
         self.assertNotIn("ai_organisme_destinataire", [field["key"] for field in result["custom_fields"]])
 
-    def test_weak_database_match_requests_llm_fallback(self):
+    def test_weak_database_match_uses_prompt_only_plan_when_useful(self):
         result = adaptive.generate_autre_response(
             {
                 "text": "demande d un transport par taxi pour une formation externe de html",
@@ -577,7 +577,9 @@ class DemandeAdaptiveModelTest(unittest.TestCase):
             }
         )
 
-        self.assertTrue(result["needsLlmFallback"])
+        self.assertFalse(result["needsLlmFallback"])
+        self.assertIn("ai_type_transport", result["details"])
+        self.assertIn("ai_nom_formation", result["details"])
         self.assertLess(result["dynamicFieldConfidence"]["score"], 50)
 
 
