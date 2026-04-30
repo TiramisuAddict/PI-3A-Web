@@ -626,6 +626,8 @@ class DemandeController extends AbstractController
             $firstDetail     = $demandeDetails->first();
             $existingDetails = json_decode($firstDetail->getDetails(), true) ?? [];
         }
+        $existingAiFieldPlan = $this->extractStoredAiFieldPlan($existingDetails);
+        $usesStoredAiSchema = [] !== $existingAiFieldPlan;
 
         $form = $this->createForm(DemandeType::class, $demande, [
             'is_edit'        => true,
@@ -643,7 +645,9 @@ class DemandeController extends AbstractController
             $submittedDetails = $formData['details'] ?? [];
 
             if ($submittedType) {
-                $detailErrors = $this->validateDetails($submittedType, $submittedDetails);
+                $detailErrors = $usesStoredAiSchema
+                    ? $this->validateAiCustomDetails($submittedDetails, $existingAiFieldPlan)
+                    : $this->validateDetails($submittedType, $submittedDetails);
             }
 
             if ($form->isValid() && empty($detailErrors)) {
@@ -669,8 +673,8 @@ class DemandeController extends AbstractController
                     $this->em->persist($historique);
                 }
 
-                if (!empty($submittedDetails)) {
-                    if ('Autre' === (string) $submittedType && !empty($existingDetails)) {
+                if (!empty($submittedDetails) || $usesStoredAiSchema) {
+                    if (!empty($existingDetails)) {
                         foreach ($existingDetails as $detailKey => $detailValue) {
                             $detailKey = (string) $detailKey;
                             if ($this->isTechnicalDetailKey($detailKey) && !array_key_exists($detailKey, $submittedDetails)) {
@@ -871,6 +875,29 @@ class DemandeController extends AbstractController
         }
 
         return $labels;
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @return array<string, mixed>
+     */
+    private function extractStoredAiFieldPlan(array $details): array
+    {
+        $plan = $details['_ai_field_plan'] ?? $details['__ai_field_plan'] ?? null;
+        if (is_string($plan) && '' !== trim($plan)) {
+            $decodedPlan = json_decode($plan, true);
+            $plan = is_array($decodedPlan) ? $decodedPlan : null;
+        }
+
+        if (!is_array($plan) || !is_array($plan['add'] ?? null) || [] === $plan['add']) {
+            return [];
+        }
+
+        return [
+            'add' => $plan['add'],
+            'remove' => is_array($plan['remove'] ?? null) ? $plan['remove'] : [],
+            'replaceBase' => true === ($plan['replaceBase'] ?? false),
+        ];
     }
 
     /**

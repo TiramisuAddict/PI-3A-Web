@@ -453,6 +453,7 @@
     function isIgnoredExtraKey(key, baseFieldMap) {
         if (!key) return true;
         if (baseFieldMap[key]) return true;
+        if (String(key).indexOf("_ai_") === 0 || String(key).indexOf("__ai_") === 0 || key === "ai_field_plan") return true;
 
         if (key.endsWith("Lat") || key.endsWith("Lon")) {
             var rootKey = key.replace(/(Lat|Lon)$/, "");
@@ -464,10 +465,6 @@
     }
 
     function composeAdminFields(type, baseFields, values) {
-        if (!isAutreType(type)) {
-            return baseFields;
-        }
-
         var baseByKey = {};
         var baseFieldMap = {};
         for (var i = 0; i < baseFields.length; i++) {
@@ -476,11 +473,36 @@
             baseByKey[baseKey] = baseFields[i];
         }
 
+        var plan = values && values._ai_field_plan && typeof values._ai_field_plan === "object"
+            ? values._ai_field_plan
+            : null;
+        var hasStoredAiPlan = !!(plan && Array.isArray(plan.add) && plan.add.length > 0);
         var extraFields = [];
+        var extraFieldMap = {};
+        if (hasStoredAiPlan) {
+            for (var p = 0; p < plan.add.length; p++) {
+                var planned = plan.add[p];
+                if (!planned || typeof planned !== "object") continue;
+
+                var plannedKey = String(planned.key || "").trim();
+                if (!plannedKey || isIgnoredExtraKey(plannedKey, baseFieldMap)) continue;
+
+                extraFields.push({
+                    key: plannedKey,
+                    label: String(planned.label || prettifyCustomKey(plannedKey)),
+                    type: String(planned.type || inferCustomFieldType(plannedKey, values[plannedKey])),
+                    required: !!planned.required,
+                    options: Array.isArray(planned.options) ? planned.options : []
+                });
+                extraFieldMap[plannedKey] = true;
+            }
+        }
+
         var keys = Object.keys(values || {});
         for (var j = 0; j < keys.length; j++) {
             var key = keys[j];
             if (isIgnoredExtraKey(key, baseFieldMap)) continue;
+            if (extraFieldMap[key]) continue;
 
             var rawValue = values[key];
             extraFields.push({
@@ -494,6 +516,14 @@
         extraFields.sort(function (a, b) {
             return a.label.localeCompare(b.label);
         });
+
+        if (hasStoredAiPlan) {
+            return extraFields.length > 0 ? extraFields : baseFields;
+        }
+
+        if (!isAutreType(type)) {
+            return baseFields.concat(extraFields);
+        }
 
         if (extraFields.length > 0) {
             var finalFields = [];
