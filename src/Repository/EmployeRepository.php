@@ -19,27 +19,7 @@ class EmployeRepository extends ServiceEntityRepository
         parent::__construct($registry, Employe::class);
     }
 
-    /**
-     * @param Entreprise $entreprise
-     * @return Employe[]
-     */
-    public function findByEntrepriseAndFilters(Entreprise $entreprise, ?string $search, ?string $role): array
-    {
-        $qb = $this->createQueryBuilder('e')
-            ->andWhere('e.entreprise = :entreprise')
-            ->setParameter('entreprise', $entreprise);
-
-<<<<<<< HEAD
-    //    public function findOneBySomeField($value): ?Employé
-    //    {
-    //        return $this->createQueryBuilder('e')
-    //            ->andWhere('e.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->getQuery()
-    //            ->getOneOrNullResult()
-    //        ;
-    //    }
-    public function createFilteredQueryBuilder($entreprise, ?string $search, ?string $role)
+    public function createFilteredQueryBuilder(Entreprise $entreprise, ?string $search, ?string $role)
     {
         $qb = $this->createQueryBuilder('e')
             ->andWhere('e.entreprise = :entreprise')
@@ -58,29 +38,15 @@ class EmployeRepository extends ServiceEntityRepository
         return $qb;
     }
 
-    public function findByEntrepriseAndFilters($entreprise, ?string $search, ?string $role): array
+    public function findByEntrepriseAndFilters(Entreprise $entreprise, ?string $search, ?string $role): array
     {
         return $this->createFilteredQueryBuilder($entreprise, $search, $role)
             ->orderBy('e.id_employe', 'ASC')
-=======
-        if (null !== $search && '' !== trim($search)) {
-            $qb->andWhere('LOWER(e.nom) LIKE :search OR LOWER(e.prenom) LIKE :search')
-                ->setParameter('search', '%' . strtolower(trim($search)) . '%');
-        }
-
-        if (null !== $role && '' !== trim($role)) {
-            $qb->andWhere('LOWER(e.role) = :role')
-                ->setParameter('role', strtolower(trim($role)));
-        }
-
-        return $qb->orderBy('e.nom', 'ASC')
->>>>>>> origin/gestion-demande
             ->getQuery()
             ->getResult();
     }
 
-<<<<<<< HEAD
-    public function findByEntrepriseAndFiltersPaginated($entreprise, ?string $search, ?string $role, int $page, int $perPage): array
+    public function findByEntrepriseAndFiltersPaginated(Entreprise $entreprise, ?string $search, ?string $role, int $page, int $perPage): array
     {
         $offset = max(0, ($page - 1) * $perPage);
 
@@ -92,18 +58,6 @@ class EmployeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    public function countByEntrepriseAndFilters($entreprise, ?string $search, ?string $role): int
-    {
-        return (int) $this->createFilteredQueryBuilder($entreprise, $search, $role)
-            ->select('COUNT(e.id_employe)')
-            ->getQuery()
-            ->getSingleScalarResult();
-    }
-
-=======
-    /**
-     * @return string[]
-     */
     public function findDemandeManagerEmailsByEntrepriseId(int $entrepriseId): array
     {
         $rows = $this->createQueryBuilder('e')
@@ -119,9 +73,16 @@ class EmployeRepository extends ServiceEntityRepository
             ->getArrayResult();
 
         return array_values(array_filter(array_map(
-            static fn (array $row): string => trim((string) ($row['email'] ?? '')),
+            static fn(array $row): string => trim((string) ($row['email'] ?? '')),
             $rows
         )));
     }
->>>>>>> origin/gestion-demande
+
+    public function countByEntrepriseAndFilters(Entreprise $entreprise, ?string $search, ?string $role): int
+    {
+        return (int) $this->createFilteredQueryBuilder($entreprise, $search, $role)
+            ->select('COUNT(e.id_employe)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }
