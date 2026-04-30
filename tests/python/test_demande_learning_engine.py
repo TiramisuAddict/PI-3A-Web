@@ -1,11 +1,11 @@
 import sys
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "ml"))
+sys.path.insert(0, str(ROOT / "ml" / "demande"))
 
 import demande_adaptive_model as adaptive  # noqa: E402
 from extractors import extract_date, extract_entities, has_word  # noqa: E402
@@ -201,6 +201,52 @@ class DemandeLearningEngineTest(unittest.TestCase):
         self.assertNotIn("ai_extra_infos", result["details"])
         self.assertEqual(["ai_type_materiel"], [field["key"] for field in result["custom_fields"]])
 
+    def test_shift_prompt_does_not_create_material_current_or_generic_date_fields(self):
+        bad_shift_feedback = {
+            "prompt": "je veux un shift nuit 22h-6h uniquement pendant la semaine prochaine",
+            "confirmed": True,
+            "manual": True,
+            "createdAt": "2026-04-27T10:00:00+00:00",
+            "details": {
+                "ai_type_demande": "Shift de nuit",
+                "ai_shift_souhaite": "Nuit",
+                "ai_horaire_souhaite": "22h-6h",
+                "ai_periode_concernee": "Semaine prochaine",
+                "ai_materiel_concerne": "shift nuit 22h 6h",
+                "ai_horaire_actuel": "22h",
+                "ai_date_souhaitee": "2026-05-07",
+            },
+            "fieldPlan": {
+                "add": [
+                    {"key": "ai_type_demande", "label": "Type de demande", "type": "text", "required": True},
+                    {"key": "ai_shift_souhaite", "label": "Shift souhaite", "type": "text", "required": True},
+                    {"key": "ai_horaire_souhaite", "label": "Horaire souhaite", "type": "text", "required": True},
+                    {"key": "ai_periode_concernee", "label": "Periode concernee", "type": "text", "required": True},
+                    {"key": "ai_materiel_concerne", "label": "Materiel concerne", "type": "text", "required": True},
+                    {"key": "ai_horaire_actuel", "label": "Horaire actuel", "type": "text", "required": False},
+                    {"key": "ai_date_souhaitee", "label": "Date souhaitee", "type": "date", "required": False},
+                ],
+                "remove": ["ALL"],
+                "replaceBase": True,
+            },
+        }
+
+        result = adaptive.generate_autre_response(
+            {
+                "text": "je veux un shift nuit 22h-6h uniquement pendant la semaine prochaine",
+                "acceptedAutreFeedback": [bad_shift_feedback],
+            }
+        )
+        expected_next_week = (datetime.now().date() + timedelta(days=7)).isoformat()
+
+        self.assertEqual("Shift de nuit", result["details"].get("ai_type_demande"))
+        self.assertEqual("Nuit", result["details"].get("ai_shift_souhaite"))
+        self.assertEqual("22h-6h", result["details"].get("ai_horaire_souhaite"))
+        self.assertEqual(expected_next_week, result["details"].get("ai_date_souhaitee"))
+        self.assertNotIn("ai_materiel_concerne", result["details"])
+        self.assertNotIn("ai_horaire_actuel", result["details"])
+        self.assertNotIn("ai_periode_concernee", result["details"])
+
     def test_relative_dates_and_weekdays_are_resolved_from_current_day(self):
         base = datetime(2026, 4, 29)  # Wednesday
 
@@ -209,6 +255,12 @@ class DemandeLearningEngineTest(unittest.TestCase):
         self.assertEqual("2026-05-02", extract_date("samedi", base))
         self.assertEqual("2026-05-03", extract_date("dimanche", base))
         self.assertEqual("2026-04-30", extract_date("apres un jour", base))
+
+        result = adaptive.generate_autre_response(
+            {"text": "je veux un shift nuit 22h-6h demain", "acceptedAutreFeedback": []}
+        )
+        expected_tomorrow = (datetime.now().date() + timedelta(days=1)).isoformat()
+        self.assertEqual(expected_tomorrow, result["details"].get("ai_date_souhaitee"))
 
     def test_explicit_transport_date_and_formation_fields_are_merged_after_db_match(self):
         training_feedback = {

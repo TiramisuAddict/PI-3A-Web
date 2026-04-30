@@ -221,7 +221,7 @@ def _field_benchmark_cases():
 
 
 def _run_autre_prompt(workspace_root, prompt_text):
-    script_path = Path(workspace_root) / "ml" / "demande_ai_model.py"
+    script_path = Path(workspace_root) / "ml" / "demande" / "demande_ai_model.py"
     payload = {
         "prompt": (
             "Tu es un assistant RH/IT qui aide a rediger des demandes internes professionnelles en francais. "

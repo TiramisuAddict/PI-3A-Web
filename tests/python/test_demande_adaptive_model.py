@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "ml"))
+sys.path.insert(0, str(ROOT / "ml" / "demande"))
 
 import demande_adaptive_model as adaptive  # noqa: E402
 

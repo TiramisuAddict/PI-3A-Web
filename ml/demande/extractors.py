@@ -460,6 +460,8 @@ def extract_date_range(text: Any) -> tuple[str, str]:
         flags=re.IGNORECASE,
     )
     second = extract_date(without_first)
+    if second == first:
+        second = ""
     return first, second
 
 
@@ -694,8 +696,11 @@ def extract_requested_object(text: Any) -> str:
         if has_phrase(clean, term) or has_word(clean, term):
             return norm(term)
 
+    if has_any_word(clean, ["horaire", "shift", "poste"]):
+        return ""
+
     patterns = [
-        r"\b(?:besoin\s+de|demande\s+de|je\s+veux|je\s+souhaite|il\s+me\s+faut)\s+(?:un|une|des|du|de\s+l[' ]|d[' ])?\s+(.+?)(?=\s+(?:pour|afin|car|avec|sans|le|la|les|du|de|des|a partir|à partir)\b|[,.;]|$)",
+        r"\b(?:besoin\s+de|demande\s+de|je\s+veux|je\s+souhaite|il\s+me\s+faut)\s+(?:un|une|des|du|de\s+l[' ]|d[' ])?\s+(.+?)(?=\s+(?:pour|afin|car|avec|sans|le|la|les|du|de|des|a partir|à partir|uniquement|seulement|exclusivement|pendant)\b|[,.;]|$)",
         r"\b(?:remboursement|avance|attestation|parking|transport|nettoyage|maintenance|acces|accès|conge|congé)\b(?:\s+de)?\s+(.+?)(?=\s+(?:pour|afin|car|avec|sans|le|la|les|du|de|des)\b|[,.;]|$)",
     ]
     for pattern in patterns:
@@ -707,6 +712,8 @@ def extract_requested_object(text: Any) -> str:
             continue
         candidate_norm = norm(candidate)
         if candidate_norm in GENERIC_OBJECTS:
+            continue
+        if has_any_word(candidate_norm, ["horaire", "shift", "poste"]):
             continue
         if candidate_norm.startswith("par "):
             continue
@@ -857,9 +864,21 @@ def extract_schedule_change(text: Any) -> tuple[str, str]:
     source = normalize_ws(text)
     if not has_any_word(source, ["horaire", "shift", "poste"]):
         return "", ""
+
+    lieu_match = re.search(r"\bau\s+lieu\s+de\b", source, flags=re.IGNORECASE)
+    if lieu_match:
+        target_source = source[:lieu_match.start()]
+        current_source = source[lieu_match.end():]
+        current_start, _, current_full = extract_time_range(current_source)
+        target_start, _, target_full = extract_time_range(target_source)
+        current = current_full or current_start
+        target = target_full or target_start
+        if current or target:
+            return current, target
+
     start, end, full = extract_time_range(source)
     if start and end:
-        return start, end
+        return "", full
     if has_any_word(source, ["nuit", "nocturne"]):
         return "", "Nuit"
     if has_any_word(source, ["soir", "soiree"]):

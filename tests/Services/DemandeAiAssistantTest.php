@@ -191,7 +191,7 @@ final class DemandeAiAssistantTest extends TestCase
             ]
         );
 
-        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertSame('local-ml:demande/demande_adaptive_model.py', $result['model']);
         self::assertTrue($result['dynamicFieldPlan']['replaceBase']);
         self::assertNotEmpty($result['suggestedDetails']);
         self::assertArrayNotHasKey('besoinPersonnalise', $result['suggestedDetails']);
@@ -266,7 +266,7 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertSame('local-ml:demande/demande_adaptive_model.py', $result['model']);
         self::assertSame('Focus', $result['suggestedDetails']['ai_salle'] ?? null);
         self::assertStringContainsString('atelier produit', strtolower((string) ($result['suggestedDetails']['ai_motif'] ?? '')));
         self::assertArrayNotHasKey('ai_date_souhaitee', $result['suggestedDetails']);
@@ -298,7 +298,7 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertSame('local-ml:demande/demande_adaptive_model.py', $result['model']);
         self::assertArrayNotHasKey('ai_salle', $result['suggestedDetails']);
         self::assertArrayNotHasKey('ai_motif', $result['suggestedDetails']);
         self::assertNotEmpty($result['suggestedDetails']);
@@ -381,7 +381,7 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertSame('local-ml:demande/demande_adaptive_model.py', $result['model']);
         self::assertNotEmpty($result['suggestedDetails']);
         self::assertSame('Moyenne', $result['dynamicFieldConfidence']['label'] ?? null);
     }
@@ -462,7 +462,7 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('local-ml:demande_adaptive_model.py', $keyboardResult['model']);
+        self::assertSame('local-ml:demande/demande_adaptive_model.py', $keyboardResult['model']);
         self::assertSame('clavier', $keyboardResult['suggestedDetails']['ai_materiel_concerne'] ?? null);
         self::assertSame('mecanique', $keyboardResult['suggestedDetails']['ai_specification'] ?? null);
         self::assertSame('micro casque', $headsetResult['suggestedDetails']['ai_materiel_concerne'] ?? null);
@@ -581,7 +581,7 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertSame('local-ml:demande/demande_adaptive_model.py', $result['model']);
         self::assertNotEmpty($result['suggestedDetails']);
     }
 
@@ -703,7 +703,7 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertSame('local-ml:demande/demande_adaptive_model.py', $result['model']);
         self::assertSame('Taxi', $result['suggestedDetails']['ai_type_transport'] ?? null);
         self::assertSame('Html', $result['suggestedDetails']['ai_nom_formation'] ?? null);
         self::assertArrayNotHasKey('ai_materiel_concerne', $result['suggestedDetails']);
@@ -782,7 +782,7 @@ final class DemandeAiAssistantTest extends TestCase
             []
         );
 
-        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertSame('local-ml:demande/demande_adaptive_model.py', $result['model']);
         self::assertNotEmpty($result['suggestedDetails']);
     }
 
@@ -1204,11 +1204,12 @@ final class DemandeAiAssistantTest extends TestCase
             [],
             []
         );
+        $expectedNextWeek = (new \DateTimeImmutable('today'))->modify('+7 days')->format('Y-m-d');
 
         self::assertSame('Nuit', $result['suggestedDetails']['ai_type_shift'] ?? null);
         self::assertSame('20h', $result['suggestedDetails']['ai_horaire_debut'] ?? null);
         self::assertSame('7h', $result['suggestedDetails']['ai_horaire_fin'] ?? null);
-        self::assertSame('Semaine prochaine', $result['suggestedDetails']['ai_periode'] ?? null);
+        self::assertSame($expectedNextWeek, $result['suggestedDetails']['ai_periode'] ?? null);
     }
 
     public function testGenerateAutreSuggestionsDoesNotMergeUnrelatedLearnedSchemas(): void
@@ -1334,11 +1335,12 @@ final class DemandeAiAssistantTest extends TestCase
             [],
             []
         );
+        $expectedNextWeek = (new \DateTimeImmutable('today'))->modify('+7 days')->format('Y-m-d');
 
         self::assertSame('Shift de nuit', $result['suggestedDetails']['ai_type_demande'] ?? null);
         self::assertSame('Nuit', $result['suggestedDetails']['ai_shift_souhaite'] ?? null);
         self::assertSame('22h-6h', $result['suggestedDetails']['ai_horaire_souhaite'] ?? null);
-        self::assertSame('Semaine prochaine', $result['suggestedDetails']['ai_periode_concernee'] ?? null);
+        self::assertSame($expectedNextWeek, $result['suggestedDetails']['ai_periode_concernee'] ?? null);
         self::assertArrayNotHasKey('ai_type_de_materiel', $result['suggestedDetails']);
         self::assertArrayNotHasKey('ai_specification_modele_souhaite', $result['suggestedDetails']);
         self::assertArrayNotHasKey('ai_usage_justification_metier', $result['suggestedDetails']);
@@ -1419,12 +1421,13 @@ final class DemandeAiAssistantTest extends TestCase
             [],
             []
         );
+        $expectedNextWeek = (new \DateTimeImmutable('today'))->modify('+7 days')->format('Y-m-d');
 
         self::assertSame('Shift de nuit', $result['suggestedDetails']['ai_type_demande'] ?? null);
         self::assertFalse(str_starts_with((string) ($result['suggestedDetails']['ai_type_demande'] ?? ''), 'Je veux'));
         self::assertSame('Nuit', $result['suggestedDetails']['ai_shift_souhaite'] ?? null);
         self::assertSame('22h-7h', $result['suggestedDetails']['ai_horaire_souhaite'] ?? null);
-        self::assertSame('Semaine prochaine', $result['suggestedDetails']['ai_periode_concernee'] ?? null);
+        self::assertSame($expectedNextWeek, $result['suggestedDetails']['ai_periode_concernee'] ?? null);
     }
 
     public function testManualAutreFieldsNeverCallLearningOrLlm(): void
@@ -1885,7 +1888,7 @@ final class DemandeAiAssistantTest extends TestCase
             ['ai_type_d_intervention', 'ai_nature_du_degat_incident', 'ai_surface_element_concerne'],
             array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add'])
         );
-        self::assertSame('local-ml:demande_adaptive_model.py', $result['model']);
+        self::assertSame('local-ml:demande/demande_adaptive_model.py', $result['model']);
     }
 
     public function testManualFeedbackDoesNotLearnServiceGeneratedFields(): void

@@ -155,7 +155,7 @@ class DemandeAiAssistant
                 ? $parsed['dynamicFieldConfidence']
                 : ['score' => 0, 'label' => 'Faible', 'tone' => 'info', 'message' => 'Aucun apprentissage confirme similaire n a ete retrouve.'],
             'skipConfirmationRestriction' => $this->toBooleanFlag($parsed['skipConfirmationRestriction'] ?? false),
-            'model' => trim((string) ($parsed['_model'] ?? '')) ?: 'local-ml:demande_adaptive_model.py',
+            'model' => trim((string) ($parsed['_model'] ?? '')) ?: 'local-ml:demande/demande_adaptive_model.py',
         ];
     }
 
@@ -2009,7 +2009,13 @@ class DemandeAiAssistant
             }
         }
 
-        return dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'ml' . DIRECTORY_SEPARATOR . $scriptName;
+        $root = dirname(__DIR__, 2);
+        $candidate = $root . DIRECTORY_SEPARATOR . 'ml' . DIRECTORY_SEPARATOR . 'demande' . DIRECTORY_SEPARATOR . $scriptName;
+        if (is_file($candidate)) {
+            return $candidate;
+        }
+
+        return $root . DIRECTORY_SEPARATOR . 'ml' . DIRECTORY_SEPARATOR . $scriptName;
     }
 
     /**
@@ -4358,7 +4364,8 @@ class DemandeAiAssistant
         if (preg_match('/\b(periode|p[ée]riode|semaine|mois|intervalle|concern[ée]e?)\b/i', $haystack) === 1) {
             $period = $this->extractRelativePeriodLabel($text);
             if ('' !== $period) {
-                return $period;
+                $dates = $this->extractAllFrenchDates($text);
+                return $dates[0] ?? $period;
             }
 
             $dates = $this->extractAllFrenchDates($text);

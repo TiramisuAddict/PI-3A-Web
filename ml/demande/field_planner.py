@@ -7,6 +7,7 @@ from typing import Any, Iterable
 
 from extractors import (
     ExtractedEntities,
+    MATERIAL_TERMS,
     contains_term,
     extract_entities,
     extract_first_number,
@@ -214,6 +215,68 @@ def _has_maintenance_signal(source: str) -> bool:
     )
 
 
+def _has_schedule_signal(source: str) -> bool:
+    return has_any_word(source, ["horaire", "shift", "poste"])
+
+
+def _has_material_signal(source: str) -> bool:
+    clean = norm(source)
+    if has_any_word(clean, ["materiel", "equipement", "outil", "accessoire", "peripherique"]):
+        return True
+    return any(has_phrase(clean, term) or has_word(clean, term) for term in MATERIAL_TERMS)
+
+
+def _object_supported_by_source(source: str, entities: ExtractedEntities) -> bool:
+    if not entities.requested_object or _has_maintenance_signal(source):
+        return False
+    if _has_schedule_signal(source) and not _has_material_signal(source):
+        return False
+    return True
+
+
+def _period_blocks_generic_date(source: str) -> bool:
+    period = _extract_period_label(source)
+    return period.startswith("Tous les ")
+
+
+def _period_value_for_source(source: str, entities: ExtractedEntities) -> str:
+    period = _extract_period_label(source)
+    if period.startswith("Tous les "):
+        return period
+    if entities.date_start and entities.date_end and entities.date_end != entities.date_start:
+        return f"{entities.date_start} - {entities.date_end}"
+    if entities.date_start:
+        return entities.date_start
+    return period
+
+
+def _date_supported_by_source(source: str, field: FieldSpec, entities: ExtractedEntities) -> bool:
+    if not entities.date_start:
+        return False
+    key_text = norm(f"{field.key} {field.label}")
+    if _period_blocks_generic_date(source) and not any(token in key_text for token in ["conge", "absence", "debut", "fin"]):
+        return False
+    return True
+
+
+def _is_current_time_field(field: FieldSpec) -> bool:
+    key_text = norm(f"{field.key} {field.label}")
+    return any(token in key_text for token in ["actuel", "ancien"])
+
+
+def _time_supported_by_source(source: str, field: FieldSpec, entities: ExtractedEntities) -> bool:
+    key_text = norm(f"{field.key} {field.label}")
+    if "shift" in key_text and "horaire" not in key_text:
+        return bool(_extract_shift_value(source, with_prefix=False))
+    if any(token in key_text for token in ["debut", "dÃ©but"]):
+        return bool(entities.time_start)
+    if _is_current_time_field(field):
+        return bool(entities.schedule_current)
+    if any(token in key_text for token in ["fin", "sortie"]):
+        return bool(entities.time_end)
+    return bool(entities.time_range or entities.schedule_target)
+
+
 def _extract_category_value(source: str, field: FieldSpec, entities: ExtractedEntities) -> str:
     key_text = norm(f"{field.key} {field.label}")
 
@@ -271,8 +334,16 @@ def extract_value_for_field(source: str, field: FieldSpec, entities: ExtractedEn
     for example in examples:
         generic_custom_object = field.key.startswith("ai_custom_") and "objet" in key_text
         generic_value = norm(example.value) in {"demande", "demande transport", "demande de transport", "transport", "trajet", "deplacement"}
+        role_supported = True
+        if role == "date":
+            role_supported = _date_supported_by_source(source, field, entities)
+        elif role == "object":
+            role_supported = _object_supported_by_source(source, entities)
+        elif role == "time":
+            role_supported = _time_supported_by_source(source, field, entities)
         if (
             role != "organization"
+            and role_supported
             and not generic_custom_object
             and not generic_value
             and example.key == field.key
@@ -281,6 +352,8 @@ def extract_value_for_field(source: str, field: FieldSpec, entities: ExtractedEn
             and not is_long_text_key(example.key, example.label)
         ):
             value = normalize_ws(example.value)
+            if role == "period":
+                value = _period_value_for_source(source, entities) or value
             if field.type == "select":
                 value = _select_value_from_options(value, field.options or example.options, source)
             return value, bool(value)
@@ -294,7 +367,9 @@ def extract_value_for_field(source: str, field: FieldSpec, entities: ExtractedEn
         return value, bool(value)
 
     if role == "date":
-        return entities.date_start, bool(entities.date_start)
+        if not _date_supported_by_source(source, field, entities):
+            return "", False
+        return entities.date_start, True
     if role == "number":
         value = entities.amount or extract_first_number(source)
         return value, bool(value)
@@ -324,7 +399,9 @@ def extract_value_for_field(source: str, field: FieldSpec, entities: ExtractedEn
     if role == "organization":
         return entities.organization, bool(entities.organization)
     if role == "object":
-        return entities.requested_object, bool(entities.requested_object)
+        if not _object_supported_by_source(source, entities):
+            return "", False
+        return entities.requested_object, True
     if role == "specification":
         return entities.specification, bool(entities.specification)
     if role == "category":
@@ -344,17 +421,13 @@ def extract_value_for_field(source: str, field: FieldSpec, entities: ExtractedEn
         if any(token in key_text for token in ["debut", "début"]):
             return entities.time_start, bool(entities.time_start)
         if any(token in key_text for token in ["actuel", "ancien"]):
-            return entities.schedule_current or entities.time_start, bool(entities.schedule_current or entities.time_start)
+            return entities.schedule_current, bool(entities.schedule_current)
         if any(token in key_text for token in ["fin", "sortie"]):
             return entities.time_end, bool(entities.time_end)
         return entities.time_range or entities.schedule_target, bool(entities.time_range or entities.schedule_target)
     if role == "period":
-        period = _extract_period_label(source)
-        if period:
-            return period, True
-        if entities.date_start and entities.date_end:
-            return f"{entities.date_start} - {entities.date_end}", True
-        return entities.date_start, bool(entities.date_start)
+        value = _period_value_for_source(source, entities)
+        return value, bool(value)
 
     intervention = _extract_intervention_value(source, key_text)
     if intervention:
@@ -380,7 +453,7 @@ def _field_named_explicitly(source: str, field: FieldSpec) -> bool:
 def _source_supports_field(source: str, field: FieldSpec, entities: ExtractedEntities) -> bool:
     role = field_role(field)
     if role == "date":
-        return bool(entities.date_start)
+        return _date_supported_by_source(source, field, entities)
     if role == "number":
         return bool(entities.amount)
     if role == "route_from":
@@ -400,7 +473,7 @@ def _source_supports_field(source: str, field: FieldSpec, entities: ExtractedEnt
     if role == "organization":
         return bool(entities.organization)
     if role == "object":
-        return bool(entities.requested_object) and not _has_maintenance_signal(source)
+        return _object_supported_by_source(source, entities)
     if role == "specification":
         return bool(entities.specification)
     if role == "category":
@@ -415,7 +488,7 @@ def _source_supports_field(source: str, field: FieldSpec, entities: ExtractedEnt
     if role == "room":
         return has_any_word(source, ["salle", "room", "reservation"])
     if role == "time":
-        return bool(entities.time_range or entities.schedule_target)
+        return _time_supported_by_source(source, field, entities)
     if role == "period":
         return bool(_extract_period_label(source) or entities.date_start or entities.date_end)
     return False
@@ -497,6 +570,10 @@ def _duplicate_value_keep_score(field: FieldSpec) -> float:
         score += 0.4
     if field.type == "textarea":
         score -= 0.8
+    if field.type == "date":
+        score += 3.0
+    if role == "period":
+        score -= 0.5
     if role in {"object", "specification", "attestation", "organization", "route_from", "route_to", "transport_mode"}:
         score += 1.0
     if role in {"reason", "generic"}:
@@ -515,7 +592,7 @@ def _duplicate_value_keep_score(field: FieldSpec) -> float:
 def _dedupe_same_values(fields: Iterable[FieldSpec]) -> list[FieldSpec]:
     field_list = list(fields)
     groups: dict[str, list[FieldSpec]] = {}
-    dedupe_excluded_roles = {"date", "time", "period", "route_from", "route_to"}
+    dedupe_excluded_roles = {"route_from", "route_to"}
 
     for field in field_list:
         value = normalize_ws(field.value)
@@ -525,7 +602,6 @@ def _dedupe_same_values(fields: Iterable[FieldSpec]) -> list[FieldSpec]:
             or len(value_key) < 3
             or field_role(field) in dedupe_excluded_roles
             or re.fullmatch(r"\d+(?:[.,]\d+)?", value_key)
-            or re.fullmatch(r"\d{4}\s+\d{2}\s+\d{2}", value_key)
         ):
             continue
         groups.setdefault(value_key, []).append(field)
@@ -658,7 +734,7 @@ def fallback_fields(source: str, entities: ExtractedEntities) -> tuple[list[Fiel
 
     maintenance_signal = _has_maintenance_signal(source)
 
-    if entities.requested_object and not maintenance_signal and not has_any_word(source, ["remboursement", "transport", "parking", "attestation"]):
+    if _has_material_signal(source) and entities.requested_object and not maintenance_signal and not has_any_word(source, ["remboursement", "transport", "parking", "attestation"]):
         fields.append(_field("ai_materiel_concerne", "Materiel concerne", "text", True, entities.requested_object))
         if entities.specification:
             fields.append(_field("ai_specification", "Specification", "text", False, entities.specification))
@@ -692,14 +768,23 @@ def fallback_fields(source: str, entities: ExtractedEntities) -> tuple[list[Fiel
         if entities.reason:
             fields.append(_field("ai_motif_conge", "Motif", "textarea", False, entities.reason))
 
-    if has_any_word(source, ["horaire", "shift", "poste"]):
+    if _has_schedule_signal(source):
+        shift_value = _extract_shift_value(source, with_prefix=False)
+        if shift_value:
+            fields.append(_field("ai_type_demande", "Type de demande", "text", True, _extract_shift_value(source, with_prefix=True)))
+            fields.append(_field("ai_shift_souhaite", "Shift souhaite", "text", True, shift_value))
         if entities.schedule_current:
             fields.append(_field("ai_horaire_actuel", "Horaire actuel", "text", False, entities.schedule_current))
         if entities.schedule_target:
             fields.append(_field("ai_horaire_souhaite", "Horaire souhaite", "text", True, entities.schedule_target))
         period = _extract_period_label(source)
         if period:
-            fields.append(_field("ai_periode_concernee", "Periode concernee", "text", False, period))
+            if period.startswith("Tous les "):
+                fields.append(_field("ai_periode_concernee", "Periode concernee", "text", False, period))
+            elif entities.date_start:
+                fields.append(_field("ai_date_souhaitee", "Date souhaitee", "date", False, entities.date_start))
+            else:
+                fields.append(_field("ai_periode_concernee", "Periode concernee", "text", False, period))
         if entities.reason:
             fields.append(_field("ai_motif_changement", "Motif changement", "textarea", False, entities.reason))
 
@@ -708,7 +793,7 @@ def fallback_fields(source: str, entities: ExtractedEntities) -> tuple[list[Fiel
         training_type = "Certification" if has_word(source, "certification") else ""
         fields.append(_field("ai_type_formation", "Type de formation", "select", False, training_type, ["Formation interne", "Formation externe", "Certification"]))
 
-    if entities.date_start and not any(field.type == "date" for field in fields):
+    if entities.date_start and not any(field.type == "date" for field in fields) and not _period_blocks_generic_date(source):
         fields.append(_field("ai_date_souhaitee", "Date souhaitee", "date", False, entities.date_start))
 
     fields = _dedupe_same_values(_dedupe_fields(fields))
@@ -736,6 +821,11 @@ def build_title(source: str, fields: Iterable[FieldSpec]) -> str:
         value = normalize_ws(field.value)
         if not value:
             continue
+        if field.key == "ai_type_demande" and value:
+            return sentence_case(value)[:100]
+        if "shift" in key_text and value:
+            shift_value = value if value.lower().startswith("shift") else f"Shift de {value.lower()}"
+            return sentence_case(shift_value)[:100]
         if "materiel" in key_text or "equipement" in key_text:
             return sentence_case(f"Demande de materiel {value}")[:100]
         if "attestation" in key_text:

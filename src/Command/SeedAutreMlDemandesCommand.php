@@ -29,6 +29,7 @@ class SeedAutreMlDemandesCommand extends Command
         $this
             ->addOption('employee-id', null, InputOption::VALUE_REQUIRED, 'Employe cible.', '181')
             ->addOption('enterprise-id', null, InputOption::VALUE_REQUIRED, 'Entreprise a associer si --create-employee cree un employe.', null)
+            ->addOption('employee-password', null, InputOption::VALUE_REQUIRED, 'Mot de passe temporaire si --create-employee cree un compte.', null)
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Nombre maximum de seeds a inserer.', '2200')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Affiche sans ecrire en base.')
             ->addOption('create-employee', null, InputOption::VALUE_NONE, 'Cree un employe minimal si employee-id est absent.');
@@ -71,6 +72,15 @@ class SeedAutreMlDemandesCommand extends Command
                     'id_entreprise' => $enterpriseId,
                     'cv_data' => null,
                     'cv_nom' => null,
+                ]);
+
+                $plainPassword = trim((string) ($input->getOption('employee-password') ?? ''));
+                if ('' === $plainPassword) {
+                    $plainPassword = sprintf('Momentum@%d', $employeeId);
+                }
+                $connection->insert('compte', [
+                    'id_employe' => $employeeId,
+                    'mot_de_passe' => password_hash($plainPassword, PASSWORD_DEFAULT),
                 ]);
             }
             $io->note(sprintf('Employe seed #%d %s.', $employeeId, $dryRun ? 'serait cree' : 'cree'));
