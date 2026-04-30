@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -27,6 +28,7 @@ class SeedAutreMlDemandesCommand extends Command
     {
         $this
             ->addOption('employee-id', null, InputOption::VALUE_REQUIRED, 'Employe cible.', '181')
+            ->addOption('enterprise-id', null, InputOption::VALUE_REQUIRED, 'Entreprise a associer si --create-employee cree un employe.', null)
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Nombre maximum de seeds a inserer.', '2200')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Affiche sans ecrire en base.')
             ->addOption('create-employee', null, InputOption::VALUE_NONE, 'Cree un employe minimal si employee-id est absent.');
@@ -48,6 +50,13 @@ class SeedAutreMlDemandesCommand extends Command
                 return Command::FAILURE;
             }
 
+            $enterpriseId = $this->resolveSeedEnterpriseId($connection, $input->getOption('enterprise-id'));
+            if (null === $enterpriseId) {
+                $io->error('Aucune entreprise disponible pour creer l employe seed. Creez une entreprise ou passez --enterprise-id.');
+
+                return Command::FAILURE;
+            }
+
             if (!$dryRun) {
                 $connection->insert('employe', [
                     'id_employe' => $employeeId,
@@ -59,7 +68,7 @@ class SeedAutreMlDemandesCommand extends Command
                     'role' => 'employe',
                     'date_embauche' => (new \DateTimeImmutable('-2 years'))->format('Y-m-d'),
                     'image_profil' => null,
-                    'id_entreprise' => null,
+                    'id_entreprise' => $enterpriseId,
                     'cv_data' => null,
                     'cv_nom' => null,
                 ]);
@@ -103,6 +112,15 @@ class SeedAutreMlDemandesCommand extends Command
             $connection->insert('demande_details', [
                 'id_demande' => $demandeId,
                 'details' => json_encode($details, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ]);
+
+            $connection->insert('historique_demande', [
+                'id_demande' => $demandeId,
+                'ancien_statut' => null,
+                'nouveau_statut' => 'Nouvelle',
+                'date_action' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'acteur' => sprintf('Seed ML - employe #%d', $employeeId),
+                'commentaire' => 'Demande creee',
             ]);
 
             ++$stats['created'];
@@ -161,6 +179,28 @@ class SeedAutreMlDemandesCommand extends Command
             $this->trainingAndRoomSeeds(),
             $this->generatedDiverseSeeds(2600)
         ));
+    }
+
+    private function resolveSeedEnterpriseId(Connection $connection, mixed $requestedEnterpriseId): ?int
+    {
+        $requested = null !== $requestedEnterpriseId && '' !== trim((string) $requestedEnterpriseId)
+            ? max(1, (int) $requestedEnterpriseId)
+            : 0;
+
+        if ($requested > 0) {
+            $exists = (int) $connection->fetchOne(
+                'SELECT COUNT(*) FROM entreprise WHERE id_entreprise = ?',
+                [$requested]
+            ) > 0;
+
+            return $exists ? $requested : null;
+        }
+
+        $fallback = $connection->fetchOne(
+            'SELECT id_entreprise FROM entreprise ORDER BY CASE WHEN id_entreprise = 102 THEN 0 WHEN id_entreprise = 105 THEN 1 ELSE 2 END, id_entreprise LIMIT 1'
+        );
+
+        return false !== $fallback && null !== $fallback ? (int) $fallback : null;
     }
 
     /**
@@ -804,7 +844,7 @@ class SeedAutreMlDemandesCommand extends Command
     ): array
     {
         return [
-            'title' => $title,
+            'title' => $this->cleanSeedTitle($title),
             'description' => ucfirst($prompt) . '.',
             'prompt' => $prompt,
             'priority' => $priority,
@@ -813,6 +853,17 @@ class SeedAutreMlDemandesCommand extends Command
             'details' => $details,
             'fields' => $fields,
         ];
+    }
+
+    private function cleanSeedTitle(string $title): string
+    {
+        $clean = trim((string) preg_replace('/\s+/', ' ', $title));
+        $clean = preg_replace('/^AUTO-\d+\s+/i', '', $clean) ?? $clean;
+        $clean = preg_replace('/^Seed\s+/i', '', $clean) ?? $clean;
+        $clean = preg_replace('/^RH\s+/i', '', $clean) ?? $clean;
+        $clean = trim($clean);
+
+        return '' !== $clean ? $clean : trim($title);
     }
 
     /**
