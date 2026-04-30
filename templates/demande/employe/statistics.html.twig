@@ -6,28 +6,19 @@
 {{ parent() }}
 <style>
     .stat-card {
-        background: linear-gradient(135deg, #4a5def, #6b7ae0);
-        color: white;
+        border: 1px solid rgba(15, 23, 42, 0.08);
         border-radius: 10px;
+        background: #fff;
         padding: 24px;
         text-align: center;
-        box-shadow: 0 4px 16px rgba(74, 93, 239, 0.2);
-        transition: transform 0.2s ease;
+        box-shadow: 0 4px 16px rgba(74, 93, 239, 0.08);
+        transition: border-color .2s ease, box-shadow .2s ease;
+        color: #1f2937;
     }
     .stat-card:hover {
-        transform: translateY(-4px);
-    }
-    .stat-card.green {
-        background: linear-gradient(135deg, #10b981, #059669);
-        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
-    }
-    .stat-card.yellow {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        box-shadow: 0 4px 16px rgba(245, 158, 11, 0.2);
-    }
-    .stat-card.red {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-        box-shadow: 0 4px 16px rgba(239, 68, 68, 0.2);
+        border-color: rgba(74, 93, 239, 0.35);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+        transform: translateY(-2px);
     }
     .stat-value {
         font-size: 2.5rem;
@@ -70,22 +61,11 @@
         display: inline-block;
         color: white !important;
     }
-    .badge.bg-danger {
-        background-color: #dc3545 !important;
-    }
-    .badge.bg-warning {
-        background-color: #ffc107 !important;
-        color: #333 !important;
-    }
-    .badge.bg-success {
-        background-color: #28a745 !important;
-    }
-    .badge.bg-info {
-        background-color: #17a2b8 !important;
-    }
-    .badge.bg-secondary {
-        background-color: #6c757d !important;
-    }
+    .badge.bg-danger { background-color: #dc3545 !important; }
+    .badge.bg-warning { background-color: #ffc107 !important; color: #fff !important; }
+    .badge.bg-success { background-color: #28a745 !important; }
+    .badge.bg-info { background-color: #17a2b8 !important; }
+    .badge.bg-secondary { background-color: #6c757d !important; }
 </style>
 {% endblock %}
 
@@ -99,7 +79,7 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <i class="ti ti-chart-bar me-2"></i>Statistiques
+                    Statistiques
                     </h2>
                     <div class="text-secondary">Vue d'ensemble de vos demandes</div>
                 </div>
@@ -122,7 +102,7 @@
                     <div class="stat-card green">
                         <div class="stat-value">{{ stats.byStatus['Resolue'] | default(0) }}</div>
                         <div class="stat-label">
-                            <i class="ti ti-check me-2"></i>Demandes résolues
+                            <i class="ti ti-check me-2"></i>Demandes resolues
                         </div>
                     </div>
                 </div>
@@ -141,7 +121,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">
-                                <i class="ti ti-flag me-2"></i>Répartition par Statut
+                                <i class="ti ti-flag me-2"></i>Repartition par Statut
                             </h3>
                         </div>
                         <div class="card-body p-0">
@@ -150,9 +130,11 @@
                                     <tbody>
                                         {% set statusColors = {
                                             'Nouvelle': '#3b82f6',
-                                            'En cours': '#f59e0b', 
+                                            'En cours': '#f59e0b',
                                             'En attente': '#f97316',
                                             'Resolue': '#10b981',
+                                            'Rejetee': '#ef4444',
+                                            'Reconsideration': '#4a5def',
                                             'Fermee': '#6b7280',
                                             'Annulee': '#ef4444'
                                         } %}
@@ -186,7 +168,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">
-                                <i class="ti ti-alert-triangle me-2"></i>Répartition par Priorité
+                                <i class="ti ti-alert-triangle me-2"></i>Repartition par Priorite
                             </h3>
                         </div>
                         <div class="card-body p-0">
@@ -231,7 +213,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">
-                                <i class="ti ti-folder me-2"></i>Répartition par Catégorie
+                                <i class="ti ti-folder me-2"></i>Repartition par Categorie
                             </h3>
                         </div>
                         <div class="card-body p-0">
@@ -268,7 +250,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">
-                                <i class="ti ti-tag me-2"></i>Répartition par Type
+                                <i class="ti ti-tag me-2"></i>Repartition par Type
                             </h3>
                         </div>
                         <div class="card-body p-0">
@@ -303,4 +285,5 @@
     </div>
 </div>
 </div>
+{{ include('demande/_logout_modal.html.twig') }}
 {% endblock %}

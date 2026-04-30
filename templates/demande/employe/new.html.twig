@@ -1,0 +1,3502 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Nouvelle Demande{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+    .form-label.required::after { content: " *"; color: #dc2626; }
+    .field-error { color: #dc2626; font-size: 0.875rem; margin-top: 6px; display: block; }
+    .map-wrapper { position: relative; }
+    .map-zoom-controls { position: absolute; top: 10px; left: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 4px; }
+    .map-zoom-controls button { width: 32px; height: 32px; background: white; border: 1px solid #ddd; border-radius: 4px; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+    .map-zoom-controls button:hover { background: #f0f0f0; }
+    .map-info-bar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; background: white; padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: bold; color: #444; box-shadow: 0 2px 8px rgba(0,0,0,0.15); white-space: nowrap; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+    .map-search-bar { display: flex; gap: 8px; margin-bottom: 10px; }
+    .map-search-bar input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+    .map-search-bar button { padding: 8px 16px; background: #4a5def; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s ease; }
+    .map-search-bar button:hover { background: #3a4ddf; }
+    .map-selected-info { font-size: .9rem; color: #475569; background: #f0f5ff; border: 1px solid #c0d0ff; padding: .65rem .85rem; border-radius: 6px; margin-top: 8px; display: none; }
+    .map-selected-info.visible { display: block; }
+    .map-card-header { background: #f0f5ff; padding: 12px 16px; border-bottom: 1px solid #c0d0ff; display: flex; align-items: center; gap: 8px; font-weight: 600; color: #4a5def; border-radius: 6px 6px 0 0; }
+    .map-card-body { padding: 16px; border: 1px solid #c0d0ff; border-top: none; border-radius: 0 0 6px 6px; }
+    .card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 4px 16px rgba(74, 93, 239, 0.08);
+    }
+    .card-header {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        background: #f5f7fb;
+        border-radius: 10px 10px 0 0;
+        padding: 16px 20px;
+        font-weight: 600;
+        color: #4a5def;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .card-body {
+        padding: 20px;
+        border-radius: 0 0 10px 10px;
+    }
+    .map-confirm-bar { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+    .btn-confirm-location { background: #4a5def; color: white; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s ease; }
+    .btn-confirm-location:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-confirm-location:not(:disabled):hover { background: #3a4ddf; }
+    .btn-clear-location { background: #6b7280; color: white; border: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s ease; }
+    .btn-clear-location:hover { background: #4b5563; }
+    .inline-map-section { margin-top: 8px; border: 1px solid #c0d0ff; border-radius: 6px; overflow: hidden; background: white; }
+    #map { height: 400px; width: 100%; background: #aad3df; border-radius: 4px; }
+    .location-input-group input { background: #f8fafc !important; }
+    .classification-ai-box { border: 1px solid rgba(13, 148, 136, 0.2); border-radius: 10px; padding: 14px; background: linear-gradient(180deg, #f4fffd 0%, #eefcf8 100%); }
+    .autre-ai-box { border: 1px dashed #4a5def; border-radius: 8px; padding: 14px; background: #f8faff; }
+    .ai-status { font-size: .88rem; color: #475569; }
+    .ai-status.success { color: #166534; }
+    .ai-status.error { color: #b91c1c; }
+    .ai-status.info { color: #0f766e; }
+    .suggestion-summary { background: #ecfeff; border: 1px solid #a5f3fc; color: #155e75; padding: 10px 12px; border-radius: 6px; font-size: .92rem; display: none; }
+    .type-info { font-size: .82rem; color: #64748b; margin-top: 6px; display: block; }
+    .assistant-panel { position: sticky; top: 76px; }
+    .assistant-panel .card-header { align-items: flex-start; flex-direction: column; gap: 4px; }
+    .assistant-eyebrow { font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #0f766e; }
+    .assistant-title { margin: 0; font-size: 1.1rem; color: #0f172a; }
+    .assistant-subtitle { margin: 0; font-size: .9rem; color: #64748b; line-height: 1.45; }
+    .classification-ai-box .form-control { min-height: 112px; resize: vertical; border-radius: 8px; }
+    .assistant-tips { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+    .assistant-tips li { font-size: .93rem; line-height: 1.45; color: #334155; padding-left: 16px; position: relative; }
+    .assistant-tips li::before { content: ""; position: absolute; left: 0; top: 9px; width: 6px; height: 6px; border-radius: 999px; background: #4a5def; }
+    .col-lg-4 > .card { display: none; }
+    .ai-prefill-hint { display: none; margin-bottom: 12px; padding: 10px 12px; border-radius: 8px; background: #effcf6; border: 1px solid #bbf7d0; color: #166534; font-size: .9rem; }
+    .ai-prefill-hint.visible { display: block; }
+    .ai-prefilled-label { display: flex; align-items: center; gap: 8px; }
+    .ai-badge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 7px; border-radius: 999px; font-size: .72rem; font-weight: 700; background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .ai-prefilled-input { border-color: #86efac !important; background: #f6fff9 !important; box-shadow: 0 0 0 0.18rem rgba(34, 197, 94, 0.08); }
+    .inline-ai-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+    .inline-ai-toggle { display: inline-flex; align-items: center; gap: 6px; margin-left: 2px; }
+    .inline-ai-toggle .form-check-input { margin-top: 0; }
+    .inline-ai-toggle .form-check-label { font-size: .82rem; color: #64748b; }
+    .client-valid {
+        border-color: #16a34a !important;
+        background: #f0fdf4 !important;
+        box-shadow: 0 0 0 0.16rem rgba(34, 197, 94, 0.12);
+    }
+    .field-label-valid {
+        color: #166534 !important;
+    }
+    .autre-confidence-badge {
+        display: none;
+        margin-top: 8px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        font-size: .84rem;
+        font-weight: 600;
+        border: 1px solid transparent;
+    }
+    .autre-confidence-badge.visible { display: block; }
+    .autre-confidence-badge.success { background: #ecfdf3; color: #166534; border-color: #bbf7d0; }
+    .autre-confidence-badge.info { background: #ecfeff; color: #0f766e; border-color: #a5f3fc; }
+    .autre-confidence-badge.error { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+</style>
+{% endblock %}
+
+{% block body %}
+{{ include('components/navbar.html.twig') }}
+<div class="d-flex" style="min-height:calc(100vh - 56px);">
+{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': role}) }}
+<div class="page-wrapper">
+    <div class="page-header d-print-none mb-3">
+        <div class="container-xl">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Nouvelle demande</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'id': 'demandeForm'}}) }}
+            <input type="hidden" name="ai_generated" id="aiGeneratedInput" value="{{ aiGenerated ? '1' : '0' }}">
+            <input type="hidden" name="ai_confirmed" id="aiConfirmedInput" value="0">
+            <input type="hidden" name="ai_trusted_learning" id="aiTrustedLearningInput" value="{{ aiTrustedFromLearning|default(false) ? '1' : '0' }}">
+            <input type="hidden" name="autre_ai_raw_prompt" id="autreAiRawPromptInput" value="{{ submittedAiRawPrompt|default('')|e('html_attr') }}">
+            <input type="hidden" name="ai_field_plan" id="aiFieldPlanInput" value="{{ submittedAiFieldPlan|default({'add': [], 'remove': [], 'replaceBase': false})|json_encode|e('html_attr') }}">
+            <input type="hidden" name="ai_generation_snapshot" id="aiGenerationSnapshotInput" value="">
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-info-circle me-2"></i>Informations générales</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        {{ form_label(form.employe, null, {'label_attr': {'class': 'form-label required'}}) }}
+                                        {{ form_widget(form.employe, {'attr': {'class': 'form-select' ~ (form.employe.vars.errors|length > 0 ? ' is-invalid' : ''), 'onmousedown': 'return false;', 'onkeydown': 'return false;'}}) }}
+                                        {% if form.employe.vars.errors %}
+                                            <div class="field-error">
+                                                {% for error in form.employe.vars.errors %}{{ error.message }}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form_label(form.categorie, null, {'label_attr': {'class': 'form-label required'}}) }}
+                                        {{ form_widget(form.categorie, {'attr': {'class': 'form-select' ~ (form.categorie.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                        {% if form.categorie.vars.errors %}
+                                            <div class="field-error">
+                                                {% for error in form.categorie.vars.errors %}{{ error.message }}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        {{ form_label(form.typeDemande, null, {'label_attr': {'class': 'form-label required'}}) }}
+                                        {{ form_widget(form.typeDemande, {'attr': {'class': 'form-select' ~ (form.typeDemande.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                        <span id="typeInfo" class="type-info"></span>
+                                        {% if form.typeDemande.vars.errors %}
+                                            <div class="field-error">
+                                                {% for error in form.typeDemande.vars.errors %}{{ error.message }}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form_label(form.priorite, null, {'label_attr': {'class': 'form-label required'}}) }}
+                                        {{ form_widget(form.priorite, {'attr': {'class': 'form-select' ~ (form.priorite.vars.errors|length > 0 ? ' is-invalid' : '')}}) }}
+                                        {% if form.priorite.vars.errors %}
+                                            <div class="field-error">
+                                                {% for error in form.priorite.vars.errors %}{{ error.message }}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                {{ form_label(form.titre, null, {'label_attr': {'class': 'form-label required'}}) }}
+                                {{ form_widget(form.titre, {'attr': {'class': 'form-control' ~ (form.titre.vars.errors|length > 0 ? ' is-invalid' : ''), 'placeholder': 'Titre de votre demande'}}) }}
+                                {% if form.titre.vars.errors %}
+                                    <div class="field-error">
+                                        {% for error in form.titre.vars.errors %}{{ error.message }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="mb-0">
+                                {{ form_label(form.description, null, {'label_attr': {'class': 'form-label'}}) }}
+                                {{ form_widget(form.description, {'attr': {'class': 'form-control', 'rows': 4}}) }}
+                                <div class="inline-ai-tools">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="generateDescriptionBtn">
+                                        <i class="ti ti-sparkles me-1"></i>Remplir avec IA
+                                    </button>
+                                    <div class="form-check form-switch inline-ai-toggle">
+                                        <input class="form-check-input" type="checkbox" id="autoGenerateDescriptionToggle">
+                                        <label class="form-check-label" for="autoGenerateDescriptionToggle">Auto depuis titre</label>
+                                    </div>
+                                    <div class="form-check form-switch inline-ai-toggle">
+                                        <input class="form-check-input" type="checkbox" id="sendDescriptionToSuggestionToggle">
+                                        <label class="form-check-label" for="sendDescriptionToSuggestionToggle">Vers Suggestion IA</label>
+                                    </div>
+                                    <span id="descriptionAiStatusText" class="ai-status"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3" id="dynamicFieldsCard" style="{{ submittedType ? 'display:block;' : 'display:none;' }}">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-forms me-2"></i>Informations spécifiques</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="autreAiBox" class="autre-ai-box mb-3" style="display:none;">
+                                <label for="autreAiDescription" class="form-label required">Description initiale pour assistant IA</label>
+                                <textarea
+                                    id="autreAiDescription"
+                                    name="autre_ai_description"
+                                    class="form-control"
+                                    rows="4"
+                                    placeholder="Decrivez ce dont vous avez besoin. L IA proposera une description plus claire et remplira les champs specifiques."
+                                >{{ submittedAiDescription|default('') }}</textarea>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                                    <button type="button" class="btn btn-outline-primary" id="generateWithAiBtn">
+                                        <i class="ti ti-sparkles me-1"></i>Generer avec IA
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="regenerateWithAiBtn" style="display:none;">
+                                        <i class="ti ti-refresh me-1"></i>Regenerer
+                                    </button>
+                                    <span id="aiStatusText" class="ai-status"></span>
+                                </div>
+                                <div id="autreConfidenceBadge" class="autre-confidence-badge"></div>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="openManualAutreFieldsBtn" data-bs-toggle="modal" data-bs-target="#manualAutreFieldsModal">
+                                        <i class="ti ti-layout-grid-add me-1"></i>Configurer les champs
+                                    </button>
+                                    <span class="text-secondary small">Definissez vos propres champs, puis modifiez les valeurs avant confirmation.</span>
+                                </div>
+                            </div>
+                            <div id="aiPrefillHint" class="ai-prefill-hint"></div>
+                            <div class="row g-3" id="dynamicFields"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-send me-2"></i>Actions</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-primary" id="submitBtn">
+                                    <i class="ti ti-check me-1"></i>Créer la demande
+                                </button>
+                                <a href="{{ path('demande_index') }}" class="btn btn-outline-secondary">Annuler</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="assistant-panel">
+                        <div class="card">
+                            <div class="card-header">
+                                <span class="assistant-eyebrow">Assistant IA</span>
+                                <h3 class="assistant-title">Classement intelligent</h3>
+                                <p class="assistant-subtitle">Ecrivez votre besoin meme avec des fautes. L assistant corrige le texte et propose automatiquement la categorie, le type et la priorite.</p>
+                            </div>
+                            <div class="card-body">
+                                <div class="classification-ai-box">
+                                    <label for="classificationAiPrompt" class="form-label">Decrivez votre besoin</label>
+                                    <textarea
+                                        id="classificationAiPrompt"
+                                        class="form-control"
+                                        rows="4"
+                                        placeholder="Exemple: slt j besoin dacces salesforc pr mn nv poste et c un peu urgent"
+                                    ></textarea>
+                                    <div class="d-grid gap-2 mt-3">
+                                        <button type="button" class="btn btn-primary" id="suggestClassificationBtn">
+                                            <i class="ti ti-wand me-1"></i>Suggerer automatiquement
+                                        </button>
+                                        <span id="classificationStatusText" class="ai-status"></span>
+                                    </div>
+                                    <div id="classificationSummary" class="suggestion-summary mt-2"></div>
+                                </div>
+
+                                <ul class="assistant-tips">
+                                    <li><strong>Titre clair :</strong> gardez un objet simple et descriptif.</li>
+                                    <li><strong>Priorite juste :</strong> reservez le niveau haute aux cas vraiment bloquants.</li>
+                                    <li><strong>Champs specifiques :</strong> apres la suggestion, completez uniquement les informations utiles.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-lightbulb me-2"></i>Conseils</h3>
+                        </div>
+                        <div class="card-body">
+                            <div style="font-size: 0.95rem; line-height: 1.6; color: #555;">
+                                <div style="display: flex; margin-bottom: 12px;">
+                                    <span style="color: #4a5def; font-weight: bold; margin-right: 8px;">•</span>
+                                    <span><strong>Titre clair :</strong> Utilisez un titre court et descriptif pour votre demande.</span>
+                                </div>
+                                <div style="display: flex; margin-bottom: 12px;">
+                                    <span style="color: #4a5def; font-weight: bold; margin-right: 8px;">•</span>
+                                    <span><strong>Priorité :</strong> Sélectionnez le niveau de priorité approprié à votre besoin.</span>
+                                </div>
+                                <div style="display: flex; margin-bottom: 12px;">
+                                    <span style="color: #4a5def; font-weight: bold; margin-right: 8px;">•</span>
+                                    <span><strong>Description :</strong> Fournissez des détails pertinents pour faciliter le traitement.</span>
+                                </div>
+                                <div style="display: flex;">
+                                    <span style="color: #4a5def; font-weight: bold; margin-right: 8px;">•</span>
+                                    <span><strong>Champs spécifiques :</strong> Remplissez tous les champs dynamiques requis selon le type choisi.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{ form_end(form) }}
+        </div>
+    </div>
+</div>
+</div>
+
+<div class="modal" id="manualAutreFieldsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            <div class="modal-status bg-primary"></div>
+            <div class="modal-body py-4">
+                <h3 class="mb-2">Definir les champs specifiques</h3>
+                <p class="text-secondary mb-3">Choisissez combien de champs vous voulez, nommez-les puis appliquez-les. Vous pourrez ensuite modifier chaque valeur dans la demande.</p>
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-sm-4">
+                        <label for="manualAutreFieldCount" class="form-label">Nombre de champs</label>
+                        <input type="number" min="1" max="6" step="1" value="1" class="form-control" id="manualAutreFieldCount">
+                    </div>
+                    <div class="col-sm-8 d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-secondary" id="buildManualAutreFieldsBtn">Generer les champs</button>
+                        <button type="button" class="btn btn-primary" id="applyManualAutreFieldsBtn">Appliquer au formulaire</button>
+                    </div>
+                </div>
+                <div class="text-secondary small mb-2">Saisissez les noms des champs puis leurs valeurs par defaut si besoin.</div>
+                <div id="manualAutreFieldEditor" class="row g-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="aiConfirmModal" tabindex="-1">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            <div class="modal-status bg-primary"></div>
+            <div class="modal-body py-4">
+                <h3 class="mb-2">Confirmer cette demande generee avec IA ?</h3>
+                <p class="text-secondary mb-3">Verifiez les informations ci-dessous avant enregistrement. Si ce n est pas exact, vous pouvez modifier ou regenerer.</p>
+                <div id="aiConfirmPreview" class="border rounded p-3" style="background:#f8fafc;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" data-bs-dismiss="modal" id="aiModalRejectBtn">Non, je modifie</button>
+                <button type="button" class="btn btn-outline-secondary" id="aiModalRegenerateBtn">M aider a regenerer</button>
+                <button type="button" class="btn btn-primary" id="aiModalConfirmBtn">
+                        <i class="ti ti-check me-1"></i>Oui, enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ include('demande/_logout_modal.html.twig') }}
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+    "use strict";
+
+    var CATEGORIES = {{ categories|json_encode|raw }};
+    var SUBMITTED_DETAILS = {{ submittedDetails|json_encode|raw }};
+    var SUBMITTED_TYPE = {{ submittedType|json_encode|raw }};
+    var DETAIL_ERRORS = {{ detailErrors|json_encode|raw }};
+    var SUBMITTED_AI_DESCRIPTION = {{ submittedAiDescription|default('')|json_encode|raw }};
+    var SUBMITTED_AI_RAW_PROMPT = {{ submittedAiRawPrompt|default('')|json_encode|raw }};
+    var SUBMITTED_AI_FIELD_PLAN = {{ submittedAiFieldPlan|default({'add': [], 'remove': [], 'replaceBase': false})|json_encode|raw }};
+    var CLASSIFICATION_AI_ENDPOINT = "{{ path('demande_api_suggest_classification') }}";
+    var AUTOCORRECT_AI_ENDPOINT = "{{ path('demande_api_autocorrect') }}";
+    var DESCRIPTION_AI_ENDPOINT = "{{ path('demande_api_generate_description') }}";
+    var AUTRE_AI_ENDPOINT = "{{ path('demande_api_autre_generate') }}";
+
+    var AUTRE_BASE_REQUIRED_KEYS = ["besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre"];
+    var AUTRE_HIDDEN_DUPLICATE_KEYS = ["besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre", "pieceOuContexte"];
+    var AI_DYNAMIC_FIELDS = [];
+    var aiModal = null;
+    var aiModalEl = null;
+    var AI_REMOVED_BASE_FIELDS = [];
+    var AI_REPLACE_BASE_FIELDS = false;
+    var MANUAL_AUTRE_FIELD_MODE = false;
+    var AUTO_FILLED_DETAIL_KEYS = {};
+    var maps = {};
+    var markers = {};
+    var selectedLocations = {};
+    var AUTO_DESCRIPTION_PREF_KEY = "demande.auto_description_from_title";
+    var DESCRIPTION_TO_SUGGESTION_PREF_KEY = "demande.description_to_suggestion_ai";
+    var descriptionAutoTimer = null;
+    var isDescriptionRequestInFlight = false;
+    var isUpdatingDescriptionFromAi = false;
+    var descriptionManuallyEdited = false;
+    var lastAutoGeneratedTitle = "";
+    var isSubmittingForm = false;
+    var lastAutrePromptNormalized = "";
+    var autreGenerationRequestId = 0;
+    var latestAppliedAutreGenerationRequestId = 0;
+    var autreRegenerateCount = 0;
+    var classificationAutocorrectTimer = null;
+    var classificationAutocorrectRequestId = 0;
+    var latestAppliedClassificationAutocorrectRequestId = 0;
+    var isApplyingClassificationAutocorrect = false;
+    var classificationAutocorrectApplied = false;
+    var manualAutreFieldCountInput = null;
+    var manualAutreFieldEditor = null;
+    var buildManualAutreFieldsBtn = null;
+    var applyManualAutreFieldsBtn = null;
+    var openManualAutreFieldsBtn = null;
+    var manualAutreFieldsModal = null;
+
+    function loadDynamicFields(type, existingValues, container, card) {
+        fetch("{{ path('demande_api_fields', {type: '__TYPE__'}) }}".replace("__TYPE__", encodeURIComponent(type)))
+            .then(function (r) {
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                return r.json();
+            })
+            .then(function (fields) {
+                if (fields && fields.length > 0) {
+                    var finalFields = fields;
+                    if (isAutreType(type)) {
+                        finalFields = composeAutreFields(fields);
+                    }
+
+                    renderDynamicFields(finalFields, existingValues, container);
+                    card.style.display = "block";
+                } else {
+                    card.style.display = "none";
+                    container.innerHTML = "";
+                }
+            })
+            .catch(function (e) { console.error(e); });
+    }
+
+    function isAutreType(type) {
+        return type === "Autre";
+    }
+
+    function setAiStatus(text, state) {
+        var status = document.getElementById("aiStatusText");
+        if (!status) return;
+        status.className = "ai-status";
+        if (state) status.classList.add(state);
+        status.textContent = text || "";
+    }
+
+    function clearAutreConfidenceBadge() {
+        var badge = document.getElementById("autreConfidenceBadge");
+        if (!badge) return;
+        badge.className = "autre-confidence-badge";
+        badge.textContent = "";
+    }
+
+    function setAutreConfidenceBadge(confidenceStatus) {
+        var badge = document.getElementById("autreConfidenceBadge");
+        if (!badge) return;
+
+        if (!confidenceStatus || !confidenceStatus.text) {
+            clearAutreConfidenceBadge();
+            return;
+        }
+
+        var tone = String(confidenceStatus.tone || "info").toLowerCase();
+        if (tone !== "success" && tone !== "info" && tone !== "error") {
+            tone = "info";
+        }
+
+        badge.className = "autre-confidence-badge visible " + tone;
+        badge.textContent = confidenceStatus.text;
+    }
+
+    function setAutoFilledDetailKeys(keys) {
+        AUTO_FILLED_DETAIL_KEYS = {};
+        if (!Array.isArray(keys)) {
+            updateAiPrefillHint();
+            return;
+        }
+
+        for (var i = 0; i < keys.length; i++) {
+            var key = String(keys[i] || "").trim();
+            if (!key) continue;
+            AUTO_FILLED_DETAIL_KEYS[key] = true;
+        }
+
+        updateAiPrefillHint();
+    }
+
+    function isAutoFilledDetailKey(key) {
+        return !!AUTO_FILLED_DETAIL_KEYS[String(key || "")];
+    }
+
+    function updateAiPrefillHint() {
+        var hint = document.getElementById("aiPrefillHint");
+        if (!hint) return;
+
+        var count = Object.keys(AUTO_FILLED_DETAIL_KEYS).length;
+        if (count <= 0) {
+            hint.classList.remove("visible");
+            hint.textContent = "";
+            return;
+        }
+
+        hint.classList.add("visible");
+        hint.textContent = count === 1
+            ? "1 champ specifique a ete pre-rempli par l IA. Vous pouvez le modifier."
+            : count + " champs specifiques ont ete pre-remplis par l IA. Vous pouvez les modifier.";
+    }
+
+    function markFieldAsReviewed(inputEl) {
+        if (!inputEl) return;
+        inputEl.classList.remove("ai-prefilled-input");
+
+        var key = String(inputEl.getAttribute("data-field-key") || "").trim();
+        if (key && AUTO_FILLED_DETAIL_KEYS[key]) {
+            delete AUTO_FILLED_DETAIL_KEYS[key];
+            updateAiPrefillHint();
+        }
+
+        var labelId = inputEl.getAttribute("data-ai-label-id");
+        if (labelId) {
+            var badge = document.getElementById(labelId);
+            if (badge) badge.remove();
+        }
+    }
+
+    function setClassificationStatus(text, state) {
+        var status = document.getElementById("classificationStatusText");
+        if (!status) return;
+        status.className = "ai-status";
+        if (state) status.classList.add(state);
+        status.textContent = text || "";
+    }
+
+    function setDescriptionAiStatus(text, state) {
+        var status = document.getElementById("descriptionAiStatusText");
+        if (!status) return;
+        status.className = "ai-status";
+        if (state) status.classList.add(state);
+        status.textContent = text || "";
+    }
+
+    function setDescriptionValueFromAi(descriptionInput, value) {
+        if (!descriptionInput) return;
+        isUpdatingDescriptionFromAi = true;
+        descriptionInput.value = value;
+        isUpdatingDescriptionFromAi = false;
+        descriptionManuallyEdited = false;
+    }
+
+    function setSuggestionPromptFromGeneratedDescription(value) {
+        var promptInput = document.getElementById("classificationAiPrompt");
+        if (!promptInput) return;
+        promptInput.value = String(value || "").trim();
+    }
+
+    function requestLiveClassificationAutocorrect() {
+        var promptInput = document.getElementById("classificationAiPrompt");
+        if (!promptInput) return;
+
+        if (classificationAutocorrectApplied) {
+            return;
+        }
+
+        var rawText = String(promptInput.value || "").trim();
+        if (rawText.length < 6) return;
+
+        var requestId = ++classificationAutocorrectRequestId;
+
+        fetch(AUTOCORRECT_AI_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({ text: rawText })
+        })
+            .then(function (response) {
+                return response.json().then(function (json) {
+                    if (!response.ok || !json.success) {
+                        throw new Error(json.message || "Correction IA indisponible.");
+                    }
+                    return json;
+                });
+            })
+            .then(function (json) {
+                if (requestId < latestAppliedClassificationAutocorrectRequestId) {
+                    return;
+                }
+
+                var correctedText = String(json.correctedText || "").trim();
+                if (!correctedText) {
+                    return;
+                }
+
+                var currentText = String(promptInput.value || "").trim();
+                if (normalizeUiLabel(currentText) === normalizeUiLabel(correctedText)) {
+                    return;
+                }
+
+                latestAppliedClassificationAutocorrectRequestId = requestId;
+                isApplyingClassificationAutocorrect = true;
+                promptInput.value = correctedText;
+                if (typeof promptInput.setSelectionRange === "function") {
+                    var caret = correctedText.length;
+                    promptInput.setSelectionRange(caret, caret);
+                }
+                isApplyingClassificationAutocorrect = false;
+                classificationAutocorrectApplied = true;
+                setClassificationStatus("Texte corrige automatiquement pendant la saisie.", "info");
+            })
+            .catch(function () {
+                // Keep typing smooth: ignore transient live-correction errors.
+            });
+    }
+
+    function syncAutreRawPromptFromVisible(force) {
+        var promptInput = document.getElementById("autreAiDescription");
+        var rawPromptInput = document.getElementById("autreAiRawPromptInput");
+        if (!promptInput || !rawPromptInput) return;
+
+        var visibleValue = String(promptInput.value || "").trim();
+        var rawValue = String(rawPromptInput.value || "").trim();
+        if (force || !rawValue) {
+            rawPromptInput.value = visibleValue;
+        }
+    }
+
+    function updateClassificationSummary(suggestion) {
+        var summary = document.getElementById("classificationSummary");
+        if (!summary) return;
+
+        if (!suggestion || typeof suggestion !== "object") {
+            summary.style.display = "none";
+            summary.innerHTML = "";
+            return;
+        }
+
+        var detailsCount = suggestion.suggestedDetails && typeof suggestion.suggestedDetails === "object"
+            ? Object.keys(suggestion.suggestedDetails).length
+            : 0;
+
+        summary.style.display = "block";
+        summary.innerHTML = ""
+            + "<strong>Texte corrige:</strong> " + escapeHtml(suggestion.correctedText || "") + "<br>"
+            + "<strong>Suggestion:</strong> " + escapeHtml(suggestion.categorie || "") + " / " + escapeHtml(suggestion.typeDemande || "")
+            + " / " + escapeHtml(suggestion.priorite || "") + "<br>"
+            + "<strong>Confiance:</strong> " + escapeHtml(String(suggestion.confidence || 0)) + "<br>"
+            + "<strong>Champs pre-remplis:</strong> " + escapeHtml(String(detailsCount));
+    }
+
+    function sanitizeAiCustomField(field) {
+        if (!field || typeof field !== "object") return null;
+
+        var key = String(field.key || "").trim().toLowerCase();
+        key = key.replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+        if (!key) return null;
+        if (key.indexOf("ai_") !== 0) key = "ai_" + key;
+
+        var label = String(field.label || "Champ complementaire").trim();
+        if (!label) label = "Champ complementaire";
+
+        var type = String(field.type || "text").trim().toLowerCase();
+        var allowedTypes = ["text", "textarea", "select", "number", "date"];
+        if (allowedTypes.indexOf(type) === -1) type = "text";
+
+        var normalized = {
+            key: key,
+            label: label,
+            type: type,
+            required: !!field.required,
+            value: String(field.value || "")
+        };
+
+        var source = String(field.source || "").trim().toLowerCase();
+        if (source === "manual" || source === "learned" || source === "generated" || source.indexOf("llm") === 0) {
+            normalized.source = source;
+        }
+
+        if (type === "select") {
+            var options = [];
+            var seen = {};
+            var rawOptions = Array.isArray(field.options) ? field.options : [];
+            for (var i = 0; i < rawOptions.length; i++) {
+                var optionText = String(rawOptions[i] || "").trim();
+                if (!optionText || seen[optionText]) continue;
+                seen[optionText] = true;
+                options.push(optionText);
+                if (options.length >= 8) break;
+            }
+
+            if (!options.length) {
+                normalized.type = "text";
+            } else {
+                normalized.options = options;
+            }
+        }
+
+        return normalized;
+    }
+
+    function normalizeAiFieldPlan(plan) {
+        var normalized = { add: [], remove: [], replaceBase: false, manualMode: false };
+        if (!plan || typeof plan !== "object") return normalized;
+
+        var removeRaw = Array.isArray(plan.remove) ? plan.remove : [];
+        var removeSeen = {};
+        for (var i = 0; i < removeRaw.length; i++) {
+            var key = String(removeRaw[i] || "").trim();
+            if (!key || removeSeen[key]) continue;
+            removeSeen[key] = true;
+            normalized.remove.push(key);
+        }
+
+        var addRaw = Array.isArray(plan.add) ? plan.add : [];
+        var addSeen = {};
+        for (var j = 0; j < addRaw.length; j++) {
+            var field = sanitizeAiCustomField(addRaw[j]);
+            if (!field || addSeen[field.key]) continue;
+            addSeen[field.key] = true;
+            normalized.add.push(field);
+            if (normalized.add.length >= 8) break;
+        }
+
+        normalized.replaceBase = true === plan.replaceBase;
+        normalized.manualMode = true === plan.manualMode;
+
+        return normalized;
+    }
+
+    function saveAiFieldPlanInput() {
+        var planInput = document.getElementById("aiFieldPlanInput");
+        if (!planInput) return;
+        planInput.value = JSON.stringify({
+            add: AI_DYNAMIC_FIELDS,
+            remove: AI_REMOVED_BASE_FIELDS,
+            replaceBase: AI_REPLACE_BASE_FIELDS,
+            manualMode: MANUAL_AUTRE_FIELD_MODE
+        });
+    }
+
+    function resetAiGenerationSnapshot() {
+        var snapshotInput = document.getElementById("aiGenerationSnapshotInput");
+        if (snapshotInput) {
+            snapshotInput.value = "";
+        }
+    }
+
+    function saveAiGenerationSnapshot(suggestedDetails, fieldPlan, model) {
+        var snapshotInput = document.getElementById("aiGenerationSnapshotInput");
+        if (!snapshotInput) return;
+
+        snapshotInput.value = JSON.stringify({
+            suggestedDetails: suggestedDetails && typeof suggestedDetails === "object" ? suggestedDetails : {},
+            dynamicFieldPlan: fieldPlan && typeof fieldPlan === "object" ? fieldPlan : { add: [], remove: [], replaceBase: false },
+            model: String(model || ""),
+            createdAt: new Date().toISOString()
+        });
+    }
+
+    function setAiFieldPlan(plan) {
+        var normalized = normalizeAiFieldPlan(plan);
+        AI_DYNAMIC_FIELDS = normalized.add;
+        AI_REMOVED_BASE_FIELDS = normalized.remove;
+        AI_REPLACE_BASE_FIELDS = normalized.replaceBase;
+        MANUAL_AUTRE_FIELD_MODE = normalized.manualMode;
+        saveAiFieldPlanInput();
+    }
+
+    function resetAiFieldPlan() {
+        setAiFieldPlan({ add: [], remove: [], replaceBase: false });
+        resetAiGenerationSnapshot();
+        resetManualAutreFieldBuilder();
+    }
+
+    function resetManualAutreFieldBuilder() {
+        if (manualAutreFieldCountInput) {
+            manualAutreFieldCountInput.value = "1";
+        }
+
+        if (manualAutreFieldEditor) {
+            renderManualAutreFieldBuilder();
+        }
+    }
+
+    function shouldHideAutreBaseField(fieldKey) {
+        var key = String(fieldKey || "");
+        for (var i = 0; i < AUTRE_HIDDEN_DUPLICATE_KEYS.length; i++) {
+            if (AUTRE_HIDDEN_DUPLICATE_KEYS[i] === key) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function isAutreBaseRequiredKey(fieldKey) {
+        var key = String(fieldKey || "");
+        for (var i = 0; i < AUTRE_BASE_REQUIRED_KEYS.length; i++) {
+            if (AUTRE_BASE_REQUIRED_KEYS[i] === key) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function mapPrioriteToAutreUrgence(priorite) {
+        var value = String(priorite || "").trim().toUpperCase();
+        if (value === "HAUTE") return "Urgente";
+        if (value === "BASSE") return "Faible";
+        return "Normale";
+    }
+
+    function getMirroredAutreValue(fieldKey) {
+        var key = String(fieldKey || "");
+        if (key === "besoinPersonnalise") {
+            var titreInput = document.getElementById("demande_titre");
+            return String((titreInput || {}).value || "").trim();
+        }
+
+        if (key === "descriptionBesoin") {
+            var descriptionInput = document.getElementById("demande_description");
+            var descriptionValue = String((descriptionInput || {}).value || "").trim();
+            if (descriptionValue) {
+                return descriptionValue;
+            }
+
+            var autrePromptInput = document.getElementById("autreAiDescription");
+            return String((autrePromptInput || {}).value || "").trim();
+        }
+
+        if (key === "niveauUrgenceAutre") {
+            var prioriteInput = document.getElementById("demande_priorite");
+            return mapPrioriteToAutreUrgence(String((prioriteInput || {}).value || ""));
+        }
+
+        return "";
+    }
+
+    function syncAutreMirroredFields() {
+        var typeSelect = document.getElementById("demande_typeDemande");
+        if (!typeSelect || !isAutreType(typeSelect.value)) return;
+
+        for (var i = 0; i < AUTRE_HIDDEN_DUPLICATE_KEYS.length; i++) {
+            var key = AUTRE_HIDDEN_DUPLICATE_KEYS[i];
+            var input = document.querySelector('[name="details[' + key + ']"]');
+            if (!input) continue;
+
+            var mirroredValue = getMirroredAutreValue(key);
+            if (mirroredValue !== "") {
+                input.value = mirroredValue;
+            }
+        }
+    }
+
+    function composeAutreFields(baseFields) {
+        var removeMap = {};
+        for (var i = 0; i < AI_REMOVED_BASE_FIELDS.length; i++) {
+            removeMap[AI_REMOVED_BASE_FIELDS[i]] = true;
+        }
+
+        var baseByKey = {};
+        var usedKeys = {};
+        var finalFields = [];
+
+        for (var x = 0; x < baseFields.length; x++) {
+            baseByKey[String(baseFields[x].key || "")] = baseFields[x];
+        }
+
+        if (AI_REPLACE_BASE_FIELDS && AI_DYNAMIC_FIELDS.length > 0) {
+            for (var d = 0; d < AI_DYNAMIC_FIELDS.length; d++) {
+                var dynamicField = AI_DYNAMIC_FIELDS[d];
+                if (!dynamicField || usedKeys[dynamicField.key]) continue;
+                finalFields.push(dynamicField);
+                usedKeys[dynamicField.key] = true;
+            }
+
+            for (var h = 0; h < AUTRE_BASE_REQUIRED_KEYS.length; h++) {
+                var requiredKey = AUTRE_BASE_REQUIRED_KEYS[h];
+                if (usedKeys[requiredKey]) continue;
+
+                var baseField = baseByKey[requiredKey] || {
+                    key: requiredKey,
+                    label: requiredKey,
+                    required: true,
+                    type: "text"
+                };
+
+                finalFields.push({
+                    key: requiredKey,
+                    label: baseField.label || requiredKey,
+                    required: true,
+                    type: "hidden"
+                });
+                usedKeys[requiredKey] = true;
+            }
+
+            return dedupeAutreComposedFields(finalFields);
+        }
+
+        for (var j = 0; j < baseFields.length; j++) {
+            var field = baseFields[j];
+            var key = String(field.key || "");
+            var isRequired = !!field.required;
+
+            if (removeMap[key] && !isRequired) {
+                continue;
+            }
+
+            if (shouldHideAutreBaseField(key) && field.type !== "hidden") {
+                finalFields.push({
+                    key: key,
+                    label: field.label || key,
+                    required: true,
+                    type: "hidden"
+                });
+            } else {
+                finalFields.push(field);
+            }
+            usedKeys[key] = true;
+        }
+
+        for (var k = 0; k < AI_DYNAMIC_FIELDS.length; k++) {
+            var customField = AI_DYNAMIC_FIELDS[k];
+            if (!customField || usedKeys[customField.key]) continue;
+            finalFields.push(customField);
+            usedKeys[customField.key] = true;
+        }
+
+        return dedupeAutreComposedFields(finalFields);
+    }
+
+    function slugifyManualAutreFieldKey(label, fallbackIndex) {
+        var key = normalizeUiLabel(String(label || "")).toLowerCase();
+        key = key.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+        if (!key) {
+            key = "custom_" + String(fallbackIndex || 1);
+        }
+
+        if (key.indexOf("ai_") !== 0) {
+            key = "ai_" + key;
+        }
+
+        return key;
+    }
+
+    function renderManualAutreFieldBuilder() {
+        if (!manualAutreFieldEditor || !manualAutreFieldCountInput) {
+            return;
+        }
+
+        var count = parseInt(manualAutreFieldCountInput.value, 10);
+        if (!count || count < 1) {
+            count = 1;
+        }
+        if (count > 6) {
+            count = 6;
+        }
+
+        manualAutreFieldEditor.innerHTML = "";
+
+        for (var i = 0; i < count; i++) {
+            var col = document.createElement("div");
+            col.className = "col-12 col-md-6";
+
+            var card = document.createElement("div");
+            card.className = "border rounded p-2 h-100";
+
+            var label = document.createElement("label");
+            label.className = "form-label small mb-1";
+            label.textContent = "Champ " + (i + 1);
+
+            var labelInput = document.createElement("input");
+            labelInput.type = "text";
+            labelInput.className = "form-control form-control-sm mb-2 manual-autre-field-label";
+            labelInput.placeholder = "Nom du champ";
+            labelInput.setAttribute("data-manual-autre-index", String(i));
+
+            var typeInput = document.createElement("select");
+            typeInput.className = "form-select form-select-sm mb-2 manual-autre-field-type";
+            typeInput.setAttribute("data-manual-autre-index", String(i));
+            ["text", "textarea", "number", "date", "select"].forEach(function (optionValue) {
+                var option = document.createElement("option");
+                option.value = optionValue;
+                option.textContent = optionValue === "textarea" ? "Zone de texte" : optionValue.charAt(0).toUpperCase() + optionValue.slice(1);
+                typeInput.appendChild(option);
+            });
+
+            var valueInput = document.createElement("input");
+            valueInput.type = "text";
+            valueInput.className = "form-control form-control-sm manual-autre-field-value";
+            valueInput.placeholder = "Valeur initiale";
+            valueInput.setAttribute("data-manual-autre-index", String(i));
+
+            var optionsInput = document.createElement("input");
+            optionsInput.type = "text";
+            optionsInput.className = "form-control form-control-sm mt-2 manual-autre-field-options";
+            optionsInput.placeholder = "Options separees par des virgules";
+            optionsInput.style.display = "none";
+            optionsInput.setAttribute("data-manual-autre-index", String(i));
+
+            var keyPreview = document.createElement("div");
+            keyPreview.className = "text-secondary small mt-2 manual-autre-field-key-preview";
+            keyPreview.setAttribute("data-manual-autre-index", String(i));
+            keyPreview.textContent = "Cle: " + slugifyManualAutreFieldKey("custom " + (i + 1), i + 1);
+
+            labelInput.addEventListener("input", function () {
+                var index = this.getAttribute("data-manual-autre-index");
+                var preview = manualAutreFieldEditor.querySelector('.manual-autre-field-key-preview[data-manual-autre-index="' + index + '"]');
+                if (preview) {
+                    preview.textContent = "Cle: " + slugifyManualAutreFieldKey(this.value, parseInt(index, 10) + 1);
+                }
+            });
+
+            typeInput.addEventListener("change", function () {
+                var index = this.getAttribute("data-manual-autre-index");
+                var input = manualAutreFieldEditor.querySelector('.manual-autre-field-options[data-manual-autre-index="' + index + '"]');
+                if (!input) return;
+                input.style.display = this.value === "select" ? "block" : "none";
+            });
+
+            card.appendChild(label);
+            card.appendChild(labelInput);
+            card.appendChild(typeInput);
+            card.appendChild(valueInput);
+            card.appendChild(optionsInput);
+            card.appendChild(keyPreview);
+            col.appendChild(card);
+            manualAutreFieldEditor.appendChild(col);
+        }
+    }
+
+    function applyManualAutreFieldPlan(categorieSelect, typeSelect, dynamicFieldsContainer, dynamicFieldsCard) {
+        if (!manualAutreFieldEditor || !typeSelect) {
+            return;
+        }
+
+        var labelInputs = manualAutreFieldEditor.querySelectorAll(".manual-autre-field-label");
+        var fields = [];
+
+        for (var i = 0; i < labelInputs.length; i++) {
+            var labelInput = labelInputs[i];
+            var index = parseInt(labelInput.getAttribute("data-manual-autre-index") || String(i), 10);
+            var typeInput = manualAutreFieldEditor.querySelector('.manual-autre-field-type[data-manual-autre-index="' + index + '"]');
+            var valueInput = manualAutreFieldEditor.querySelector('.manual-autre-field-value[data-manual-autre-index="' + index + '"]');
+            var optionsInput = manualAutreFieldEditor.querySelector('.manual-autre-field-options[data-manual-autre-index="' + index + '"]');
+            var label = String(labelInput.value || "").trim();
+            if (!label) {
+                label = "Champ " + (index + 1);
+            }
+
+            var typeValue = String((typeInput || {}).value || "text").trim() || "text";
+            var optionValues = [];
+            if (typeValue === "select" && optionsInput) {
+                String(optionsInput.value || "")
+                    .split(/[,;\n]/)
+                    .forEach(function (rawOption) {
+                        var option = String(rawOption || "").trim();
+                        if (option && optionValues.indexOf(option) === -1) {
+                            optionValues.push(option);
+                        }
+                    });
+            }
+
+            fields.push({
+                key: slugifyManualAutreFieldKey(label, index + 1),
+                label: label,
+                type: typeValue,
+                required: false,
+                value: String((valueInput || {}).value || "").trim(),
+                options: optionValues,
+                source: "manual"
+            });
+        }
+
+        setAiFieldPlan({ add: fields, remove: [], replaceBase: true, manualMode: true });
+
+        var currentType = String((typeSelect || {}).value || "");
+        if (isAutreType(currentType)) {
+            var aiGeneratedInput = document.getElementById("aiGeneratedInput");
+            var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+            var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
+            var regenerateBtn = document.getElementById("regenerateWithAiBtn");
+
+            if (aiGeneratedInput) aiGeneratedInput.value = "0";
+            if (aiConfirmedInput) aiConfirmedInput.value = "1";
+            if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
+            if (regenerateBtn) regenerateBtn.style.display = "none";
+
+            resetAiGenerationSnapshot();
+            setAutoFilledDetailKeys([]);
+            loadDynamicFields(currentType, {}, dynamicFieldsContainer, dynamicFieldsCard);
+            setAiStatus(String(fields.length) + " champ(s) personnalise(s) appliques. Vous pouvez remplir puis enregistrer la demande.", "success");
+        }
+    }
+
+    function canonicalAutreFieldSignature(field) {
+        if (!field || typeof field !== "object") return "";
+
+        var key = normalizeUiLabel(String(field.key || ""));
+        var label = normalizeUiLabel(String(field.label || ""));
+        var type = normalizeUiLabel(String(field.type || "text"));
+
+        var canonical = key;
+        if (canonical.indexOf("ai ") === 0) {
+            canonical = canonical.slice(3);
+        }
+
+        if (canonical.indexOf("date souhaitee") !== -1 || canonical.indexOf("datesouhaitee") !== -1) {
+            canonical = "date_souhaitee";
+        } else if (canonical.indexOf("nom formation") !== -1 || canonical.indexOf("nom de la formation") !== -1) {
+            canonical = "nom_formation";
+        } else if (canonical.indexOf("type formation") !== -1) {
+            canonical = "type_formation";
+        } else if (canonical.indexOf("lieu depart") !== -1) {
+            canonical = "lieu_depart";
+        } else if (canonical.indexOf("lieu souhaite") !== -1 || canonical.indexOf("destination") !== -1) {
+            canonical = "lieu_destination";
+        } else if (canonical.indexOf("type transport") !== -1) {
+            canonical = "type_transport";
+        }
+
+        if (!canonical) {
+            canonical = label;
+        }
+
+        return canonical + "|" + type;
+    }
+
+    function scoreAutreFieldForDedup(field) {
+        if (!field || typeof field !== "object") return 0;
+
+        var score = 0;
+        var key = String(field.key || "");
+        var type = String(field.type || "");
+
+        if (key && key.indexOf("ai_") !== 0) score += 4;
+        if (!!field.required) score += 2;
+        if (type !== "hidden") score += 1;
+
+        return score;
+    }
+
+    function dedupeAutreComposedFields(fields) {
+        if (!Array.isArray(fields) || fields.length <= 1) {
+            return Array.isArray(fields) ? fields : [];
+        }
+
+        var bySignature = {};
+        var ordered = [];
+
+        for (var i = 0; i < fields.length; i++) {
+            var candidate = fields[i];
+            if (!candidate || typeof candidate !== "object") continue;
+
+            var signature = canonicalAutreFieldSignature(candidate);
+            if (!signature) {
+                ordered.push(candidate);
+                continue;
+            }
+
+            if (!bySignature[signature]) {
+                bySignature[signature] = {
+                    field: candidate,
+                    score: scoreAutreFieldForDedup(candidate)
+                };
+                ordered.push(candidate);
+                continue;
+            }
+
+            var current = bySignature[signature];
+            var incomingScore = scoreAutreFieldForDedup(candidate);
+            if (incomingScore > current.score) {
+                var idx = ordered.indexOf(current.field);
+                if (idx >= 0) {
+                    ordered[idx] = candidate;
+                }
+                bySignature[signature] = {
+                    field: candidate,
+                    score: incomingScore
+                };
+            }
+        }
+
+        return ordered;
+    }
+
+    function applySuggestedGeneralFields(suggestedGeneral) {
+        var general = suggestedGeneral || {};
+
+        var titreInput = document.getElementById("demande_titre");
+        var descriptionInput = document.getElementById("demande_description");
+        var prioriteInput = document.getElementById("demande_priorite");
+
+        var suggestedTitre = String(general.titre || "").trim();
+        var suggestedDescription = String(general.description || "").trim();
+        var suggestedPriorite = String(general.priorite || "").trim().toUpperCase();
+
+        if (titreInput && suggestedTitre) {
+            titreInput.value = suggestedTitre;
+        }
+
+        if (descriptionInput && suggestedDescription) {
+            descriptionInput.value = suggestedDescription;
+        }
+
+        if (prioriteInput && suggestedPriorite) {
+            var canApply = false;
+            for (var i = 0; i < prioriteInput.options.length; i++) {
+                if (String(prioriteInput.options[i].value || "").toUpperCase() === suggestedPriorite) {
+                    canApply = true;
+                    break;
+                }
+            }
+
+            if (canApply) {
+                prioriteInput.value = suggestedPriorite;
+            }
+        }
+    }
+
+    function updateAutreAiControls(type) {
+        var autreAiBox = document.getElementById("autreAiBox");
+        var regenerateBtn = document.getElementById("regenerateWithAiBtn");
+        var aiGeneratedInput = document.getElementById("aiGeneratedInput");
+        var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
+
+        if (!autreAiBox || !regenerateBtn || !aiGeneratedInput || !aiConfirmedInput || !aiTrustedLearningInput) return;
+
+        if (isAutreType(type)) {
+            autreAiBox.style.display = "block";
+            regenerateBtn.style.display = aiGeneratedInput.value === "1" ? "inline-block" : "none";
+            return;
+        }
+
+        autreAiBox.style.display = "none";
+        regenerateBtn.style.display = "none";
+        resetAiFieldPlan();
+        setAiStatus("", "");
+        clearAutreConfidenceBadge();
+    }
+
+    function resetAutreAiGeneratedState() {
+        var aiGeneratedInput = document.getElementById("aiGeneratedInput");
+        var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
+        if (aiGeneratedInput) aiGeneratedInput.value = "0";
+        if (aiConfirmedInput) aiConfirmedInput.value = "0";
+        if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
+    }
+
+    function clearAutreGeneratedContent(dynamicFieldsContainer, dynamicFieldsCard) {
+        resetAiFieldPlan();
+        setAutoFilledDetailKeys([]);
+        clearAutreConfidenceBadge();
+        setAiStatus("", "");
+        resetAutreAiGeneratedState();
+
+        var typeSelect = document.getElementById("demande_typeDemande");
+        var currentType = String((typeSelect || {}).value || "");
+        if (dynamicFieldsContainer && dynamicFieldsCard && isAutreType(currentType)) {
+            loadDynamicFields(currentType, {}, dynamicFieldsContainer, dynamicFieldsCard);
+        }
+    }
+
+    function clearDynamicFieldState(container) {
+        if (!container) return;
+
+        var inputs = container.querySelectorAll("input[name^='details['], textarea[name^='details['], select[name^='details[']");
+        for (var i = 0; i < inputs.length; i++) {
+            var input = inputs[i];
+            var tag = String(input.tagName || "").toUpperCase();
+            var type = String(input.type || "").toLowerCase();
+
+            if (tag === "SELECT") {
+                input.value = "";
+                continue;
+            }
+
+            if (type === "checkbox" || type === "radio") {
+                input.checked = false;
+                continue;
+            }
+
+            input.value = "";
+        }
+
+        container.innerHTML = "";
+    }
+
+    function clearAutreDetailValue(container, key) {
+        if (!container || !key) return;
+
+        var inputs = container.querySelectorAll('[name="details[' + key + ']"]');
+        for (var i = 0; i < inputs.length; i++) {
+            var input = inputs[i];
+            var tag = String(input.tagName || "").toUpperCase();
+            var type = String(input.type || "").toLowerCase();
+
+            if (tag === "SELECT") {
+                input.value = "";
+                continue;
+            }
+
+            if (type === "checkbox" || type === "radio") {
+                input.checked = false;
+                continue;
+            }
+
+            input.value = "";
+        }
+    }
+
+    function buildAutreReplaceBaseDetails() {
+        return {
+            descriptionBesoin: "",
+            besoinPersonnalise: "",
+            niveauUrgenceAutre: "",
+            dateSouhaiteeAutre: "",
+            pieceOuContexte: ""
+        };
+    }
+
+    function resetAutreReplaceBaseState(container) {
+        var cleared = buildAutreReplaceBaseDetails();
+        var keys = Object.keys(cleared);
+
+        if (container) {
+            for (var i = 0; i < keys.length; i++) {
+                clearAutreDetailValue(container, keys[i]);
+            }
+
+            var allInputs = container.querySelectorAll("input[name^='details['], textarea[name^='details['], select[name^='details[']");
+            for (var j = 0; j < allInputs.length; j++) {
+                var input = allInputs[j];
+                var name = String(input.name || "");
+                if (!/^details\[/.test(name)) continue;
+
+                var type = String(input.type || "").toLowerCase();
+                var tag = String(input.tagName || "").toUpperCase();
+                if (tag === "SELECT") {
+                    input.value = "";
+                } else if (type === "checkbox" || type === "radio") {
+                    input.checked = false;
+                } else {
+                    input.value = "";
+                }
+            }
+
+            container.innerHTML = "";
+        }
+
+        return cleared;
+    }
+
+    function collectGeneralContext() {
+        return {
+            categorie: (document.getElementById("demande_categorie") || {}).value || "",
+            typeDemande: (document.getElementById("demande_typeDemande") || {}).value || "",
+            titre: (document.getElementById("demande_titre") || {}).value || "",
+            description: (document.getElementById("demande_description") || {}).value || "",
+            priorite: (document.getElementById("demande_priorite") || {}).value || "",
+            aiDescriptionPrompt: (document.getElementById("autreAiDescription") || {}).value || ""
+        };
+    }
+
+    function collectCurrentDetails(container) {
+        var map = {};
+        if (!container) return map;
+
+        var inputs = container.querySelectorAll("input[name^='details['], textarea[name^='details['], select[name^='details[']");
+        for (var i = 0; i < inputs.length; i++) {
+            var input = inputs[i];
+            if (!input.name) continue;
+
+            var key = input.name.replace(/^details\[/, "").replace(/\]$/, "");
+            map[key] = input.value;
+        }
+
+        return map;
+    }
+
+    function inferCategoryFromDescriptionText(rawText) {
+        var text = normalizeUiLabel(rawText || "");
+        if (!text.trim()) return "";
+
+        function hasAny(keywords) {
+            for (var i = 0; i < keywords.length; i++) {
+                if (text.indexOf(keywords[i]) !== -1) return true;
+            }
+            return false;
+        }
+
+        var hasFinanceContext = hasAny(["finance", "financier", "financiere", "salaire", "remboursement", "budget", "paye", "paie", "montant", "facture", "tnd", "dt"])
+            || (text.indexOf("avance sur salaire") !== -1)
+            || (text.indexOf("avance") !== -1 && hasAny(["salaire", "paie", "paye"]));
+        if (hasFinanceContext) {
+            return "Administrative";
+        }
+
+        if (hasAny(["conge", "attestation", "certificat", "mutation", "demission", "ressources humaines", "rh"])) {
+            return "Ressources Humaines";
+        }
+
+        if (hasAny(["ordinateur", "pc", "laptop", "logiciel", "systeme", "reseau", "email", "bug", "informatique", "acces"])) {
+            return "Informatique";
+        }
+
+        if (hasAny(["formation", "certification", "cours", "training"])) {
+            return "Formation";
+        }
+
+        if (hasAny(["teletravail", "horaire", "heures supplementaires", "organisation"])) {
+            return "Organisation du travail";
+        }
+
+        return "";
+    }
+
+    function inferTypeForCategoryFromText(category, rawText) {
+        if (!category || !CATEGORIES[category]) return "";
+
+        var text = normalizeUiLabel(rawText || "");
+        if (!text) return "";
+
+        var options = CATEGORIES[category] || [];
+        var bestMatch = "";
+        var bestScore = 0;
+
+        for (var i = 0; i < options.length; i++) {
+            var option = String(options[i] || "");
+            if (!option || isAutreType(option)) continue;
+
+            var normalizedOption = normalizeUiLabel(option);
+            if (!normalizedOption) continue;
+
+            if (text.indexOf(normalizedOption) !== -1 && normalizedOption.length > bestScore) {
+                bestMatch = option;
+                bestScore = normalizedOption.length;
+            }
+        }
+
+        if (bestMatch) {
+            return bestMatch;
+        }
+
+        var normalizedCategory = normalizeUiLabel(category);
+        if (normalizedCategory === normalizeUiLabel("Ressources Humaines")) {
+            if (text.indexOf("conge") !== -1 || text.indexOf("vacance") !== -1 || text.indexOf("absence") !== -1) {
+                for (var j = 0; j < options.length; j++) {
+                    var optionCandidate = String(options[j] || "");
+                    if (normalizeUiLabel(optionCandidate).indexOf("conge") !== -1) {
+                        return optionCandidate;
+                    }
+                }
+            }
+        }
+
+        return "";
+    }
+
+    function normalizeUiLabel(value) {
+        var text = String(value || "").toLowerCase().trim();
+        if (text.normalize) {
+            text = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        }
+        return text.replace(/\s+/g, " ");
+    }
+
+    function resolveCategoryLabel(candidate) {
+        var value = String(candidate || "").trim();
+        if (!value) return "";
+        if (CATEGORIES[value]) return value;
+
+        var normalized = normalizeUiLabel(value);
+        var keys = Object.keys(CATEGORIES || {});
+        for (var i = 0; i < keys.length; i++) {
+            if (normalizeUiLabel(keys[i]) === normalized) {
+                return keys[i];
+            }
+        }
+
+        return value;
+    }
+
+    function resolveTypeOptionValue(typeSelect, candidate) {
+        var value = String(candidate || "").trim();
+        if (!typeSelect || !value) return value;
+
+        for (var i = 0; i < typeSelect.options.length; i++) {
+            if (String(typeSelect.options[i].value || "") === value) {
+                return value;
+            }
+        }
+
+        var normalized = normalizeUiLabel(value);
+        for (var j = 0; j < typeSelect.options.length; j++) {
+            if (normalizeUiLabel(typeSelect.options[j].value || "") === normalized) {
+                return String(typeSelect.options[j].value || "");
+            }
+        }
+
+        return value;
+    }
+
+    function rebuildTypeOptionsForCategory(typeSelect, category) {
+        typeSelect.innerHTML = '<option value="">-- Choisir un type --</option>';
+        if (!(category && CATEGORIES[category])) return;
+
+        var types = CATEGORIES[category];
+        for (var i = 0; i < types.length; i++) {
+            var opt = document.createElement("option");
+            opt.value = types[i];
+            opt.textContent = types[i];
+            typeSelect.appendChild(opt);
+        }
+    }
+
+    function updateTypeInfo(typeInfo, category) {
+        if (!typeInfo) return;
+        if (category && CATEGORIES[category]) {
+            typeInfo.textContent = CATEGORIES[category].length + " types disponibles";
+            typeInfo.style.color = "green";
+            return;
+        }
+
+        typeInfo.textContent = "";
+    }
+
+    function applyClassificationSuggestion(suggestion, categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard) {
+        if (!suggestion || typeof suggestion !== "object") return;
+
+        var correctedText = String(suggestion.correctedText || "").trim();
+        var categorie = resolveCategoryLabel(String(suggestion.categorie || "").trim());
+        var typeDemande = String(suggestion.typeDemande || "").trim();
+        var priorite = String(suggestion.priorite || "").trim().toUpperCase();
+        var titre = String(suggestion.titre || "").trim();
+        var description = String(suggestion.description || "").trim();
+        var suggestedDetails = suggestion.suggestedDetails && typeof suggestion.suggestedDetails === "object"
+            ? suggestion.suggestedDetails
+            : {};
+        setAutoFilledDetailKeys(Object.keys(suggestedDetails));
+
+        if (correctedText) {
+            var promptInput = document.getElementById("classificationAiPrompt");
+            if (promptInput) promptInput.value = correctedText;
+        }
+
+        if (categorie && CATEGORIES[categorie]) {
+            categorieSelect.value = categorie;
+            rebuildTypeOptionsForCategory(typeSelect, categorie);
+            updateTypeInfo(typeInfo, categorie);
+        }
+
+        if (typeDemande) {
+            typeDemande = resolveTypeOptionValue(typeSelect, typeDemande);
+            var canApplyType = false;
+            for (var i = 0; i < typeSelect.options.length; i++) {
+                if (String(typeSelect.options[i].value || "") === typeDemande) {
+                    canApplyType = true;
+                    break;
+                }
+            }
+
+            if (canApplyType) {
+                typeSelect.value = typeDemande;
+            }
+        }
+
+        var prioriteInput = document.getElementById("demande_priorite");
+        if (prioriteInput && priorite) {
+            prioriteInput.value = priorite;
+        }
+
+        var titreInput = document.getElementById("demande_titre");
+        if (titreInput && titre) {
+            var existingTitle = String(titreInput.value || "").trim();
+            if (!existingTitle) {
+                titreInput.value = titre;
+            }
+        }
+
+        var descriptionInput = document.getElementById("demande_description");
+        if (descriptionInput && description) {
+            descriptionInput.value = description;
+        }
+
+        var aiGeneratedInput = document.getElementById("aiGeneratedInput");
+        var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
+        if (aiGeneratedInput) aiGeneratedInput.value = "1";
+        if (aiConfirmedInput) aiConfirmedInput.value = "0";
+        if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
+        resetAiFieldPlan();
+        setAiStatus("", "");
+        updateAutreAiControls(typeDemande);
+
+        if (typeDemande) {
+            loadDynamicFields(typeDemande, suggestedDetails, dynamicFieldsContainer, dynamicFieldsCard);
+        } else {
+            dynamicFieldsCard.style.display = "none";
+            dynamicFieldsContainer.innerHTML = "";
+        }
+    }
+
+    function requestClassificationSuggestion(categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard) {
+        var button = document.getElementById("suggestClassificationBtn");
+        var promptInput = document.getElementById("classificationAiPrompt");
+        var aiGeneratedInput = document.getElementById("aiGeneratedInput");
+        var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
+        var originalText = button ? button.innerHTML : "";
+        var rawText = promptInput ? String(promptInput.value || "").trim() : "";
+
+        if (!rawText) {
+            setClassificationStatus("Ajoutez une description avant de lancer la suggestion.", "error");
+            if (promptInput) promptInput.focus();
+            updateClassificationSummary(null);
+            return;
+        }
+
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = "<span class='spinner-border spinner-border-sm me-1'></span>Analyse...";
+        }
+
+        setClassificationStatus("Correction et classement en cours...", "info");
+
+        fetch(CLASSIFICATION_AI_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({ text: rawText })
+        })
+            .then(function (response) {
+                return response.json().then(function (json) {
+                    if (!response.ok || !json.success) {
+                        throw new Error(json.message || "Suggestion IA impossible.");
+                    }
+                    return json;
+                });
+            })
+            .then(function (json) {
+                var suggestion = json.suggestion || {};
+                applyClassificationSuggestion(suggestion, categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard);
+                updateClassificationSummary(suggestion);
+                if (aiGeneratedInput) aiGeneratedInput.value = "1";
+                if (aiConfirmedInput) aiConfirmedInput.value = "0";
+                if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
+                setClassificationStatus("Texte corrige et demande classee automatiquement.", "success");
+            })
+            .catch(function (error) {
+                console.error(error);
+                setAutoFilledDetailKeys([]);
+                updateClassificationSummary(null);
+                setClassificationStatus(error.message || "Suggestion IA impossible.", "error");
+            })
+            .finally(function () {
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                }
+            });
+    }
+
+    function requestDescriptionGeneration(options) {
+        var opts = options || {};
+        var trigger = opts.trigger === "auto" ? "auto" : "manual";
+        var forceApply = true === opts.forceApply;
+        var button = document.getElementById("generateDescriptionBtn");
+        var titleInput = document.getElementById("demande_titre");
+        var descriptionInput = document.getElementById("demande_description");
+        var categorieInput = document.getElementById("demande_categorie");
+        var typeInput = document.getElementById("demande_typeDemande");
+        var autoToggle = document.getElementById("autoGenerateDescriptionToggle");
+        var sendToSuggestionToggle = document.getElementById("sendDescriptionToSuggestionToggle");
+        var aiGeneratedInput = document.getElementById("aiGeneratedInput");
+        var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var originalText = button ? button.innerHTML : "";
+        var title = titleInput ? String(titleInput.value || "").trim() : "";
+
+        if ("auto" === trigger) {
+            if (!autoToggle || !autoToggle.checked) {
+                return;
+            }
+
+            if (!title || title.length < 4 || title === lastAutoGeneratedTitle) {
+                return;
+            }
+
+            if (
+                descriptionInput &&
+                descriptionManuallyEdited &&
+                String(descriptionInput.value || "").trim() !== "" &&
+                !forceApply
+            ) {
+                return;
+            }
+        }
+
+        if (isDescriptionRequestInFlight) {
+            if ("manual" === trigger) {
+                setDescriptionAiStatus("Une generation est deja en cours...", "info");
+            }
+            return;
+        }
+
+        if (!title) {
+            if ("manual" === trigger) {
+                setDescriptionAiStatus("Ajoutez un titre avant de lancer l IA.", "error");
+                if (titleInput) titleInput.focus();
+            }
+            return;
+        }
+
+        if ("manual" === trigger && button) {
+            button.disabled = true;
+            button.innerHTML = "<span class='spinner-border spinner-border-sm me-1'></span>Generation...";
+        }
+
+        isDescriptionRequestInFlight = true;
+
+        if ("manual" === trigger) {
+            setDescriptionAiStatus("Generation de la description en cours...", "info");
+        }
+
+        fetch(DESCRIPTION_AI_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({
+                title: title,
+                categorie: (categorieInput || {}).value || "",
+                typeDemande: (typeInput || {}).value || ""
+            })
+        })
+            .then(function (response) {
+                return response.json().then(function (json) {
+                    if (!response.ok || !json.success) {
+                        throw new Error(json.message || "Generation IA impossible.");
+                    }
+                    return json;
+                });
+            })
+            .then(function (json) {
+                var generatedDescription = String(json.description || "").trim();
+                if ("" === generatedDescription) {
+                    return;
+                }
+
+                var shouldApply = true;
+                if (
+                    "auto" === trigger &&
+                    descriptionInput &&
+                    String(descriptionInput.value || "").trim() !== "" &&
+                    descriptionManuallyEdited &&
+                    !forceApply
+                ) {
+                    shouldApply = false;
+                }
+
+                if (descriptionInput && shouldApply) {
+                    setDescriptionValueFromAi(descriptionInput, generatedDescription);
+                    lastAutoGeneratedTitle = title;
+                }
+
+                if (aiGeneratedInput) aiGeneratedInput.value = "1";
+                if (aiConfirmedInput) aiConfirmedInput.value = "0";
+                if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
+
+                if (sendToSuggestionToggle && sendToSuggestionToggle.checked) {
+                    setSuggestionPromptFromGeneratedDescription(generatedDescription);
+                }
+
+                if ("manual" === trigger) {
+                    if (sendToSuggestionToggle && sendToSuggestionToggle.checked) {
+                        setDescriptionAiStatus("Description proposee par IA et envoyee vers Suggestion IA.", "success");
+                    } else {
+                        setDescriptionAiStatus("Description proposee par IA. Vous pouvez la modifier librement.", "success");
+                    }
+                    return;
+                }
+
+                if (shouldApply) {
+                    setDescriptionAiStatus("Description suggeree automatiquement depuis le titre.", "success");
+                }
+            })
+            .catch(function (error) {
+                console.error(error);
+                if ("manual" === trigger) {
+                    setDescriptionAiStatus(error.message || "Generation IA impossible.", "error");
+                }
+            })
+            .finally(function () {
+                isDescriptionRequestInFlight = false;
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                }
+            });
+    }
+
+    function applyCategoryAndAutreType(categorieSelect, typeSelect, typeInfo, detectedCategory, silent, sourceText, suggestedType) {
+        if (!detectedCategory || !CATEGORIES[detectedCategory]) return false;
+
+        var changed = false;
+        var isSilent = true === silent;
+
+        if (categorieSelect.value !== detectedCategory) {
+            categorieSelect.value = detectedCategory;
+            if (isSilent) {
+                rebuildTypeOptionsForCategory(typeSelect, detectedCategory);
+                if (typeInfo) {
+                    typeInfo.textContent = CATEGORIES[detectedCategory].length + " types disponibles";
+                    typeInfo.style.color = "green";
+                }
+            } else {
+                categorieSelect.dispatchEvent(new Event("change"));
+            }
+            changed = true;
+        }
+
+        var targetType = resolveTypeOptionValue(typeSelect, String(suggestedType || "").trim());
+        var canApplyTargetType = false;
+        if (targetType) {
+            for (var i = 0; i < typeSelect.options.length; i++) {
+                if (String(typeSelect.options[i].value || "") === targetType) {
+                    canApplyTargetType = true;
+                    break;
+                }
+            }
+        }
+
+        if (!canApplyTargetType) {
+            targetType = inferTypeForCategoryFromText(detectedCategory, sourceText || "");
+            canApplyTargetType = !!targetType;
+        }
+
+        if (!canApplyTargetType) {
+            var hasAutreType = !!typeSelect.querySelector('option[value="Autre"]');
+            targetType = hasAutreType ? "Autre" : "";
+            canApplyTargetType = !!targetType;
+        }
+
+        if (canApplyTargetType && typeSelect.value !== targetType) {
+            typeSelect.value = targetType;
+            if (!isSilent) {
+                typeSelect.dispatchEvent(new Event("change"));
+            }
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    function autoAdjustCategoryForAutreFlow(categorieSelect, typeSelect, typeInfo, sourceTextOverride) {
+        if (!categorieSelect || !typeSelect) return false;
+        if (!isAutreType(typeSelect.value)) return false;
+
+        var sourceText = String(sourceTextOverride || "").trim();
+        if (!sourceText) {
+            sourceText = [
+                (document.getElementById("autreAiDescription") || {}).value || "",
+                (document.getElementById("demande_description") || {}).value || "",
+                (document.getElementById("demande_titre") || {}).value || ""
+            ].join(" ");
+        }
+
+        var detectedCategory = inferCategoryFromDescriptionText(sourceText);
+        if (!detectedCategory) return false;
+
+        var changed = applyCategoryAndAutreType(categorieSelect, typeSelect, typeInfo, detectedCategory, true, sourceText, "");
+        if (changed) {
+            setAiStatus("Categorie ajustee automatiquement: " + detectedCategory + ".", "");
+        }
+
+        return changed;
+    }
+
+    function applyAiSuggestedCategory(suggestedGeneral, categorieSelect, typeSelect, typeInfo) {
+        if (!suggestedGeneral || typeof suggestedGeneral !== "object") return false;
+        var suggestedCategory = resolveCategoryLabel(String(suggestedGeneral.categorie || "").trim());
+
+        var sourceText = [
+            String(suggestedGeneral.description || "").trim(),
+            String(suggestedGeneral.titre || "").trim(),
+            (document.getElementById("autreAiDescription") || {}).value || "",
+            (document.getElementById("demande_description") || {}).value || "",
+            (document.getElementById("demande_titre") || {}).value || ""
+        ].join(" ");
+        var suggestedType = String(suggestedGeneral.typeDemande || "").trim();
+
+        if (!suggestedCategory || !CATEGORIES[suggestedCategory]) {
+            suggestedCategory = inferCategoryFromDescriptionText(sourceText);
+        }
+        if (!suggestedCategory || !CATEGORIES[suggestedCategory]) return false;
+
+        var changed = applyCategoryAndAutreType(categorieSelect, typeSelect, typeInfo, suggestedCategory, true, sourceText, suggestedType);
+        if (changed) {
+            setAiStatus("Categorie ajustee par IA: " + suggestedCategory + ".", "");
+        }
+
+        return changed;
+    }
+
+    function escapeHtml(text) {
+        var value = String(text || "");
+        return value
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function buildConfirmationPreview(container) {
+        var general = collectGeneralContext();
+        var details = collectCurrentDetails(container);
+        var detailsRows = "";
+
+        Object.keys(details).forEach(function (key) {
+            var value = String(details[key] || "").trim();
+            if (!value) return;
+            detailsRows += "<tr><td style='width:35%;font-weight:600;'>" + escapeHtml(key) + "</td><td>" + escapeHtml(value) + "</td></tr>";
+        });
+
+        if (!detailsRows) {
+            detailsRows = "<tr><td colspan='2' class='text-secondary'>Aucun detail specifique rempli.</td></tr>";
+        }
+
+        return ""
+            + "<div class='mb-3'><h4 style='font-size:1rem;'>Informations generales</h4>"
+            + "<p class='mb-1'><strong>Categorie:</strong> " + escapeHtml(general.categorie) + "</p>"
+            + "<p class='mb-1'><strong>Type:</strong> " + escapeHtml(general.typeDemande) + "</p>"
+            + "<p class='mb-1'><strong>Titre:</strong> " + escapeHtml(general.titre) + "</p>"
+            + "<p class='mb-1'><strong>Priorite:</strong> " + escapeHtml(general.priorite) + "</p>"
+            + "<p class='mb-0'><strong>Description:</strong> " + escapeHtml(general.description) + "</p></div>"
+            + "<div><h4 style='font-size:1rem;'>Informations specifiques</h4>"
+            + "<div class='table-responsive'><table class='table table-sm mb-0'><tbody>" + detailsRows + "</tbody></table></div></div>";
+    }
+
+    function closeAiModal(modalInstance, modalEl) {
+        if (modalInstance) {
+            modalInstance.hide();
+            return;
+        }
+
+        if (modalEl) {
+            modalEl.classList.remove("show");
+            modalEl.style.display = "none";
+        }
+
+        // Manual fallback cleanup when Bootstrap modal JS API is not available.
+        document.body.classList.remove("modal-open");
+        document.body.style.removeProperty("padding-right");
+
+        var backdrops = document.querySelectorAll(".modal-backdrop");
+        for (var i = 0; i < backdrops.length; i++) {
+            backdrops[i].remove();
+        }
+    }
+
+    function markFormSubmitting(submitBtn, aiModalConfirmBtn) {
+        isSubmittingForm = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        if (aiModalConfirmBtn) {
+            aiModalConfirmBtn.disabled = true;
+        }
+    }
+
+    function shouldRequireAiConfirmation(typeSelect, aiGeneratedInput, regenerateWithAiBtn, aiTrustedLearningInput) {
+        if (MANUAL_AUTRE_FIELD_MODE) {
+            return false;
+        }
+
+        if (aiGeneratedInput && aiGeneratedInput.value === "1") {
+            return true;
+        }
+
+        if (!typeSelect || !isAutreType(typeSelect.value)) {
+            return false;
+        }
+
+        return !!(regenerateWithAiBtn && regenerateWithAiBtn.style.display !== "none");
+    }
+
+    function buildAutreConfidenceMessage(confidence) {
+        if (!confidence || typeof confidence !== "object") {
+            return { text: "", tone: "" };
+        }
+
+        var score = Number(confidence.score || 0);
+        var label = String(confidence.label || "").trim();
+        var message = String(confidence.message || "").trim();
+        var tone = String(confidence.tone || "info").trim().toLowerCase();
+        if (tone === "warning") {
+            tone = "info";
+        }
+        if (tone !== "success" && tone !== "info" && tone !== "error") {
+            tone = "info";
+        }
+
+        if (!label && !message) {
+            return { text: "", tone: "" };
+        }
+
+        var parts = [];
+        if (label) {
+            parts.push("Confiance du plan: " + label + (score > 0 ? " (" + score + "%)" : ""));
+        }
+        if (message) {
+            parts.push(message);
+        }
+
+        return {
+            text: parts.join(". "),
+            tone: tone || "info"
+        };
+    }
+
+    function requestAutreAiGeneration(categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard, options) {
+        options = options || {};
+        var mode = String(options.mode || "generate").toLowerCase();
+        var forceFresh = true === options.forceFresh;
+        var generateBtn = document.getElementById("generateWithAiBtn");
+        var regenerateBtn = document.getElementById("regenerateWithAiBtn");
+        var autrePromptInput = document.getElementById("autreAiDescription");
+        var aiGeneratedInput = document.getElementById("aiGeneratedInput");
+        var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
+        var originalText = generateBtn ? generateBtn.innerHTML : "";
+        var requestId = ++autreGenerationRequestId;
+        var promptValue = String((autrePromptInput || {}).value || "").trim();
+        syncAutreRawPromptFromVisible(false);
+
+        var general = collectGeneralContext();
+        general.aiDescriptionPrompt = promptValue;
+
+        if (!promptValue) {
+            setAiStatus("Ajoutez une description initiale avant de lancer l IA.", "error");
+            var promptInput = document.getElementById("autreAiDescription");
+            if (promptInput) promptInput.focus();
+            return;
+        }
+
+        if (!isAutreType(typeSelect.value)) {
+            setAiStatus("La generation IA est disponible uniquement pour le type Autre.", "error");
+            return;
+        }
+
+        general = collectGeneralContext();
+        general.aiDescriptionPrompt = promptValue;
+        general.manualFieldMode = MANUAL_AUTRE_FIELD_MODE;
+        var promptNormalized = normalizeUiLabel(promptValue);
+        var requestPromptNormalized = promptNormalized;
+        var promptChanged = !!lastAutrePromptNormalized && promptNormalized !== lastAutrePromptNormalized;
+
+        if (promptChanged) {
+            autreRegenerateCount = 0;
+        } else if (mode === "regenerate") {
+            autreRegenerateCount += 1;
+        } else {
+            autreRegenerateCount = 0;
+        }
+
+        general.regenerateMode = mode;
+        general.regenerateCount = autreRegenerateCount;
+
+        var shouldClearExistingAutreState = !MANUAL_AUTRE_FIELD_MODE && (promptChanged || forceFresh || mode === "regenerate");
+        var details = MANUAL_AUTRE_FIELD_MODE ? collectCurrentDetails(dynamicFieldsContainer) : {};
+        if (shouldClearExistingAutreState) {
+            resetAiFieldPlan();
+            setAutoFilledDetailKeys([]);
+            clearDynamicFieldState(dynamicFieldsContainer);
+            general.manualFieldMode = MANUAL_AUTRE_FIELD_MODE;
+        }
+
+        if (generateBtn) {
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = "<span class='spinner-border spinner-border-sm me-1'></span>Generation...";
+        }
+        if (regenerateBtn) regenerateBtn.disabled = true;
+        if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
+        setAiStatus("Generation IA en cours...", "");
+        clearAutreConfidenceBadge();
+
+        var requestPayload = {
+            general: general,
+            details: details,
+            userPromptAutre: promptValue,
+            manualFieldMode: MANUAL_AUTRE_FIELD_MODE,
+            fieldPlan: (function () {
+                var planInput = document.getElementById("aiFieldPlanInput");
+                if (!planInput) {
+                    return { add: [], remove: [], replaceBase: false };
+                }
+
+                try {
+                    var parsedPlan = JSON.parse(String(planInput.value || "{}"));
+                    return parsedPlan && typeof parsedPlan === "object" ? parsedPlan : { add: [], remove: [], replaceBase: false };
+                } catch (error) {
+                    return { add: [], remove: [], replaceBase: false };
+                }
+            })()
+        };
+
+        fetch(AUTRE_AI_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify(requestPayload)
+        })
+            .then(function (response) {
+                return response.json().then(function (json) {
+                    if (!response.ok || !json.success) {
+                        throw new Error(json.message || "Generation IA impossible.");
+                    }
+                    return json;
+                });
+            })
+            .then(function (json) {
+                if (requestId < autreGenerationRequestId || requestId < latestAppliedAutreGenerationRequestId) {
+                    return;
+                }
+                latestAppliedAutreGenerationRequestId = requestId;
+
+                var currentPromptNormalized = normalizeUiLabel(String((autrePromptInput || {}).value || ""));
+                if (currentPromptNormalized && currentPromptNormalized !== requestPromptNormalized) {
+                    setAiStatus("La description initiale a change. Relancez la generation pour utiliser le texte courant.", "info");
+                    clearAutreConfidenceBadge();
+                    return;
+                }
+                lastAutrePromptNormalized = requestPromptNormalized;
+
+                var previousDynamicKeys = {};
+                for (var p = 0; p < AI_DYNAMIC_FIELDS.length; p++) {
+                    var previousField = AI_DYNAMIC_FIELDS[p];
+                    if (!previousField || !previousField.key) continue;
+                    previousDynamicKeys[String(previousField.key)] = true;
+                }
+
+                var fieldPlan;
+                if (MANUAL_AUTRE_FIELD_MODE) {
+                    fieldPlan = normalizeAiFieldPlan({
+                        add: AI_DYNAMIC_FIELDS,
+                        remove: AI_REMOVED_BASE_FIELDS,
+                        replaceBase: true,
+                        manualMode: true
+                    });
+                } else {
+                    fieldPlan = normalizeAiFieldPlan(json.dynamicFieldPlan || { add: [], remove: [], replaceBase: false });
+                    fieldPlan.manualMode = String(json.model || "").indexOf("manual-fields:") === 0;
+                }
+                setAiFieldPlan(fieldPlan);
+
+                var shouldReplaceBase = shouldClearExistingAutreState || true === fieldPlan.replaceBase;
+                var merged = shouldReplaceBase
+                    ? resetAutreReplaceBaseState(dynamicFieldsContainer)
+                    : {};
+                if (!shouldReplaceBase) {
+                    var currentKeys = Object.keys(details);
+                    for (var i = 0; i < currentKeys.length; i++) {
+                        var currentKey = currentKeys[i];
+                        if (previousDynamicKeys[currentKey] && !isAutreBaseRequiredKey(currentKey)) {
+                            continue;
+                        }
+                        merged[currentKey] = details[currentKey];
+                    }
+                }
+
+                var suggestedDetails = json.suggestedDetails && typeof json.suggestedDetails === "object"
+                    ? json.suggestedDetails
+                    : {};
+                if (fieldPlan.manualMode) {
+                    var allowedSuggestionKeys = {};
+                    for (var rk = 0; rk < AUTRE_BASE_REQUIRED_KEYS.length; rk++) {
+                        allowedSuggestionKeys[AUTRE_BASE_REQUIRED_KEYS[rk]] = true;
+                    }
+                    for (var ak = 0; ak < fieldPlan.add.length; ak++) {
+                        var allowedField = fieldPlan.add[ak];
+                        if (!allowedField || !allowedField.key) continue;
+                        allowedSuggestionKeys[String(allowedField.key)] = true;
+                    }
+
+                    var filteredSuggestedDetails = {};
+                    var suggestedKeys = Object.keys(suggestedDetails);
+                    for (var sk = 0; sk < suggestedKeys.length; sk++) {
+                        var suggestedKey = suggestedKeys[sk];
+                        if (!allowedSuggestionKeys[suggestedKey]) continue;
+                        filteredSuggestedDetails[suggestedKey] = suggestedDetails[suggestedKey];
+                    }
+                    suggestedDetails = filteredSuggestedDetails;
+                }
+
+                if (fieldPlan.manualMode) {
+                    resetAiGenerationSnapshot();
+                } else {
+                    saveAiGenerationSnapshot(suggestedDetails, fieldPlan, json.model || "");
+                }
+
+                var suggestionKeys = Object.keys(suggestedDetails);
+                for (var j = 0; j < suggestionKeys.length; j++) {
+                    merged[suggestionKeys[j]] = suggestedDetails[suggestionKeys[j]];
+                }
+
+                var autoFilledKeys = suggestionKeys.slice();
+                for (var af = 0; af < fieldPlan.add.length; af++) {
+                    var autoField = fieldPlan.add[af];
+                    if (autoField && autoField.key) {
+                        autoFilledKeys.push(autoField.key);
+                    }
+                }
+                setAutoFilledDetailKeys(autoFilledKeys);
+
+                for (var r = 0; r < fieldPlan.remove.length; r++) {
+                    delete merged[fieldPlan.remove[r]];
+                }
+
+                for (var a = 0; a < fieldPlan.add.length; a++) {
+                    var customField = fieldPlan.add[a];
+                    if (!customField || !customField.key) continue;
+                    if (shouldReplaceBase || typeof merged[customField.key] === "undefined" || merged[customField.key] === "") {
+                        merged[customField.key] = customField.value || "";
+                    }
+                }
+
+                var generatedDescription = String(json.generatedDescription || "").trim();
+                var suggestedGeneralTitle = String((json.suggestedGeneral || {}).titre || "").trim();
+                var suggestedGeneralDescription = String((json.suggestedGeneral || {}).description || "").trim();
+                var aiGeneratedDescription = generatedDescription || suggestedGeneralDescription;
+
+                if (shouldReplaceBase) {
+                    if (generatedDescription) {
+                        merged.descriptionBesoin = generatedDescription;
+                    }
+
+                    if (!String(merged.besoinPersonnalise || "").trim() && suggestedGeneralTitle) {
+                        merged.besoinPersonnalise = suggestedGeneralTitle;
+                    }
+
+                    if (!String(merged.descriptionBesoin || "").trim() && aiGeneratedDescription) {
+                        merged.descriptionBesoin = aiGeneratedDescription;
+                    }
+                } else {
+                    if (json.generatedDescription && !merged.descriptionBesoin) {
+                        merged.descriptionBesoin = json.generatedDescription;
+                    }
+
+                    if (!String(merged.descriptionBesoin || "").trim() && aiGeneratedDescription) {
+                        merged.descriptionBesoin = aiGeneratedDescription;
+                    }
+
+                    if (!String(merged.besoinPersonnalise || "").trim() && suggestedGeneralTitle) {
+                        merged.besoinPersonnalise = suggestedGeneralTitle;
+                    }
+                }
+
+                // Keep the ML response authoritative for the general section.
+                applySuggestedGeneralFields(json.suggestedGeneral || {});
+
+                var currentType = String((typeSelect || {}).value || "");
+                var isStillAutre = isAutreType(currentType);
+                updateAutreAiControls(currentType);
+
+                if (isStillAutre) {
+                    if (shouldReplaceBase) {
+                        dynamicFieldsContainer.innerHTML = "";
+                    }
+                    loadDynamicFields(currentType, merged, dynamicFieldsContainer, dynamicFieldsCard);
+                } else {
+                    setAutoFilledDetailKeys([]);
+                    loadDynamicFields(currentType, {}, dynamicFieldsContainer, dynamicFieldsCard);
+                }
+
+                if (fieldPlan.manualMode) {
+                    if (aiGeneratedInput) aiGeneratedInput.value = "0";
+                    if (aiConfirmedInput) aiConfirmedInput.value = "1";
+                } else {
+                    if (aiGeneratedInput) aiGeneratedInput.value = "1";
+                    if (aiConfirmedInput) aiConfirmedInput.value = "0";
+                }
+                if (aiTrustedLearningInput) {
+                    aiTrustedLearningInput.value = json.skipConfirmationRestriction ? "1" : "0";
+                }
+
+                if (isStillAutre && regenerateBtn) regenerateBtn.style.display = fieldPlan.manualMode ? "none" : "inline-block";
+                if (isStillAutre) {
+                    var confidenceStatus = buildAutreConfidenceMessage(json.dynamicFieldConfidence || null);
+                    var baseMessage = "Champs Autre pre-remplis par IA.";
+                    var finalMessage = confidenceStatus.text
+                        ? baseMessage + " " + confidenceStatus.text
+                        : baseMessage + " Verifiez puis confirmez la creation.";
+                    setAiStatus(finalMessage, confidenceStatus.tone || "success");
+                    setAutreConfidenceBadge(confidenceStatus);
+
+                    if (aiConfirmPreview) {
+                        aiConfirmPreview.innerHTML = buildConfirmationPreview(dynamicFieldsContainer);
+                    }
+                } else {
+                    setAiStatus("Type ajuste automatiquement vers " + currentType + ". Le bloc IA Autre est masque.", "info");
+                    clearAutreConfidenceBadge();
+                }
+            })
+            .catch(function (error) {
+                setAiStatus(error.message || "Une erreur est survenue pendant la generation IA.", "error");
+                clearAutreConfidenceBadge();
+            })
+            .finally(function () {
+                if (generateBtn) {
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = originalText;
+                }
+                if (regenerateBtn) regenerateBtn.disabled = false;
+            });
+    }
+
+    function hasFieldError(key) {
+        for (var i = 0; i < DETAIL_ERRORS.length; i++) {
+            if (DETAIL_ERRORS[i].field === key) return true;
+        }
+        return false;
+    }
+
+    function getFieldErrorMessage(key) {
+        for (var i = 0; i < DETAIL_ERRORS.length; i++) {
+            if (DETAIL_ERRORS[i].field === key) return DETAIL_ERRORS[i].message;
+        }
+        return "";
+    }
+
+    function renderDynamicFields(fields, existingValues, container) {
+        container.innerHTML = "";
+        maps = {};
+        markers = {};
+        selectedLocations = {};
+
+        for (var i = 0; i < fields.length; i++) {
+            var field = fields[i];
+            var existingValue = existingValues[field.key] || "";
+            var errClass = hasFieldError(field.key) ? " is-invalid-custom" : "";
+
+            if (field.type === "hidden") {
+                container.appendChild(buildInput(field, existingValue, ""));
+                continue;
+            }
+
+            if (field.type === "location") {
+                var fullCol = document.createElement("div");
+                fullCol.className = "col-12";
+                fullCol.appendChild(buildLocationField(field, existingValue, existingValues));
+                container.appendChild(fullCol);
+            } else {
+                var col = document.createElement("div");
+                col.className = field.type === "textarea" ? "col-12" : "col-md-6";
+                col.appendChild(buildLabel(field));
+                col.appendChild(buildInput(field, existingValue, errClass));
+                appendFieldError(col, field.key);
+                container.appendChild(col);
+            }
+        }
+
+        syncAutreMirroredFields();
+
+        setTimeout(function () {
+            autoFillNombreJours();
+        }, 100);
+    }
+
+    function appendFieldError(container, key) {
+        var message = getFieldErrorMessage(key);
+        if (!message) return;
+        var error = document.createElement("div");
+        error.className = "field-error";
+        error.textContent = message;
+        container.appendChild(error);
+    }
+
+    function applyInputConstraints(inputEl, field) {
+        if (!inputEl || !field) return;
+
+        var isRequired = !!field.required && field.type !== "hidden";
+        if (isRequired) {
+            inputEl.required = true;
+            inputEl.setAttribute("data-required", "1");
+        }
+
+        inputEl.setAttribute("data-field-key", String(field.key || ""));
+        inputEl.setAttribute("data-field-label", String(field.label || field.key || ""));
+    }
+
+    function getInputLabelText(inputEl) {
+        if (!inputEl) return "ce champ";
+
+        var directLabel = String(inputEl.getAttribute("data-field-label") || "").trim();
+        if (directLabel) {
+            return directLabel;
+        }
+
+        var id = String(inputEl.id || "").trim();
+        if (id) {
+            var labelEl = document.querySelector('label[for="' + id.replace(/"/g, '\\"') + '"]');
+            if (labelEl) {
+                return String(labelEl.textContent || "").replace(/\*/g, "").trim() || "ce champ";
+            }
+        }
+
+        var name = String(inputEl.getAttribute("name") || "").trim();
+        if (name) {
+            return name
+                .replace(/^details\[/, "")
+                .replace(/^demande\[/, "")
+                .replace(/\]$/, "")
+                .replace(/_/g, " ") || "ce champ";
+        }
+
+        return "ce champ";
+    }
+
+    function clearClientFieldErrors(form) {
+        if (!form) return;
+
+        var errors = form.querySelectorAll(".client-field-error");
+        for (var i = 0; i < errors.length; i++) {
+            errors[i].remove();
+        }
+
+        var invalidInputs = form.querySelectorAll(".client-invalid");
+        for (var j = 0; j < invalidInputs.length; j++) {
+            invalidInputs[j].classList.remove("client-invalid");
+            invalidInputs[j].classList.remove("is-invalid");
+            invalidInputs[j].classList.remove("is-invalid-custom");
+            invalidInputs[j].classList.remove("is-valid");
+            invalidInputs[j].classList.remove("client-valid");
+        }
+
+    }
+
+    function resolveInputLabelElement(inputEl) {
+        if (!inputEl) return null;
+
+        var form = inputEl.closest("form") || document;
+        var id = String(inputEl.id || "").trim();
+        if (id) {
+            var byFor = form.querySelector('label[for="' + id.replace(/"/g, '\\"') + '"]');
+            if (byFor) return byFor;
+        }
+
+        var fieldKey = String(inputEl.getAttribute("data-field-key") || "").trim();
+        if (fieldKey) {
+            var escaped = fieldKey.replace(/"/g, '\\"');
+            var byKey = form.querySelector('label[data-field-key="' + escaped + '"]');
+            if (byKey) return byKey;
+        }
+
+        var group = inputEl.closest(".mb-3, .col-md-6, .col-12");
+        if (group) {
+            return group.querySelector("label.form-label");
+        }
+
+        return null;
+    }
+
+    function setInputLabelValidState(inputEl, isValid) {
+        var labelEl = resolveInputLabelElement(inputEl);
+        if (!labelEl) return;
+
+        if (isValid) {
+            labelEl.classList.add("field-label-valid");
+        } else {
+            labelEl.classList.remove("field-label-valid");
+        }
+    }
+
+    function getClientFieldToken(inputEl) {
+        if (!inputEl) return "";
+        var byName = String(inputEl.getAttribute("name") || "").trim();
+        if (byName) return byName;
+        return String(inputEl.id || "").trim();
+    }
+
+    function clearClientErrorForInput(inputEl) {
+        if (!inputEl) return;
+        var token = getClientFieldToken(inputEl);
+        if (!token) return;
+
+        var form = inputEl.closest("form");
+        if (!form) return;
+
+        var escaped = token.replace(/"/g, '\\"');
+        var errors = form.querySelectorAll('.client-field-error[data-field="' + escaped + '"]');
+        for (var i = 0; i < errors.length; i++) {
+            errors[i].remove();
+        }
+    }
+
+    function updateClientFieldVisualState(inputEl) {
+        if (!inputEl || inputEl.disabled) return;
+
+        var inputType = String(inputEl.type || "").toLowerCase();
+        if (inputType === "hidden") return;
+
+        var isRequired = inputEl.hasAttribute("required") || inputEl.getAttribute("data-required") === "1";
+        if (!isRequired) return;
+
+        var value = String(inputEl.value || "").trim();
+        if (value === "") {
+            inputEl.classList.remove("is-valid");
+            inputEl.classList.remove("client-valid");
+            setInputLabelValidState(inputEl, false);
+            return;
+        }
+
+        clearClientErrorForInput(inputEl);
+        inputEl.classList.remove("client-invalid");
+        inputEl.classList.remove("is-invalid");
+        inputEl.classList.remove("is-invalid-custom");
+        inputEl.classList.add("is-valid");
+        inputEl.classList.add("client-valid");
+        setInputLabelValidState(inputEl, true);
+    }
+
+    function setupLiveFieldValidation(form) {
+        if (!form || form.__liveValidationBound) return;
+
+        var handler = function (event) {
+            var inputEl = event.target;
+            if (!inputEl) return;
+            var tag = String(inputEl.tagName || "").toUpperCase();
+            if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT") return;
+            updateClientFieldVisualState(inputEl);
+        };
+
+        form.addEventListener("input", handler, true);
+        form.addEventListener("change", handler, true);
+        form.__liveValidationBound = true;
+    }
+
+    function appendClientFieldError(inputEl, message) {
+        if (!inputEl || !message) return;
+
+        clearClientErrorForInput(inputEl);
+
+        inputEl.classList.add("client-invalid");
+        inputEl.classList.remove("is-valid");
+        inputEl.classList.remove("client-valid");
+        setInputLabelValidState(inputEl, false);
+        if (inputEl.closest("#dynamicFields")) {
+            inputEl.classList.add("is-invalid-custom");
+        } else {
+            inputEl.classList.add("is-invalid");
+        }
+
+        var error = document.createElement("div");
+        error.className = "field-error client-field-error";
+        error.textContent = message;
+        error.setAttribute("data-field", getClientFieldToken(inputEl));
+        inputEl.insertAdjacentElement("afterend", error);
+    }
+
+    function validateDemandeFormBeforeSubmit(form) {
+        if (!form) return true;
+
+        syncAutreMirroredFields();
+
+        clearClientFieldErrors(form);
+
+        var hasErrors = false;
+        var requiredInputs = form.querySelectorAll("[required], [data-required='1']");
+
+        for (var i = 0; i < requiredInputs.length; i++) {
+            var inputEl = requiredInputs[i];
+            if (!inputEl || inputEl.disabled) continue;
+
+            var inputType = String(inputEl.type || "").toLowerCase();
+            if (inputType === "hidden") continue;
+
+            var value = String(inputEl.value || "").trim();
+            if (value !== "") continue;
+
+            hasErrors = true;
+            var label = getInputLabelText(inputEl);
+            appendClientFieldError(inputEl, 'Il faut remplir le champ "' + label + '".');
+        }
+
+        if (!hasErrors) {
+            for (var j = 0; j < requiredInputs.length; j++) {
+                updateClientFieldVisualState(requiredInputs[j]);
+            }
+        }
+
+        if (hasErrors) {
+            setAiStatus("Veuillez remplir tous les champs obligatoires de la demande.", "error");
+            return false;
+        }
+
+        return true;
+    }
+
+    function buildLabel(field) {
+        var lbl = document.createElement("label");
+        lbl.className = "form-label" + (field.required ? " required" : "") + (isAutoFilledDetailKey(field.key) ? " ai-prefilled-label" : "");
+        lbl.textContent = field.label;
+        lbl.setAttribute("data-field-key", String(field.key || ""));
+
+        if (isAutoFilledDetailKey(field.key)) {
+            var badge = document.createElement("span");
+            badge.className = "ai-badge";
+            badge.textContent = "IA";
+            badge.id = "ai-badge-" + String(field.key || "").replace(/[^a-zA-Z0-9_-]+/g, "_");
+            lbl.appendChild(badge);
+        }
+        return lbl;
+    }
+
+    function buildInput(field, value, errClass) {
+        var inp;
+        switch (field.type) {
+            case "hidden":
+                inp = document.createElement("input");
+                inp.type = "hidden";
+                inp.name = "details[" + field.key + "]";
+                var hiddenValue = String(value || "").trim();
+                if (hiddenValue === "") {
+                    hiddenValue = getMirroredAutreValue(field.key);
+                }
+                inp.value = hiddenValue;
+                applyInputConstraints(inp, field);
+                return inp;
+            case "text":
+                inp = document.createElement("input");
+                inp.type = "text";
+                inp.className = "form-control" + errClass;
+                inp.name = "details[" + field.key + "]";
+                inp.value = value;
+                applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
+                return inp;
+            case "number":
+                inp = document.createElement("input");
+                inp.type = "number";
+                inp.className = "form-control" + errClass;
+                inp.name = "details[" + field.key + "]";
+                inp.value = value;
+                inp.min = "0";
+                inp.addEventListener("input", function () {
+                    autoFillNombreJours();
+                });
+                inp.addEventListener("change", function () {
+                    autoFillNombreJours();
+                });
+                applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
+                return inp;
+            case "date":
+                inp = document.createElement("input");
+                inp.type = "date";
+                inp.className = "form-control" + errClass;
+                inp.name = "details[" + field.key + "]";
+                inp.value = value;
+                inp.addEventListener("change", function () {
+                    autoFillNombreJours();
+                });
+                applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
+                return inp;
+            case "textarea":
+                inp = document.createElement("textarea");
+                inp.className = "form-control" + errClass;
+                inp.rows = 3;
+                inp.name = "details[" + field.key + "]";
+                inp.value = value;
+                applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
+                return inp;
+            case "select":
+                inp = document.createElement("select");
+                inp.className = "form-select" + errClass;
+                inp.name = "details[" + field.key + "]";
+                var def = document.createElement("option");
+                def.value = "";
+                def.textContent = "-- Selectionnez --";
+                inp.appendChild(def);
+                if (field.options) {
+                    for (var j = 0; j < field.options.length; j++) {
+                        var o = document.createElement("option");
+                        o.value = field.options[j];
+                        o.textContent = field.options[j];
+                        if (value === field.options[j]) o.selected = true;
+                        inp.appendChild(o);
+                    }
+                }
+                applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
+                return inp;
+            default:
+                inp = document.createElement("input");
+                inp.type = "text";
+                inp.className = "form-control" + errClass;
+                inp.name = "details[" + field.key + "]";
+                inp.value = value;
+                applyInputConstraints(inp, field);
+                applyAiPrefillState(inp, field);
+                return inp;
+        }
+    }
+
+    function applyAiPrefillState(inputEl, field) {
+        if (!inputEl || !field || !isAutoFilledDetailKey(field.key) || field.type === "hidden") return;
+
+        var badgeId = "ai-badge-" + String(field.key || "").replace(/[^a-zA-Z0-9_-]+/g, "_");
+        inputEl.classList.add("ai-prefilled-input");
+        inputEl.setAttribute("data-ai-label-id", badgeId);
+
+        var eventName = inputEl.tagName === "SELECT" ? "change" : "input";
+        inputEl.addEventListener(eventName, function handleReview() {
+            markFieldAsReviewed(inputEl);
+            inputEl.removeEventListener(eventName, handleReview);
+        });
+    }
+
+    function autoFillNombreJours() {
+        var container = document.getElementById("dynamicFields");
+        if (!container) return;
+
+        var startKeys = [
+            "dateDebut", "dateDebutConge", "dateDebutTeletravail",
+            "dateDebutFormation", "dateDebutHoraires", "dateDebutMission"
+        ];
+        var endKeys = [
+            "dateFin", "dateFinConge", "dateFinTeletravail",
+            "dateFinFormation", "dateFinHoraires", "dateFinMission"
+        ];
+        var joursKeys = [
+            "nombreJours", "nombreJoursConge", "nombreJoursTeletravail",
+            "nombreJoursFormation", "duree", "nombreJoursMission"
+        ];
+
+        var startInput = null;
+        var endInput   = null;
+        var joursInput = null;
+
+        for (var i = 0; i < startKeys.length; i++) {
+            var el = container.querySelector('[name="details[' + startKeys[i] + ']"]');
+            if (el) { startInput = el; break; }
+        }
+        for (var j = 0; j < endKeys.length; j++) {
+            var el2 = container.querySelector('[name="details[' + endKeys[j] + ']"]');
+            if (el2) { endInput = el2; break; }
+        }
+        for (var k = 0; k < joursKeys.length; k++) {
+            var el3 = container.querySelector('[name="details[' + joursKeys[k] + ']"]');
+            if (el3) { joursInput = el3; break; }
+        }
+
+        if (!startInput || !endInput || !joursInput) return;
+
+        var startVal = startInput.value;
+        var endVal   = endInput.value;
+        var joursVal = String(joursInput.value || "").trim();
+
+        var startDate = parseIsoDate(startVal);
+        var endDate   = parseIsoDate(endVal);
+        var activeEl = document.activeElement;
+        var joursCount = parseInt(joursVal, 10);
+
+        if (startDate && endDate && endDate >= startDate && (activeEl === endInput || !joursVal)) {
+            joursInput.value = diffInclusiveDays(startDate, endDate);
+            return;
+        }
+
+        if (startDate && !isNaN(joursCount) && joursCount > 0) {
+            var computedEndDate = addDaysInclusive(startDate, joursCount);
+            var computedEndValue = formatIsoDate(computedEndDate);
+            if (!endVal || activeEl === joursInput || activeEl === startInput) {
+                endInput.value = computedEndValue;
+                return;
+            }
+        }
+
+        if (startDate && endDate && endDate >= startDate) {
+            joursInput.value = diffInclusiveDays(startDate, endDate);
+        }
+    }
+
+    function parseIsoDate(value) {
+        var text = String(value || "").trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+
+        var parts = text.split("-");
+        var year = parseInt(parts[0], 10);
+        var month = parseInt(parts[1], 10) - 1;
+        var day = parseInt(parts[2], 10);
+        var date = new Date(year, month, day);
+        if (
+            isNaN(date.getTime()) ||
+            date.getFullYear() !== year ||
+            date.getMonth() !== month ||
+            date.getDate() !== day
+        ) {
+            return null;
+        }
+
+        return date;
+    }
+
+    function formatIsoDate(date) {
+        if (!date || isNaN(date.getTime())) return "";
+        var year = String(date.getFullYear());
+        var month = String(date.getMonth() + 1).padStart(2, "0");
+        var day = String(date.getDate()).padStart(2, "0");
+        return year + "-" + month + "-" + day;
+    }
+
+    function addDaysInclusive(startDate, numberOfDays) {
+        var date = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        date.setDate(date.getDate() + Math.max(0, numberOfDays - 1));
+        return date;
+    }
+
+    function diffInclusiveDays(startDate, endDate) {
+        var start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        var end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+        var diffMs = end.getTime() - start.getTime();
+        return Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+    }
+
+    function buildLocationField(field, existingValue, existingValues) {
+        var wrapper = document.createElement("div");
+        var errClass = hasFieldError(field.key) ? " is-invalid-custom" : "";
+
+        var lbl = buildLabel(field);
+        wrapper.appendChild(lbl);
+
+        var existingLat = existingValues[field.key + "Lat"] || "";
+        var existingLon = existingValues[field.key + "Lon"] || "";
+
+        var readonlyInput = document.createElement("input");
+        readonlyInput.type = "text";
+        readonlyInput.className = "form-control mb-2" + errClass;
+        readonlyInput.readOnly = true;
+        readonlyInput.name = "details[" + field.key + "]";
+        readonlyInput.id = "locval-" + field.key;
+        readonlyInput.placeholder = "Cliquez sur la carte ci-dessous pour choisir un lieu";
+        readonlyInput.value = existingValue;
+        applyInputConstraints(readonlyInput, field);
+        applyAiPrefillState(readonlyInput, field);
+        wrapper.appendChild(readonlyInput);
+
+        var latInput = document.createElement("input");
+        latInput.type = "hidden";
+        latInput.name = "details[" + field.key + "Lat]";
+        latInput.id = "lat-" + field.key;
+        latInput.value = existingLat;
+        wrapper.appendChild(latInput);
+
+        var lonInput = document.createElement("input");
+        lonInput.type = "hidden";
+        lonInput.name = "details[" + field.key + "Lon]";
+        lonInput.id = "lon-" + field.key;
+        lonInput.value = existingLon;
+        wrapper.appendChild(lonInput);
+
+        var mapSection = document.createElement("div");
+        mapSection.className = "inline-map-section active";
+        mapSection.id = "mapsection-" + field.key;
+
+        var mapCardHeader = document.createElement("div");
+        mapCardHeader.className = "map-card-header";
+        mapCardHeader.innerHTML = '<svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right:6px"><path d="M8 0C5.24 0 3 2.24 3 5c0 3.75 5 11 5 11s5-7.25 5-11c0-2.76-2.24-5-5-5zm0 7.5C6.62 7.5 5.5 6.38 5.5 5S6.62 2.5 8 2.5 10.5 3.62 10.5 5 9.38 7.5 8 7.5z"/></svg>' + field.label + ' - Choisir sur la carte';
+        mapSection.appendChild(mapCardHeader);
+
+        var mapCardBody = document.createElement("div");
+        mapCardBody.className = "map-card-body";
+
+        var searchBar = document.createElement("div");
+        searchBar.className = "map-search-bar";
+        var searchInput = document.createElement("input");
+        searchInput.type = "text";
+        searchInput.placeholder = "Rechercher une ville ou adresse...";
+        searchInput.id = "mapsearch-" + field.key;
+        var searchBtn = document.createElement("button");
+        searchBtn.type = "button";
+        searchBtn.textContent = "Rechercher";
+        searchBtn.onclick = (function (k) {
+            return function () { searchOnMap(k, document.getElementById("mapsearch-" + k).value); };
+        })(field.key);
+        searchInput.addEventListener("keypress", (function (k) {
+            return function (e) {
+                if (e.key === "Enter") { e.preventDefault(); searchOnMap(k, document.getElementById("mapsearch-" + k).value); }
+            };
+        })(field.key));
+        searchBar.appendChild(searchInput);
+        searchBar.appendChild(searchBtn);
+        mapCardBody.appendChild(searchBar);
+
+        var mapWrapper = document.createElement("div");
+        mapWrapper.className = "map-wrapper";
+
+        var infoBar = document.createElement("div");
+        infoBar.className = "map-info-bar";
+        infoBar.id = "mapinfo-" + field.key;
+        infoBar.textContent = "Cliquez sur la carte pour choisir un lieu";
+        mapWrapper.appendChild(infoBar);
+
+        var zoomBox = document.createElement("div");
+        zoomBox.className = "map-zoom-controls";
+        var zoomInBtn = document.createElement("button");
+        zoomInBtn.type = "button"; zoomInBtn.textContent = "+";
+        zoomInBtn.onclick = (function (k) { return function () { if (maps[k]) maps[k].zoomIn(); }; })(field.key);
+        var zoomOutBtn = document.createElement("button");
+        zoomOutBtn.type = "button"; zoomOutBtn.textContent = "−";
+        zoomOutBtn.onclick = (function (k) { return function () { if (maps[k]) maps[k].zoomOut(); }; })(field.key);
+        zoomBox.appendChild(zoomInBtn);
+        zoomBox.appendChild(zoomOutBtn);
+        mapWrapper.appendChild(zoomBox);
+
+        var mapDiv = document.createElement("div");
+        mapDiv.id = "map-" + field.key;
+        mapDiv.style.height = "450px";
+        mapDiv.style.width = "100%";
+        mapDiv.style.borderRadius = "0 0 10px 10px";
+        mapDiv.style.background = "#aad3df";
+        mapWrapper.appendChild(mapDiv);
+        mapCardBody.appendChild(mapWrapper);
+
+        var infoSelected = document.createElement("div");
+        infoSelected.className = "map-selected-info";
+        infoSelected.id = "mapselected-" + field.key;
+        mapCardBody.appendChild(infoSelected);
+
+        var confirmBar = document.createElement("div");
+        confirmBar.className = "map-confirm-bar";
+        var clearBtn = document.createElement("button");
+        clearBtn.type = "button"; clearBtn.className = "btn-clear-location"; clearBtn.textContent = "Effacer";
+        clearBtn.onclick = (function (k) { return function () { clearLocation(k); }; })(field.key);
+        var confirmBtn = document.createElement("button");
+        confirmBtn.type = "button"; confirmBtn.className = "btn-confirm-location";
+        confirmBtn.id = "mapconfirm-" + field.key; confirmBtn.textContent = "Confirmer cette destination";
+        confirmBtn.disabled = true;
+        confirmBtn.onclick = (function (k) { return function () { confirmLocation(k); }; })(field.key);
+        confirmBar.appendChild(clearBtn);
+        confirmBar.appendChild(confirmBtn);
+        mapCardBody.appendChild(confirmBar);
+
+        mapSection.appendChild(mapCardBody);
+        wrapper.appendChild(mapSection);
+        appendFieldError(wrapper, field.key);
+
+        setTimeout(function () { initInlineMap(field.key, existingLat, existingLon, existingValue); }, 300);
+
+        return wrapper;
+    }
+
+    function initInlineMap(key, existingLat, existingLon, existingValue) {
+        var mapDiv = document.getElementById("map-" + key);
+        if (!mapDiv) return;
+
+        var m = L.map("map-" + key, { zoomControl: false }).setView([36.8065, 10.1815], 6);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "&copy; OpenStreetMap contributors", maxZoom: 18
+        }).addTo(m);
+
+        maps[key] = m;
+        markers[key] = null;
+        selectedLocations[key] = null;
+
+        if (existingLat && existingLon) {
+            var lat = parseFloat(existingLat);
+            var lon = parseFloat(existingLon);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                m.setView([lat, lon], 13);
+                markers[key] = L.marker([lat, lon]).addTo(m);
+                selectedLocations[key] = { lat: lat, lon: lon, name: existingValue || (lat.toFixed(5) + ", " + lon.toFixed(5)) };
+                updateMapInfo(key, selectedLocations[key].name);
+                showSelectedInfo(key, selectedLocations[key]);
+                document.getElementById("mapconfirm-" + key).disabled = false;
+            }
+        }
+
+        m.on("click", (function (k) {
+            return function (e) { pickLocationOnMap(k, e.latlng.lat, e.latlng.lng); };
+        })(key));
+    }
+
+    function pickLocationOnMap(key, lat, lon) {
+        var m = maps[key];
+        if (!m) return;
+        if (markers[key]) m.removeLayer(markers[key]);
+        markers[key] = L.marker([lat, lon]).addTo(m);
+        var tempName = lat.toFixed(5) + ", " + lon.toFixed(5);
+        selectedLocations[key] = { lat: lat, lon: lon, name: tempName };
+        updateMapInfo(key, "Recherche en cours...");
+        document.getElementById("mapconfirm-" + key).disabled = true;
+        showSelectedInfo(key, { lat: lat, lon: lon, name: "Geocodage en cours..." });
+
+        fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lon + "&accept-language=fr")
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var name = data.display_name || tempName;
+                selectedLocations[key] = { lat: lat, lon: lon, name: name };
+                updateMapInfo(key, name);
+                showSelectedInfo(key, selectedLocations[key]);
+                if (markers[key]) markers[key].bindPopup(name).openPopup();
+                document.getElementById("mapconfirm-" + key).disabled = false;
+            })
+            .catch(function () {
+                selectedLocations[key] = { lat: lat, lon: lon, name: tempName };
+                updateMapInfo(key, tempName);
+                showSelectedInfo(key, selectedLocations[key]);
+                document.getElementById("mapconfirm-" + key).disabled = false;
+            });
+    }
+
+    function searchOnMap(key, query) {
+        if (!query || !query.trim()) return;
+        updateMapInfo(key, "Recherche: " + query + "...");
+        fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(query.trim()) + "&limit=1&accept-language=fr")
+            .then(function (r) { return r.json(); })
+            .then(function (results) {
+                if (results && results.length > 0) {
+                    var r = results[0];
+                    var lat = parseFloat(r.lat);
+                    var lon = parseFloat(r.lon);
+                    var m = maps[key];
+                    if (m) { m.setView([lat, lon], 13); pickLocationOnMap(key, lat, lon); }
+                } else { updateMapInfo(key, "Aucun resultat trouve"); }
+            })
+            .catch(function () { updateMapInfo(key, "Erreur de recherche"); });
+    }
+
+    function updateMapInfo(key, text) {
+        var el = document.getElementById("mapinfo-" + key);
+        if (el) el.textContent = text.length > 60 ? text.substring(0, 57) + "..." : text;
+    }
+
+    function showSelectedInfo(key, loc) {
+        var el = document.getElementById("mapselected-" + key);
+        if (!el) return;
+        el.className = "map-selected-info visible";
+        el.innerHTML = "<strong>Lieu selectionne:</strong> " + loc.name +
+            "<br><small style='color:#888'>Lat: " + loc.lat.toFixed(6) + " | Lon: " + loc.lon.toFixed(6) + "</small>";
+    }
+
+    function confirmLocation(key) {
+        var loc = selectedLocations[key];
+        if (!loc) return;
+        var valInput = document.getElementById("locval-" + key);
+        var latInput = document.getElementById("lat-" + key);
+        var lonInput = document.getElementById("lon-" + key);
+        if (valInput) valInput.value = loc.name;
+        if (latInput) latInput.value = loc.lat;
+        if (lonInput) lonInput.value = loc.lon;
+        updateClientFieldVisualState(valInput);
+        var infoEl = document.getElementById("mapselected-" + key);
+        if (infoEl) {
+            infoEl.innerHTML = "<strong style='color:#16a34a'>Destination confirmee:</strong> " + loc.name +
+                "<br><small style='color:#888'>Lat: " + loc.lat.toFixed(6) + " | Lon: " + loc.lon.toFixed(6) + "</small>";
+        }
+        var confirmBtn = document.getElementById("mapconfirm-" + key);
+        if (confirmBtn) { confirmBtn.textContent = "Confirme"; confirmBtn.style.background = "#16a34a"; }
+    }
+
+    function clearLocation(key) {
+        var m = maps[key];
+        if (m && markers[key]) { m.removeLayer(markers[key]); markers[key] = null; }
+        selectedLocations[key] = null;
+        var valInput = document.getElementById("locval-" + key);
+        var latInput = document.getElementById("lat-" + key);
+        var lonInput = document.getElementById("lon-" + key);
+        if (valInput) valInput.value = "";
+        if (latInput) latInput.value = "";
+        if (lonInput) lonInput.value = "";
+        if (valInput) {
+            valInput.classList.remove("is-valid");
+            valInput.classList.remove("client-valid");
+            setInputLabelValidState(valInput, false);
+        }
+        updateMapInfo(key, "Cliquez sur la carte pour choisir un lieu");
+        var infoEl = document.getElementById("mapselected-" + key);
+        if (infoEl) { infoEl.className = "map-selected-info"; infoEl.innerHTML = ""; }
+        var confirmBtn = document.getElementById("mapconfirm-" + key);
+        if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = "Confirmer cette destination"; confirmBtn.style.background = ""; }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        var form = document.getElementById("demandeForm");
+        var categorieSelect = document.getElementById("demande_categorie");
+        var typeSelect = document.getElementById("demande_typeDemande");
+        var typeInfo = document.getElementById("typeInfo");
+        var classificationAiPrompt = document.getElementById("classificationAiPrompt");
+        var suggestClassificationBtn = document.getElementById("suggestClassificationBtn");
+        var generateDescriptionBtn = document.getElementById("generateDescriptionBtn");
+        var autoGenerateDescriptionToggle = document.getElementById("autoGenerateDescriptionToggle");
+        var sendDescriptionToSuggestionToggle = document.getElementById("sendDescriptionToSuggestionToggle");
+        var titleInput = document.getElementById("demande_titre");
+        var descriptionInput = document.getElementById("demande_description");
+        var prioriteInput = document.getElementById("demande_priorite");
+        var dynamicFieldsCard = document.getElementById("dynamicFieldsCard");
+        var dynamicFieldsContainer = document.getElementById("dynamicFields");
+        var generateWithAiBtn = document.getElementById("generateWithAiBtn");
+        var regenerateWithAiBtn = document.getElementById("regenerateWithAiBtn");
+        var autreAiDescription = document.getElementById("autreAiDescription");
+        var submitBtn = document.getElementById("submitBtn");
+        var aiGeneratedInput = document.getElementById("aiGeneratedInput");
+        var aiConfirmedInput = document.getElementById("aiConfirmedInput");
+        var aiTrustedLearningInput = document.getElementById("aiTrustedLearningInput");
+        var autreAiRawPromptInput = document.getElementById("autreAiRawPromptInput");
+        aiModalEl = document.getElementById("aiConfirmModal");
+        var aiModalRejectBtn = document.getElementById("aiModalRejectBtn");
+        var aiModalConfirmBtn = document.getElementById("aiModalConfirmBtn");
+        var aiModalRegenerateBtn = document.getElementById("aiModalRegenerateBtn");
+        var aiConfirmPreview = document.getElementById("aiConfirmPreview");
+        manualAutreFieldCountInput = document.getElementById("manualAutreFieldCount");
+        manualAutreFieldEditor = document.getElementById("manualAutreFieldEditor");
+        buildManualAutreFieldsBtn = document.getElementById("buildManualAutreFieldsBtn");
+        applyManualAutreFieldsBtn = document.getElementById("applyManualAutreFieldsBtn");
+        openManualAutreFieldsBtn = document.getElementById("openManualAutreFieldsBtn");
+
+        setupLiveFieldValidation(form);
+
+        if (autreAiDescription && SUBMITTED_AI_DESCRIPTION) {
+            autreAiDescription.value = SUBMITTED_AI_DESCRIPTION;
+        }
+        if (autreAiRawPromptInput) {
+            autreAiRawPromptInput.value = SUBMITTED_AI_RAW_PROMPT || SUBMITTED_AI_DESCRIPTION || String((autreAiDescription || {}).value || "").trim();
+        }
+
+        if (aiModalEl && window.bootstrap && bootstrap.Modal) {
+            aiModal = new bootstrap.Modal(aiModalEl);
+        }
+
+        var manualAutreFieldsModalEl = document.getElementById("manualAutreFieldsModal");
+        if (manualAutreFieldsModalEl && window.bootstrap && bootstrap.Modal) {
+            manualAutreFieldsModal = new bootstrap.Modal(manualAutreFieldsModalEl);
+        }
+
+        setAiFieldPlan(SUBMITTED_AI_FIELD_PLAN);
+
+        if (SUBMITTED_TYPE) {
+            loadDynamicFields(SUBMITTED_TYPE, SUBMITTED_DETAILS, dynamicFieldsContainer, dynamicFieldsCard);
+        }
+
+        updateTypeInfo(typeInfo, categorieSelect.value || "");
+        updateAutreAiControls(typeSelect.value || SUBMITTED_TYPE || "");
+
+        if (classificationAiPrompt && !classificationAiPrompt.value) {
+            classificationAiPrompt.value = String((document.getElementById("demande_description") || {}).value || "").trim();
+        }
+
+        if (classificationAiPrompt) {
+            classificationAiPrompt.addEventListener("input", function () {
+                if (isApplyingClassificationAutocorrect) {
+                    return;
+                }
+
+                if (!String(classificationAiPrompt.value || "").trim()) {
+                    classificationAutocorrectApplied = false;
+                }
+
+                if (classificationAutocorrectTimer) {
+                    window.clearTimeout(classificationAutocorrectTimer);
+                }
+
+                var current = String(classificationAiPrompt.value || "").trim();
+                if (!current) {
+                    return;
+                }
+
+                classificationAutocorrectTimer = window.setTimeout(function () {
+                    requestLiveClassificationAutocorrect();
+                }, 1200);
+            });
+        }
+
+        if (autreAiDescription) {
+            autreAiDescription.addEventListener("input", function () {
+                if (aiTrustedLearningInput) {
+                    aiTrustedLearningInput.value = "0";
+                }
+
+                var current = String(autreAiDescription.value || "").trim();
+                if (!current) {
+                    syncAutreRawPromptFromVisible(true);
+                    return;
+                }
+
+                syncAutreRawPromptFromVisible(true);
+            });
+        }
+
+        if (descriptionInput) {
+            descriptionManuallyEdited = String(descriptionInput.value || "").trim() !== "";
+            descriptionInput.addEventListener("input", function () {
+                if (isUpdatingDescriptionFromAi) {
+                    return;
+                }
+
+                descriptionManuallyEdited = String(descriptionInput.value || "").trim() !== "";
+                if (!descriptionManuallyEdited) {
+                    lastAutoGeneratedTitle = "";
+                }
+            });
+        }
+
+        if (autoGenerateDescriptionToggle) {
+            try {
+                autoGenerateDescriptionToggle.checked = window.localStorage.getItem(AUTO_DESCRIPTION_PREF_KEY) === "1";
+            } catch (error) {
+                console.warn("Cannot read localStorage for auto description toggle", error);
+            }
+
+            autoGenerateDescriptionToggle.addEventListener("change", function () {
+                try {
+                    window.localStorage.setItem(AUTO_DESCRIPTION_PREF_KEY, this.checked ? "1" : "0");
+                } catch (error) {
+                    console.warn("Cannot persist auto description toggle", error);
+                }
+
+                if (this.checked) {
+                    requestDescriptionGeneration({ trigger: "auto" });
+                }
+            });
+        }
+
+        if (sendDescriptionToSuggestionToggle) {
+            try {
+                sendDescriptionToSuggestionToggle.checked = window.localStorage.getItem(DESCRIPTION_TO_SUGGESTION_PREF_KEY) === "1";
+            } catch (error) {
+                console.warn("Cannot read localStorage for description to suggestion toggle", error);
+            }
+
+            sendDescriptionToSuggestionToggle.addEventListener("change", function () {
+                try {
+                    window.localStorage.setItem(DESCRIPTION_TO_SUGGESTION_PREF_KEY, this.checked ? "1" : "0");
+                } catch (error) {
+                    console.warn("Cannot persist description to suggestion toggle", error);
+                }
+            });
+        }
+
+        if (titleInput) {
+            titleInput.addEventListener("input", function () {
+                if (descriptionAutoTimer) {
+                    window.clearTimeout(descriptionAutoTimer);
+                }
+
+                syncAutreMirroredFields();
+
+                if (!autoGenerateDescriptionToggle || !autoGenerateDescriptionToggle.checked) {
+                    return;
+                }
+
+                descriptionAutoTimer = window.setTimeout(function () {
+                    requestDescriptionGeneration({ trigger: "auto" });
+                }, 900);
+            });
+        }
+
+        if (prioriteInput) {
+            prioriteInput.addEventListener("change", function () {
+                syncAutreMirroredFields();
+            });
+        }
+
+        if (suggestClassificationBtn) {
+            suggestClassificationBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                requestClassificationSuggestion(categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard);
+            });
+        }
+
+        if (generateDescriptionBtn) {
+            generateDescriptionBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                requestDescriptionGeneration({ trigger: "manual", forceApply: true });
+            });
+        }
+
+        if (generateWithAiBtn) {
+            generateWithAiBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                requestAutreAiGeneration(categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard, {
+                    mode: "generate",
+                    forceFresh: false
+                });
+            });
+        }
+
+        if (regenerateWithAiBtn) {
+            regenerateWithAiBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                requestAutreAiGeneration(categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard, {
+                    mode: "regenerate",
+                    forceFresh: true
+                });
+            });
+        }
+
+        if (buildManualAutreFieldsBtn) {
+            buildManualAutreFieldsBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                renderManualAutreFieldBuilder();
+            });
+        }
+
+        if (applyManualAutreFieldsBtn) {
+            applyManualAutreFieldsBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                applyManualAutreFieldPlan(categorieSelect, typeSelect, dynamicFieldsContainer, dynamicFieldsCard);
+                if (manualAutreFieldsModal) {
+                    manualAutreFieldsModal.hide();
+                }
+            });
+        }
+
+        if (openManualAutreFieldsBtn) {
+            openManualAutreFieldsBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                renderManualAutreFieldBuilder();
+                if (manualAutreFieldsModal) {
+                    manualAutreFieldsModal.show();
+                }
+            });
+        }
+
+        renderManualAutreFieldBuilder();
+
+        function handleFormSubmitIntent() {
+            if (isSubmittingForm) {
+                return;
+            }
+
+            syncAutreRawPromptFromVisible(false);
+
+            if (!validateDemandeFormBeforeSubmit(form)) {
+                return;
+            }
+
+            if (shouldRequireAiConfirmation(typeSelect, aiGeneratedInput, regenerateWithAiBtn, aiTrustedLearningInput)) {
+                if (aiGeneratedInput) aiGeneratedInput.value = "1";
+                if (aiConfirmedInput) aiConfirmedInput.value = "0";
+                if (aiConfirmPreview) {
+                    aiConfirmPreview.innerHTML = buildConfirmationPreview(dynamicFieldsContainer);
+                }
+
+                if (aiModal) {
+                    aiModal.show();
+                } else if (aiModalEl) {
+                    aiModalEl.classList.add("show");
+                    aiModalEl.style.display = "block";
+                }
+
+                return;
+            }
+
+            markFormSubmitting(submitBtn, aiModalConfirmBtn);
+            form.submit();
+        }
+
+        if (submitBtn && form) {
+            submitBtn.addEventListener("click", function () {
+                handleFormSubmitIntent();
+            });
+        }
+
+        if (form) {
+            form.addEventListener("submit", function (event) {
+                if (isSubmittingForm) {
+                    return;
+                }
+
+                event.preventDefault();
+                handleFormSubmitIntent();
+            });
+        }
+
+        if (aiModalConfirmBtn && form) {
+            aiModalConfirmBtn.addEventListener("click", function () {
+                if (isSubmittingForm) {
+                    return;
+                }
+
+                if (!validateDemandeFormBeforeSubmit(form)) {
+                    return;
+                }
+
+                syncAutreRawPromptFromVisible(false);
+                if (aiConfirmedInput) aiConfirmedInput.value = "1";
+                closeAiModal(aiModal, aiModalEl);
+                markFormSubmitting(submitBtn, aiModalConfirmBtn);
+                if (typeof form.requestSubmit === "function") {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            });
+        }
+
+        if (aiModalRegenerateBtn) {
+            aiModalRegenerateBtn.addEventListener("click", function () {
+                closeAiModal(aiModal, aiModalEl);
+                requestAutreAiGeneration(categorieSelect, typeSelect, typeInfo, dynamicFieldsContainer, dynamicFieldsCard, {
+                    mode: "regenerate",
+                    forceFresh: true
+                });
+            });
+        }
+
+        if (aiModalRejectBtn) {
+            aiModalRejectBtn.addEventListener("click", function () {
+                closeAiModal(aiModal, aiModalEl);
+            });
+        }
+
+        categorieSelect.addEventListener("change", function () {
+            var category = this.value;
+            typeSelect.innerHTML = '<option value="">-- Choisir un type --</option>';
+            dynamicFieldsCard.style.display = "none";
+            dynamicFieldsContainer.innerHTML = "";
+            maps = {}; markers = {}; selectedLocations = {};
+            if (aiGeneratedInput && aiGeneratedInput.value === "1" && aiConfirmedInput) {
+                aiConfirmedInput.value = "0";
+            }
+            resetAutreAiGeneratedState();
+            resetAiFieldPlan();
+            setAutoFilledDetailKeys([]);
+            clearAutreConfidenceBadge();
+            updateAutreAiControls("");
+
+            if (category && CATEGORIES[category]) {
+                var types = CATEGORIES[category];
+                for (var i = 0; i < types.length; i++) {
+                    var opt = document.createElement("option");
+                    opt.value = types[i]; opt.textContent = types[i];
+                    typeSelect.appendChild(opt);
+                }
+                updateTypeInfo(typeInfo, category);
+            } else {
+                updateTypeInfo(typeInfo, "");
+            }
+        });
+
+        typeSelect.addEventListener("change", function () {
+            var type = this.value;
+            maps = {}; markers = {}; selectedLocations = {};
+            updateTypeInfo(typeInfo, categorieSelect.value || "");
+            if (!type) {
+                dynamicFieldsCard.style.display = "none";
+                dynamicFieldsContainer.innerHTML = "";
+                updateAutreAiControls("");
+                return;
+            }
+
+            if (aiGeneratedInput && aiGeneratedInput.value === "1" && aiConfirmedInput) {
+                aiConfirmedInput.value = "0";
+            }
+            resetAutreAiGeneratedState();
+            resetAiFieldPlan();
+            setAutoFilledDetailKeys([]);
+            setAiStatus("", "");
+            clearAutreConfidenceBadge();
+            updateAutreAiControls(type);
+            loadDynamicFields(type, {}, dynamicFieldsContainer, dynamicFieldsCard);
+        });
+    });
+
+})();
+</script>
+{% endblock %}

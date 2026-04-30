@@ -40,6 +40,9 @@ class DemandeFormHelper
             'Changement horaires',
             'Heures supplementaires',
             'Autre'
+        ],
+        'Autre' => [
+            'Autre'
         ]
     ];
 
@@ -54,35 +57,143 @@ class DemandeFormHelper
         'En cours',
         'En attente',
         'Resolue',
+        'Rejetee',
+        'Reconsideration',
         'Fermee',
         'Annulee'
     ];
 
+    private const CATEGORY_ALIASES = [
+        'financiere' => 'Administrative',
+        'financière' => 'Administrative',
+        'finance' => 'Administrative',
+        'technique' => 'Informatique',
+        'it' => 'Informatique',
+        'rh' => 'Ressources Humaines',
+        'ressources humaines' => 'Ressources Humaines',
+        'organisation travail' => 'Organisation du travail',
+    ];
+
+    private const TYPE_ALIASES = [
+        'badge d acces' => 'Badge acces',
+        'badge d\'accès' => 'Badge acces',
+        'badge acces' => 'Badge acces',
+        'conge' => 'Conge',
+        'congé' => 'Conge',
+        'conges' => 'Conge',
+        'teletravail' => 'Teletravail',
+        'télétravail' => 'Teletravail',
+        'heures supplementaires' => 'Heures supplementaires',
+        'heures supplémentaires' => 'Heures supplementaires',
+        'materiel informatique' => 'Materiel informatique',
+        'matériel informatique' => 'Materiel informatique',
+    ];
+
+    /**
+     * @return array<string, array<int, string>>
+     */
     public function getCategoryTypes(): array
     {
         return self::CATEGORY_TYPES;
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function getCategories(): array
     {
         return array_keys(self::CATEGORY_TYPES);
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function getTypesForCategory(string $category): array
     {
         return self::CATEGORY_TYPES[$category] ?? [];
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function getPriorites(): array
     {
         return self::PRIORITES;
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function getStatuses(): array
     {
         return self::STATUSES;
     }
 
+    public function resolveCanonicalCategory(?string $category, ?string $typeDemande = null): ?string
+    {
+        $rawCategory = trim($category ?? '');
+        $rawType = trim($typeDemande ?? '');
+
+        if (isset(self::CATEGORY_TYPES[$rawCategory])) {
+            return $rawCategory;
+        }
+
+        $normalizedCategory = $this->normalizeTypeKey($rawCategory);
+        if ('' !== $normalizedCategory && isset(self::CATEGORY_ALIASES[$normalizedCategory])) {
+            return self::CATEGORY_ALIASES[$normalizedCategory];
+        }
+
+        foreach (array_keys(self::CATEGORY_TYPES) as $knownCategory) {
+            if ($this->normalizeTypeKey($knownCategory) === $normalizedCategory) {
+                return $knownCategory;
+            }
+        }
+
+        if ('' !== $rawType) {
+            $owner = $this->findOwningCategoryForType($rawType);
+            if (null !== $owner) {
+                return $owner;
+            }
+        }
+
+        return '' !== $rawCategory ? $rawCategory : null;
+    }
+
+    public function resolveCanonicalType(?string $typeDemande, ?string $category = null): ?string
+    {
+        $rawType = trim($typeDemande ?? '');
+        if ('' === $rawType) {
+            return null;
+        }
+
+        $normalizedType = $this->normalizeTypeKey($rawType);
+        if (isset(self::TYPE_ALIASES[$normalizedType])) {
+            return self::TYPE_ALIASES[$normalizedType];
+        }
+
+        $resolvedCategory = $this->resolveCanonicalCategory($category, $rawType);
+        if (null !== $resolvedCategory && isset(self::CATEGORY_TYPES[$resolvedCategory])) {
+            foreach (self::CATEGORY_TYPES[$resolvedCategory] as $knownType) {
+                if ($this->normalizeTypeKey($knownType) === $normalizedType) {
+                    return $knownType;
+                }
+            }
+        }
+
+        foreach (self::CATEGORY_TYPES as $types) {
+            foreach ($types as $knownType) {
+                if ($this->normalizeTypeKey($knownType) === $normalizedType) {
+                    return $knownType;
+                }
+            }
+        }
+
+        return $rawType;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function getFieldsForType(string $typeDemande): array
     {
         $fieldsMap = [
@@ -840,7 +951,15 @@ class DemandeFormHelper
             ]
         ];
 
-        return $fieldsMap[$typeDemande] ?? [];
+        $resolvedType = $this->resolveCanonicalType($typeDemande);
+        $normalizedType = $this->normalizeTypeKey($resolvedType ?? $typeDemande);
+        foreach ($fieldsMap as $knownType => $fields) {
+            if ($this->normalizeTypeKey($knownType) === $normalizedType) {
+                return $fields;
+            }
+        }
+
+        return [];
     }
 
     public function getFieldLabel(string $typeDemande, string $fieldKey): string
@@ -854,5 +973,44 @@ class DemandeFormHelper
         }
 
         return $fieldKey;
+    }
+
+    private function findOwningCategoryForType(string $typeDemande): ?string
+    {
+        $rawType = trim($typeDemande);
+        if ('' === $rawType) {
+            return null;
+        }
+
+        $normalizedType = $this->normalizeTypeKey($rawType);
+        $resolvedType = self::TYPE_ALIASES[$normalizedType] ?? null;
+
+        foreach (self::CATEGORY_TYPES as $category => $types) {
+            foreach ($types as $knownType) {
+                if ($knownType === $resolvedType || $this->normalizeTypeKey($knownType) === $normalizedType) {
+                    return $category;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeTypeKey(string $value): string
+    {
+        $normalized = trim(mb_strtolower($value));
+        $replacements = [
+            'à' => 'a', 'â' => 'a', 'ä' => 'a',
+            'ç' => 'c',
+            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'î' => 'i', 'ï' => 'i',
+            'ô' => 'o', 'ö' => 'o',
+            'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+        ];
+
+        $normalized = strtr($normalized, $replacements);
+        $normalized = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
+
+        return $normalized;
     }
 }
