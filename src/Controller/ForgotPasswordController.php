@@ -149,7 +149,7 @@ final class ForgotPasswordController extends AbstractController
     }
 
     #[Route('/forgot-password/new', name: 'forgot_password_new', methods: ['GET', 'POST'])]
-    public function forgotPasswordNew(Request $request, SessionInterface $session, AdministrateurSystemeRepository $adminRepo, EmployeRepository $employeRepo, EntityManagerInterface $entityManager, UserPasswordHasherInterface $passwordHasher): Response
+    public function forgotPasswordNew(Request $request, SessionInterface $session, AdministrateurSystemeRepository $adminRepo, EmployeRepository $employeRepo, EntityManagerInterface $entityManager, UserPasswordHasherInterface $passwordHasher, \App\Services\PasswordGenerator $passwordGenerator): Response
     {
         if ($session->get('reset_password_pending') !== true || $session->get('reset_password_verified') !== true) {
             return $this->redirectToRoute('forgot_password');
@@ -176,7 +176,7 @@ final class ForgotPasswordController extends AbstractController
             if ($userType === 'admin') {
                 $admin = $adminRepo->find($userId);
                 if ($admin) {
-                    $admin->setMot_de_passe(password_hash($newPassword, PASSWORD_DEFAULT));
+                    $admin->setMot_de_passe($passwordGenerator->hash($newPassword));
                     $entityManager->flush();
                 }
             }
@@ -186,7 +186,7 @@ final class ForgotPasswordController extends AbstractController
                 if ($employe) {
                     $compte = $employe->getComptes()->first();
                     if ($compte) {
-                        $compte->setMot_de_passe($passwordHasher->hashPassword($compte, $newPassword));
+                        $compte->setMot_de_passe($passwordGenerator->hash($newPassword));
                         $entityManager->flush();
                     }
                 }

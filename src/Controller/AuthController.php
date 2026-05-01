@@ -9,6 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use App\Form\LoginType;
+use Symfony\Component\Form\FormError;
 use App\Repository\EmployeRepository;
 use App\Repository\AdministrateurSystemeRepository;
 use App\Repository\VisiteurRepository;
@@ -32,7 +33,7 @@ final class AuthController extends AbstractController
     }
 
     #[Route('/login', name: 'login', methods: ['GET', 'POST'])]
-    public function login(Request $request, AdministrateurSystemeRepository $adminRepo, EmployeRepository $employeRepo, VisiteurRepository $visiteurRepo, SessionInterface $session, TwilioVerifyService $twilioVerifyService): Response
+    public function login(Request $request, AdministrateurSystemeRepository $adminRepo, EmployeRepository $employeRepo, VisiteurRepository $visiteurRepo, SessionInterface $session, TwilioVerifyService $twilioVerifyService, \App\Services\PasswordGenerator $passwordGenerator): Response
     {
         $cancelTwoFactor = $request->query->getBoolean('cancel_2fa');
         if ($cancelTwoFactor) {
@@ -62,12 +63,26 @@ final class AuthController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $data = $form->getData();
-            $email = $data['email'];
-            $password = $data['password'];
+            $email = trim((string) ($data['email'] ?? ''));
+            $password = $data['password'] ?? null;
 
-            // Vérification admin système
+            if ($email === '' || $password === null || trim((string) $password) === '') {
+                if ($email === '') {
+                    if ($form->has('email')) {
+                        $form->get('email')->addError(new FormError('L\'email est obligatoire.'));
+                    }
+                }
+                if ($password === null || trim((string) $password) === '') {
+                    if ($form->has('password')) {
+                        $form->get('password')->addError(new FormError('Le mot de passe est obligatoire.'));
+                    }
+                }
+                return $this->render('auth/login.html.twig', ['form' => $form]);
+            }
+
+            // Vérification admin système (SHA-256)
             $admin = $adminRepo->findOneBy(['e_mail' => $email]);
-            if ($admin && $admin->getMot_de_passe() === $password) {
+            if ($admin && $admin->getMot_de_passe() === $passwordGenerator->hash($password)) {
                 /*
                 $destination = $admin->getTelephone();
                 if ($destination === '') {
@@ -93,10 +108,11 @@ final class AuthController extends AbstractController
             }
 
             $employe = $employeRepo->findOneBy(['e_mail' => $email]);
-            if ($employe) {
+                if ($employe) {
                 $compte = null;
                 foreach ($employe->getComptes() as $c) {
-                    if (password_verify($password, $c->getMot_de_passe()) || $c->getMot_de_passe() === $password) {
+                    // Accept SHA-256 hashed passwords; keep legacy checks as fallback
+                    if ($c->getMot_de_passe() === $passwordGenerator->hash($password) || password_verify($password, $c->getMot_de_passe()) || $c->getMot_de_passe() === $password) {
                         $compte = $c;
                         break;
                     }
@@ -142,7 +158,7 @@ final class AuthController extends AbstractController
                 return $this->redirectToRoute('app_offre_home');
             }
 
-            $this->addFlash('error', 'Email ou mot de passe incorrect.');
+            $form->addError(new FormError('Email ou mot de passe incorrect.'));
         }
 
         return $this->render('auth/login.html.twig', ['form' => $form]);
