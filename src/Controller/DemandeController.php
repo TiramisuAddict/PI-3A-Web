@@ -175,6 +175,11 @@ class DemandeController extends AbstractController
             $aiConfirmed = '1' === (string) $request->request->get('ai_confirmed', '0');
             $aiTrustedFromLearning = '1' === (string) $request->request->get('ai_trusted_learning', '0');
 
+            if ('Autre' === $submittedType && $manualFieldMode) {
+                $submittedAiFieldPlan = $this->sanitizeManualAutreFieldPlan($submittedAiFieldPlan, $submittedDetails);
+                $manualFieldMode = [] !== ($submittedAiFieldPlan['add'] ?? []);
+            }
+
             if ($submittedType) {
                 $detailErrors = $this->validateDetails($submittedType, $submittedDetails);
                 if ('Autre' === $submittedType) {
@@ -200,9 +205,10 @@ class DemandeController extends AbstractController
 
                     if (!empty($submittedDetails)) {
                         $persistedDetails = $submittedDetails;
-                        if ('Autre' === $submittedType && (($aiGenerated && $aiConfirmed) || $manualFieldMode)) {
+                        $isAcceptedAutreFeedback = 'Autre' === $submittedType && (($aiGenerated && $aiConfirmed) || $manualFieldMode);
+                        if ($isAcceptedAutreFeedback) {
                             $trustedPrompt = trim('' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription);
-                            $persistedDetails['_ai_feedback_confirmed'] = !$manualFieldMode;
+                            $persistedDetails['_ai_feedback_confirmed'] = true;
                             $persistedDetails['_ai_manual_fields'] = $manualFieldMode;
                             $persistedDetails['_ai_confirmed_at'] = (new \DateTimeImmutable())->format(DATE_ATOM);
                             $persistedDetails['_ai_field_plan'] = $submittedAiFieldPlan;
@@ -237,23 +243,23 @@ class DemandeController extends AbstractController
                             $demande->getCategorie(),
                             $employe->getId_employe()
                         );
+                    }
 
-                        if ('Autre' === $demande->getTypeDemande()) {
-                            $this->demandeAiAssistant->recordAcceptedAutreFeedback(
-                                '' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription,
-                                [
-                                    'titre' => (string) ($demande->getTitre() ?? ''),
-                                    'description' => (string) ($demande->getDescription() ?? ''),
-                                    'priorite' => (string) ($demande->getPriorite() ?? ''),
-                                    'categorie' => (string) ($demande->getCategorie() ?? ''),
-                                    'typeDemande' => (string) ($demande->getTypeDemande() ?? ''),
-                                ],
-                                $submittedDetails,
-                                $submittedAiFieldPlan,
-                                $employe->getId_employe(),
-                                $submittedAiGenerationSnapshot
-                            );
-                        }
+                    if ('Autre' === $demande->getTypeDemande() && (($aiGenerated && $aiConfirmed) || $manualFieldMode)) {
+                        $this->demandeAiAssistant->recordAcceptedAutreFeedback(
+                            '' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription,
+                            [
+                                'titre' => (string) ($demande->getTitre() ?? ''),
+                                'description' => (string) ($demande->getDescription() ?? ''),
+                                'priorite' => (string) ($demande->getPriorite() ?? ''),
+                                'categorie' => (string) ($demande->getCategorie() ?? ''),
+                                'typeDemande' => (string) ($demande->getTypeDemande() ?? ''),
+                            ],
+                            $submittedDetails,
+                            $submittedAiFieldPlan,
+                            $employe->getId_employe(),
+                            $submittedAiGenerationSnapshot
+                        );
                     }
 
                     $this->demandeMailer->notifyManagersDemandeCreated($demande);
@@ -910,6 +916,7 @@ class DemandeController extends AbstractController
      */
     private function filterManualAutreSubmittedDetails(array $details, array $fieldPlan): array
     {
+        $fieldPlan = $this->sanitizeManualAutreFieldPlan($fieldPlan, $details);
         $allowedKeys = array_fill_keys([
             'besoinPersonnalise',
             'descriptionBesoin',
@@ -941,6 +948,163 @@ class DemandeController extends AbstractController
         return $filtered;
     }
 
+    /**
+     * Manual Autre field plans can come back with stale generated fields from a
+     * previous AI pass. Keep only employee-defined fields and collapse duplicate
+     * same-value entries before validation, persistence, and feedback learning.
+     *
+     * @param array<string, mixed> $fieldPlan
+     * @param array<string, mixed> $details
+     * @return array<string, mixed>
+     */
+    private function sanitizeManualAutreFieldPlan(array $fieldPlan, array $details): array
+    {
+        $add = [];
+        $seenKeys = [];
+        $seenValues = [];
+        $rawAdd = is_array($fieldPlan['add'] ?? null) ? $fieldPlan['add'] : [];
+
+        foreach ($rawAdd as $field) {
+            if (!is_array($field) || $this->isGeneratedAutreFieldSource($field['source'] ?? null)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            if ('' === $key || isset($seenKeys[$key])) {
+                continue;
+            }
+
+            $label = trim((string) ($field['label'] ?? $key));
+            if ('' === $label) {
+                $label = $key;
+            }
+
+            $type = strtolower(trim((string) ($field['type'] ?? 'text')));
+            if (!in_array($type, ['text', 'textarea', 'select', 'number', 'date'], true)) {
+                $type = 'text';
+            }
+
+            $normalizedField = [
+                'key' => $key,
+                'label' => $label,
+                'type' => $type,
+                'required' => true === ($field['required'] ?? false),
+                'value' => trim((string) ($field['value'] ?? '')),
+                'source' => 'manual',
+            ];
+
+            if ('select' === $type && is_array($field['options'] ?? null)) {
+                $options = [];
+                foreach ($field['options'] as $option) {
+                    $option = trim((string) $option);
+                    if ('' !== $option && !in_array($option, $options, true)) {
+                        $options[] = $option;
+                    }
+                }
+                if ([] !== $options) {
+                    $normalizedField['options'] = $options;
+                }
+            }
+
+            $value = $details[$key] ?? $normalizedField['value'];
+            $valueKey = $this->manualAutreDuplicateValueKey($value);
+            if ('' !== $valueKey) {
+                $score = $this->manualAutreDuplicateKeepScore($normalizedField);
+                if (isset($seenValues[$valueKey])) {
+                    $previousIndex = $seenValues[$valueKey]['index'];
+                    $previousScore = $seenValues[$valueKey]['score'];
+                    if ($score > $previousScore && isset($add[$previousIndex])) {
+                        $previousKey = trim((string) ($add[$previousIndex]['key'] ?? ''));
+                        if ('' !== $previousKey) {
+                            unset($seenKeys[$previousKey]);
+                        }
+                        $seenKeys[$key] = true;
+                        $add[$previousIndex] = $normalizedField;
+                        $seenValues[$valueKey] = [
+                            'index' => $previousIndex,
+                            'score' => $score,
+                        ];
+                    }
+
+                    continue;
+                }
+
+                $seenValues[$valueKey] = [
+                    'index' => count($add),
+                    'score' => $score,
+                ];
+            }
+
+            $seenKeys[$key] = true;
+            $add[] = $normalizedField;
+        }
+
+        return [
+            'add' => $add,
+            'remove' => is_array($fieldPlan['remove'] ?? null)
+                ? array_values(array_map('strval', $fieldPlan['remove']))
+                : [],
+            'replaceBase' => true === ($fieldPlan['replaceBase'] ?? false),
+            'manualMode' => true,
+        ];
+    }
+
+    private function manualAutreDuplicateValueKey(mixed $value): string
+    {
+        if (!is_scalar($value)) {
+            return '';
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        if (function_exists('iconv')) {
+            $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $normalized);
+            if (false !== $ascii) {
+                $normalized = $ascii;
+            }
+        }
+
+        $normalized = preg_replace('/[^a-z0-9\/\- ]+/', ' ', $normalized) ?? $normalized;
+        $normalized = trim((string) (preg_replace('/\s+/', ' ', $normalized) ?? $normalized));
+        if (strlen($normalized) < 3) {
+            return '';
+        }
+
+        if (in_array($normalized, ['oui', 'non', 'autre', 'a definir', 'n/a'], true)) {
+            return '';
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $field
+     */
+    private function manualAutreDuplicateKeepScore(array $field): int
+    {
+        $haystack = $this->manualAutreDuplicateValueKey(
+            (string) ($field['key'] ?? '') . ' ' . (string) ($field['label'] ?? '')
+        );
+        $score = true === ($field['required'] ?? false) ? 20 : 0;
+
+        if ('manual' === strtolower(trim((string) ($field['source'] ?? '')))) {
+            $score += 10;
+        }
+
+        if ('textarea' === strtolower(trim((string) ($field['type'] ?? 'text')))) {
+            $score -= 10;
+        }
+
+        if (preg_match('/\b(type|nature|materiel|equipement|systeme|logiciel|montant|date|lieu|destination|attestation|formation|conge|horaire|shift|zone|salle)\b/', $haystack) === 1) {
+            $score += 20;
+        }
+
+        if (preg_match('/\b(extra|infos?|information|description|details?|commentaire|justification|motif|custom|champ)\b/', $haystack) === 1) {
+            $score -= 20;
+        }
+
+        return $score;
+    }
+
     private function isGeneratedAutreFieldSource(mixed $source): bool
     {
         $normalized = strtolower(trim((string) $source));
@@ -948,7 +1112,7 @@ class DemandeController extends AbstractController
             return false;
         }
 
-        return in_array($normalized, ['generated', 'learned'], true)
+        return in_array($normalized, ['generated', 'learned', 'explicit', 'seed'], true)
             || str_starts_with($normalized, 'llm')
             || str_starts_with($normalized, 'local-ml')
             || str_contains($normalized, 'fallback');

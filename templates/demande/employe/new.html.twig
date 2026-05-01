@@ -362,8 +362,8 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             <div class="modal-status bg-primary"></div>
             <div class="modal-body py-4">
-                <h3 class="mb-2">Confirmer cette demande generee avec IA ?</h3>
-                <p class="text-secondary mb-3">Verifiez les informations ci-dessous avant enregistrement. Si ce n est pas exact, vous pouvez modifier ou regenerer.</p>
+                <h3 class="mb-2" id="aiConfirmTitle">Confirmer cette demande generee avec IA ?</h3>
+                <p class="text-secondary mb-3" id="aiConfirmDescription">Verifiez les informations ci-dessous avant enregistrement. Si ce n est pas exact, vous pouvez modifier ou regenerer.</p>
                 <div id="aiConfirmPreview" class="border rounded p-3" style="background:#f8fafc;"></div>
             </div>
             <div class="modal-footer">
@@ -698,7 +698,7 @@
         };
 
         var source = String(field.source || "").trim().toLowerCase();
-        if (source === "manual" || source === "learned" || source === "generated" || source.indexOf("llm") === 0) {
+        if (source === "manual" || source === "learned" || source === "generated" || source === "explicit" || source === "seed" || source.indexOf("llm") === 0 || source.indexOf("local-ml") === 0 || source.indexOf("fallback") !== -1) {
             normalized.source = source;
         }
 
@@ -727,6 +727,7 @@
     function normalizeAiFieldPlan(plan) {
         var normalized = { add: [], remove: [], replaceBase: false, manualMode: false };
         if (!plan || typeof plan !== "object") return normalized;
+        var manualMode = true === plan.manualMode;
 
         var removeRaw = Array.isArray(plan.remove) ? plan.remove : [];
         var removeSeen = {};
@@ -742,13 +743,17 @@
         for (var j = 0; j < addRaw.length; j++) {
             var field = sanitizeAiCustomField(addRaw[j]);
             if (!field || addSeen[field.key]) continue;
+            if (manualMode && field.source && field.source !== "manual") continue;
             addSeen[field.key] = true;
             normalized.add.push(field);
             if (normalized.add.length >= 8) break;
         }
 
         normalized.replaceBase = true === plan.replaceBase;
-        normalized.manualMode = true === plan.manualMode;
+        normalized.manualMode = manualMode;
+        if (normalized.manualMode) {
+            normalized.add = dedupeManualAutreFieldsByValue(normalized.add);
+        }
 
         return normalized;
     }
@@ -806,6 +811,73 @@
         if (manualAutreFieldEditor) {
             renderManualAutreFieldBuilder();
         }
+    }
+
+    function manualAutreDuplicateValueKey(field) {
+        if (!field || typeof field !== "object") return "";
+        var raw = String(field.value || "").trim();
+        if (!raw) return "";
+
+        var normalized = normalizeUiLabel(raw);
+        if (normalized.length < 3 && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+            return "";
+        }
+
+        if (/^(oui|non|autre|a definir|n\/a)$/.test(normalized)) {
+            return "";
+        }
+
+        return normalized;
+    }
+
+    function manualAutreDuplicateKeepScore(field) {
+        if (!field || typeof field !== "object") return 0;
+        var haystack = normalizeUiLabel(String(field.key || "") + " " + String(field.label || ""));
+        var score = 0;
+        if (!!field.required) score += 20;
+        if (String(field.source || "").toLowerCase() === "manual") score += 10;
+        if (String(field.type || "").toLowerCase() === "textarea") score -= 10;
+        if (/\b(type|nature|materiel|equipement|systeme|logiciel|montant|date|lieu|destination|attestation|formation|conge|horaire|shift|zone|salle)\b/.test(haystack)) {
+            score += 20;
+        }
+        if (/\b(extra|infos?|information|description|details?|commentaire|justification|motif|custom|champ)\b/.test(haystack)) {
+            score -= 20;
+        }
+        return score;
+    }
+
+    function dedupeManualAutreFieldsByValue(fields) {
+        if (!Array.isArray(fields) || fields.length <= 1) {
+            return Array.isArray(fields) ? fields : [];
+        }
+
+        var kept = [];
+        var byValue = {};
+        for (var i = 0; i < fields.length; i++) {
+            var field = fields[i];
+            if (!field || typeof field !== "object") continue;
+
+            var valueKey = manualAutreDuplicateValueKey(field);
+            if (!valueKey) {
+                kept.push(field);
+                continue;
+            }
+
+            var score = manualAutreDuplicateKeepScore(field);
+            if (typeof byValue[valueKey] === "undefined") {
+                byValue[valueKey] = { index: kept.length, score: score };
+                kept.push(field);
+                continue;
+            }
+
+            var previous = byValue[valueKey];
+            if (score > previous.score) {
+                kept[previous.index] = field;
+                byValue[valueKey] = { index: previous.index, score: score };
+            }
+        }
+
+        return kept;
     }
 
     function shouldHideAutreBaseField(fieldKey) {
@@ -1111,10 +1183,20 @@
             if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
             if (regenerateBtn) regenerateBtn.style.display = "none";
 
+            var manualValues = {};
+            for (var m = 0; m < AI_DYNAMIC_FIELDS.length; m++) {
+                var manualField = AI_DYNAMIC_FIELDS[m];
+                if (!manualField || !manualField.key) continue;
+                var manualValue = String(manualField.value || "").trim();
+                if (manualValue) {
+                    manualValues[manualField.key] = manualValue;
+                }
+            }
+
             resetAiGenerationSnapshot();
             setAutoFilledDetailKeys([]);
-            loadDynamicFields(currentType, {}, dynamicFieldsContainer, dynamicFieldsCard);
-            setAiStatus(String(fields.length) + " champ(s) personnalise(s) appliques. Vous pouvez remplir puis enregistrer la demande.", "success");
+            loadDynamicFields(currentType, manualValues, dynamicFieldsContainer, dynamicFieldsCard);
+            setAiStatus(String(AI_DYNAMIC_FIELDS.length) + " champ(s) personnalise(s) appliques. Remplissez-les puis confirmez la demande.", "success");
         }
     }
 
@@ -2001,7 +2083,7 @@
 
     function shouldRequireAiConfirmation(typeSelect, aiGeneratedInput, regenerateWithAiBtn, aiTrustedLearningInput) {
         if (MANUAL_AUTRE_FIELD_MODE) {
-            return false;
+            return !!(typeSelect && isAutreType(typeSelect.value) && AI_DYNAMIC_FIELDS.length > 0);
         }
 
         if (aiGeneratedInput && aiGeneratedInput.value === "1") {
@@ -3370,7 +3452,23 @@
             }
 
             if (shouldRequireAiConfirmation(typeSelect, aiGeneratedInput, regenerateWithAiBtn, aiTrustedLearningInput)) {
-                if (aiGeneratedInput) aiGeneratedInput.value = "1";
+                var manualConfirmation = !!MANUAL_AUTRE_FIELD_MODE;
+                var confirmTitle = document.getElementById("aiConfirmTitle");
+                var confirmDescription = document.getElementById("aiConfirmDescription");
+                if (confirmTitle) {
+                    confirmTitle.textContent = manualConfirmation
+                        ? "Confirmer cette demande avec vos champs manuels ?"
+                        : "Confirmer cette demande generee avec IA ?";
+                }
+                if (confirmDescription) {
+                    confirmDescription.textContent = manualConfirmation
+                        ? "Verifiez les champs que vous avez configures et leurs valeurs. Apres confirmation, cette structure sera apprise pour les prompts similaires."
+                        : "Verifiez les informations ci-dessous avant enregistrement. Si ce n est pas exact, vous pouvez modifier ou regenerer.";
+                }
+                if (aiModalRegenerateBtn) {
+                    aiModalRegenerateBtn.style.display = manualConfirmation ? "none" : "inline-block";
+                }
+                if (aiGeneratedInput) aiGeneratedInput.value = manualConfirmation ? "0" : "1";
                 if (aiConfirmedInput) aiConfirmedInput.value = "0";
                 if (aiConfirmPreview) {
                     aiConfirmPreview.innerHTML = buildConfirmationPreview(dynamicFieldsContainer);

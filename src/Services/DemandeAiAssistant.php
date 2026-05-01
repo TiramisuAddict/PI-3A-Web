@@ -326,6 +326,19 @@ class DemandeAiAssistant
         return $score;
     }
 
+    private function isGeneratedAutreFieldSource(mixed $source): bool
+    {
+        $normalized = strtolower(trim((string) $source));
+        if ('' === $normalized || 'manual' === $normalized) {
+            return false;
+        }
+
+        return in_array($normalized, ['generated', 'learned', 'explicit', 'seed'], true)
+            || str_starts_with($normalized, 'llm')
+            || str_starts_with($normalized, 'local-ml')
+            || str_contains($normalized, 'fallback');
+    }
+
     /**
      * @param array<string, string> $details
      */
@@ -946,12 +959,21 @@ class DemandeAiAssistant
         $sanitizedDetails = $this->sanitizeFeedbackMap($details);
         $normalizedFieldPlan = $this->normalizeFeedbackFieldPlan($fieldPlan, $sanitizedDetails);
         $normalizedGeneratedSnapshot = $this->normalizeGeneratedAutreSnapshot($generatedSnapshot);
+        $isManualFields = true === ($fieldPlan['manualMode'] ?? false);
+        foreach ((is_array($fieldPlan['add'] ?? null) ? $fieldPlan['add'] : []) as $field) {
+            if (is_array($field) && 'manual' === strtolower(trim((string) ($field['source'] ?? '')))) {
+                $isManualFields = true;
+                break;
+            }
+        }
 
         $record = [
             'createdAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
             'employeId' => $employeId,
             'prompt' => $normalizedPrompt,
             'rawPrompt' => $normalizedPrompt,
+            'confirmed' => true,
+            'manual' => $isManualFields,
             'general' => [
                 'titre' => $generalTitle,
                 'description' => $generalDescription,
@@ -981,10 +1003,12 @@ class DemandeAiAssistant
      * @param array<string, string> $sanitizedDetails
      * @return array<string, mixed>
      */
-    private function normalizeFeedbackFieldPlan(array $fieldPlan, array $sanitizedDetails): array
+    private function normalizeFeedbackFieldPlan(array $fieldPlan, array &$sanitizedDetails): array
     {
         $keptKeys = [];
         $normalizedAdd = [];
+        $seenValues = [];
+        $manualMode = true === ($fieldPlan['manualMode'] ?? false);
 
         $rawAdd = is_array($fieldPlan['add'] ?? null) ? $fieldPlan['add'] : [];
         foreach ($rawAdd as $field) {
@@ -993,6 +1017,13 @@ class DemandeAiAssistant
             }
 
             $key = trim((string) ($field['key'] ?? ''));
+            if ($manualMode && $this->isGeneratedAutreFieldSource($field['source'] ?? null)) {
+                if ('' !== $key) {
+                    unset($sanitizedDetails[$key]);
+                }
+                continue;
+            }
+
             if ('' === $key || !array_key_exists($key, $sanitizedDetails)) {
                 continue;
             }
@@ -1002,6 +1033,46 @@ class DemandeAiAssistant
             }
 
             $keptKeys[$key] = true;
+            if ($manualMode) {
+                $valueKey = $this->duplicateAutreFieldValueKey(
+                    strtolower(trim((string) ($field['type'] ?? 'text'))),
+                    trim((string) ($sanitizedDetails[$key] ?? ''))
+                );
+                if ('' !== $valueKey) {
+                    $score = $this->duplicateAutreFieldPreferenceScore(
+                        $key,
+                        trim((string) ($field['label'] ?? $key)),
+                        strtolower(trim((string) ($field['type'] ?? 'text'))),
+                        true === ($field['required'] ?? false)
+                    );
+
+                    if (isset($seenValues[$valueKey])) {
+                        $previousIndex = $seenValues[$valueKey]['index'];
+                        $previousScore = $seenValues[$valueKey]['score'];
+                        if ($score > $previousScore && isset($normalizedAdd[$previousIndex])) {
+                            $previousKey = trim((string) ($normalizedAdd[$previousIndex]['key'] ?? ''));
+                            if ('' !== $previousKey) {
+                                unset($sanitizedDetails[$previousKey]);
+                            }
+                            $normalizedAdd[$previousIndex] = $field;
+                            $seenValues[$valueKey] = ['index' => $previousIndex, 'score' => $score];
+                        } else {
+                            unset($sanitizedDetails[$key]);
+                        }
+
+                        continue;
+                    }
+
+                    $seenValues[$valueKey] = [
+                        'index' => count($normalizedAdd),
+                        'score' => $score,
+                    ];
+                }
+            }
+
+            if ($manualMode) {
+                $field['source'] = 'manual';
+            }
             $normalizedAdd[] = $field;
         }
 
@@ -1009,6 +1080,7 @@ class DemandeAiAssistant
             'add' => $normalizedAdd,
             'remove' => is_array($fieldPlan['remove'] ?? null) ? array_values(array_map('strval', $fieldPlan['remove'])) : [],
             'replaceBase' => true === ($fieldPlan['replaceBase'] ?? false),
+            'manualMode' => $manualMode,
         ];
     }
 
@@ -4658,6 +4730,10 @@ class DemandeAiAssistant
                 continue;
             }
 
+            if ($this->isGeneratedAutreFieldSource($candidate['source'] ?? null)) {
+                continue;
+            }
+
             $type = strtolower(trim((string) ($candidate['type'] ?? 'text')));
             if (!in_array($type, ['text', 'textarea', 'number', 'date', 'select'], true)) {
                 $type = 'text';
@@ -4670,7 +4746,7 @@ class DemandeAiAssistant
                 'required' => true === ($candidate['required'] ?? false),
                 'options' => is_array($candidate['options'] ?? null) ? array_values(array_map('strval', $candidate['options'])) : [],
                 'value' => trim((string) ($candidate['value'] ?? '')),
-                'source' => strtolower(trim((string) ($candidate['source'] ?? ''))),
+                'source' => 'manual',
             ];
         }
 

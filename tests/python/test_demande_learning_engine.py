@@ -247,6 +247,43 @@ class DemandeLearningEngineTest(unittest.TestCase):
         self.assertNotIn("ai_horaire_actuel", result["details"])
         self.assertNotIn("ai_periode_concernee", result["details"])
 
+    def test_manual_anchor_schema_is_kept_even_when_value_is_not_in_prompt(self):
+        result = adaptive.generate_autre_response(
+            {
+                "text": "demande badge visiteur pour client",
+                "acceptedAutreFeedback": [
+                    {
+                        "prompt": "demande badge visiteur pour client",
+                        "confirmed": True,
+                        "manual": True,
+                        "createdAt": "2026-04-27T10:00:00+00:00",
+                        "details": {
+                            "ai_couleur_badge": "Bleu",
+                        },
+                        "fieldPlan": {
+                            "add": [
+                                {
+                                    "key": "ai_couleur_badge",
+                                    "label": "Couleur badge",
+                                    "type": "text",
+                                    "required": False,
+                                    "source": "manual",
+                                },
+                            ],
+                            "remove": ["ALL"],
+                            "replaceBase": True,
+                            "manualMode": True,
+                        },
+                    }
+                ],
+            }
+        )
+
+        fields = {field["key"]: field for field in result["custom_fields"]}
+        self.assertIn("ai_couleur_badge", fields)
+        self.assertEqual("", fields["ai_couleur_badge"]["value"])
+        self.assertNotIn("ai_couleur_badge", result["details"])
+
     def test_relative_dates_and_weekdays_are_resolved_from_current_day(self):
         base = datetime(2026, 4, 29)  # Wednesday
 

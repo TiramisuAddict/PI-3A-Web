@@ -646,7 +646,8 @@ def plan_from_retrieval(source: str, result: RetrievalResult, profile: LearningP
             continue
 
         explicit = bool(value) or named_explicit
-        inferred_supported = explicit or named_explicit or (from_anchor and _source_supports_field(source, field, entities))
+        manual_anchor_schema = from_anchor and field_role(field) == "generic" and (result.matches[0].sample.manual or field.source == "manual")
+        inferred_supported = explicit or named_explicit or manual_anchor_schema or (from_anchor and _source_supports_field(source, field, entities))
         if not inferred_supported:
             continue
 

@@ -1524,9 +1524,18 @@ final class DemandeAiAssistantTest extends TestCase
                             'required' => true,
                             'value' => 'Casque',
                         ],
+                        [
+                            'key' => 'ai_contexte_detecte',
+                            'label' => 'Contexte detecte',
+                            'type' => 'text',
+                            'required' => false,
+                            'value' => 'Demande materiel',
+                            'source' => 'explicit',
+                        ],
                     ],
                     'remove' => [],
                     'replaceBase' => true,
+                    'manualMode' => true,
                 ],
             ],
             [],
@@ -1960,6 +1969,67 @@ final class DemandeAiAssistantTest extends TestCase
             ['ai_type_materiel'],
             array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add'])
         );
+    }
+
+    public function testManualFeedbackSampleWithoutConfirmedFlagStillProvidesSchema(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'demande badge visiteur pour client',
+                    'confirmed' => false,
+                    'manual' => true,
+                    'createdAt' => '2026-04-27T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Badge visiteur',
+                        'description' => 'demande badge visiteur pour client',
+                        'priorite' => 'NORMALE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_couleur_badge' => 'Bleu',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_couleur_badge',
+                                'label' => 'Couleur badge',
+                                'type' => 'text',
+                                'required' => false,
+                                'source' => 'manual',
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                        'manualMode' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            '',
+            ''
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'demande badge visiteur pour client',
+            ],
+            [],
+            []
+        );
+
+        $fieldKeys = array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add']);
+        self::assertContains('ai_couleur_badge', $fieldKeys);
+        self::assertArrayNotHasKey('ai_couleur_badge', $result['suggestedDetails']);
     }
 
     public function testLearnedFeedbackDoesNotUseStaleFieldPlanValueMissingFromFinalDetails(): void

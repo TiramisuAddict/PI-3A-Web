@@ -252,9 +252,10 @@ class DemandeRepository extends ServiceEntityRepository
         $rows = $this->createQueryBuilder('d')
             ->select('d.titre AS titre, d.description AS description, d.priorite AS priorite, d.categorie AS categorie, d.type_demande AS typeDemande, d.date_creation AS createdAt, dd.details AS detailsJson')
             ->leftJoin('d.demandeDetails', 'dd')
-            ->andWhere('dd.details LIKE :seedMarker OR dd.details LIKE :confirmedMarker')
+            ->andWhere('dd.details LIKE :seedMarker OR dd.details LIKE :confirmedMarker OR dd.details LIKE :manualMarker')
             ->setParameter('seedMarker', '%"_ai_seed_autre_ml":true%')
             ->setParameter('confirmedMarker', '%"_ai_feedback_confirmed":true%')
+            ->setParameter('manualMarker', '%"_ai_manual_fields":true%')
             ->orderBy('d.date_creation', 'DESC')
             ->setMaxResults(max(100, $limit))
             ->getQuery()
@@ -280,7 +281,7 @@ class DemandeRepository extends ServiceEntityRepository
             $isManualFields = $this->toBooleanValue(
                 $details['_ai_manual_fields'] ?? $details['__ai_manual_fields'] ?? false
             );
-            if (!$isConfirmedAiFeedback) {
+            if (!$isConfirmedAiFeedback && !$isManualFields) {
                 continue;
             }
 
@@ -417,7 +418,7 @@ class DemandeRepository extends ServiceEntityRepository
                 'prompt' => $prompt,
                 'general' => $general,
                 'details' => $feedbackDetails,
-                'confirmed' => $isConfirmedAiFeedback,
+                'confirmed' => $isConfirmedAiFeedback || $isManualFields,
                 'manual' => $isManualFields,
                 'createdAt' => $row['createdAt'] instanceof \DateTimeInterface
                     ? $row['createdAt']->format(DATE_ATOM)
@@ -428,6 +429,7 @@ class DemandeRepository extends ServiceEntityRepository
                         ? array_values(array_map('strval', $storedFieldPlan['remove']))
                         : [],
                     'replaceBase' => [] !== $planAdd || true === ($storedFieldPlan['replaceBase'] ?? false),
+                    'manualMode' => $isManualFields,
                 ],
                 'generatedSnapshot' => $generatedSnapshot,
             ];
@@ -476,7 +478,7 @@ class DemandeRepository extends ServiceEntityRepository
             return false;
         }
 
-        return in_array($normalized, ['generated', 'learned'], true)
+        return in_array($normalized, ['generated', 'learned', 'explicit', 'seed'], true)
             || str_starts_with($normalized, 'llm')
             || str_starts_with($normalized, 'local-ml')
             || str_contains($normalized, 'fallback');
