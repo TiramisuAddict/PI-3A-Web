@@ -8,6 +8,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Form\Extension\Core\Type\EmailType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
+use Symfony\Component\Validator\Constraints as Assert;
 
 class LoginType extends AbstractType
 {
@@ -17,10 +18,17 @@ class LoginType extends AbstractType
             ->add('email', EmailType::class, [
                 'label' => 'Email',
                 'required' => true,
+                'constraints' => [
+                    new Assert\NotBlank(message: 'L\'email est obligatoire.'),
+                    new Assert\Email(message: 'L\'email est invalide.'),
+                ],
             ])
             ->add('password', PasswordType::class, [
                 'label' => 'Mot de passe',
                 'required' => true,
+                'constraints' => [
+                    new Assert\NotBlank(message: 'Le mot de passe est obligatoire.'),
+                ],
             ])
             ->add('se_connecter', SubmitType::class, [
                 'label' => 'Se connecter',
