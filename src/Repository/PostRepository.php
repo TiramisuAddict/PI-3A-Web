@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Post;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -19,9 +20,8 @@ class PostRepository extends ServiceEntityRepository
     /**
      * Liste admin : tri par date, recherche optionnelle sur titre / contenu (LIKE).
      *
-     * @return Post[]
      */
-    public function findForAdminIndex(?string $search): array
+    public function createAdminIndexQueryBuilder(?string $search): QueryBuilder
     {
         $qb = $this->createQueryBuilder('p')
             ->orderBy('p.date_creation', 'DESC');
@@ -31,7 +31,7 @@ class PostRepository extends ServiceEntityRepository
             ->setParameter('search', '%' . $search . '%');
         }
 
-        return $qb->getQuery()->getResult();
+        return $qb;
     }
 
     public function countWithTypePost(int $typePost): int

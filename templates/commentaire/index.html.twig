@@ -47,7 +47,7 @@
                             <span class="badge {{ current_post.typePost == 2 ? 'bg-yellow-lt text-yellow' : 'bg-azure-lt text-azure' }}">
                                 {{ current_post.typePost == 2 ? 'Evenement' : 'Annonce' }}
                             </span>
-                            <span class="text-secondary small">{{ commentaires|length }} commentaire{{ commentaires|length > 1 ? 's' : '' }}</span>
+                            <span class="text-secondary small">{{ commentaires.getTotalItemCount }} commentaire{{ commentaires.getTotalItemCount > 1 ? 's' : '' }}</span>
                         </div>
                     </div>
                 </div>
@@ -72,7 +72,7 @@
                                 <td class="text-secondary small">{{ commentaire.dateCommentaire ? commentaire.dateCommentaire|date('d/m/Y H:i') : '-' }}</td>
                                 <td class="text-end text-nowrap">
                                     <div class="d-flex align-items-center justify-content-end gap-2">
-                                        <form class="d-inline" method="post" action="{{ path('app_commentaire_delete', { id_commentaire: commentaire.idCommentaire, id_post: current_post ? current_post.idPost : null }) }}" onsubmit="return confirm('Supprimer ce commentaire ?');">
+                                        <form class="d-inline" method="post" action="{{ path('app_commentaire_delete', { id_commentaire: commentaire.idCommentaire, id_post: current_post ? current_post.idPost : null, page: commentaires.getCurrentPageNumber }) }}" onsubmit="return confirm('Supprimer ce commentaire ?');">
                                             <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ commentaire.idCommentaire) }}">
                                             <button type="submit" class="btn btn-icon btn-ghost-danger" title="Supprimer">
                                                 <i class="ti ti-trash" style="font-size: 1.25rem;"></i>
@@ -97,6 +97,19 @@
                         </tbody>
                     </table>
                 </div>
+                {% if commentaires.getTotalItemCount > 0 %}
+                    {% set page_start = ((commentaires.getCurrentPageNumber - 1) * commentaires.getItemNumberPerPage) + 1 %}
+                    {% set page_end_candidate = commentaires.getCurrentPageNumber * commentaires.getItemNumberPerPage %}
+                    {% set page_end = page_end_candidate < commentaires.getTotalItemCount ? page_end_candidate : commentaires.getTotalItemCount %}
+                    <div class="card-footer d-flex flex-column flex-md-row align-items-md-center gap-3">
+                        <div class="text-secondary small">
+                            Affichage de {{ page_start }} a {{ page_end }} sur {{ commentaires.getTotalItemCount }} commentaire{{ commentaires.getTotalItemCount > 1 ? 's' : '' }}
+                        </div>
+                        <div class="ms-md-auto">
+                            {{ knp_pagination_render(commentaires) }}
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>

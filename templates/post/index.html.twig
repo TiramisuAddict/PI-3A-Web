@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Publications — Momentum{% endblock %}
+{% block title %}Publications - Momentum{% endblock %}
 
 {% block body %}
 <div class="page-wrapper">
@@ -11,7 +11,7 @@
                     <h2 class="page-title">Publications</h2>
                 </div>
                 <div class="col-auto">
-                    <a class="btn btn-primary" href="{{ path('app_post_new') }}"><i class="ti ti-plus me-1"></i>Créer une publication</a>
+                    <a class="btn btn-primary" href="{{ path('app_post_new') }}"><i class="ti ti-plus me-1"></i>Creer une publication</a>
                 </div>
             </div>
         </div>
@@ -20,15 +20,27 @@
         <div class="container-xl">
             <div class="card">
                 <div class="card-body">
-                    <form id="post-search-form" method="get" action="{{ path('app_post_index') }}" class="mb-0" data-rows-url="{{ path('app_post_rows') }}">
+                    <form id="post-search-form" method="get" action="{{ path('app_post_index') }}" class="mb-0">
                         <div class="row g-2 align-items-end">
                             <div class="col-md-8 col-lg-6">
                                 <label class="form-label" for="post-search-input">Rechercher</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="ti ti-search"></i></span>
-                                    <input type="search" id="post-search-input" name="search" value="{{ search|default('') }}" class="form-control" placeholder="Rechercher par titre ou contenu..." autocomplete="off" aria-busy="false">
+                                    <input type="search" id="post-search-input" name="search" value="{{ search|default('') }}" class="form-control" placeholder="Rechercher par titre ou contenu..." autocomplete="off">
+                                    <button type="submit" class="btn btn-primary">Rechercher</button>
                                 </div>
-                                <p id="post-search-meta" class="text-secondary small mt-2 mb-0 {{ search|default('') == '' ? 'd-none' : '' }}">{% if search|default('') != '' %}{{ posts|length }} résultat{{ posts|length > 1 ? 's' : '' }} trouvé{{ posts|length > 1 ? 's' : '' }}{% endif %}</p>
+                                <p id="post-search-meta" class="text-secondary small mt-2 mb-0 {{ search|default('') == '' ? 'd-none' : '' }}">
+                                    {% if search|default('') != '' %}
+                                        {{ posts.getTotalItemCount }} resultat{{ posts.getTotalItemCount > 1 ? 's' : '' }} trouve{{ posts.getTotalItemCount > 1 ? 's' : '' }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-auto">
+                                {% if search|default('') != '' %}
+                                    <a class="btn btn-outline-secondary" href="{{ path('app_post_index') }}">
+                                        <i class="ti ti-x me-1"></i>Reinitialiser
+                                    </a>
+                                {% endif %}
                             </div>
                         </div>
                     </form>
@@ -36,14 +48,14 @@
             </div>
 
             <div class="card">
-                <div class="table-responsive" id="posts-table-wrapper">
+                <div class="table-responsive {{ posts.getTotalItemCount == 0 ? 'd-none' : '' }}" id="posts-table-wrapper">
                     <table class="table table-vcenter card-table">
                         <thead>
                             <tr>
                                 <th>Titre</th>
                                 <th>Type</th>
-                                <th>État</th>
-                                <th>Création</th>
+                                <th>Etat</th>
+                                <th>Creation</th>
                                 <th class="text-end">Actions</th>
                             </tr>
                         </thead>
@@ -52,123 +64,31 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="card-body {{ posts|length > 0 ? 'd-none' : '' }}" id="empty-state">
+                <div class="card-body {{ posts.getTotalItemCount > 0 ? 'd-none' : '' }}" id="empty-state">
                     <div class="empty">
                         <div class="empty-header">404</div>
-                        <div class="empty-title">Aucune publication trouvée</div>
-                        <div class="empty-subtitle text-secondary">Créez une nouvelle publication pour commencer.</div>
+                        <div class="empty-title">Aucune publication trouvee</div>
+                        <div class="empty-subtitle text-secondary">Creez une nouvelle publication pour commencer.</div>
                         <div class="empty-action">
-                            <a href="{{ path('app_post_new') }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Créer une publication</a>
+                            <a href="{{ path('app_post_new') }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Creer une publication</a>
                         </div>
                     </div>
                 </div>
+                {% if posts.getTotalItemCount > 0 %}
+                    {% set page_start = ((posts.getCurrentPageNumber - 1) * posts.getItemNumberPerPage) + 1 %}
+                    {% set page_end_candidate = posts.getCurrentPageNumber * posts.getItemNumberPerPage %}
+                    {% set page_end = page_end_candidate < posts.getTotalItemCount ? page_end_candidate : posts.getTotalItemCount %}
+                    <div class="card-footer d-flex flex-column flex-md-row align-items-md-center gap-3">
+                        <div class="text-secondary small">
+                            Affichage de {{ page_start }} a {{ page_end }} sur {{ posts.getTotalItemCount }} publication{{ posts.getTotalItemCount > 1 ? 's' : '' }}
+                        </div>
+                        <div class="ms-md-auto">
+                            {{ knp_pagination_render(posts) }}
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block javascripts %}
-    {{ parent() }}
-    <script>
-        function initPostSearchPage() {
-            var form = document.getElementById('post-search-form');
-            var input = document.getElementById('post-search-input');
-            var tbody = document.getElementById('posts-table-body');
-            var meta = document.getElementById('post-search-meta');
-            var emptyState = document.getElementById('empty-state');
-            var tableWrapper = document.getElementById('posts-table-wrapper');
-            var rowsUrl = form ? form.dataset.rowsUrl : null;
-
-            if (!form || !input || !tbody || !rowsUrl || form.dataset.searchInitialized === 'true') {
-                return;
-            }
-
-            form.dataset.searchInitialized = 'true';
-
-            var debounceTimer = null;
-            var abortController = null;
-
-            function updateMeta(query, count) {
-                if (!meta) {
-                    return;
-                }
-
-                if (query.trim() === '') {
-                    meta.classList.add('d-none');
-                    meta.textContent = '';
-                    return;
-                }
-
-                meta.classList.remove('d-none');
-                meta.textContent = count + ' résultat' + (count !== 1 ? 's' : '') + ' trouvé' + (count !== 1 ? 's' : '');
-            }
-
-            function updateEmptyState(hasRows) {
-                if (!emptyState || !tableWrapper) {
-                    return;
-                }
-
-                emptyState.classList.toggle('d-none', hasRows);
-                tableWrapper.classList.toggle('d-none', !hasRows);
-            }
-
-            async function fetchRows(query) {
-                if (abortController) {
-                    abortController.abort();
-                }
-
-                abortController = new AbortController();
-                input.setAttribute('aria-busy', 'true');
-
-                try {
-                    var url = rowsUrl + '?search=' + encodeURIComponent(query);
-                    var response = await fetch(url, {
-                        method: 'GET',
-                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                        signal: abortController.signal
-                    });
-
-                    if (!response.ok) {
-                        throw new Error('HTTP ' + response.status);
-                    }
-
-                    var html = await response.text();
-                    tbody.innerHTML = html;
-
-                    var count = tbody.querySelectorAll('tr[data-post-row]').length;
-                    updateMeta(query, count);
-                    updateEmptyState(count > 0);
-
-                    var newUrl = query.trim() === ''
-                        ? window.location.pathname
-                        : window.location.pathname + '?search=' + encodeURIComponent(query);
-                    window.history.replaceState({}, '', newUrl);
-                } catch (error) {
-                    if (error.name !== 'AbortError') {
-                        console.error('Post search failed:', error);
-                    }
-                } finally {
-                    input.setAttribute('aria-busy', 'false');
-                }
-            }
-
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
-                fetchRows(input.value);
-            });
-
-            input.addEventListener('input', function () {
-                window.clearTimeout(debounceTimer);
-                debounceTimer = window.setTimeout(function () {
-                    fetchRows(input.value);
-                }, 250);
-            });
-
-            updateEmptyState(tbody.querySelectorAll('tr[data-post-row]').length > 0);
-        }
-
-        document.addEventListener('DOMContentLoaded', initPostSearchPage);
-        document.addEventListener('turbo:load', initPostSearchPage);
-    </script>
 {% endblock %}

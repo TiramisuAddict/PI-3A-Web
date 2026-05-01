@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Commentaire;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -21,41 +22,19 @@ class CommentaireRepository extends ServiceEntityRepository
         parent::__construct($registry, Commentaire::class);
     }
 
-    /**
-     * @return Commentaire[]
-     */
-    public function findForPostAdmin(int $postId): array
+    public function createAdminListQueryBuilder(?int $postId = null): QueryBuilder
     {
-        return $this->createQueryBuilder('c')
-            ->andWhere('c.post = :postId')
-            ->setParameter('postId', $postId)
-            ->orderBy('c.date_commentaire', 'DESC')
-            ->getQuery()
-            ->getResult();
+        $qb = $this->createQueryBuilder('c')
+            ->leftJoin('c.post', 'p')
+            ->addSelect('p')
+            ->orderBy('c.date_commentaire', 'DESC');
+
+        if ($postId !== null) {
+            $qb
+                ->andWhere('c.post = :postId')
+                ->setParameter('postId', $postId);
+        }
+
+        return $qb;
     }
-
-//    /**
-//     * @return Commentaire[] Returns an array of Commentaire objects
-//     */
-//    public function findByExampleField($value): array
-//    {
-//        return $this->createQueryBuilder('c')
-//            ->andWhere('c.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->orderBy('c.id', 'ASC')
-//            ->setMaxResults(10)
-//            ->getQuery()
-//            ->getResult()
-//        ;
-//    }
-
-//    public function findOneBySomeField($value): ?Commentaire
-//    {
-//        return $this->createQueryBuilder('c')
-//            ->andWhere('c.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->getQuery()
-//            ->getOneOrNullResult()
-//        ;
-//    }
 }

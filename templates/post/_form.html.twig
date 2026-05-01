@@ -8,7 +8,6 @@
     {% endif %}
 {% endmacro %}
 
-{# Type "evenement" = 2 (aligne sur FeedController / post_type_evenement) #}
 {% set post_type_evenement = 2 %}
 {% set current_type = form.vars.data is not null and form.vars.data.typePost is not null ? form.vars.data.typePost : 1 %}
 {% set existing_event_images = form.vars.data is not null ? form.vars.data.eventImages : [] %}
@@ -28,10 +27,51 @@
     </div>
 
     <div class="col-12">
-        {{ form_label(form.contenu, 'Contenu *', { label_attr: { class: 'form-label' } }) }}
+        <section class="post-assistant-card">
+            <div class="post-assistant-toolbar">
+                <div class="post-assistant-copy">
+                    <p class="post-assistant-kicker">IA Hugging Face</p>
+                    <div class="post-assistant-title-row">
+                        <h3 class="post-assistant-title">Generer une description a partir du titre</h3>
+                        <span class="post-assistant-provider" id="post-draft-provider">Assistant</span>
+                    </div>
+                    <p class="post-assistant-subtitle">Le bouton ci-dessous genere le contenu du post a partir du titre. La generation IA est active uniquement pour la gestion des posts.</p>
+                </div>
+                <div class="post-assistant-actions">
+                    <button type="button" class="btn btn-primary post-assistant-btn" id="generate-template-btn">
+                        <span><i class="ti ti-wand me-1"></i>Generer un brouillon</span>
+                        <span class="spinner-border spinner-border-sm ms-2 d-none" id="generate-template-spinner" role="status" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="btn btn-outline-primary post-assistant-btn" id="load-news-btn">
+                        <span><i class="ti ti-world me-1"></i>Suggestions</span>
+                        <span class="spinner-border spinner-border-sm ms-2 d-none" id="load-news-spinner" role="status" aria-hidden="true"></span>
+                    </button>
+                </div>
+            </div>
+
+            <p class="post-assistant-hint">Le meme bouton est disponible pour les champs de contenu du module post, en creation comme en modification.</p>
+            <div class="post-assistant-status d-none" id="post-assistant-status" role="status" aria-live="polite"></div>
+
+            <div class="post-news-panel d-none" id="post-news-panel">
+                <div class="post-news-panel-head">
+                    <h4 class="post-news-title">Inspiration rapide</h4>
+                    <span class="post-news-pill" id="post-news-provider">Suggestions</span>
+                </div>
+                <div class="post-news-list" id="post-news-list"></div>
+            </div>
+        </section>
+    </div>
+
+    <div class="col-12">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+            {{ form_label(form.contenu, 'Contenu *', { label_attr: { class: 'form-label mb-0' } }) }}
+            <button type="button" class="btn btn-outline-primary btn-sm" id="generate-content-inline-btn">
+                <i class="ti ti-sparkles me-1"></i>Generer depuis le titre
+            </button>
+        </div>
         {{ form_widget(form.contenu, {
             attr: {
-                class: 'form-control' ~ (form.contenu.vars.errors|length > 0 ? ' is-invalid' : ''),
+                class: 'form-control post-content-textarea' ~ (form.contenu.vars.errors|length > 0 ? ' is-invalid' : ''),
                 placeholder: 'Entrez le contenu',
                 rows: 6
             }
@@ -200,6 +240,218 @@
     {% endfor %}
 {% endif %}
 
+<style>
+    .post-assistant-card {
+        padding: 1rem 1rem 1.1rem;
+        border-radius: 1.25rem;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+    }
+    .post-assistant-toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 1rem;
+        align-items: start;
+    }
+    .post-assistant-copy {
+        min-width: 0;
+    }
+    .post-assistant-kicker {
+        display: inline-flex;
+        align-items: center;
+        margin: 0 0 0.5rem;
+        padding: 0.24rem 0.56rem;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #4338ca;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+    .post-assistant-title-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.35rem;
+    }
+    .post-assistant-title {
+        margin: 0;
+        color: #0f172a;
+        font-size: 1.08rem;
+        font-weight: 700;
+        line-height: 1.35;
+    }
+    .post-assistant-provider {
+        display: inline-flex;
+        align-items: center;
+        min-height: 1.8rem;
+        padding: 0.18rem 0.62rem;
+        border-radius: 999px;
+        background: #f8fafc;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        color: #475569;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+    .post-assistant-provider.is-fallback {
+        background: #f8fafc;
+        border-color: rgba(148, 163, 184, 0.25);
+        color: #475569;
+    }
+    .post-assistant-subtitle {
+        margin: 0;
+        max-width: 46rem;
+        color: #64748b;
+        line-height: 1.6;
+        font-size: 0.92rem;
+    }
+    .post-assistant-actions {
+        display: flex;
+        align-items: stretch;
+        justify-content: flex-end;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+    }
+    .post-assistant-btn {
+        border-radius: 999px;
+        padding-inline: 0.95rem;
+        min-height: 2.7rem;
+        font-weight: 700;
+        box-shadow: none !important;
+    }
+    .post-assistant-hint {
+        margin: 0.75rem 0 0;
+        color: #64748b;
+        font-size: 0.84rem;
+        line-height: 1.55;
+    }
+    .post-assistant-status {
+        margin-top: 0.8rem;
+        padding: 0.65rem 0.85rem;
+        border-radius: 0.9rem;
+        font-size: 0.88rem;
+        line-height: 1.5;
+    }
+    .post-assistant-status.is-loading {
+        background: #eff6ff;
+        border: 1px solid rgba(59, 130, 246, 0.18);
+        color: #1d4ed8;
+    }
+    .post-assistant-status.is-success {
+        background: #f8fafc;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        color: #334155;
+    }
+    .post-assistant-status.is-error {
+        background: #fef2f2;
+        border: 1px solid rgba(239, 68, 68, 0.18);
+        color: #b91c1c;
+    }
+    .post-news-panel {
+        margin-top: 0.85rem;
+        padding-top: 0.9rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.16);
+    }
+    .post-news-panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .post-news-title {
+        margin: 0;
+        color: #0f172a;
+        font-size: 0.98rem;
+        font-weight: 700;
+    }
+    .post-news-pill {
+        border-radius: 999px;
+        padding: 0.3rem 0.68rem;
+        background: #f8fafc;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        color: #475569;
+        font-size: 0.76rem;
+        font-weight: 700;
+    }
+    .post-news-list {
+        display: grid;
+        gap: 0.7rem;
+    }
+    .post-news-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.85rem;
+        align-items: center;
+        padding: 0.85rem 0.95rem;
+        border-radius: 1rem;
+        background: #ffffff;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+    }
+    .post-news-item-title {
+        color: #0f172a;
+        font-weight: 700;
+        line-height: 1.45;
+        margin-bottom: 0.28rem;
+    }
+    .post-news-item-meta {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        color: #64748b;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+    .post-news-item-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .post-news-action {
+        border-radius: 999px;
+        min-height: 2rem;
+    }
+    .post-content-textarea.is-generated {
+        animation: postGeneratedPulse 0.8s ease-out;
+    }
+    @keyframes postGeneratedPulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.18);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+        100% {
+            box-shadow: 0 0 0 12px rgba(59, 130, 246, 0);
+            border-color: inherit;
+        }
+    }
+    @media (max-width: 768px) {
+        .post-assistant-toolbar,
+        .post-news-item {
+            grid-template-columns: 1fr;
+        }
+        .post-assistant-actions {
+            width: 100%;
+            justify-content: stretch;
+        }
+        .post-assistant-btn {
+            width: 100%;
+            justify-content: center;
+        }
+        .post-news-item-actions {
+            justify-content: flex-start;
+        }
+        .post-news-panel-head {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+</style>
+
 <script>
 (function () {
     var ef = document.getElementById('post-event-fields');
@@ -207,6 +459,19 @@
     var select = document.querySelector('.post-crud-form select[name="post[type_post]"]');
     var block = document.getElementById('post-event-fields');
     var hint = document.getElementById('post-type-hint');
+    var titleInput = document.getElementById('{{ form.titre.vars.id }}');
+    var contentTextarea = document.getElementById('{{ form.contenu.vars.id }}');
+    var assistantStatus = document.getElementById('post-assistant-status');
+    var draftProvider = document.getElementById('post-draft-provider');
+    var newsPanel = document.getElementById('post-news-panel');
+    var newsList = document.getElementById('post-news-list');
+    var newsProvider = document.getElementById('post-news-provider');
+    var generateTemplateButton = document.getElementById('generate-template-btn');
+    var generateContentInlineButton = document.getElementById('generate-content-inline-btn');
+    var generateTemplateSpinner = document.getElementById('generate-template-spinner');
+    var loadNewsButton = document.getElementById('load-news-btn');
+    var loadNewsSpinner = document.getElementById('load-news-spinner');
+    var newsLoaded = false;
 
     function sync() {
         if (!select || !block) return;
@@ -220,9 +485,234 @@
         }
     }
 
+    function setStatus(type, message) {
+        if (!assistantStatus) return;
+
+        assistantStatus.classList.remove('d-none', 'is-loading', 'is-success', 'is-error');
+        assistantStatus.textContent = message || '';
+
+        if (type === 'loading') {
+            assistantStatus.classList.add('is-loading');
+        } else if (type === 'success') {
+            assistantStatus.classList.add('is-success');
+        } else if (type === 'error') {
+            assistantStatus.classList.add('is-error');
+        } else {
+            assistantStatus.classList.add('d-none');
+        }
+    }
+
+    function setButtonLoading(button, spinner, isLoading) {
+        if (button) {
+            button.disabled = isLoading;
+        }
+        if (spinner) {
+            spinner.classList.toggle('d-none', !isLoading);
+        }
+    }
+
+    function markTextareaGenerated() {
+        if (!contentTextarea) return;
+
+        contentTextarea.classList.remove('is-generated');
+        void contentTextarea.offsetWidth;
+        contentTextarea.classList.add('is-generated');
+    }
+
+    function setDraftProvider(label, isFallback) {
+        if (!draftProvider) return;
+
+        draftProvider.textContent = label || 'Assistant';
+        draftProvider.classList.toggle('is-fallback', !!isFallback);
+    }
+
+    async function sendFormRequest(url, payload) {
+        var response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: new URLSearchParams(payload).toString(),
+            credentials: 'same-origin'
+        });
+
+        var data;
+        try {
+            data = await response.json();
+        } catch (error) {
+            data = { success: false, message: 'Reponse serveur invalide.' };
+        }
+
+        return { response: response, data: data };
+    }
+
+    async function generateDraftFromTitle(title, sourceTitle) {
+        if (!titleInput || !contentTextarea) return;
+
+        var effectiveTitle = (title || titleInput.value || '').trim();
+        if (!effectiveTitle) {
+            setStatus('error', 'Ajoutez un titre avant de demander un brouillon.');
+            titleInput.focus();
+            return;
+        }
+
+        if (titleInput.value.trim() === '') {
+            titleInput.value = effectiveTitle;
+        }
+
+        setButtonLoading(generateTemplateButton, generateTemplateSpinner, true);
+        setStatus('loading', 'Generation du brouillon en cours...');
+        setDraftProvider('Generation...', false);
+
+        try {
+            var result = await sendFormRequest('{{ path('app_post_generate_template') }}', {
+                title: effectiveTitle,
+                source_title: sourceTitle || ''
+            });
+
+            if (result.response.ok && result.data.success) {
+                contentTextarea.value = result.data.content || '';
+                contentTextarea.focus();
+                markTextareaGenerated();
+                setDraftProvider(result.data.provider || 'Assistant', !!result.data.usedFallback);
+                setStatus('success', result.data.usedFallback ? 'Description generee avec le mode simple.' : 'Description generee avec Hugging Face.');
+            } else {
+                setDraftProvider('Indisponible', true);
+                setStatus('error', result.data.message || 'Impossible de generer un brouillon pour le moment.');
+            }
+        } catch (error) {
+            console.error(error);
+            setDraftProvider('Indisponible', true);
+            setStatus('error', 'Une erreur est survenue lors de la generation du brouillon.');
+        } finally {
+            setButtonLoading(generateTemplateButton, generateTemplateSpinner, false);
+        }
+    }
+
+    function renderNewsArticles(articles, provider) {
+        if (!newsPanel || !newsList) return;
+
+        newsList.innerHTML = '';
+        if (newsProvider) {
+            newsProvider.textContent = provider || 'Suggestions';
+        }
+
+        if (!Array.isArray(articles) || articles.length === 0) {
+            newsPanel.classList.add('d-none');
+            return;
+        }
+
+        articles.forEach(function (article) {
+            var item = document.createElement('article');
+            item.className = 'post-news-item';
+            item.innerHTML =
+                '<div>' +
+                    '<div class="post-news-item-title"></div>' +
+                    '<div class="post-news-item-meta"><i class="ti ti-world"></i><span></span></div>' +
+                '</div>' +
+                '<div class="post-news-item-actions">' +
+                    '<button type="button" class="btn btn-sm btn-outline-primary post-news-action" data-action="use-headline">Utiliser</button>' +
+                    '<button type="button" class="btn btn-sm btn-primary post-news-action" data-action="generate-from-news">Brouillon</button>' +
+                '</div>';
+
+            item.querySelector('.post-news-item-title').textContent = article.title || '';
+            item.querySelector('.post-news-item-meta span').textContent = article.source || 'NewsAPI';
+
+            if (article.url) {
+                var openLink = document.createElement('a');
+                openLink.className = 'btn btn-sm btn-ghost-secondary post-news-action';
+                openLink.setAttribute('data-action', 'open-link');
+                openLink.target = '_blank';
+                openLink.rel = 'noopener noreferrer';
+                openLink.href = article.url;
+                openLink.textContent = 'Lire';
+                item.querySelector('.post-news-item-actions').appendChild(openLink);
+            }
+
+            item.querySelector('[data-action="use-headline"]').addEventListener('click', function () {
+                if (titleInput) {
+                    titleInput.value = article.title || '';
+                    titleInput.focus();
+                }
+                setStatus('success', 'Titre applique. Vous pouvez maintenant generer un brouillon ou ecrire votre version.');
+            });
+
+            item.querySelector('[data-action="generate-from-news"]').addEventListener('click', function () {
+                if (titleInput) {
+                    titleInput.value = article.title || '';
+                }
+                generateDraftFromTitle(article.title || '', article.title || '');
+            });
+
+            newsList.appendChild(item);
+        });
+
+        newsLoaded = true;
+        newsPanel.classList.remove('d-none');
+    }
+
+    async function loadNewsSuggestions() {
+        if (newsLoaded && newsPanel) {
+            newsPanel.classList.toggle('d-none');
+            return;
+        }
+
+        setButtonLoading(loadNewsButton, loadNewsSpinner, true);
+        setStatus('loading', 'Recuperation des idees en cours...');
+
+        try {
+            var response = await fetch('{{ path('app_post_news_suggestions') }}', {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+
+            var data;
+            try {
+                data = await response.json();
+            } catch (error) {
+                data = { success: false, articles: [], message: 'Reponse serveur invalide.' };
+            }
+
+            renderNewsArticles(data.articles || [], data.provider || 'Suggestions');
+
+            if (response.ok && data.success && Array.isArray(data.articles) && data.articles.length > 0) {
+                setStatus('success', data.usedFallback ? 'Selection editoriale locale chargee.' : 'Actualites chargees.');
+            } else {
+                setStatus('error', data.message || 'Aucune actualite n\'est disponible pour le moment.');
+            }
+        } catch (error) {
+            console.error(error);
+            setStatus('error', 'Impossible de charger les actualites pour le moment.');
+        } finally {
+            setButtonLoading(loadNewsButton, loadNewsSpinner, false);
+        }
+    }
+
     if (select) {
         select.addEventListener('change', sync);
         sync();
+    }
+
+    if (generateTemplateButton) {
+        generateTemplateButton.addEventListener('click', function () {
+            generateDraftFromTitle(titleInput ? titleInput.value : '', '');
+        });
+    }
+
+    if (generateContentInlineButton) {
+        generateContentInlineButton.addEventListener('click', function () {
+            generateDraftFromTitle(titleInput ? titleInput.value : '', '');
+        });
+    }
+
+    if (loadNewsButton) {
+        loadNewsButton.addEventListener('click', function () {
+            loadNewsSuggestions();
+        });
     }
 })();
 </script>

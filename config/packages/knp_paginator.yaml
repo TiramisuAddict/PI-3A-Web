@@ -1,0 +1,8 @@
+knp_paginator:
+    page_range: 3
+    remove_first_page_param: true
+    default_options:
+        page_name: page
+        distinct: true
+    template:
+        pagination: 'pagination/tabler_pagination.html.twig'

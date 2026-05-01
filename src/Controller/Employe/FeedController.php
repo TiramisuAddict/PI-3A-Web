@@ -9,7 +9,10 @@ use App\Entity\Post;
 use App\Repository\EmployeRepository;
 use App\Repository\PostRepository;
 use App\Service\BadWordService;
+use App\Service\NewsService;
+use App\Service\ParticipationTicketService;
 use App\Service\ReasonAssistantService;
+use App\Service\ToxicIntentService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,6 +20,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 #[Route('/employe')]
 class FeedController extends AbstractController
@@ -27,6 +31,9 @@ class FeedController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly ReasonAssistantService $reasonAssistantService,
         private readonly BadWordService $badWordService,
+        private readonly ToxicIntentService $toxicIntentService,
+        private readonly NewsService $newsService,
+        private readonly ParticipationTicketService $participationTicketService,
     ) {
     }
 
@@ -233,6 +240,40 @@ class FeedController extends AbstractController
         return $correctedContent !== '' ? $correctedContent : $trimmedContent;
     }
 
+    private function buildUnsafeCommentResponse(string $content): ?JsonResponse
+    {
+        $analysis = $this->badWordService->analyze($content);
+        if ($analysis['score'] >= 10) {
+            return new JsonResponse([
+                'success' => false,
+                'type' => 'bad_words',
+                'message' => 'Your comment contains inappropriate language.',
+                'bad_words_found' => $analysis['found'],
+                'censored_preview' => $analysis['censored'],
+                'suggestion' => 'Please review your comment and remove or rephrase the inappropriate content.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $intentAnalysis = $this->toxicIntentService->analyze($content);
+        if ($intentAnalysis['is_toxic']) {
+            $labels = array_keys($intentAnalysis['labels']);
+
+            return new JsonResponse([
+                'success' => false,
+                'type' => 'harmful_intent',
+                'message' => 'Your comment may hurt or target another person.',
+                'bad_words_found' => $labels !== [] ? $labels : ['toxic_intent'],
+                'censored_preview' => $content,
+                'suggestion' => 'Please rephrase the comment so it criticizes ideas or behavior without targeting or threatening a person.',
+                'toxicity_score' => $intentAnalysis['score'],
+                'toxicity_engine' => $intentAnalysis['engine'],
+                'toxicity_labels' => $intentAnalysis['labels'],
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        return null;
+    }
+
     private function createPostNotification(Post $post, int $actorUserId, string $title, string $message): void
     {
         $ownerUserId = (int) $post->getUtilisateurId();
@@ -257,6 +298,7 @@ class FeedController extends AbstractController
     {
         $filter = $request->query->get('filter', 'all');
         $userId = $this->getUserIdFromSession($session);
+        $topNews = $this->newsService->getTopNews();
 
         $criteria = ['active' => true];
         if ($filter === 'annonce') {
@@ -292,8 +334,10 @@ class FeedController extends AbstractController
                 'feed_route_like' => 'app_employe_feed_like',
                 'feed_route_participate' => 'app_employe_feed_participate',
                 'author_labels' => $postAuthorLabels,
+                'user_participation_ticket_urls' => [],
                 'email' => $session->get('employe_email') ?? '',
                 'role' => $session->get('employe_role') ?? '',
+                'top_news' => $topNews,
             ]);
         }
 
@@ -335,13 +379,26 @@ class FeedController extends AbstractController
         }
 
         $userParticipatIds = [];
+        $userParticipationTicketUrls = [];
         if ($userId) {
             $userParts = $conn->executeQuery(
-                'SELECT post_id FROM participation WHERE utilisateur_id = ? AND post_id IN (?)',
+                'SELECT id_participation, post_id, utilisateur_id, date_action FROM participation WHERE utilisateur_id = ? AND post_id IN (?)',
                 [$userId, array_values($postIds)],
                 [null, \Doctrine\DBAL\ArrayParameterType::INTEGER]
-            )->fetchFirstColumn();
-            $userParticipatIds = array_map('intval', $userParts);
+            )->fetchAllAssociative();
+            $userParticipatIds = array_map(static fn (array $row): int => (int) $row['post_id'], $userParts);
+
+            foreach ($userParts as $row) {
+                $normalizedRow = $this->participationTicketService->normalizeTicketRow([
+                    'id_participation' => $row['id_participation'],
+                    'utilisateur_id' => $row['utilisateur_id'],
+                    'post_id' => $row['post_id'],
+                    'date_action' => $row['date_action'],
+                ]);
+                $userParticipationTicketUrls[(int) $row['post_id']] = $this->generateUrl('app_participation_ticket', [
+                    'id_participation' => (int) $normalizedRow['id_participation'],
+                ]);
+            }
         }
 
         return $this->render('employe/feed.html.twig', [
@@ -365,8 +422,10 @@ class FeedController extends AbstractController
             'feed_route_like' => 'app_employe_feed_like',
             'feed_route_participate' => 'app_employe_feed_participate',
             'author_labels' => $postAuthorLabels + $commentsData['authorLabels'],
+            'user_participation_ticket_urls' => $userParticipationTicketUrls,
             'email' => $session->get('employe_email') ?? '',
             'role' => $session->get('employe_role') ?? '',
+            'top_news' => $topNews,
         ]);
     }
 
@@ -449,17 +508,9 @@ class FeedController extends AbstractController
             return new JsonResponse(['success' => false, 'message' => 'Comment cannot be empty'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Check for bad words
-        $analysis = $this->badWordService->analyze($content);
-        if ($analysis['score'] >= 10) {
-            return new JsonResponse([
-                'success' => false,
-                'type' => 'bad_words',
-                'message' => 'Your comment contains inappropriate language.',
-                'bad_words_found' => $analysis['found'],
-                'censored_preview' => $analysis['censored'],
-                'suggestion' => 'Please review your comment and remove or rephrase the inappropriate content.',
-            ], Response::HTTP_BAD_REQUEST);
+        $unsafeCommentResponse = $this->buildUnsafeCommentResponse($content);
+        if ($unsafeCommentResponse instanceof JsonResponse) {
+            return $unsafeCommentResponse;
         }
 
         $parentId = $request->request->get('parent_id');
@@ -524,17 +575,9 @@ class FeedController extends AbstractController
             return new JsonResponse(['success' => false, 'message' => 'Comment cannot be empty'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Check for bad words
-        $analysis = $this->badWordService->analyze($content);
-        if ($analysis['score'] >= 10) {
-            return new JsonResponse([
-                'success' => false,
-                'type' => 'bad_words',
-                'message' => 'Your comment contains inappropriate language.',
-                'bad_words_found' => $analysis['found'],
-                'censored_preview' => $analysis['censored'],
-                'suggestion' => 'Please review your comment and remove or rephrase the inappropriate content.',
-            ], Response::HTTP_BAD_REQUEST);
+        $unsafeCommentResponse = $this->buildUnsafeCommentResponse($content);
+        if ($unsafeCommentResponse instanceof JsonResponse) {
+            return $unsafeCommentResponse;
         }
 
         $comment->setContenu($this->normalizeCommentContent($content));
@@ -610,6 +653,7 @@ class FeedController extends AbstractController
         )->fetchOne();
 
         $participating = false;
+        $ticketUrl = null;
         if ($existing) {
             $conn->executeStatement(
                 'DELETE FROM participation WHERE utilisateur_id = ? AND post_id = ?',
@@ -636,6 +680,21 @@ class FeedController extends AbstractController
                 [$userId, $id_post, 'GOING']
             );
             $participating = true;
+
+            $ticketRow = $conn->executeQuery(
+                'SELECT id_participation, utilisateur_id, post_id, date_action
+                 FROM participation
+                 WHERE utilisateur_id = ? AND post_id = ?
+                 ORDER BY id_participation DESC
+                 LIMIT 1',
+                [$userId, $id_post]
+            )->fetchAssociative();
+
+            if (is_array($ticketRow)) {
+                $ticketUrl = $this->generateUrl('app_participation_ticket', [
+                    'id_participation' => (int) $ticketRow['id_participation'],
+                ], UrlGeneratorInterface::ABSOLUTE_URL);
+            }
 
             $actorName = $this->resolveAuthorLabels([$userId])[$userId] ?? 'Employe';
             $this->createPostNotification(
@@ -676,6 +735,7 @@ class FeedController extends AbstractController
             'capacity_status' => $capacityStatus,
             'capacity_percentage' => $percentage,
             'remaining_places' => $capacity !== null ? max(0, $capacity - $count) : null,
+            'ticket_url' => $ticketUrl,
         ]);
     }
 }

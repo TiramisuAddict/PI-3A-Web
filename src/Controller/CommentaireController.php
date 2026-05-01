@@ -7,6 +7,7 @@ use App\Form\CommentaireType;
 use App\Repository\CommentaireRepository;
 use App\Repository\PostRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,7 +18,12 @@ use Symfony\Component\Routing\Attribute\Route;
 final class CommentaireController extends AbstractController
 {
     #[Route(name: 'app_commentaire_index', methods: ['GET'])]
-    public function index(Request $request, CommentaireRepository $commentaireRepository, PostRepository $postRepository): Response
+    public function index(
+        Request $request,
+        CommentaireRepository $commentaireRepository,
+        PostRepository $postRepository,
+        PaginatorInterface $paginator
+    ): Response
     {
         $postId = $request->query->getInt('id_post', 0);
         $currentPost = null;
@@ -29,10 +35,14 @@ final class CommentaireController extends AbstractController
             }
         }
 
+        $commentaires = $paginator->paginate(
+            $commentaireRepository->createAdminListQueryBuilder($currentPost?->getIdPost()),
+            max(1, $request->query->getInt('page', 1)),
+            10
+        );
+
         return $this->render('commentaire/index.html.twig', [
-            'commentaires' => $currentPost !== null
-                ? $commentaireRepository->findForPostAdmin($currentPost->getIdPost())
-                : $commentaireRepository->findBy([], ['date_commentaire' => 'DESC']),
+            'commentaires' => $commentaires,
             'current_post' => $currentPost,
         ]);
     }
@@ -94,7 +104,11 @@ final class CommentaireController extends AbstractController
         }
 
         $postId = $request->query->getInt('id_post', 0);
+        $page = max(1, $request->query->getInt('page', 1));
 
-        return $this->redirectToRoute('app_commentaire_index', $postId > 0 ? ['id_post' => $postId] : [], Response::HTTP_SEE_OTHER);
+        return $this->redirectToRoute('app_commentaire_index', array_filter([
+            'id_post' => $postId > 0 ? $postId : null,
+            'page' => $page > 1 ? $page : null,
+        ], static fn (mixed $value): bool => $value !== null), Response::HTTP_SEE_OTHER);
     }
 }

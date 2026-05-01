@@ -6,12 +6,16 @@ use App\Entity\EventImage;
 use App\Entity\Post;
 use App\Form\PostType;
 use App\Repository\PostRepository;
+use App\Service\AnnouncementTemplateService;
+use App\Service\NewsService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Form\FormInterface;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -24,7 +28,10 @@ final class PostController extends AbstractController
 {
     private Filesystem $filesystem;
 
-    public function __construct()
+    public function __construct(
+        private readonly NewsService $newsService,
+        private readonly AnnouncementTemplateService $announcementTemplateService,
+    )
     {
         $this->filesystem = new Filesystem();
     }
@@ -65,10 +72,14 @@ final class PostController extends AbstractController
     }
 
     #[Route('/', name: 'app_post_index', methods: ['GET'])]
-    public function index(Request $request, PostRepository $postRepository): Response
+    public function index(Request $request, PostRepository $postRepository, PaginatorInterface $paginator): Response
     {
         $search = trim($request->query->getString('search', ''));
-        $posts = $postRepository->findForAdminIndex('' !== $search ? $search : null);
+        $posts = $paginator->paginate(
+            $postRepository->createAdminIndexQueryBuilder('' !== $search ? $search : null),
+            max(1, $request->query->getInt('page', 1)),
+            10
+        );
 
         return $this->render('post/index.html.twig', [
             'posts' => $posts,
@@ -118,14 +129,65 @@ final class PostController extends AbstractController
      * Fragment HTML (tbody) pour recherche dynamique sur la liste admin.
      */
     #[Route('/rows', name: 'app_post_rows', methods: ['GET'])]
-    public function rows(Request $request, PostRepository $postRepository): Response
+    public function rows(Request $request, PostRepository $postRepository, PaginatorInterface $paginator): Response
     {
         $search = trim($request->query->getString('search', ''));
-        $posts = $postRepository->findForAdminIndex('' !== $search ? $search : null);
+        $posts = $paginator->paginate(
+            $postRepository->createAdminIndexQueryBuilder('' !== $search ? $search : null),
+            max(1, $request->query->getInt('page', 1)),
+            10
+        );
 
         return $this->render('post/_rows.html.twig', [
             'posts' => $posts,
+            'search' => $search,
         ]);
+    }
+
+    #[Route('/news-suggestions', name: 'app_post_news_suggestions', methods: ['GET'])]
+    public function newsSuggestions(): JsonResponse
+    {
+        $news = $this->newsService->getTopNews();
+
+        return new JsonResponse([
+            'success' => true,
+            'articles' => $news['articles'],
+            'provider' => $news['provider'],
+            'usedFallback' => $news['usedFallback'],
+            'message' => $news['usedFallback']
+                ? 'Les actualites en ligne ne sont pas disponibles pour le moment. Voici quelques idees locales pour vous depanner.'
+                : 'Actualites chargees avec succes.',
+        ]);
+    }
+
+    #[Route('/generate-template', name: 'app_post_generate_template', methods: ['POST'])]
+    public function generateTemplate(Request $request): JsonResponse
+    {
+        try {
+            $title = trim((string) $request->request->get('title', ''));
+            $sourceTitle = trim((string) $request->request->get('source_title', ''));
+
+            if ($title === '') {
+                return new JsonResponse([
+                    'success' => false,
+                    'message' => 'Veuillez saisir un titre avant de generer un brouillon.',
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            $draft = $this->announcementTemplateService->generateDraft($title, $sourceTitle !== '' ? $sourceTitle : null);
+
+            return new JsonResponse([
+                'success' => true,
+                'content' => $draft['content'],
+                'provider' => $draft['provider'],
+                'usedFallback' => $draft['usedFallback'],
+            ]);
+        } catch (\Throwable $e) {
+            return new JsonResponse([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], Response::HTTP_BAD_REQUEST);
+        }
     }
 
     #[Route('/{id_post}', name: 'app_post_show', methods: ['GET'])]
@@ -188,7 +250,13 @@ final class PostController extends AbstractController
             $entityManager->flush();
         }
 
-        return $this->redirectToRoute('app_post_index', [], Response::HTTP_SEE_OTHER);
+        $search = trim((string) $request->query->get('search', ''));
+        $page = max(1, $request->query->getInt('page', 1));
+
+        return $this->redirectToRoute('app_post_index', array_filter([
+            'search' => $search !== '' ? $search : null,
+            'page' => $page > 1 ? $page : null,
+        ], static fn (mixed $value): bool => $value !== null), Response::HTTP_SEE_OTHER);
     }
 
     private function handleEventImageUploads(Post $post, FormInterface $form): void

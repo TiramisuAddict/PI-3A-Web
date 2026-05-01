@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Participation;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -16,9 +17,25 @@ class ParticipationRepository extends ServiceEntityRepository
         parent::__construct($registry, Participation::class);
     }
 
+    public function createAdminListQueryBuilder(?int $postId = null): QueryBuilder
+    {
+        $qb = $this->createQueryBuilder('part')
+            ->leftJoin('part.post', 'p')
+            ->addSelect('p')
+            ->orderBy('part.date_action', 'DESC');
+
+        if ($postId !== null) {
+            $qb
+                ->andWhere('part.post = :postId')
+                ->setParameter('postId', $postId);
+        }
+
+        return $qb;
+    }
+
     /**
-     * Participations sur des posts événement (type_post = 2), agrégées par jour (date d'action).
-     * Requête compatible MySQL / MariaDB (schéma projet « momentum »).
+     * Participations sur des posts evenement (type_post = 2), agregees par jour (date d'action).
+     * Requete compatible MySQL / MariaDB (schema projet momentum).
      *
      * @return list<array{day: string, count: int}>
      */

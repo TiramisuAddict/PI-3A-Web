@@ -236,7 +236,7 @@
 
                         <div class="feed-stats-row">
                             <span class="feed-stat" id="like-count-{{ pid }}">
-                                <i class="ti ti-heart-filled"></i>
+                                <i class="ti ti-heart"></i>
                                 <span>{{ like_n }} j'aime</span>
                             </span>
                             <span class="feed-stat" id="com-count-{{ pid }}">
@@ -274,7 +274,7 @@
                                 data-csrf="{{ csrf_token('feed_like_' ~ pid) }}"
                             >
                                 <span class="feed-action-icon">
-                                    <i class="ti {% if liked %}ti-heart-filled{% else %}ti-heart{% endif %}"></i>
+                                    <i class="ti ti-heart"></i>
                                 </span>
                                 <span class="feed-action-label">J'aime</span>
                             </button>
@@ -300,10 +300,20 @@
                                     data-csrf="{{ csrf_token('feed_participate_' ~ pid) }}"
                                 >
                                     <span class="feed-action-icon">
-                                        <i class="ti {% if participating %}ti-circle-check-filled{% else %}ti-circle-check{% endif %}"></i>
+                                        <i class="ti ti-circle-check"></i>
                                     </span>
                                     <span class="feed-action-label feed-action-text">{% if participating %}Annuler{% else %}Participer{% endif %}</span>
                                 </button>
+                                <a
+                                    href="{{ user_participation_ticket_urls[pid]|default('#') }}"
+                                    class="feed-ticket-link {% if not participating %}d-none{% endif %}"
+                                    id="ticket-link-{{ pid }}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <i class="ti ti-qrcode"></i>
+                                    <span>Mon QR code</span>
+                                </a>
                             {% endif %}
                         </div>
 
@@ -366,6 +376,122 @@
             align-items: flex-end;
             gap: 1rem;
             margin-bottom: 1.5rem;
+        }
+        .feed-news-card {
+            margin-bottom: 1.4rem;
+            padding: 1.1rem 1.2rem;
+            border-radius: 1.4rem;
+            border: 1px solid rgba(14, 116, 144, 0.14);
+            background: linear-gradient(135deg, rgba(236, 254, 255, 0.96), rgba(255, 255, 255, 0.98));
+            box-shadow: 0 18px 42px rgba(15, 23, 42, 0.06);
+        }
+        .feed-news-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 0.95rem;
+        }
+        .feed-news-kicker {
+            margin: 0 0 0.3rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #0f766e;
+        }
+        .feed-news-title {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .feed-news-subtitle {
+            margin: 0.35rem 0 0;
+            max-width: 34rem;
+            color: #64748b;
+        }
+        .feed-news-pill {
+            border-radius: 999px;
+            padding: 0.35rem 0.7rem;
+            background: rgba(13, 148, 136, 0.12);
+            color: #0f766e;
+            font-size: 0.76rem;
+            font-weight: 700;
+        }
+        .feed-news-list {
+            display: grid;
+            gap: 0.75rem;
+        }
+        .feed-ticket-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            min-height: 2.8rem;
+            padding: 0.75rem 1rem;
+            border-radius: 999px;
+            border: 1px solid rgba(59, 130, 246, 0.18);
+            background: rgba(239, 246, 255, 0.92);
+            color: #1d4ed8;
+            font-weight: 700;
+            text-decoration: none;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .feed-ticket-link:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 20px rgba(29, 78, 216, 0.12);
+            color: #1d4ed8;
+        }
+        .feed-news-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.9rem 1rem;
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            color: inherit;
+            text-decoration: none;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+        .feed-news-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+            border-color: rgba(13, 148, 136, 0.22);
+        }
+        .feed-news-item-main {
+            min-width: 0;
+            display: grid;
+            gap: 0.32rem;
+        }
+        .feed-news-item-title {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            color: #0f172a;
+            font-weight: 700;
+            line-height: 1.5;
+        }
+        .feed-news-item-meta {
+            display: inline-flex;
+            color: #64748b;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .feed-news-item-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            color: #0f766e;
+            font-size: 0.82rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .feed-news-empty {
+            margin: 0;
+            color: #64748b;
         }
         .feed-kicker {
             margin: 0 0 0.35rem;
@@ -803,6 +929,7 @@
                 align-items: stretch;
                 flex-direction: column;
             }
+            .feed-news-head,
             .feed-post-head,
             .feed-comment-head {
                 flex-direction: column;
@@ -971,7 +1098,7 @@
             function updateLikeSummary(postId, count) {
                 var stats = document.getElementById('like-count-' + postId);
                 if (stats) {
-                    stats.innerHTML = '<i class="ti ti-heart-filled"></i><span>' + count + ' j\'aime</span>';
+                    stats.innerHTML = '<i class="ti ti-heart"></i><span>' + count + ' j\'aime</span>';
                 }
             }
 
@@ -1027,6 +1154,21 @@
                 }
 
                 badge.innerHTML = (iconClass ? '<i class="' + iconClass + '"></i>' : '') + '<span>' + escapeHtml(remainingText || '') + '</span>';
+            }
+
+            function updateTicketLink(postId, ticketUrl, shouldShow) {
+                var link = document.getElementById('ticket-link-' + postId);
+                if (!link) {
+                    return;
+                }
+
+                if (shouldShow && ticketUrl) {
+                    link.href = ticketUrl;
+                    link.classList.remove('d-none');
+                } else {
+                    link.href = '#';
+                    link.classList.add('d-none');
+                }
             }
 
             function ensureCommentsList(postId) {
@@ -1145,6 +1287,14 @@
             }
 
             function showBadWordWarning(errorData, form, textarea) {
+                var isHarmfulIntent = errorData.type === 'harmful_intent';
+                var labels = errorData.bad_words_found || [];
+                var heading = isHarmfulIntent ? 'Harmful Intent Detected' : 'Inappropriate Language Detected';
+                var badgeLabel = isHarmfulIntent ? 'Detected signal(s): ' : 'Found ' + labels.length + ' word(s): ';
+                var previewTitle = isHarmfulIntent
+                    ? 'This comment expresses an opinion in a harmful or targeted way:'
+                    : 'Your comment contains these inappropriate words:';
+
                 // Remove existing warning
                 var existingWarning = form.querySelector('.bad-word-warning-box');
                 if (existingWarning) {
@@ -1155,7 +1305,7 @@
                 var warningBox = document.createElement('div');
                 warningBox.className = 'bad-word-warning-box mb-3';
                 
-                var badWordsHTML = (errorData.bad_words_found || [])
+                var badWordsHTML = labels
                     .map(function(word) { 
                         return '<span class="badge bg-danger ms-1">' + escapeHtml(word) + '</span>'; 
                     })
@@ -1165,13 +1315,13 @@
                     '<div class="alert alert-danger alert-dismissible fade show d-flex gap-3" role="alert">' +
                         '<i class="ti ti-alert-triangle-filled flex-shrink-0" style="font-size:20px; margin-top:2px;"></i>' +
                         '<div class="flex-grow-1">' +
-                            '<h6 class="alert-heading mb-2">Inappropriate Language Detected</h6>' +
+                            '<h6 class="alert-heading mb-2">' + heading + '</h6>' +
                             '<p class="mb-2 small">' +
-                                'Found ' + (errorData.bad_words_found || []).length + ' word(s): ' +
+                                badgeLabel +
                                 badWordsHTML +
                             '</p>' +
                             '<div class="bg-white p-2 rounded mb-2" style="border-left: 3px solid #dc2626; font-size:0.85rem; word-break: break-word;">' +
-                                '<strong>Your comment contains these inappropriate words:</strong><br/>' +
+                                '<strong>' + previewTitle + '</strong><br/>' +
                                 '<em class="text-muted">' + escapeHtml(errorData.censored_preview || '') + '</em>' +
                             '</div>' +
                             '<small class="text-muted">' + (errorData.suggestion || '') + '</small>' +
@@ -1203,12 +1353,6 @@
                         }, 150);
                     }
                 }, 13000);
-            }
-
-            function escapeHtml(text) {
-                var div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
             }
 
             function ensureEmptyState(postId) {
@@ -1282,7 +1426,7 @@
                         if (likeData.success) {
                             actionButton.classList.toggle('is-active', !!likeData.liked);
                             if (likeIcon) {
-                                likeIcon.className = 'ti ' + (likeData.liked ? 'ti-heart-filled' : 'ti-heart');
+                                likeIcon.className = 'ti ti-heart';
                             }
                             updateLikeSummary(likePostId, likeData.count);
                         } else {
@@ -1311,7 +1455,7 @@
                         if (participateData.success) {
                             actionButton.classList.toggle('is-active', !!participateData.participating);
                             if (participateIcon) {
-                                participateIcon.className = 'ti ' + (participateData.participating ? 'ti-circle-check-filled' : 'ti-circle-check');
+                                participateIcon.className = 'ti ti-circle-check';
                             }
                             if (participateText) {
                                 participateText.textContent = participateData.participating ? 'Annuler' : 'Participer';
@@ -1319,6 +1463,7 @@
                             updateParticipationSummary(participatePostId, participateData.count);
                             updateRemainingPlaces(participatePostId, participateData.remaining_places);
                             updateCapacityBadge(participatePostId, participateData.capacity_status);
+                            updateTicketLink(participatePostId, participateData.ticket_url || null, !!participateData.participating);
                         } else {
                             alert(participateData.message || 'Erreur lors de la mise a jour de la participation');
                         }
@@ -1427,7 +1572,7 @@
                             updateCommentSummary(postId, commentData.count);
                             textarea.value = '';
                             document.getElementById('comments-section-' + postId).style.display = 'block';
-                        } else if (commentData.type === 'bad_words') {
+                        } else if (commentData.type === 'bad_words' || commentData.type === 'harmful_intent') {
                             showBadWordWarning(commentData, form, textarea);
                         } else {
                             alert(commentData.message || 'Erreur lors de la publication du commentaire');
@@ -1464,7 +1609,7 @@
                             updateCommentSummary(replyPostId, replyData.count);
                             form.reset();
                             form.style.display = 'none';
-                        } else if (replyData.type === 'bad_words') {
+                        } else if (replyData.type === 'bad_words' || replyData.type === 'harmful_intent') {
                             showBadWordWarning(replyData, form, replyTextareaField);
                         } else {
                             alert(replyData.message || 'Erreur lors de la publication de la reponse');
@@ -1509,7 +1654,7 @@
                                 var meta = commentCard.querySelector('.feed-comment-meta');
                                 if (meta) meta.appendChild(badge);
                             }
-                        } else if (editData.type === 'bad_words') {
+                        } else if (editData.type === 'bad_words' || editData.type === 'harmful_intent') {
                             showBadWordWarning(editData, form, editTextareaField);
                         } else {
                             alert(editData.message || 'Erreur lors de la modification du commentaire');
