@@ -12,7 +12,7 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class EmployeRepository extends ServiceEntityRepository
 {
-    private const DEMANDE_MANAGER_ROLES = ['RH', 'administrateur entreprise'];
+    private const DEMANDE_MANAGER_ROLES = ['rh', 'administrateur entreprise'];
 
     public function __construct(ManagerRegistry $registry)
     {
@@ -64,7 +64,7 @@ class EmployeRepository extends ServiceEntityRepository
             ->select('DISTINCT e.e_mail AS email')
             ->leftJoin('e.entreprise', 'en')
             ->andWhere('en.id_entreprise = :entrepriseId')
-            ->andWhere('e.role IN (:roles)')
+            ->andWhere('LOWER(e.role) IN (:roles)')
             ->andWhere('e.e_mail IS NOT NULL')
             ->andWhere("TRIM(e.e_mail) <> ''")
             ->setParameter('entrepriseId', $entrepriseId)

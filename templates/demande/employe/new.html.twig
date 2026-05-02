@@ -398,6 +398,8 @@
     var AUTOCORRECT_AI_ENDPOINT = "{{ path('demande_api_autocorrect') }}";
     var DESCRIPTION_AI_ENDPOINT = "{{ path('demande_api_generate_description') }}";
     var AUTRE_AI_ENDPOINT = "{{ path('demande_api_autre_generate') }}";
+    var GEOCODE_REVERSE_ENDPOINT = "{{ path('demande_api_geocode_reverse') }}";
+    var GEOCODE_SEARCH_ENDPOINT = "{{ path('demande_api_geocode_search') }}";
 
     var AUTRE_BASE_REQUIRED_KEYS = ["besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre"];
     var AUTRE_HIDDEN_DUPLICATE_KEYS = ["besoinPersonnalise", "descriptionBesoin", "niveauUrgenceAutre", "pieceOuContexte"];
@@ -3115,21 +3117,27 @@
         })(key));
     }
 
-    function pickLocationOnMap(key, lat, lon) {
+    function pickLocationOnMap(key, lat, lon, fallbackName) {
         var m = maps[key];
         if (!m) return;
         if (markers[key]) m.removeLayer(markers[key]);
         markers[key] = L.marker([lat, lon]).addTo(m);
-        var tempName = lat.toFixed(5) + ", " + lon.toFixed(5);
+        var fallbackText = String(fallbackName || "").trim();
+        var tempName = fallbackText || (lat.toFixed(5) + ", " + lon.toFixed(5));
         selectedLocations[key] = { lat: lat, lon: lon, name: tempName };
         updateMapInfo(key, "Recherche en cours...");
         document.getElementById("mapconfirm-" + key).disabled = true;
         showSelectedInfo(key, { lat: lat, lon: lon, name: "Geocodage en cours..." });
 
-        fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lon + "&accept-language=fr")
-            .then(function (r) { return r.json(); })
+        fetch(GEOCODE_REVERSE_ENDPOINT + "?" + new URLSearchParams({ lat: lat, lon: lon }).toString(), {
+            headers: { "Accept": "application/json" }
+        })
+            .then(function (r) {
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                return r.json();
+            })
             .then(function (data) {
-                var name = data.display_name || tempName;
+                var name = (data && data.name) ? data.name : tempName;
                 selectedLocations[key] = { lat: lat, lon: lon, name: name };
                 updateMapInfo(key, name);
                 showSelectedInfo(key, selectedLocations[key]);
@@ -3147,16 +3155,20 @@
     function searchOnMap(key, query) {
         if (!query || !query.trim()) return;
         updateMapInfo(key, "Recherche: " + query + "...");
-        fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(query.trim()) + "&limit=1&accept-language=fr")
+        fetch(GEOCODE_SEARCH_ENDPOINT + "?" + new URLSearchParams({ q: query.trim() }).toString(), {
+            headers: { "Accept": "application/json" }
+        })
             .then(function (r) { return r.json(); })
-            .then(function (results) {
-                if (results && results.length > 0) {
-                    var r = results[0];
-                    var lat = parseFloat(r.lat);
-                    var lon = parseFloat(r.lon);
+            .then(function (result) {
+                if (result && result.success) {
+                    var lat = parseFloat(result.lat);
+                    var lon = parseFloat(result.lon);
                     var m = maps[key];
-                    if (m) { m.setView([lat, lon], 13); pickLocationOnMap(key, lat, lon); }
-                } else { updateMapInfo(key, "Aucun resultat trouve"); }
+                    if (m && !isNaN(lat) && !isNaN(lon)) {
+                        m.setView([lat, lon], 13);
+                        pickLocationOnMap(key, lat, lon, result.name || query.trim());
+                    }
+                } else { updateMapInfo(key, (result && result.message) ? result.message : "Aucun resultat trouve"); }
             })
             .catch(function () { updateMapInfo(key, "Erreur de recherche"); });
     }
@@ -3170,7 +3182,7 @@
         var el = document.getElementById("mapselected-" + key);
         if (!el) return;
         el.className = "map-selected-info visible";
-        el.innerHTML = "<strong>Lieu selectionne:</strong> " + loc.name +
+        el.innerHTML = "<strong>Lieu selectionne:</strong> " + escapeHtml(loc.name) +
             "<br><small style='color:#888'>Lat: " + loc.lat.toFixed(6) + " | Lon: " + loc.lon.toFixed(6) + "</small>";
     }
 
@@ -3186,7 +3198,7 @@
         updateClientFieldVisualState(valInput);
         var infoEl = document.getElementById("mapselected-" + key);
         if (infoEl) {
-            infoEl.innerHTML = "<strong style='color:#16a34a'>Destination confirmee:</strong> " + loc.name +
+            infoEl.innerHTML = "<strong style='color:#16a34a'>Destination confirmee:</strong> " + escapeHtml(loc.name) +
                 "<br><small style='color:#888'>Lat: " + loc.lat.toFixed(6) + " | Lon: " + loc.lon.toFixed(6) + "</small>";
         }
         var confirmBtn = document.getElementById("mapconfirm-" + key);
