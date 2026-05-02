@@ -1172,7 +1172,7 @@ class DemandeController extends AbstractController
                 ? trim((string) $details[$key])
                 : trim((string) ($field['value'] ?? ''));
 
-            if ('' !== $key && $this->isUnsupportedEmptyCurrentAutreScheduleField($key, $label, $value, $sourceText)) {
+            if ('' !== $key && $this->isUnsupportedCurrentAutreScheduleField($key, $label, $value, $sourceText)) {
                 unset($details[$key]);
                 continue;
             }
@@ -1190,9 +1190,9 @@ class DemandeController extends AbstractController
         ];
     }
 
-    private function isUnsupportedEmptyCurrentAutreScheduleField(string $key, string $label, string $value, string $sourceText): bool
+    private function isUnsupportedCurrentAutreScheduleField(string $key, string $label, string $value, string $sourceText): bool
     {
-        if ('' !== trim($value) || '' === trim($sourceText)) {
+        if ('' === trim($sourceText)) {
             return false;
         }
 
@@ -1214,7 +1214,8 @@ class DemandeController extends AbstractController
 
     private function normalizeAutreTextForMatch(string $value): string
     {
-        $normalized = strtolower(trim($value));
+        $normalized = preg_replace('/([a-z0-9])([A-Z])/', '$1 $2', trim($value)) ?? $value;
+        $normalized = strtolower(trim($normalized));
         if (function_exists('iconv')) {
             $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $normalized);
             if (false !== $ascii) {
@@ -1223,6 +1224,8 @@ class DemandeController extends AbstractController
         }
 
         $normalized = preg_replace('/[^a-z0-9]+/', ' ', $normalized) ?? $normalized;
+        $normalized = preg_replace('/\b(?:horriaire|horraire|horairre|horiare|horairee)(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|souhaite|souhaitee|souhaites|souhaitees)\b/', 'horaire $1', $normalized) ?? $normalized;
+        $normalized = preg_replace('/\b(?:horriaire|horraire|horairre|horiare|horairee)\b/', 'horaire', $normalized) ?? $normalized;
 
         return trim((string) (preg_replace('/\s+/', ' ', $normalized) ?? $normalized));
     }
