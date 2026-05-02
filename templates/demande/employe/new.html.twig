@@ -744,6 +744,7 @@
             var field = sanitizeAiCustomField(addRaw[j]);
             if (!field || addSeen[field.key]) continue;
             if (manualMode && field.source && field.source !== "manual") continue;
+            if (!manualMode && isUnsupportedEmptyCurrentAutreScheduleField(field)) continue;
             addSeen[field.key] = true;
             normalized.add.push(field);
             if (normalized.add.length >= 8) break;
@@ -756,6 +757,23 @@
         }
 
         return normalized;
+    }
+
+    function isUnsupportedEmptyCurrentAutreScheduleField(field) {
+        if (!field || typeof field !== "object") return false;
+        if (String(field.value || "").trim()) return false;
+
+        var haystack = normalizeUiLabel(String(field.key || "") + " " + String(field.label || ""));
+        var isCurrentScheduleField = /\b(horaire|heure|creneau|shift|poste)\b/.test(haystack)
+            && /\b(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes)\b/.test(haystack);
+
+        if (!isCurrentScheduleField) return false;
+
+        var promptInput = document.getElementById("autreAiDescription");
+        var promptText = normalizeUiLabel(String((promptInput || {}).value || SUBMITTED_AI_RAW_PROMPT || SUBMITTED_AI_DESCRIPTION || ""));
+        return !/\b(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|actuellement)\b/.test(promptText)
+            && promptText.indexOf("au lieu de") === -1
+            && !/\bpasser\s+de\b/.test(promptText);
     }
 
     function saveAiFieldPlanInput() {
@@ -1179,7 +1197,7 @@
             var regenerateBtn = document.getElementById("regenerateWithAiBtn");
 
             if (aiGeneratedInput) aiGeneratedInput.value = "0";
-            if (aiConfirmedInput) aiConfirmedInput.value = "1";
+            if (aiConfirmedInput) aiConfirmedInput.value = "0";
             if (aiTrustedLearningInput) aiTrustedLearningInput.value = "0";
             if (regenerateBtn) regenerateBtn.style.display = "none";
 
@@ -2389,7 +2407,7 @@
 
                 if (fieldPlan.manualMode) {
                     if (aiGeneratedInput) aiGeneratedInput.value = "0";
-                    if (aiConfirmedInput) aiConfirmedInput.value = "1";
+                    if (aiConfirmedInput) aiConfirmedInput.value = "0";
                 } else {
                     if (aiGeneratedInput) aiGeneratedInput.value = "1";
                     if (aiConfirmedInput) aiConfirmedInput.value = "0";

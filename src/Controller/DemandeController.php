@@ -178,6 +178,12 @@ class DemandeController extends AbstractController
             if ('Autre' === $submittedType && $manualFieldMode) {
                 $submittedAiFieldPlan = $this->sanitizeManualAutreFieldPlan($submittedAiFieldPlan, $submittedDetails);
                 $manualFieldMode = [] !== ($submittedAiFieldPlan['add'] ?? []);
+            } elseif ('Autre' === $submittedType) {
+                $submittedAiFieldPlan = $this->sanitizeGeneratedAutreFieldPlan(
+                    $submittedAiFieldPlan,
+                    $submittedDetails,
+                    '' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription
+                );
             }
 
             if ($submittedType) {
@@ -193,8 +199,11 @@ class DemandeController extends AbstractController
             $demande->setEmploye($employe);
 
             if ($form->isValid() && empty($detailErrors)) {
-                if ($aiGenerated && !$aiConfirmed && !$manualFieldMode) {
-                    $this->addFlash('warning', 'Veuillez confirmer la demande apres generation IA avant de creer la demande.');
+                if ($this->requiresAutreAiConfirmation($submittedType, $aiGenerated, $manualFieldMode, $aiConfirmed)) {
+                    $this->addFlash('warning', $manualFieldMode
+                        ? 'Veuillez confirmer les champs manuels avant de creer la demande.'
+                        : 'Veuillez confirmer la demande apres generation IA avant de creer la demande.'
+                    );
                 } else {
                     if ('Autre' === $submittedType && $manualFieldMode) {
                         $submittedDetails = $this->filterManualAutreSubmittedDetails($submittedDetails, $submittedAiFieldPlan);
@@ -205,7 +214,7 @@ class DemandeController extends AbstractController
 
                     if (!empty($submittedDetails)) {
                         $persistedDetails = $submittedDetails;
-                        $isAcceptedAutreFeedback = 'Autre' === $submittedType && (($aiGenerated && $aiConfirmed) || $manualFieldMode);
+                        $isAcceptedAutreFeedback = $this->isAcceptedAutreFeedback($submittedType, $aiGenerated, $manualFieldMode, $aiConfirmed);
                         if ($isAcceptedAutreFeedback) {
                             $trustedPrompt = trim('' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription);
                             $persistedDetails['_ai_feedback_confirmed'] = true;
@@ -245,7 +254,7 @@ class DemandeController extends AbstractController
                         );
                     }
 
-                    if ('Autre' === $demande->getTypeDemande() && (($aiGenerated && $aiConfirmed) || $manualFieldMode)) {
+                    if ($this->isAcceptedAutreFeedback($demande->getTypeDemande(), $aiGenerated, $manualFieldMode, $aiConfirmed)) {
                         $this->demandeAiAssistant->recordAcceptedAutreFeedback(
                             '' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription,
                             [
@@ -1009,7 +1018,9 @@ class DemandeController extends AbstractController
             $value = $details[$key] ?? $normalizedField['value'];
             $valueKey = $this->manualAutreDuplicateValueKey($value);
             if ('' !== $valueKey) {
-                $score = $this->manualAutreDuplicateKeepScore($normalizedField);
+                    $scoreField = $normalizedField;
+                    $scoreField['value'] = is_scalar($value) ? trim((string) $value) : '';
+                    $score = $this->manualAutreDuplicateKeepScore($scoreField);
                 if (isset($seenValues[$valueKey])) {
                     $previousIndex = $seenValues[$valueKey]['index'];
                     $previousScore = $seenValues[$valueKey]['score'];
@@ -1102,6 +1113,15 @@ class DemandeController extends AbstractController
             $score -= 20;
         }
 
+        $value = trim((string) ($field['value'] ?? ''));
+        if (preg_match('/\b\d{1,2}\s*(?:h|:)\s*\d{0,2}\s*[-–]\s*\d{1,2}\s*(?:h|:)\s*\d{0,2}\b/i', $value) === 1) {
+            if (preg_match('/\b(horaire|heure|creneau|shift|poste)\b/', $haystack) === 1) {
+                $score += 30;
+            } elseif (preg_match('/\b(type|nature|categorie|description|details?|commentaire|justification|motif|custom|champ)\b/', $haystack) === 1) {
+                $score -= 30;
+            }
+        }
+
         return $score;
     }
 
@@ -1116,6 +1136,95 @@ class DemandeController extends AbstractController
             || str_starts_with($normalized, 'llm')
             || str_starts_with($normalized, 'local-ml')
             || str_contains($normalized, 'fallback');
+    }
+
+    private function requiresAutreAiConfirmation(?string $typeDemande, bool $aiGenerated, bool $manualFieldMode, bool $aiConfirmed): bool
+    {
+        return 'Autre' === $typeDemande && ($aiGenerated || $manualFieldMode) && !$aiConfirmed;
+    }
+
+    private function isAcceptedAutreFeedback(?string $typeDemande, bool $aiGenerated, bool $manualFieldMode, bool $aiConfirmed): bool
+    {
+        return 'Autre' === $typeDemande && $aiConfirmed && ($aiGenerated || $manualFieldMode);
+    }
+
+    /**
+     * Learned Autre AI plans may carry a "current schedule" field from a prior
+     * schema even when the current prompt only contains the requested schedule.
+     *
+     * @param array<string, mixed> $fieldPlan
+     * @param array<string, mixed> $details
+     * @return array<string, mixed>
+     */
+    private function sanitizeGeneratedAutreFieldPlan(array $fieldPlan, array &$details, string $sourceText): array
+    {
+        $add = [];
+        $rawAdd = is_array($fieldPlan['add'] ?? null) ? $fieldPlan['add'] : [];
+
+        foreach ($rawAdd as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = trim((string) ($field['key'] ?? ''));
+            $label = trim((string) ($field['label'] ?? $key));
+            $value = is_scalar($details[$key] ?? null)
+                ? trim((string) $details[$key])
+                : trim((string) ($field['value'] ?? ''));
+
+            if ('' !== $key && $this->isUnsupportedEmptyCurrentAutreScheduleField($key, $label, $value, $sourceText)) {
+                unset($details[$key]);
+                continue;
+            }
+
+            $add[] = $field;
+        }
+
+        return [
+            'add' => $add,
+            'remove' => is_array($fieldPlan['remove'] ?? null)
+                ? array_values(array_map('strval', $fieldPlan['remove']))
+                : [],
+            'replaceBase' => true === ($fieldPlan['replaceBase'] ?? false),
+            'manualMode' => false,
+        ];
+    }
+
+    private function isUnsupportedEmptyCurrentAutreScheduleField(string $key, string $label, string $value, string $sourceText): bool
+    {
+        if ('' !== trim($value) || '' === trim($sourceText)) {
+            return false;
+        }
+
+        $haystack = $this->normalizeAutreTextForMatch($key . ' ' . $label);
+        $isCurrentScheduleField =
+            preg_match('/\b(horaire|heure|creneau|shift|poste)\b/', $haystack) === 1
+            && preg_match('/\b(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes)\b/', $haystack) === 1;
+
+        if (!$isCurrentScheduleField) {
+            return false;
+        }
+
+        $source = $this->normalizeAutreTextForMatch($sourceText);
+
+        return preg_match('/\b(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|actuellement)\b/', $source) !== 1
+            && !str_contains($source, 'au lieu de')
+            && preg_match('/\bpasser\s+de\b/', $source) !== 1;
+    }
+
+    private function normalizeAutreTextForMatch(string $value): string
+    {
+        $normalized = strtolower(trim($value));
+        if (function_exists('iconv')) {
+            $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $normalized);
+            if (false !== $ascii) {
+                $normalized = $ascii;
+            }
+        }
+
+        $normalized = preg_replace('/[^a-z0-9]+/', ' ', $normalized) ?? $normalized;
+
+        return trim((string) (preg_replace('/\s+/', ' ', $normalized) ?? $normalized));
     }
 
     private function validateDetails(string $typeDemande, array $details): array

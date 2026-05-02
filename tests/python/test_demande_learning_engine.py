@@ -201,6 +201,42 @@ class DemandeLearningEngineTest(unittest.TestCase):
         self.assertNotIn("ai_extra_infos", result["details"])
         self.assertEqual(["ai_type_materiel"], [field["key"] for field in result["custom_fields"]])
 
+    def test_manual_duration_schema_survives_duplicate_schedule_values_when_prompt_supports_it(self):
+        result = adaptive.generate_autre_response(
+            {
+                "text": "je souhaite un horaire reduit: 9h-14h pendant 2 semaines",
+                "acceptedAutreFeedback": [
+                    {
+                        "prompt": "je souhaite un horaire reduit: 9h-14h pendant 2 semaines",
+                        "confirmed": True,
+                        "manual": True,
+                        "createdAt": "2026-05-01T10:00:00+00:00",
+                        "details": {
+                            "ai_type_demande": "9h-14h",
+                            "ai_horaire_souhaite": "9h-14h",
+                            "ai_duree": "9h-14h",
+                            "ai_extra_infos": "9h-14h",
+                        },
+                        "fieldPlan": {
+                            "add": [
+                                {"key": "ai_type_demande", "label": "Type demande", "type": "text", "required": True, "source": "manual"},
+                                {"key": "ai_horaire_souhaite", "label": "Horaire souhaite", "type": "text", "required": True, "source": "manual"},
+                                {"key": "ai_duree", "label": "Duree", "type": "text", "required": False, "source": "manual"},
+                                {"key": "ai_extra_infos", "label": "Extra infos", "type": "textarea", "required": False, "source": "manual"},
+                            ],
+                            "remove": ["ALL"],
+                            "replaceBase": True,
+                            "manualMode": True,
+                        },
+                    },
+                ],
+            }
+        )
+
+        self.assertEqual("9h-14h", result["details"].get("ai_horaire_souhaite"))
+        self.assertEqual("2 semaines", result["details"].get("ai_duree"))
+        self.assertEqual(["ai_horaire_souhaite", "ai_duree"], [field["key"] for field in result["custom_fields"]])
+
     def test_shift_prompt_does_not_create_material_current_or_generic_date_fields(self):
         bad_shift_feedback = {
             "prompt": "je veux un shift nuit 22h-6h uniquement pendant la semaine prochaine",
@@ -246,6 +282,44 @@ class DemandeLearningEngineTest(unittest.TestCase):
         self.assertNotIn("ai_materiel_concerne", result["details"])
         self.assertNotIn("ai_horaire_actuel", result["details"])
         self.assertNotIn("ai_periode_concernee", result["details"])
+
+    def test_target_only_schedule_prompt_drops_empty_current_schedule_field(self):
+        feedback = {
+            "prompt": "je souhaite un horaire reduit 8h-17h pendant 2 semaines",
+            "confirmed": True,
+            "manual": True,
+            "createdAt": "2026-04-27T10:00:00+00:00",
+            "details": {
+                "ai_horaire_souhaite": "8h-17h",
+            },
+            "fieldPlan": {
+                "add": [
+                    {"key": "ai_horaire_actuel", "label": "Horaire actuel", "type": "text", "required": True},
+                    {"key": "ai_horaire_souhaite", "label": "Horaire souhaite", "type": "text", "required": True},
+                ],
+                "remove": ["ALL"],
+                "replaceBase": True,
+            },
+        }
+
+        result = adaptive.generate_autre_response(
+            {
+                "text": "je souhaite un horaire reduit: 9h-14h pendant 2 semaines",
+                "acceptedAutreFeedback": [feedback],
+            }
+        )
+
+        self.assertEqual("9h-14h", result["details"].get("ai_horaire_souhaite"))
+        self.assertNotIn("ai_horaire_actuel", result["details"])
+        self.assertNotIn("ai_horaire_actuel", [field["key"] for field in result["custom_fields"]])
+
+    def test_schedule_change_with_current_keeps_current_schedule_field(self):
+        result = adaptive.generate_autre_response(
+            {"text": "je veux passer de 8h-17h a 9h-14h pendant 2 semaines", "acceptedAutreFeedback": []}
+        )
+
+        self.assertEqual("8h-17h", result["details"].get("ai_horaire_actuel"))
+        self.assertEqual("9h-14h", result["details"].get("ai_horaire_souhaite"))
 
     def test_manual_anchor_schema_is_kept_even_when_value_is_not_in_prompt(self):
         result = adaptive.generate_autre_response(
