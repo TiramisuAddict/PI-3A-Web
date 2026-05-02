@@ -59,9 +59,9 @@ class EmployeType extends AbstractType
                 'widget'  => 'single_text',
                 'required' => false,
                 'constraints' => [
-                    new Assert\GreaterThan([
+                    new Assert\LessThanOrEqual([
                         'value' => 'today',
-                        'message' => 'La date doit etre superieure a la date d\'aujourd\'hui.',
+                        'message' => 'La date d\'embauche doit être inférieure ou égale à la date d\'aujourd\'hui.',
                     ]),
                 ],
             ])

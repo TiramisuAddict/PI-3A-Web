@@ -30,7 +30,7 @@
         <h1 class="h1 fw-bold mb-1">Créer un compte entreprise</h1>
         <p class="text-muted mb-3" style="font-size:0.78rem;">Remplissez les informations ci-dessous</p>
 
-        {{ include('components/controleSaisieAlert.html.twig') }}  
+        {{ include('components/controleSaisieAlert.html.twig', {'form': form}) }}  
            
 
         {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'enctype': 'multipart/form-data'}}) }}
