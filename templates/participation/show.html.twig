@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Participation #{{ participation.idParticipation }} — Momentum{% endblock %}
+{% block title %}Participation #{{ participation.idParticipation }} - Momentum{% endblock %}
 
 {% block body %}
 <div class="page-wrapper">
@@ -25,16 +25,16 @@
 
                         <div class="col-md-6">
                             <label class="form-label text-secondary small">Date d'action</label>
-                            <p class="mb-0">{{ participation.dateAction ? participation.dateAction|date('d/m/Y H:i') : '—' }}</p>
+                            <p class="mb-0">{{ participation.dateAction ? participation.dateAction|date('d/m/Y H:i') : '-' }}</p>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label text-secondary small">Post associé</label>
+                            <label class="form-label text-secondary small">Post associe</label>
                             <p class="mb-0">
                                 {% if participation.post %}
-                                    <a href="{{ path('app_post_show', {id_post: participation.post.idPost}) }}" class="btn btn-ghost-primary">{{ participation.post.titre|length > 40 ? participation.post.titre|slice(0, 40) ~ '…' : participation.post.titre }}</a>
+                                    <a href="{{ path('app_post_show', {id_post: participation.post.idPost}) }}" class="btn btn-ghost-primary">{{ participation.post.titre|length > 40 ? participation.post.titre|slice(0, 40) ~ '...' : participation.post.titre }}</a>
                                 {% else %}
-                                    —
+                                    -
                                 {% endif %}
                             </p>
                         </div>
@@ -43,7 +43,10 @@
             </div>
 
             <div class="d-flex flex-wrap gap-2 mt-3">
-                <a class="btn btn-primary" href="{{ path('app_participation_index') }}"><i class="ti ti-list me-1"></i>Retour à la liste</a>
+                <a class="btn btn-primary" href="{{ path('app_participation_index') }}"><i class="ti ti-list me-1"></i>Retour a la liste</a>
+                <a class="btn btn-outline-primary" href="{{ path('app_participation_ticket', { id_participation: participation.idParticipation }) }}" target="_blank" rel="noopener noreferrer">
+                    <i class="ti ti-qrcode me-1"></i>Voir le QR code
+                </a>
                 {{ include('participation/_delete_form.html.twig') }}
             </div>
         </div>

@@ -249,7 +249,6 @@ final class ReasonAssistantService
         }
 
         $lowerText = mb_strtolower($text);
-
         $frenchWords = ['je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'de', 'le', 'la', 'les', 'un', 'une', 'des', 'pour', 'dans', 'avec', 'est', 'sont', 'avoir', 'être'];
         $englishWords = ['i', 'you', 'he', 'she', 'we', 'they', 'the', 'a', 'an', 'is', 'are', 'have', 'has', 'with', 'for', 'to', 'of', 'in', 'on'];
 

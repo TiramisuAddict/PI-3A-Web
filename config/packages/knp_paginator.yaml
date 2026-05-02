@@ -1,10 +1,11 @@
 knp_paginator:
     page_range: 5
+    remove_first_page_param: true
     default_options:
         page_name: page
         sort_field_name: sort
         sort_direction_name: direction
         distinct: true
     template:
-        pagination: '@KnpPaginator/Pagination/bootstrap_v5_pagination.html.twig'
+        pagination: 'pagination/tabler_pagination.html.twig'
         sortable: '@KnpPaginator/Pagination/bootstrap_v5_bi_sortable_link.html.twig'
