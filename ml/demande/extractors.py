@@ -355,6 +355,16 @@ def extract_period_label(text: Any) -> str:
         return "Mois prochain"
     if re.search(r"\bce mois\b|\bmois en cours\b", clean):
         return "Mois en cours"
+
+    duration = re.search(r"\b(?:pendant|pour|durant|sur|duree\s+de)\s+(un|une|\d+)\s+(jours?|semaines?|mois)\b", clean)
+    if duration:
+        amount = 1 if duration.group(1) in {"un", "une"} else _small_number(duration.group(1))
+        unit = duration.group(2)
+        if amount > 0:
+            singular = unit.rstrip("s")
+            label_unit = singular if amount == 1 or singular == "mois" else singular + "s"
+            return f"{amount} {label_unit}"
+
     return ""
 
 
@@ -862,6 +872,18 @@ def extract_leave_type(text: Any) -> str:
 
 def extract_schedule_change(text: Any) -> tuple[str, str]:
     source = normalize_ws(text)
+    range_pattern = r"\d{1,2}\s*h\s*(?:[-–]\s*\d{1,2}\s*h)?"
+    direct_patterns = [
+        rf"\bpasser\s+de\s*({range_pattern})\s*(?:a|à|vers)\s*({range_pattern})\b",
+        rf"\bchangement\s+d\s*horaire.*?\bde\s*({range_pattern})\s*(?:a|à|vers)\s*({range_pattern})\b",
+    ]
+    for pattern in direct_patterns:
+        match = re.search(pattern, source, flags=re.IGNORECASE)
+        if match:
+            current = normalize_ws(match.group(1)).replace(" ", "")
+            target = normalize_ws(match.group(2)).replace(" ", "")
+            return current, target
+
     if not has_any_word(source, ["horaire", "shift", "poste"]):
         return "", ""
 

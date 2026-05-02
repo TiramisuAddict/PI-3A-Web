@@ -1212,6 +1212,162 @@ final class DemandeAiAssistantTest extends TestCase
         self::assertSame($expectedNextWeek, $result['suggestedDetails']['ai_periode'] ?? null);
     }
 
+    public function testTargetOnlySchedulePromptDropsEmptyCurrentScheduleFieldFromLearnedSchema(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'je souhaite un horaire reduit 8h-17h pendant 2 semaines',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-04-27T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Horaire reduit',
+                        'description' => 'je souhaite un horaire reduit 8h-17h pendant 2 semaines',
+                        'priorite' => 'NORMALE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_horaire_souhaite' => '8h-17h',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_horaire_actuel',
+                                'label' => 'Horaire actuel',
+                                'type' => 'text',
+                                'required' => true,
+                            ],
+                            [
+                                'key' => 'ai_horaire_souhaite',
+                                'label' => 'Horaire souhaite',
+                                'type' => 'text',
+                                'required' => true,
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            '',
+            ''
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'je souhaite un horaire reduit: 9h-14h pendant 2 semaines',
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('9h-14h', $result['suggestedDetails']['ai_horaire_souhaite'] ?? null);
+        self::assertArrayNotHasKey('ai_horaire_actuel', $result['suggestedDetails']);
+        self::assertNotContains(
+            'ai_horaire_actuel',
+            array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add'])
+        );
+    }
+
+    public function testManualDurationSchemaIsReusedWhenPromptSupportsIt(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'je souhaite un horaire reduit: 9h-14h pendant 2 semaines',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-05-01T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Horaire reduit',
+                        'description' => 'je souhaite un horaire reduit: 9h-14h pendant 2 semaines',
+                        'priorite' => 'NORMALE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_type_demande' => '9h-14h',
+                        'ai_horaire_souhaite' => '9h-14h',
+                        'ai_duree' => '9h-14h',
+                        'ai_extra_infos' => '9h-14h',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_type_demande',
+                                'label' => 'Type demande',
+                                'type' => 'text',
+                                'required' => true,
+                                'source' => 'manual',
+                            ],
+                            [
+                                'key' => 'ai_horaire_souhaite',
+                                'label' => 'Horaire souhaite',
+                                'type' => 'text',
+                                'required' => true,
+                                'source' => 'manual',
+                            ],
+                            [
+                                'key' => 'ai_duree',
+                                'label' => 'Duree',
+                                'type' => 'text',
+                                'required' => false,
+                                'source' => 'manual',
+                            ],
+                            [
+                                'key' => 'ai_extra_infos',
+                                'label' => 'Extra infos',
+                                'type' => 'textarea',
+                                'required' => false,
+                                'source' => 'manual',
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                        'manualMode' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            '',
+            ''
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'je souhaite un horaire reduit: 9h-14h pendant 2 semaines',
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('9h-14h', $result['suggestedDetails']['ai_horaire_souhaite'] ?? null);
+        self::assertSame('2 semaines', $result['suggestedDetails']['ai_duree'] ?? null);
+        self::assertSame(
+            ['ai_horaire_souhaite', 'ai_duree'],
+            array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add'])
+        );
+    }
+
     public function testGenerateAutreSuggestionsDoesNotMergeUnrelatedLearnedSchemas(): void
     {
         $repository = $this->createMock(DemandeRepository::class);

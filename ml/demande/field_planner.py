@@ -216,7 +216,9 @@ def _has_maintenance_signal(source: str) -> bool:
 
 
 def _has_schedule_signal(source: str) -> bool:
-    return has_any_word(source, ["horaire", "shift", "poste"])
+    return has_any_word(source, ["horaire", "shift", "poste"]) or bool(
+        re.search(r"\bpasser\s+de\s*\d{1,2}\s*h", norm(source))
+    )
 
 
 def _has_material_signal(source: str) -> bool:
@@ -440,8 +442,17 @@ def extract_value_for_field(source: str, field: FieldSpec, entities: ExtractedEn
     return "", False
 
 
-def _field_named_explicitly(source: str, field: FieldSpec) -> bool:
+def _field_named_explicitly(source: str, field: FieldSpec, entities: ExtractedEntities | None = None) -> bool:
     clean = norm(source)
+    if _is_current_time_field(field):
+        if entities is not None and entities.schedule_current:
+            return True
+        return bool(
+            re.search(r"\b(?:actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|actuellement)\b", clean)
+            or has_phrase(clean, "au lieu de")
+            or re.search(r"\bpasser\s+de\b", clean)
+        )
+
     tokens = [
         token
         for token in tokenize(f"{field.key} {field.label}", include_bigrams=False)
@@ -559,6 +570,8 @@ def _dedupe_fields(fields: Iterable[FieldSpec]) -> list[FieldSpec]:
 def _duplicate_value_keep_score(field: FieldSpec) -> float:
     key_text = norm(f"{field.key} {field.label}")
     role = field_role(field)
+    value = normalize_ws(field.value)
+    time_like_value = bool(re.search(r"\b\d{1,2}\s*(?:h|:)\s*\d{0,2}\s*[-–]\s*\d{1,2}\s*(?:h|:)\s*\d{0,2}\b", value, flags=re.IGNORECASE))
     score = field.confidence
     if field.required:
         score += 2.0
@@ -578,6 +591,10 @@ def _duplicate_value_keep_score(field: FieldSpec) -> float:
         score += 1.0
     if role in {"reason", "generic"}:
         score -= 0.6
+    if time_like_value and role == "time":
+        score += 2.0
+    elif time_like_value and role in {"category", "generic", "reason"}:
+        score -= 1.5
     if field.key.startswith("ai_custom_"):
         score -= 1.0
     if any(token in key_text for token in ["extra", "infos", "information", "description", "detail", "justification"]):
@@ -637,7 +654,7 @@ def plan_from_retrieval(source: str, result: RetrievalResult, profile: LearningP
 
     for field, examples, weight, from_anchor in _candidate_schema_fields(result, profile):
         value, explicit_value = extract_value_for_field(source, field, entities, examples)
-        named_explicit = _field_named_explicitly(source, field)
+        named_explicit = _field_named_explicitly(source, field, entities)
 
         if field.type == "select":
             value = _select_value_from_options(value, field.options, source)
@@ -929,7 +946,7 @@ def generate_response(payload: dict[str, Any]) -> dict[str, Any]:
         fields, useful_local_plan = fallback_fields(source, result.entities)
         used_retrieval = False
 
-    fields = [field for field in fields if not should_suppress_field(field, profile, source) or _field_named_explicitly(source, field)]
+    fields = [field for field in fields if not should_suppress_field(field, profile, source) or _field_named_explicitly(source, field, result.entities)]
     fields = _trim_fields(_dedupe_same_values(_dedupe_fields(fields)))
     details = {field.key: field.value for field in fields if normalize_ws(field.value)}
     general_priority, urgency = priority(source)

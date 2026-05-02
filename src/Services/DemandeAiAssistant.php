@@ -134,7 +134,8 @@ class DemandeAiAssistant
         $normalizedModelPayload = $this->normalizeAutreModelPayload(
             $detailsPayload,
             $customPayload,
-            array_values(array_unique($allowedKeys))
+            array_values(array_unique($allowedKeys)),
+            $sourceText
         );
         $detailsPayload = $normalizedModelPayload['suggestedDetails'];
         $customPayload = $normalizedModelPayload['customFields'];
@@ -165,7 +166,7 @@ class DemandeAiAssistant
      * @param array<int, string> $allowedDetailKeys
      * @return array{suggestedDetails: array<string, string>, customFields: array<int, array<string, mixed>>}
      */
-    private function normalizeAutreModelPayload(array $detailsPayload, array $customPayload, array $allowedDetailKeys): array
+    private function normalizeAutreModelPayload(array $detailsPayload, array $customPayload, array $allowedDetailKeys, string $sourceText = ''): array
     {
         $normalizedCustomFields = $this->normalizeCustomFields($customPayload, $allowedDetailKeys);
 
@@ -186,7 +187,7 @@ class DemandeAiAssistant
             }
         }
 
-        $normalizedCustomFields = $this->cleanAutreDuplicateAndNoisyFields($normalizedCustomFields, $normalizedDetails);
+        $normalizedCustomFields = $this->cleanAutreDuplicateAndNoisyFields($normalizedCustomFields, $normalizedDetails, $sourceText);
 
         return [
             'suggestedDetails' => $normalizedDetails,
@@ -199,7 +200,7 @@ class DemandeAiAssistant
      * @param array<string, string> $details
      * @return array<int, array<string, mixed>>
      */
-    private function cleanAutreDuplicateAndNoisyFields(array $customFields, array &$details): array
+    private function cleanAutreDuplicateAndNoisyFields(array $customFields, array &$details, string $sourceText = ''): array
     {
         $cleaned = [];
         $seenDateValues = [];
@@ -234,6 +235,11 @@ class DemandeAiAssistant
                 continue;
             }
 
+            if ($this->isUnsupportedEmptyCurrentAutreScheduleField($key, $label, $value, $sourceText)) {
+                unset($details[$key]);
+                continue;
+            }
+
             $badValue = $this->isNoisyAutreFieldValue($key, $label, $value, $details);
             if (!$badValue && $this->isAutreDateField($key, $label, $type) && '' !== $value) {
                 if (isset($seenDateValues[$value]) && 'dateSouhaiteeAutre' !== $key) {
@@ -255,7 +261,7 @@ class DemandeAiAssistant
 
             $comparableValue = $this->duplicateAutreFieldValueKey($type, $value);
             if ('' !== $comparableValue) {
-                $currentScore = $this->duplicateAutreFieldPreferenceScore($key, $label, $type, $required);
+                $currentScore = $this->duplicateAutreFieldPreferenceScore($key, $label, $type, $required, $value);
                 if (isset($seenComparableValues[$comparableValue])) {
                     $previousIndex = $seenComparableValues[$comparableValue]['index'];
                     $previousScore = $seenComparableValues[$comparableValue]['score'];
@@ -306,7 +312,7 @@ class DemandeAiAssistant
         return $normalized;
     }
 
-    private function duplicateAutreFieldPreferenceScore(string $key, string $label, string $type, bool $required): int
+    private function duplicateAutreFieldPreferenceScore(string $key, string $label, string $type, bool $required, string $value = ''): int
     {
         $haystack = $this->normalizeForSearch($key . ' ' . $label);
         $score = $required ? 10 : 0;
@@ -321,6 +327,14 @@ class DemandeAiAssistant
 
         if ('textarea' === $type) {
             $score -= 10;
+        }
+
+        if (preg_match('/\b\d{1,2}\s*(?:h|:)\s*\d{0,2}\s*[-–]\s*\d{1,2}\s*(?:h|:)\s*\d{0,2}\b/i', $value) === 1) {
+            if (preg_match('/\b(horaire|heure|creneau|shift|poste)\b/u', $haystack) === 1) {
+                $score += 30;
+            } elseif (preg_match('/\b(type|nature|categorie|description|details?|commentaire|justification|motif|custom|champ)\b/u', $haystack) === 1) {
+                $score -= 30;
+            }
         }
 
         return $score;
@@ -394,6 +408,28 @@ class DemandeAiAssistant
     private function isAutreTransportTypeField(string $haystack): bool
     {
         return preg_match('/\btype\b/i', $haystack) === 1 && $this->containsWord($haystack, 'transport');
+    }
+
+    private function isUnsupportedEmptyCurrentAutreScheduleField(string $key, string $label, string $value, string $sourceText): bool
+    {
+        if ('' !== trim($value) || '' === trim($sourceText)) {
+            return false;
+        }
+
+        $haystack = $this->normalizeForSearch($key . ' ' . $label);
+        $isCurrentScheduleField =
+            preg_match('/\b(horaire|heure|creneau|shift|poste)\b/u', $haystack) === 1
+            && preg_match('/\b(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes)\b/u', $haystack) === 1;
+
+        if (!$isCurrentScheduleField) {
+            return false;
+        }
+
+        $source = $this->normalizeForSearch($sourceText);
+
+        return preg_match('/\b(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|actuellement)\b/u', $source) !== 1
+            && !str_contains($source, 'au lieu de')
+            && !preg_match('/\bpasser\s+de\b/u', $source);
     }
 
     private function isGenericAutreObjectValue(string $normalizedValue): bool
@@ -1043,7 +1079,8 @@ class DemandeAiAssistant
                         $key,
                         trim((string) ($field['label'] ?? $key)),
                         strtolower(trim((string) ($field['type'] ?? 'text'))),
-                        true === ($field['required'] ?? false)
+                        true === ($field['required'] ?? false),
+                        trim((string) ($sanitizedDetails[$key] ?? ''))
                     );
 
                     if (isset($seenValues[$valueKey])) {
