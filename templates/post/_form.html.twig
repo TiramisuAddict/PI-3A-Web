@@ -1,66 +1,100 @@
-{# Type « événement » = 2 (aligné sur FeedController / post_type_evenement) #}
+{% macro inline_errors(field) %}
+    {% if field.vars.errors|length > 0 %}
+        <div class="mt-1">
+            {% for error in field.vars.errors %}
+                <div class="text-danger small">{{ error.message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endmacro %}
+
 {% set post_type_evenement = 2 %}
 {% set current_type = form.vars.data is not null and form.vars.data.typePost is not null ? form.vars.data.typePost : 1 %}
+{% set existing_event_images = form.vars.data is not null ? form.vars.data.eventImages : [] %}
 
 {{ form_start(form, { attr: { class: 'post-crud-form', novalidate: 'novalidate' } }) }}
-{% if form.vars.submitted and not form.vars.valid %}
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <div class="d-flex">
-            <div><i class="ti ti-alert-circle me-3"></i></div>
-            <div class="flex-grow-1">
-                <strong>Formulaire invalide</strong>
-                <div class="small mt-2">Veuillez corriger les erreurs ci-dessous :</div>
-                <ul class="small mb-0 mt-2">
-                {% for field in form %}
-                    {% for error in field.vars.errors %}
-                        <li><strong>{{ field.vars.label|default(field.vars.name) }} :</strong> {{ error.message }}</li>
-                    {% endfor %}
-                {% endfor %}
-                {% for error in form.vars.errors %}
-                    <li>{{ error.message }}</li>
-                {% endfor %}
-                </ul>
-            </div>
-        </div>
-        <a class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></a>
-    </div>
-{% endif %}
 
 <div class="row g-4">
     <div class="col-12">
-        {{ form_row(form.titre, { 
-            label: 'Titre *',
-            attr: { 
-                class: 'form-control',
+        {{ form_label(form.titre, 'Titre *', { label_attr: { class: 'form-label' } }) }}
+        {{ form_widget(form.titre, {
+            attr: {
+                class: 'form-control' ~ (form.titre.vars.errors|length > 0 ? ' is-invalid' : ''),
                 placeholder: 'Entrez le titre de la publication'
             }
         }) }}
+        {{ _self.inline_errors(form.titre) }}
     </div>
 
     <div class="col-12">
-        {{ form_row(form.contenu, { 
-            label: 'Contenu *',
-            attr: { 
-                class: 'form-control',
+        <section class="post-assistant-card">
+            <div class="post-assistant-toolbar">
+                <div class="post-assistant-copy">
+                    <p class="post-assistant-kicker">IA Hugging Face</p>
+                    <div class="post-assistant-title-row">
+                        <h3 class="post-assistant-title">Generer une description a partir du titre</h3>
+                        <span class="post-assistant-provider" id="post-draft-provider">Assistant</span>
+                    </div>
+                    <p class="post-assistant-subtitle">Le bouton ci-dessous genere le contenu du post a partir du titre. La generation IA est active uniquement pour la gestion des posts.</p>
+                </div>
+                <div class="post-assistant-actions">
+                    <button type="button" class="btn btn-primary post-assistant-btn" id="generate-template-btn">
+                        <span><i class="ti ti-wand me-1"></i>Generer un brouillon</span>
+                        <span class="spinner-border spinner-border-sm ms-2 d-none" id="generate-template-spinner" role="status" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="btn btn-outline-primary post-assistant-btn" id="load-news-btn">
+                        <span><i class="ti ti-world me-1"></i>Suggestions</span>
+                        <span class="spinner-border spinner-border-sm ms-2 d-none" id="load-news-spinner" role="status" aria-hidden="true"></span>
+                    </button>
+                </div>
+            </div>
+
+            <p class="post-assistant-hint">Le meme bouton est disponible pour les champs de contenu du module post, en creation comme en modification.</p>
+            <div class="post-assistant-status d-none" id="post-assistant-status" role="status" aria-live="polite"></div>
+
+            <div class="post-news-panel d-none" id="post-news-panel">
+                <div class="post-news-panel-head">
+                    <h4 class="post-news-title">Inspiration rapide</h4>
+                    <span class="post-news-pill" id="post-news-provider">Suggestions</span>
+                </div>
+                <div class="post-news-list" id="post-news-list"></div>
+            </div>
+        </section>
+    </div>
+
+    <div class="col-12">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+            {{ form_label(form.contenu, 'Contenu *', { label_attr: { class: 'form-label mb-0' } }) }}
+            <button type="button" class="btn btn-outline-primary btn-sm" id="generate-content-inline-btn">
+                <i class="ti ti-sparkles me-1"></i>Generer depuis le titre
+            </button>
+        </div>
+        {{ form_widget(form.contenu, {
+            attr: {
+                class: 'form-control post-content-textarea' ~ (form.contenu.vars.errors|length > 0 ? ' is-invalid' : ''),
                 placeholder: 'Entrez le contenu',
                 rows: 6
             }
         }) }}
+        {{ _self.inline_errors(form.contenu) }}
     </div>
 
     <div class="col-md-8">
-        {{ form_row(form.type_post, { 
-            label: 'Type de publication *',
-            attr: { class: 'form-select' }
+        {{ form_label(form.type_post, 'Type de publication *', { label_attr: { class: 'form-label' } }) }}
+        {{ form_widget(form.type_post, {
+            attr: {
+                class: 'form-select' ~ (form.type_post.vars.errors|length > 0 ? ' is-invalid' : '')
+            }
         }) }}
+        {{ _self.inline_errors(form.type_post) }}
     </div>
 
     <div class="col-md-4">
         <div class="form-group">
-            <label class="form-label">État</label>
+            <label class="form-label">Etat</label>
             <div class="form-check">
-                {{ form_widget(form.active, { 
-                    attr: { 
+                {{ form_widget(form.active, {
+                    attr: {
                         class: 'form-check-input'
                     }
                 }) }}
@@ -68,75 +102,118 @@
                     Actif
                 </label>
             </div>
+            {{ _self.inline_errors(form.active) }}
         </div>
     </div>
 </div>
 
 <p class="text-secondary small my-3{{ current_type == post_type_evenement ? ' d-none' : '' }}" id="post-type-hint">
-    <i class="ti ti-info-circle me-1"></i>Sélectionnez « Événement » pour afficher les champs date, lieu et coordonnées GPS.
+    <i class="ti ti-info-circle me-1"></i>Selectionnez "Evenement" pour afficher les champs date, lieu et images.
 </p>
 
 <div id="post-event-fields" class="post-event-fields border rounded p-3 my-4 bg-light{{ current_type != post_type_evenement ? ' d-none' : '' }}" data-event-type-value="{{ post_type_evenement }}">
     <div class="d-flex align-items-center gap-2 mb-3 pb-3 border-bottom">
         <i class="ti ti-calendar-event"></i>
-        <h4 class="mb-0">Détails de l'événement</h4>
+        <h4 class="mb-0">Details de l'evenement</h4>
     </div>
     <div class="row g-3">
         <div class="col-md-6">
-            {{ form_row(form.date_evenement, { 
-                label: 'Date de début',
-                attr: { class: 'form-control' }
+            {{ form_label(form.date_evenement, 'Date de debut', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(form.date_evenement, {
+                attr: {
+                    class: 'form-control' ~ (form.date_evenement.vars.errors|length > 0 ? ' is-invalid' : '')
+                }
             }) }}
+            {{ _self.inline_errors(form.date_evenement) }}
         </div>
+
         <div class="col-md-6">
-            {{ form_row(form.date_fin_evenement, { 
-                label: 'Date de fin',
-                attr: { class: 'form-control' }
+            {{ form_label(form.date_fin_evenement, 'Date de fin', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(form.date_fin_evenement, {
+                attr: {
+                    class: 'form-control' ~ (form.date_fin_evenement.vars.errors|length > 0 ? ' is-invalid' : '')
+                }
             }) }}
+            {{ _self.inline_errors(form.date_fin_evenement) }}
         </div>
+
         <div class="col-md-6">
-            {{ form_row(form.lieu, { 
-                label: 'Lieu',
-                attr: { 
-                    class: 'form-control',
+            {{ form_label(form.lieu, 'Lieu', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(form.lieu, {
+                attr: {
+                    class: 'form-control' ~ (form.lieu.vars.errors|length > 0 ? ' is-invalid' : ''),
                     placeholder: 'Entrez le lieu'
                 }
             }) }}
+            {{ _self.inline_errors(form.lieu) }}
+            {{ form_help(form.lieu) }}
         </div>
+
         <div class="col-md-6">
-            {{ form_row(form.capacite_max, { 
-                label: 'Capacité maximum',
-                attr: { 
-                    class: 'form-control',
+            {{ form_label(form.capacite_max, 'Capacite maximum', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(form.capacite_max, {
+                attr: {
+                    class: 'form-control' ~ (form.capacite_max.vars.errors|length > 0 ? ' is-invalid' : ''),
                     placeholder: 'Nombre de places'
                 }
             }) }}
+            {{ _self.inline_errors(form.capacite_max) }}
         </div>
+
         <div class="col-12 mt-4 pt-3 border-top">
-            <h4 class="mb-3">Images de l'événement</h4>
-            <div class="eventimages-collection">
-                {% for eventImageForm in form.eventImages %}
-                    <div class="card card-sm mb-2">
-                        <div class="card-body">
-                            <div class="row g-2">
-                                <div class="col-md-10">
-                                    {{ form_row(eventImageForm.image_path, {
-                                        label: 'Image',
-                                        attr: { class: 'form-control' }
-                                    }) }}
-                                </div>
-                                <div class="col-md-2">
-                                    {{ form_row(eventImageForm.ordre, {
-                                        label: 'Ordre',
-                                        attr: { class: 'form-control' }
-                                    }) }}
+            <h4 class="mb-3">Images de l'evenement</h4>
+            {{ form_label(form.event_image_files, 'Selectionner des images', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(form.event_image_files, {
+                attr: {
+                    class: 'form-control' ~ (form.event_image_files.vars.errors|length > 0 ? ' is-invalid' : ''),
+                    accept: '.jpg,.jpeg,.png,.webp',
+                    multiple: 'multiple'
+                }
+            }) }}
+            {{ _self.inline_errors(form.event_image_files) }}
+            {{ form_help(form.event_image_files) }}
+            <p class="text-secondary small mt-2 mb-0">
+                Choisissez plusieurs fichiers d'un coup. L'upload accepte 10 images ou plus.
+            </p>
+        </div>
+
+        {% if existing_event_images|length > 0 %}
+            <div class="col-12">
+                <div class="d-flex align-items-center gap-2 mt-2 mb-2">
+                    <i class="ti ti-photo"></i>
+                    <h5 class="mb-0">Images deja ajoutees</h5>
+                </div>
+                <div class="row g-3">
+                    {% for image in existing_event_images %}
+                        <div class="col-sm-6 col-lg-4">
+                            <div class="card card-sm h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-end mb-2">
+                                        <button
+                                            type="submit"
+                                            form="delete-event-image-{{ image.idImage }}"
+                                            class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('Supprimer cette image ?');"
+                                        >
+                                            <i class="ti ti-trash me-1"></i>Supprimer
+                                        </button>
+                                    </div>
+                                    <img
+                                        src="{{ asset('uploads/events/' ~ image.imagePath) }}"
+                                        alt="Image evenement {{ loop.index }}"
+                                        class="img-fluid rounded mb-2"
+                                        style="width: 100%; height: 180px; object-fit: cover;"
+                                    >
+                                    <div class="small text-secondary">
+                                        Ordre: {{ image.ordre is not null ? image.ordre : loop.index0 }}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                {% endfor %}
+                    {% endfor %}
+                </div>
             </div>
-        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -150,6 +227,231 @@
 </div>
 {{ form_end(form) }}
 
+{% if existing_event_images|length > 0 %}
+    {% for image in existing_event_images %}
+        <form
+            id="delete-event-image-{{ image.idImage }}"
+            method="post"
+            action="{{ path('app_post_event_image_delete', { id_post: form.vars.data.idPost, id_image: image.idImage }) }}"
+            class="d-none"
+        >
+            <input type="hidden" name="_token" value="{{ csrf_token('delete_event_image_' ~ image.idImage) }}">
+        </form>
+    {% endfor %}
+{% endif %}
+
+<style>
+    .post-assistant-card {
+        padding: 1rem 1rem 1.1rem;
+        border-radius: 1.25rem;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+    }
+    .post-assistant-toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 1rem;
+        align-items: start;
+    }
+    .post-assistant-copy {
+        min-width: 0;
+    }
+    .post-assistant-kicker {
+        display: inline-flex;
+        align-items: center;
+        margin: 0 0 0.5rem;
+        padding: 0.24rem 0.56rem;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #4338ca;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+    .post-assistant-title-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.35rem;
+    }
+    .post-assistant-title {
+        margin: 0;
+        color: #0f172a;
+        font-size: 1.08rem;
+        font-weight: 700;
+        line-height: 1.35;
+    }
+    .post-assistant-provider {
+        display: inline-flex;
+        align-items: center;
+        min-height: 1.8rem;
+        padding: 0.18rem 0.62rem;
+        border-radius: 999px;
+        background: #f8fafc;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        color: #475569;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+    .post-assistant-provider.is-fallback {
+        background: #f8fafc;
+        border-color: rgba(148, 163, 184, 0.25);
+        color: #475569;
+    }
+    .post-assistant-subtitle {
+        margin: 0;
+        max-width: 46rem;
+        color: #64748b;
+        line-height: 1.6;
+        font-size: 0.92rem;
+    }
+    .post-assistant-actions {
+        display: flex;
+        align-items: stretch;
+        justify-content: flex-end;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+    }
+    .post-assistant-btn {
+        border-radius: 999px;
+        padding-inline: 0.95rem;
+        min-height: 2.7rem;
+        font-weight: 700;
+        box-shadow: none !important;
+    }
+    .post-assistant-hint {
+        margin: 0.75rem 0 0;
+        color: #64748b;
+        font-size: 0.84rem;
+        line-height: 1.55;
+    }
+    .post-assistant-status {
+        margin-top: 0.8rem;
+        padding: 0.65rem 0.85rem;
+        border-radius: 0.9rem;
+        font-size: 0.88rem;
+        line-height: 1.5;
+    }
+    .post-assistant-status.is-loading {
+        background: #eff6ff;
+        border: 1px solid rgba(59, 130, 246, 0.18);
+        color: #1d4ed8;
+    }
+    .post-assistant-status.is-success {
+        background: #f8fafc;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        color: #334155;
+    }
+    .post-assistant-status.is-error {
+        background: #fef2f2;
+        border: 1px solid rgba(239, 68, 68, 0.18);
+        color: #b91c1c;
+    }
+    .post-news-panel {
+        margin-top: 0.85rem;
+        padding-top: 0.9rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.16);
+    }
+    .post-news-panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .post-news-title {
+        margin: 0;
+        color: #0f172a;
+        font-size: 0.98rem;
+        font-weight: 700;
+    }
+    .post-news-pill {
+        border-radius: 999px;
+        padding: 0.3rem 0.68rem;
+        background: #f8fafc;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        color: #475569;
+        font-size: 0.76rem;
+        font-weight: 700;
+    }
+    .post-news-list {
+        display: grid;
+        gap: 0.7rem;
+    }
+    .post-news-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.85rem;
+        align-items: center;
+        padding: 0.85rem 0.95rem;
+        border-radius: 1rem;
+        background: #ffffff;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+    }
+    .post-news-item-title {
+        color: #0f172a;
+        font-weight: 700;
+        line-height: 1.45;
+        margin-bottom: 0.28rem;
+    }
+    .post-news-item-meta {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        color: #64748b;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+    .post-news-item-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .post-news-action {
+        border-radius: 999px;
+        min-height: 2rem;
+    }
+    .post-content-textarea.is-generated {
+        animation: postGeneratedPulse 0.8s ease-out;
+    }
+    @keyframes postGeneratedPulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.18);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+        100% {
+            box-shadow: 0 0 0 12px rgba(59, 130, 246, 0);
+            border-color: inherit;
+        }
+    }
+    @media (max-width: 768px) {
+        .post-assistant-toolbar,
+        .post-news-item {
+            grid-template-columns: 1fr;
+        }
+        .post-assistant-actions {
+            width: 100%;
+            justify-content: stretch;
+        }
+        .post-assistant-btn {
+            width: 100%;
+            justify-content: center;
+        }
+        .post-news-item-actions {
+            justify-content: flex-start;
+        }
+        .post-news-panel-head {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+</style>
+
 <script>
 (function () {
     var ef = document.getElementById('post-event-fields');
@@ -157,18 +459,260 @@
     var select = document.querySelector('.post-crud-form select[name="post[type_post]"]');
     var block = document.getElementById('post-event-fields');
     var hint = document.getElementById('post-type-hint');
+    var titleInput = document.getElementById('{{ form.titre.vars.id }}');
+    var contentTextarea = document.getElementById('{{ form.contenu.vars.id }}');
+    var assistantStatus = document.getElementById('post-assistant-status');
+    var draftProvider = document.getElementById('post-draft-provider');
+    var newsPanel = document.getElementById('post-news-panel');
+    var newsList = document.getElementById('post-news-list');
+    var newsProvider = document.getElementById('post-news-provider');
+    var generateTemplateButton = document.getElementById('generate-template-btn');
+    var generateContentInlineButton = document.getElementById('generate-content-inline-btn');
+    var generateTemplateSpinner = document.getElementById('generate-template-spinner');
+    var loadNewsButton = document.getElementById('load-news-btn');
+    var loadNewsSpinner = document.getElementById('load-news-spinner');
+    var newsLoaded = false;
+
     function sync() {
         if (!select || !block) return;
+
         var v = parseInt(select.value, 10);
         var isEvent = v === EVENT;
+
         block.classList.toggle('d-none', !isEvent);
         if (hint) {
             hint.classList.toggle('d-none', isEvent);
         }
     }
+
+    function setStatus(type, message) {
+        if (!assistantStatus) return;
+
+        assistantStatus.classList.remove('d-none', 'is-loading', 'is-success', 'is-error');
+        assistantStatus.textContent = message || '';
+
+        if (type === 'loading') {
+            assistantStatus.classList.add('is-loading');
+        } else if (type === 'success') {
+            assistantStatus.classList.add('is-success');
+        } else if (type === 'error') {
+            assistantStatus.classList.add('is-error');
+        } else {
+            assistantStatus.classList.add('d-none');
+        }
+    }
+
+    function setButtonLoading(button, spinner, isLoading) {
+        if (button) {
+            button.disabled = isLoading;
+        }
+        if (spinner) {
+            spinner.classList.toggle('d-none', !isLoading);
+        }
+    }
+
+    function markTextareaGenerated() {
+        if (!contentTextarea) return;
+
+        contentTextarea.classList.remove('is-generated');
+        void contentTextarea.offsetWidth;
+        contentTextarea.classList.add('is-generated');
+    }
+
+    function setDraftProvider(label, isFallback) {
+        if (!draftProvider) return;
+
+        draftProvider.textContent = label || 'Assistant';
+        draftProvider.classList.toggle('is-fallback', !!isFallback);
+    }
+
+    async function sendFormRequest(url, payload) {
+        var response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: new URLSearchParams(payload).toString(),
+            credentials: 'same-origin'
+        });
+
+        var data;
+        try {
+            data = await response.json();
+        } catch (error) {
+            data = { success: false, message: 'Reponse serveur invalide.' };
+        }
+
+        return { response: response, data: data };
+    }
+
+    async function generateDraftFromTitle(title, sourceTitle) {
+        if (!titleInput || !contentTextarea) return;
+
+        var effectiveTitle = (title || titleInput.value || '').trim();
+        if (!effectiveTitle) {
+            setStatus('error', 'Ajoutez un titre avant de demander un brouillon.');
+            titleInput.focus();
+            return;
+        }
+
+        if (titleInput.value.trim() === '') {
+            titleInput.value = effectiveTitle;
+        }
+
+        setButtonLoading(generateTemplateButton, generateTemplateSpinner, true);
+        setStatus('loading', 'Generation du brouillon en cours...');
+        setDraftProvider('Generation...', false);
+
+        try {
+            var result = await sendFormRequest('{{ path('app_post_generate_template') }}', {
+                title: effectiveTitle,
+                source_title: sourceTitle || ''
+            });
+
+            if (result.response.ok && result.data.success) {
+                contentTextarea.value = result.data.content || '';
+                contentTextarea.focus();
+                markTextareaGenerated();
+                setDraftProvider(result.data.provider || 'Assistant', !!result.data.usedFallback);
+                setStatus('success', result.data.usedFallback ? 'Description generee avec le mode simple.' : 'Description generee avec Hugging Face.');
+            } else {
+                setDraftProvider('Indisponible', true);
+                setStatus('error', result.data.message || 'Impossible de generer un brouillon pour le moment.');
+            }
+        } catch (error) {
+            console.error(error);
+            setDraftProvider('Indisponible', true);
+            setStatus('error', 'Une erreur est survenue lors de la generation du brouillon.');
+        } finally {
+            setButtonLoading(generateTemplateButton, generateTemplateSpinner, false);
+        }
+    }
+
+    function renderNewsArticles(articles, provider) {
+        if (!newsPanel || !newsList) return;
+
+        newsList.innerHTML = '';
+        if (newsProvider) {
+            newsProvider.textContent = provider || 'Suggestions';
+        }
+
+        if (!Array.isArray(articles) || articles.length === 0) {
+            newsPanel.classList.add('d-none');
+            return;
+        }
+
+        articles.forEach(function (article) {
+            var item = document.createElement('article');
+            item.className = 'post-news-item';
+            item.innerHTML =
+                '<div>' +
+                    '<div class="post-news-item-title"></div>' +
+                    '<div class="post-news-item-meta"><i class="ti ti-world"></i><span></span></div>' +
+                '</div>' +
+                '<div class="post-news-item-actions">' +
+                    '<button type="button" class="btn btn-sm btn-outline-primary post-news-action" data-action="use-headline">Utiliser</button>' +
+                    '<button type="button" class="btn btn-sm btn-primary post-news-action" data-action="generate-from-news">Brouillon</button>' +
+                '</div>';
+
+            item.querySelector('.post-news-item-title').textContent = article.title || '';
+            item.querySelector('.post-news-item-meta span').textContent = article.source || 'NewsAPI';
+
+            if (article.url) {
+                var openLink = document.createElement('a');
+                openLink.className = 'btn btn-sm btn-ghost-secondary post-news-action';
+                openLink.setAttribute('data-action', 'open-link');
+                openLink.target = '_blank';
+                openLink.rel = 'noopener noreferrer';
+                openLink.href = article.url;
+                openLink.textContent = 'Lire';
+                item.querySelector('.post-news-item-actions').appendChild(openLink);
+            }
+
+            item.querySelector('[data-action="use-headline"]').addEventListener('click', function () {
+                if (titleInput) {
+                    titleInput.value = article.title || '';
+                    titleInput.focus();
+                }
+                setStatus('success', 'Titre applique. Vous pouvez maintenant generer un brouillon ou ecrire votre version.');
+            });
+
+            item.querySelector('[data-action="generate-from-news"]').addEventListener('click', function () {
+                if (titleInput) {
+                    titleInput.value = article.title || '';
+                }
+                generateDraftFromTitle(article.title || '', article.title || '');
+            });
+
+            newsList.appendChild(item);
+        });
+
+        newsLoaded = true;
+        newsPanel.classList.remove('d-none');
+    }
+
+    async function loadNewsSuggestions() {
+        if (newsLoaded && newsPanel) {
+            newsPanel.classList.toggle('d-none');
+            return;
+        }
+
+        setButtonLoading(loadNewsButton, loadNewsSpinner, true);
+        setStatus('loading', 'Recuperation des idees en cours...');
+
+        try {
+            var response = await fetch('{{ path('app_post_news_suggestions') }}', {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+
+            var data;
+            try {
+                data = await response.json();
+            } catch (error) {
+                data = { success: false, articles: [], message: 'Reponse serveur invalide.' };
+            }
+
+            renderNewsArticles(data.articles || [], data.provider || 'Suggestions');
+
+            if (response.ok && data.success && Array.isArray(data.articles) && data.articles.length > 0) {
+                setStatus('success', data.usedFallback ? 'Selection editoriale locale chargee.' : 'Actualites chargees.');
+            } else {
+                setStatus('error', data.message || 'Aucune actualite n\'est disponible pour le moment.');
+            }
+        } catch (error) {
+            console.error(error);
+            setStatus('error', 'Impossible de charger les actualites pour le moment.');
+        } finally {
+            setButtonLoading(loadNewsButton, loadNewsSpinner, false);
+        }
+    }
+
     if (select) {
         select.addEventListener('change', sync);
         sync();
+    }
+
+    if (generateTemplateButton) {
+        generateTemplateButton.addEventListener('click', function () {
+            generateDraftFromTitle(titleInput ? titleInput.value : '', '');
+        });
+    }
+
+    if (generateContentInlineButton) {
+        generateContentInlineButton.addEventListener('click', function () {
+            generateDraftFromTitle(titleInput ? titleInput.value : '', '');
+        });
+    }
+
+    if (loadNewsButton) {
+        loadNewsButton.addEventListener('click', function () {
+            loadNewsSuggestions();
+        });
     }
 })();
 </script>

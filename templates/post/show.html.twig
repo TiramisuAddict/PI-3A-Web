@@ -23,7 +23,36 @@
                                 <span class="badge bg-yellow-lt text-yellow">Événement</span>
                             </div>
                         {% endif %}
-                        
+
+                        {% if post.typePost == 2 and post.eventImages|length > 0 %}
+                            <div class="col-12">
+                                <div>
+                                    <label class="form-label text-secondary small">Images de l'Ã©vÃ©nement</label>
+                                    <div class="row g-3">
+                                        {% for image in post.eventImages %}
+                                            {% set image_path = image.imagePath|default('') %}
+                                            {% set image_name = image_path|split('/')|last %}
+                                            {% set src = image_path starts with 'http'
+                                                ? image_path
+                                                : (image_path starts with 'uploads/'
+                                                    ? asset(image_path)
+                                                    : asset('uploads/events/' ~ image_name)) %}
+                                            <div class="col-sm-6 col-lg-4">
+                                                <a href="{{ src }}" target="_blank" rel="noopener" class="d-block">
+                                                    <img
+                                                        src="{{ src }}"
+                                                        alt="Image de l'evenement {{ loop.index }}"
+                                                        class="img-fluid rounded border"
+                                                        style="width: 100%; height: 220px; object-fit: cover;"
+                                                    >
+                                                </a>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+
                         <div class="col-12">
                             <div>
                                 <label class="form-label text-secondary small">Contenu</label>

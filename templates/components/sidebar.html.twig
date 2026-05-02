@@ -1,11 +1,14 @@
 <aside class="d-flex flex-column border-end bg-white px-2 py-3"
   style="width:280px; min-width:280px; overflow-y:auto;">
 
+  {% set normalized_sidebar_role = sidebar_role|default('')|trim|lower %}
+  {% set is_rh_sidebar = normalized_sidebar_role in ['rh', 'administrateur entreprise'] %}
+
   {# ── Navigation links ── #}
   <ul class="list-unstyled d-flex flex-column gap-1 mb-0 mt-2">
 
     <li>
-      <a href="{{ (sidebar_role is defined and sidebar_role in ['RH', 'administrateur entreprise']) ? path('app_admin_dashboard') : path('app_employe_feed') }}"
+      <a href="{{ is_rh_sidebar ? path('app_admin_dashboard') : path('app_employe_home') }}"
         class="d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none
         {{ active_page is defined and active_page == 'accueil' ? 'bg-blue-lt text-blue fw-medium' : 'text-secondary' }}">
         <i class="ti ti-home" style="font-size:18px;"></i>
@@ -32,16 +35,15 @@
     </li>
 
     <li>
-      <a href="{{ (sidebar_role is defined and sidebar_role in ['RH', 'administrateur entreprise']) ? path('app_formation_rh') : path('app_inscription_employe') }}"
+      <a href="{{ is_rh_sidebar ? path('app_formation_rh') : path('app_inscription_employe') }}"
         class="d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none
         {{ active_page is defined and active_page == 'formations' ? 'bg-blue-lt text-blue fw-medium' : 'text-secondary' }}">
         <i class="ti ti-school" style="font-size:18px;"></i>
         <span style="font-size:0.875rem;">Les formations</span>
       </a>
     </li>
-
     {# Gestion employés — visible uniquement pour RH et administrateur entreprise #}
-    {% if sidebar_role is defined and sidebar_role in ['RH', 'administrateur entreprise'] %}
+    {% if is_rh_sidebar %}
     <li>
       <a href="{{ path('RH_Home') }}"
         class="d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none
@@ -53,7 +55,7 @@
     {% endif %}
 
     {# Offres — visible uniquement pour RH et administrateur entreprise #}
-    {% if sidebar_role is defined and sidebar_role in ['RH', 'administrateur entreprise'] %}
+    {% if is_rh_sidebar %}
     <li>
       <a href="{{ path('app_candidat_dashboard') }}"
         class="d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none

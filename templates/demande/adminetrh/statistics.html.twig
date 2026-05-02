@@ -1,0 +1,300 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Statistiques des Demandes{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<style>
+    .stat-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 10px;
+        background: #fff;
+        padding: 24px;
+        text-align: center;
+        box-shadow: 0 4px 16px rgba(74, 93, 239, 0.08);
+        transition: border-color .2s ease, box-shadow .2s ease;
+        color: #1f2937;
+    }
+    .stat-card:hover {
+        border-color: rgba(74, 93, 239, 0.35);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+        transform: translateY(-2px);
+    }
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 8px;
+    }
+    .stat-label {
+        font-size: 0.95rem;
+        opacity: 0.95;
+        font-weight: 500;
+    }
+    .progress-bar-container {
+        height: 8px;
+        background: #e5e7eb;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+    .stat-count {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: #1f2937;
+    }
+    .stat-percentage {
+        font-size: 0.8rem;
+        color: #64748b;
+        margin-top: 4px;
+        display: block;
+    }
+    .badge {
+        padding: 4px 8px !important;
+        font-size: 0.75rem !important;
+        font-weight: 600;
+        border-radius: 4px;
+        display: inline-block;
+            color: #fff !important;
+    }
+    .badge.bg-danger {
+        background-color: #dc3545 !important;
+    }
+    .badge.bg-warning {
+            background-color: #ffc107 !important;
+            color: #fff !important;
+    }
+    .badge.bg-success {
+        background-color: #28a745 !important;
+    }
+    .badge.bg-info {
+        background-color: #17a2b8 !important;
+    }
+    .badge.bg-secondary {
+        background-color: #6c757d !important;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+{{ include('components/navbar.html.twig') }}
+<div class="d-flex" style="min-height:calc(100vh - 56px);">
+{{ include('components/sidebar.html.twig', {'active_page': 'demandes','sidebar_role': role}) }}
+<div class="page-wrapper">
+    <div class="page-header d-print-none mb-3">
+        <div class="container-xl">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">
+                    Statistiques
+                    </h2>
+                    <div class="text-secondary">Vue d'ensemble de vos demandes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="row row-deck row-cards mb-3">
+                <div class="col-sm-6 col-lg-4">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ stats.total }}</div>
+                        <div class="stat-label">
+                            <i class="ti ti-files me-2"></i>Total des demandes
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                    <div class="stat-card green">
+                        <div class="stat-value">{{ stats.byStatus['Resolue'] | default(0) }}</div>
+                        <div class="stat-label">
+                            <i class="ti ti-check me-2"></i>Demandes résolues
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                    <div class="stat-card yellow">
+                        <div class="stat-value">{{ stats.byStatus['En cours'] | default(0) }}</div>
+                        <div class="stat-label">
+                            <i class="ti ti-loader me-2"></i>Demandes en cours
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row row-deck row-cards">
+                <div class="col-lg-6 mb-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="ti ti-flag me-2"></i>Répartition par Statut
+                            </h3>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-vcenter table-hover mb-0">
+                                    <tbody>
+                                        {% set statusColors = {
+                                            'Nouvelle': '#3b82f6',
+                                            'En cours': '#f59e0b', 
+                                            'En attente': '#f97316',
+                                            'Resolue': '#10b981',
+                                            'Rejetee': '#ef4444',
+                                            'Reconsideration': '#4a5def',
+                                            'Fermee': '#6b7280',
+                                            'Annulee': '#ef4444'
+                                        } %}
+                                        {% for status, count in stats.byStatus %}
+                                        {% set percentage = stats.total > 0 ? (count / stats.total * 100)|round(1) : 0 %}
+                                        <tr>
+                                            <td style="width: 140px;">
+                                                <span class="badge" style="background: {{ statusColors[status] | default('#6b7280') }}; padding: 6px 12px; font-size: 0.8rem;">
+                                                    {{ status }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="progress-bar-container">
+                                                    <div class="progress-bar-fill" style="width: {{ percentage }}%; background: {{ statusColors[status] | default('#6b7280') }};"></div>
+                                                </div>
+                                            </td>
+                                            <td class="text-end" style="width: 90px;">
+                                                <span class="stat-count">{{ count }}</span>
+                                                <span class="stat-percentage">{{ percentage }}%</span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6 mb-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="ti ti-alert-triangle me-2"></i>Répartition par Priorité
+                            </h3>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-vcenter table-hover mb-0">
+                                    <tbody>
+                                        {% set priorityColors = {'HAUTE': '#ef4444', 'NORMALE': '#3b82f6', 'BASSE': '#10b981'} %}
+                                        {% for priorite, count in stats.byPriorite %}
+                                        {% set percentage = stats.total > 0 ? (count / stats.total * 100)|round(1) : 0 %}
+                                        <tr>
+                                            <td style="width: 140px;">
+                                                <span class="badge" style="background: {{ priorityColors[priorite] | default('#6b7280') }}; padding: 6px 12px; font-size: 0.8rem;">
+                                                    {% if priorite == 'HAUTE' %}
+                                                        <i class="ti ti-alert-triangle me-1"></i>
+                                                    {% elseif priorite == 'NORMALE' %}
+                                                        <i class="ti ti-minus me-1"></i>
+                                                    {% else %}
+                                                        <i class="ti ti-arrow-down me-1"></i>
+                                                    {% endif %}
+                                                    {{ priorite }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="progress-bar-container">
+                                                    <div class="progress-bar-fill" style="width: {{ percentage }}%; background: {{ priorityColors[priorite] | default('#6b7280') }};"></div>
+                                                </div>
+                                            </td>
+                                            <td class="text-end" style="width: 90px;">
+                                                <span class="stat-count">{{ count }}</span>
+                                                <span class="stat-percentage">{{ percentage }}%</span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6 mb-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="ti ti-folder me-2"></i>Répartition par Catégorie
+                            </h3>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-vcenter table-hover mb-0">
+                                    <tbody>
+                                        {% for categorie, count in stats.byCategorie %}
+                                        {% set percentage = stats.total > 0 ? (count / stats.total * 100)|round(1) : 0 %}
+                                        <tr>
+                                            <td>
+                                                <span style="background: rgba(74, 93, 239, 0.1); color: #4a5def; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; display: inline-block;">
+                                                    <i class="ti ti-folder me-1"></i>{{ categorie }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="progress-bar-container">
+                                                    <div class="progress-bar-fill" style="width: {{ percentage }}%; background: #4a5def;"></div>
+                                                </div>
+                                            </td>
+                                            <td class="text-end" style="width: 90px;">
+                                                <span class="stat-count">{{ count }}</span>
+                                                <span class="stat-percentage">{{ percentage }}%</span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6 mb-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="ti ti-tag me-2"></i>Répartition par Type
+                            </h3>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-vcenter table-hover mb-0">
+                                    <tbody>
+                                        {% for type, count in stats.byType %}
+                                        {% set percentage = stats.total > 0 ? (count / stats.total * 100)|round(1) : 0 %}
+                                        <tr>
+                                            <td>
+                                                <span style="font-weight: 500; color: #374151;">{{ type }}</span>
+                                            </td>
+                                            <td>
+                                                <div class="progress-bar-container">
+                                                    <div class="progress-bar-fill" style="width: {{ percentage }}%; background: #8b5cf6;"></div>
+                                                </div>
+                                            </td>
+                                            <td class="text-end" style="width: 90px;">
+                                                <span class="stat-count">{{ count }}</span>
+                                                <span class="stat-percentage">{{ percentage }}%</span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+{{ include('demande/_logout_modal.html.twig') }}
+{% endblock %}

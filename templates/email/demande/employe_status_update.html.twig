@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Mise a jour de votre demande</title>
+</head>
+<body style="margin:0; padding:0; background:#f2f4f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#1f2937;">
+    {% set employeName = ((demande.employe.prenom ?? '') ~ ' ' ~ (demande.employe.nom ?? ''))|trim %}
+
+    {% set oldBg = '#e8f0fe' %}
+    {% set oldColor = '#2859c5' %}
+    {% if oldStatus in ['Annulee', 'Rejetee'] %}
+        {% set oldBg = '#fdeaea' %}
+        {% set oldColor = '#c0392b' %}
+    {% elseif oldStatus in ['En cours', 'Resolue'] %}
+        {% set oldBg = '#eaf8ef' %}
+        {% set oldColor = '#1f8c4b' %}
+    {% endif %}
+
+    {% set newBg = '#e8f0fe' %}
+    {% set newColor = '#2859c5' %}
+    {% if newStatus in ['Annulee', 'Rejetee'] %}
+        {% set newBg = '#fdeaea' %}
+        {% set newColor = '#c0392b' %}
+    {% elseif newStatus in ['En cours', 'Resolue'] %}
+        {% set newBg = '#eaf8ef' %}
+        {% set newColor = '#1f8c4b' %}
+    {% endif %}
+
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="padding:28px 12px; background:#f2f4f8;">
+        <tr>
+            <td align="center">
+                <table role="presentation" cellpadding="0" cellspacing="0" width="640" style="max-width:640px; width:100%; background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid #e5e7eb; box-shadow:0 6px 20px rgba(31,41,55,0.08);">
+                    <tr>
+                        <td style="padding:24px 28px; background:linear-gradient(135deg,#2fb344,#1f9d55); color:#ffffff;">
+                            <div style="font-size:28px; line-height:1; margin:0 0 8px;">&#8635;</div>
+                            <h1 style="margin:0; font-size:30px; font-weight:700; line-height:1.2;">Mise a jour de votre demande</h1>
+                            <p style="margin:8px 0 0; opacity:.95; font-size:14px;">Systeme de Gestion des Demandes</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding:28px;">
+                            <p style="margin:0 0 14px; font-size:22px; color:#111827;">Bonjour <strong>{{ employeName != '' ? employeName : 'Employe' }}</strong>,</p>
+                            <p style="margin:0 0 22px; font-size:16px; color:#4b5563;">Le statut de votre demande a ete mis a jour :</p>
+
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 22px;">
+                                <tr>
+                                    <td align="center" style="padding:14px; background:#f8fafc; border-radius:12px; border:1px solid #e5e7eb;">
+                                        <span style="display:inline-block; padding:8px 14px; border-radius:999px; font-size:13px; font-weight:700; background:{{ oldBg }}; color:{{ oldColor }};">{{ oldStatus ?: 'Non renseigne' }}</span>
+                                        <span style="display:inline-block; margin:0 12px; font-size:16px; color:#4b5563;">&#8594;</span>
+                                        <span style="display:inline-block; padding:8px 14px; border-radius:999px; font-size:13px; font-weight:700; background:{{ newBg }}; color:{{ newColor }};">{{ newStatus ?: 'Non renseigne' }}</span>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #e5e7eb; border-radius:12px; overflow:hidden; background:#ffffff; margin:0 0 16px;">
+                                <tr>
+                                    <td style="padding:12px 14px; font-size:15px; color:#6b7280; border-bottom:1px solid #eef2f7; width:34%;">Demande</td>
+                                    <td style="padding:12px 14px; font-size:15px; color:#111827; border-bottom:1px solid #eef2f7; font-weight:600;">{{ demande.titre ?: 'Non renseigne' }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:12px 14px; font-size:15px; color:#6b7280; border-bottom:1px solid #eef2f7;">Categorie</td>
+                                    <td style="padding:12px 14px; font-size:15px; color:#111827; border-bottom:1px solid #eef2f7;">{{ demande.categorie ?: 'Non renseignee' }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:12px 14px; font-size:15px; color:#6b7280; border-bottom:1px solid #eef2f7;">Traite par</td>
+                                    <td style="padding:12px 14px; font-size:15px; color:#111827; border-bottom:1px solid #eef2f7;">{{ actor ?: 'Systeme' }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:12px 14px; font-size:15px; color:#6b7280;">Commentaire</td>
+                                    <td style="padding:12px 14px; font-size:15px; color:#111827;">{{ commentaire is not empty ? commentaire : 'Aucun commentaire' }}</td>
+                                </tr>
+                            </table>
+
+                            <div style="padding:14px; text-align:center; background:#f3f6fb; border-radius:10px; color:#4b5563; font-size:14px;">
+                                Vous pouvez consulter votre demande dans l'application.
+                            </div>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding:16px 22px; text-align:center; background:#f8fafc; color:#9ca3af; font-size:13px; border-top:1px solid #e5e7eb;">
+                            Momentum - Systeme RH | {{ 'now'|date('d/m/Y H:i') }}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

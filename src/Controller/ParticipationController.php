@@ -6,6 +6,7 @@ use App\Entity\Participation;
 use App\Form\ParticipationType;
 use App\Repository\ParticipationRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,20 +17,32 @@ use Symfony\Component\Routing\Attribute\Route;
 final class ParticipationController extends AbstractController
 {
     #[Route(name: 'app_participation_index', methods: ['GET'])]
-    public function index(ParticipationRepository $participationRepository): Response
+    public function index(Request $request, ParticipationRepository $participationRepository, PaginatorInterface $paginator): Response
     {
+        $participations = $paginator->paginate(
+            $participationRepository->createAdminListQueryBuilder(),
+            max(1, $request->query->getInt('page', 1)),
+            10
+        );
+
         return $this->render('participation/index.html.twig', [
-            'participations' => $participationRepository->findAll(),
+            'participations' => $participations,
+            'current_post_id' => null,
         ]);
     }
 
     #[Route('/by-post/{id_post}', name: 'app_participation_by_post', methods: ['GET'])]
-    public function byPost(int $id_post, ParticipationRepository $participationRepository): Response
+    public function byPost(int $id_post, Request $request, ParticipationRepository $participationRepository, PaginatorInterface $paginator): Response
     {
-        $participations = $participationRepository->findBy(['post' => $id_post]);
+        $participations = $paginator->paginate(
+            $participationRepository->createAdminListQueryBuilder($id_post),
+            max(1, $request->query->getInt('page', 1)),
+            10
+        );
 
         return $this->render('participation/index.html.twig', [
             'participations' => $participations,
+            'current_post_id' => $id_post,
         ]);
     }
 
@@ -90,6 +103,18 @@ final class ParticipationController extends AbstractController
             $entityManager->flush();
         }
 
-        return $this->redirectToRoute('app_participation_index', [], Response::HTTP_SEE_OTHER);
+        $currentPostId = $request->query->getInt('id_post', 0);
+        $page = max(1, $request->query->getInt('page', 1));
+
+        if ($currentPostId > 0) {
+            return $this->redirectToRoute('app_participation_by_post', array_filter([
+                'id_post' => $currentPostId,
+                'page' => $page > 1 ? $page : null,
+            ], static fn (mixed $value): bool => $value !== null), Response::HTTP_SEE_OTHER);
+        }
+
+        return $this->redirectToRoute('app_participation_index', array_filter([
+            'page' => $page > 1 ? $page : null,
+        ], static fn (mixed $value): bool => $value !== null), Response::HTTP_SEE_OTHER);
     }
 }

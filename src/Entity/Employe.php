@@ -479,4 +479,32 @@ class Employe
         return $this;
     }
 
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $face_embedding = null;
+
+    public function getFaceEmbedding(): ?array
+    {
+        return $this->face_embedding;
+    }
+
+    public function setFaceEmbedding(?array $face_embedding): self
+    {
+        $this->face_embedding = $face_embedding;
+        return $this;
+    }
+
+    #[ORM\Column(type: 'boolean', nullable: false, options: ['default' => false])]
+    private bool $face_enabled = false;
+
+    public function getFaceEnabled(): bool
+    {
+        return $this->face_enabled;
+    }
+
+    public function setFaceEnabled(bool $face_enabled): self
+    {
+        $this->face_enabled = $face_enabled;
+        return $this;
+    }
+
 }

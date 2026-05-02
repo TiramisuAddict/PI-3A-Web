@@ -1,0 +1,882 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Liste des Demandes{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+    html, body {
+        overflow: hidden !important;
+        height: 100% !important;
+    }
+    .stats-row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+    .stat-card {
+        flex: 1;
+        min-width: 140px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 10px;
+        background: #fff;
+        transition: border-color .2s ease, box-shadow .2s ease;
+        cursor: pointer;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 4px 16px rgba(74, 93, 239, 0.08);
+    }
+    .stat-card:hover {
+        border-color: rgba(74, 93, 239, 0.35);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+        transform: translateY(-2px);
+    }
+    .stat-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        background: #f5f7fb;
+        color: #fff !important;
+        flex-shrink: 0;
+    }
+    .stat-content {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-top: 4px;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+    .badge {
+        padding: 4px 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 4px;
+        display: inline-block;
+        color: #fff !important;
+    }
+    .titre-link {
+        color: #1f2937;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .titre-link:hover {
+        color: var(--tblr-primary);
+    }
+    .category-tag {
+        background: rgba(31, 111, 235, 0.08);
+        color: var(--tblr-primary);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .date-text {
+        color: #64748b;
+        font-size: 0.85rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .quick-filter-btn {
+        padding: 6px 14px;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        background: white;
+        color: #64748b;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+    }
+    .quick-filter-btn:hover {
+        border-color: var(--tblr-primary);
+        color: var(--tblr-primary);
+        background: rgba(31, 111, 235, 0.05);
+    }
+    .quick-filter-btn.active {
+        background: var(--tblr-primary);
+        color: white;
+        border-color: var(--tblr-primary);
+    }
+    .btn-list {
+        display: flex !important;
+        gap: 4px;
+        align-items: center;
+    }
+    .action-buttons {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+    }
+    .action-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border-radius: 6px;
+        border: 1px solid;
+        background: transparent;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        font-size: 16px;
+    }
+    .action-btn-view {
+        color: var(--tblr-primary);
+        border-color: var(--tblr-primary);
+        background-color: rgba(31, 111, 235, 0.08);
+    }
+    .action-btn-view:hover {
+        background-color: var(--tblr-primary);
+        color: white;
+    }
+    .action-btn-edit {
+        color: #17a2b8;
+        border-color: #17a2b8;
+        background-color: rgba(23, 162, 184, 0.1);
+    }
+    .action-btn-edit:hover {
+        background-color: #17a2b8;
+        color: white;
+    }
+    .action-btn-delete {
+        color: #dc3545;
+        border-color: #dc3545;
+        background-color: rgba(220, 53, 69, 0.08);
+    }
+    .action-btn-delete:hover {
+        background-color: #dc3545;
+        color: white;
+    }
+    .empty-state {
+        padding: 60px 20px;
+        text-align: center;
+    }
+    .empty-state i {
+        font-size: 3rem;
+        color: #cbd5e1;
+        margin-bottom: 16px;
+        display: block;
+    }
+    .empty-state h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 8px;
+    }
+    .empty-state p {
+        color: #64748b;
+        margin-bottom: 20px;
+    }
+    .page-wrapper {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 56px);
+        overflow: hidden;
+    }
+    .page-body {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    .page-body > .container-xl {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .card.table-card {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-height: 0;
+    }
+    .card.table-card .table-responsive {
+        flex: 1;
+        overflow: hidden;
+    }
+    .card.table-card .table-responsive table {
+        margin-bottom: 0;
+    }
+    .card.table-card .card-footer {
+        flex-shrink: 0;
+    }
+    .card.table-card .card-footer nav,
+    .card.table-card .card-footer .pagination {
+        margin: 0;
+    }
+    #demande-table tbody tr.demande-row {
+        min-height: 68px;
+    }
+    #demande-table tbody tr.demande-row > td {
+        height: 68px;
+    }
+    #demande-table tbody td {
+        vertical-align: middle;
+    }
+    #demande-table tbody tr.demande-row > td:nth-child(2),
+    #demande-table tbody tr.demande-row > td:nth-child(3) {
+        white-space: nowrap;
+    }
+    #demande-table .category-tag {
+        white-space: nowrap;
+    }
+    .search-filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .search-filter-bar .search-input-wrap {
+        flex: 1;
+        min-width: 200px;
+        position: relative;
+    }
+    .search-filter-bar .search-input-wrap input {
+        padding-left: 36px;
+    }
+    .search-filter-bar .search-input-wrap .search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        pointer-events: none;
+    }
+    .search-filter-bar .search-input-wrap .clear-btn {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 2px;
+        display: none;
+        line-height: 1;
+    }
+    .search-filter-bar .search-input-wrap .clear-btn.visible {
+        display: block;
+    }
+    .search-filter-bar .search-input-wrap .clear-btn:hover {
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+{{ include('components/navbar.html.twig') }}
+<div class="d-flex" style="height:calc(100vh - 56px);overflow:hidden;">
+{{ include('components/sidebar.html.twig', {'active_page': 'demandes', 'sidebar_role': role}) }}
+<div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none mb-3">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Gestion des demandes</h2>
+                    <div class="text-secondary">Les comptes RH et administrateur entreprise peuvent consulter, modifier et repondre aux demandes.</div>
+                </div>
+                <div class="col-auto">
+                    <div class="btn-list">
+                        <a href="{{ path('demande_statistics') }}" class="btn btn-outline-primary">
+                            <i class="ti ti-chart-bar me-2"></i>Statistiques
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+
+            {% for message in app.flashes('success') %}
+                <div class="alert alert-success alert-dismissible fade show mb-3">
+                    <i class="ti ti-check me-2"></i>{{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+            {% for message in app.flashes('warning') %}
+                <div class="alert alert-warning alert-dismissible fade show mb-3">
+                    <i class="ti ti-alert-circle me-2"></i>{{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+            {% for message in app.flashes('danger') %}
+                <div class="alert alert-danger alert-dismissible fade show mb-3">
+                    <i class="ti ti-alert-circle me-2"></i>{{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+
+            <div class="stats-row">
+                <div class="stat-card" onclick="filterByStatus('')" data-stat-card="total">
+                    <div class="stat-icon bg-primary-lt text-primary"><i class="ti ti-files"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value text-primary" data-stat-value="total">{{ stats.total }}</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                </div>
+                <div class="stat-card" onclick="filterByStatus('Nouvelle')" data-stat-card="Nouvelle">
+                    <div class="stat-icon bg-blue-lt text-blue"><i class="ti ti-clock"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value text-blue" data-stat-value="Nouvelle">{{ stats.byStatus['Nouvelle'] | default(0) }}</div>
+                        <div class="stat-label">Nouvelles</div>
+                    </div>
+                </div>
+                <div class="stat-card" onclick="filterByStatus('En cours')" data-stat-card="En cours">
+                    <div class="stat-icon bg-yellow-lt text-yellow"><i class="ti ti-loader"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value text-yellow" data-stat-value="En cours">{{ stats.byStatus['En cours'] | default(0) }}</div>
+                        <div class="stat-label">En cours</div>
+                    </div>
+                </div>
+                <div class="stat-card" onclick="filterByStatus('Resolue')" data-stat-card="Resolue">
+                    <div class="stat-icon bg-green-lt text-green"><i class="ti ti-check"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value text-green" data-stat-value="Resolue">{{ stats.byStatus['Resolue'] | default(0) }}</div>
+                        <div class="stat-label">Resolues</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body py-2 px-3">
+                    <div class="search-filter-bar">
+                        <div class="search-input-wrap">
+                            <i class="ti ti-search search-icon"></i>
+                            <input type="text" id="demande-search-input" class="form-control"
+                                   placeholder="Rechercher par titre, categorie, type ou statut..."
+                                   autocomplete="off"
+                                   value="{{ filters.search|default('') }}">
+                            <button type="button" class="clear-btn {{ filters.search|default('') != '' ? 'visible' : '' }}" id="search-clear-btn" title="Effacer">
+                                <i class="ti ti-x"></i>
+                            </button>
+                        </div>
+                        <a href="{{ path('demande_index', {'categorie': filters.categorie|default(''), 'limit': limit|default(10), 'page': 1}) }}"
+                           class="quick-filter-btn {{ (filters.priorite|default('') == '' and filters.status|default('') == '' and filters.search|default('') == '') ? 'active' : '' }}">
+                            <i class="ti ti-list"></i>Tous
+                        </a>
+                        <a href="{{ path('demande_index', {'categorie': filters.categorie|default(''), 'priorite': 'HAUTE', 'limit': limit|default(10), 'page': 1}) }}"
+                           class="quick-filter-btn {{ filters.priorite|default('') == 'HAUTE' ? 'active' : '' }}">
+                            <i class="ti ti-alert-circle"></i>Haute
+                        </a>
+                        <a href="{{ path('demande_index', {'categorie': filters.categorie|default(''), 'status': 'Nouvelle', 'limit': limit|default(10), 'page': 1}) }}"
+                           class="quick-filter-btn {{ filters.status|default('') == 'Nouvelle' ? 'active' : '' }}">
+                            <i class="ti ti-sparkles"></i>Nouvelles
+                        </a>
+                        <a href="{{ path('demande_index', {'categorie': filters.categorie|default(''), 'status': 'En cours', 'limit': limit|default(10), 'page': 1}) }}"
+                           class="quick-filter-btn {{ filters.status|default('') == 'En cours' ? 'active' : '' }}">
+                            <i class="ti ti-progress"></i>En cours
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card table-card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter table-hover card-table" id="demande-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 28%">Titre</th>
+                                <th>Categorie</th>
+                                <th>Type</th>
+                                <th>Priorite</th>
+                                <th>Statut</th>
+                                <th>Date creation</th>
+                                <th class="text-end" style="width: 130px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for demande in demandes %}
+                                <tr class="demande-row"
+                                    data-titre="{{ demande.titre|lower }}"
+                                    data-categorie="{{ demande.categorie|lower }}"
+                                    data-type="{{ demande.typeDemande|lower }}"
+                                    data-priorite="{{ demande.priorite }}"
+                                    data-status="{{ demande.status }}">
+                                    <td>
+                                        <a href="{{ path('demande_show', {id: demande.idDemande}) }}" class="titre-link">
+                                            {{ demande.titre }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <span class="category-tag">
+                                            <i class="ti ti-folder"></i>{{ demande.categorie }}
+                                        </span>
+                                    </td>
+                                    <td>{{ demande.typeDemande }}</td>
+                                    <td>
+                                        {% if demande.priorite == 'HAUTE' %}
+                                            <span class="badge bg-danger"><i class="ti ti-alert-triangle me-1"></i>{{ demande.priorite }}</span>
+                                        {% elseif demande.priorite == 'NORMALE' %}
+                                            <span class="badge bg-info"><i class="ti ti-minus me-1"></i>{{ demande.priorite }}</span>
+                                        {% else %}
+                                            <span class="badge bg-success"><i class="ti ti-arrow-down me-1"></i>{{ demande.priorite }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if demande.status == 'Nouvelle' %}
+                                            <span class="badge bg-info"><i class="ti ti-sparkles me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'En cours' %}
+                                            <span class="badge bg-warning"><i class="ti ti-loader me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'En attente' %}
+                                            <span class="badge bg-orange"><i class="ti ti-clock me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Resolue' %}
+                                            <span class="badge bg-success"><i class="ti ti-check me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Rejetee' %}
+                                            <span class="badge bg-danger"><i class="ti ti-x me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Reconsideration' %}
+                                            <span class="badge bg-primary"><i class="ti ti-lock-open me-1"></i>{{ demande.status }}</span>
+                                        {% elseif demande.status == 'Annulee' %}
+                                            <span class="badge bg-danger"><i class="ti ti-x me-1"></i>{{ demande.status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary"><i class="ti ti-lock me-1"></i>{{ demande.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="date-text">
+                                            <i class="ti ti-calendar"></i>{{ demande.dateCreation|date('d/m/Y') }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="action-buttons">
+                                            <a href="{{ path('demande_show', {id: demande.idDemande}) }}"
+                                               class="action-btn action-btn-view" title="Afficher">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                            </a>
+                                            {% if demande.status != 'Annulee' %}
+                                                <a href="{{ path('demande_edit', {id: demande.idDemande}) }}"
+                                                   class="action-btn action-btn-edit" title="Modifier">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                                </a>
+                                            {% else %}
+                                                <span class="action-btn action-btn-edit" style="opacity:0.35;cursor:not-allowed;" title="Modification impossible">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                                </span>
+                                            {% endif %}
+                                            <button type="button"
+                                                    class="action-btn action-btn-delete"
+                                                    title="Supprimer"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#deleteDemandeModal-{{ demande.idDemande }}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="7">
+                                        <div class="empty-state">
+                                            <i class="ti ti-file-off"></i>
+                                            <h3>Aucune demande trouvee</h3>
+                                            <p class="text-muted">Aucune demande ne correspond aux filtres actuels.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if demandes.getTotalItemCount > 0 %}
+                    <div class="card-footer d-flex justify-content-center">
+                        {{ knp_pagination_render(demandes) }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+{# Delete modals #}
+<div id="delete-modals-container">
+{% for demande in demandes %}
+<div class="modal" id="deleteDemandeModal-{{ demande.idDemande }}" tabindex="-1">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-body text-center py-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon mb-2 text-danger icon-lg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                    <path d="M10 11v6"></path><path d="M14 11v6"></path>
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                </svg>
+                <h3>Supprimer la demande ?</h3>
+                <div class="text-secondary">
+                    Vous allez supprimer :<br>
+                    <strong class="text-dark">{{ demande.titre }}</strong><br><br>
+                    Cette action est <strong>irreversible</strong>.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn w-100" data-bs-dismiss="modal">Annuler</button>
+                        </div>
+                        <div class="col">
+                            <form method="post" action="{{ path('demande_delete', {id: demande.idDemande}) }}" style="margin:0;">
+                                <button type="submit" class="btn btn-danger w-100">
+                                    <i class="ti ti-trash me-1"></i>Supprimer
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+</div>
+
+{{ include('demande/_logout_modal.html.twig') }}
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script src="{{ asset('js/demande-sync.js') }}"></script>
+<script>
+(function () {
+    "use strict";
+
+    var DEFAULT_ROW_HEIGHT = 54;
+    var BOTTOM_SAFE_GAP = 18;
+    var currentLimit = {{ limit|default(10) }};
+    var resizeTimer = null;
+    var searchTimer = null;
+    var currentStatusFilter = "";
+    var searchInput = null;
+    var currentSearchTerm = "";
+    var fetchSequence = 0;
+
+    function getMeasuredRowHeight(tableCard) {
+        if (!tableCard) return DEFAULT_ROW_HEIGHT;
+
+        var sampleRow = tableCard.querySelector('#demande-table tbody tr.demande-row');
+        if (sampleRow) {
+            var measured = sampleRow.getBoundingClientRect().height;
+            if (measured > 0) {
+                return measured;
+            }
+        }
+
+        return DEFAULT_ROW_HEIGHT;
+    }
+
+    function calculateOptimalLimit() {
+        var tableCard = document.querySelector('.card.table-card');
+        if (!tableCard) return currentLimit;
+
+        var rowHeight = getMeasuredRowHeight(tableCard);
+        var cardRect = tableCard.getBoundingClientRect();
+        var thead = tableCard.querySelector('thead');
+        var footer = tableCard.querySelector('.card-footer');
+        var tableViewport = tableCard.querySelector('.table-responsive');
+        var theadHeight = thead ? thead.offsetHeight : 42;
+        var footerHeight = footer ? footer.offsetHeight : 52;
+        var availableHeight = 0;
+
+        if (tableViewport && tableViewport.clientHeight > 0) {
+            availableHeight = tableViewport.clientHeight - theadHeight - BOTTOM_SAFE_GAP;
+        }
+
+        if (availableHeight <= 0) {
+            var viewportBottom = window.innerHeight;
+            availableHeight = viewportBottom - cardRect.top - theadHeight - footerHeight - BOTTOM_SAFE_GAP;
+        }
+
+        if (availableHeight < rowHeight) availableHeight = rowHeight;
+        var rows = Math.floor(availableHeight / rowHeight);
+        if (rows < 1) rows = 1;
+        if (rows > 100) rows = 100;
+        return rows;
+    }
+
+    function buildUrl(overrides) {
+        var url = new URL(window.location.href);
+        if (overrides) {
+            for (var key in overrides) {
+                if (overrides[key] === null || overrides[key] === '') {
+                    url.searchParams.delete(key);
+                } else {
+                    url.searchParams.set(key, overrides[key]);
+                }
+            }
+        }
+        return url.toString();
+    }
+
+    function getUpdatedUrl(newLimit) {
+        var url = new URL(window.location.href);
+        var oldLimit = parseInt(url.searchParams.get('limit')) || 10;
+        var oldPage = parseInt(url.searchParams.get('page')) || 1;
+        var firstItemIndex = (oldPage - 1) * oldLimit;
+        var newPage = Math.floor(firstItemIndex / newLimit) + 1;
+        if (newPage < 1) newPage = 1;
+        url.searchParams.set('limit', newLimit.toString());
+        url.searchParams.set('page', newPage.toString());
+        return url.toString();
+    }
+
+    function applyDynamicLimit() {
+        var optimalLimit = calculateOptimalLimit();
+        if (optimalLimit !== currentLimit) {
+            currentLimit = optimalLimit;
+            window.location.assign(getUpdatedUrl(optimalLimit));
+        }
+    }
+
+    function updateQuickFilterLinks(limit) {
+        document.querySelectorAll('.quick-filter-btn').forEach(function (link) {
+            try {
+                var href = new URL(link.href);
+                href.searchParams.set('limit', limit.toString());
+                link.href = href.toString();
+            } catch (e) {}
+        });
+    }
+
+    function updateStatCardValues(responseDoc) {
+        ["total", "Nouvelle", "En cours", "Resolue"].forEach(function (key) {
+            var source = responseDoc.querySelector('[data-stat-value="' + key + '"]');
+            var target = document.querySelector('[data-stat-value="' + key + '"]');
+            if (source && target) {
+                target.textContent = source.textContent;
+            }
+        });
+    }
+
+    function syncTableFromResponse(responseDoc) {
+        var currentBody = document.querySelector('#demande-table tbody');
+        var nextBody = responseDoc.querySelector('#demande-table tbody');
+        if (currentBody && nextBody) {
+            currentBody.innerHTML = nextBody.innerHTML;
+        }
+    }
+
+    function syncPaginationFromResponse(responseDoc) {
+        var tableCard = document.querySelector('.card.table-card');
+        if (!tableCard) return;
+
+        var currentFooter = tableCard.querySelector('.card-footer');
+        var nextFooter = responseDoc.querySelector('.card.table-card .card-footer');
+
+        if (nextFooter) {
+            if (!currentFooter) {
+                currentFooter = nextFooter.cloneNode(true);
+                tableCard.appendChild(currentFooter);
+            } else {
+                currentFooter.innerHTML = nextFooter.innerHTML;
+            }
+        } else if (currentFooter) {
+            currentFooter.remove();
+        }
+
+        bindPaginationLinks();
+    }
+
+    function syncDeleteModalsFromResponse(responseDoc) {
+        var currentModals = document.getElementById('delete-modals-container');
+        var nextModals = responseDoc.getElementById('delete-modals-container');
+        if (currentModals && nextModals) {
+            currentModals.innerHTML = nextModals.innerHTML;
+        }
+    }
+
+    function buildRequestUrl(page) {
+        var url = new URL(window.location.href);
+        url.searchParams.set('limit', currentLimit.toString());
+        url.searchParams.set('page', String(page || 1));
+
+        if (currentSearchTerm) {
+            url.searchParams.set('search', currentSearchTerm);
+        } else {
+            url.searchParams.delete('search');
+        }
+
+        if (currentStatusFilter) {
+            url.searchParams.set('status', currentStatusFilter);
+            url.searchParams.delete('priorite');
+        }
+
+        if (!currentStatusFilter) {
+            url.searchParams.delete('status');
+        }
+
+        return url;
+    }
+
+    function fetchAndRender(page) {
+        var sequence = ++fetchSequence;
+        var requestUrl = buildRequestUrl(page);
+        window.history.replaceState({}, '', requestUrl.toString());
+
+        fetch(requestUrl.toString(), {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(function (response) {
+                return response.text();
+            })
+            .then(function (html) {
+                if (sequence !== fetchSequence) return;
+                var responseDoc = new DOMParser().parseFromString(html, 'text/html');
+                updateStatCardValues(responseDoc);
+                syncTableFromResponse(responseDoc);
+                syncPaginationFromResponse(responseDoc);
+                syncDeleteModalsFromResponse(responseDoc);
+            })
+            .catch(function () {
+                window.location.assign(requestUrl.toString());
+            });
+    }
+
+    function debounce(func, wait) {
+        return function () {
+            var args = arguments;
+            if (searchTimer) clearTimeout(searchTimer);
+            searchTimer = setTimeout(function () {
+                func.apply(null, args);
+            }, wait);
+        };
+    }
+
+    function bindPaginationLinks() {
+        document.querySelectorAll('.card.table-card .card-footer a').forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                event.preventDefault();
+                try {
+                    var href = new URL(link.href);
+                    var nextPage = parseInt(href.searchParams.get('page')) || 1;
+                    currentSearchTerm = href.searchParams.get('search') || currentSearchTerm;
+                    currentStatusFilter = href.searchParams.get('status') || currentStatusFilter;
+                    if (searchInput) {
+                        searchInput.value = currentSearchTerm;
+                    }
+                    fetchAndRender(nextPage);
+                } catch (e) {
+                    window.location.assign(link.href);
+                }
+            });
+        });
+    }
+
+    function filterByStatus(status) {
+        currentStatusFilter = status || "";
+        fetchAndRender(1);
+    }
+
+    function clearSearch() {
+        if (!searchInput) return;
+        searchInput.value = "";
+        currentSearchTerm = "";
+        fetchAndRender(1);
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        var optimalLimit = calculateOptimalLimit();
+        var urlLimit = parseInt(new URLSearchParams(window.location.search).get('limit')) || 0;
+        var queryParams = new URLSearchParams(window.location.search);
+
+        currentSearchTerm = queryParams.get('search') || "";
+        currentStatusFilter = queryParams.get('status') || "";
+
+        updateQuickFilterLinks(optimalLimit);
+
+        if (urlLimit === 0 || Math.abs(urlLimit - optimalLimit) >= 1) {
+            window.location.assign(getUpdatedUrl(optimalLimit));
+            return;
+        }
+
+        currentLimit = optimalLimit;
+
+        searchInput = document.getElementById("demande-search-input");
+        var clearBtn = document.getElementById("search-clear-btn");
+
+        if (searchInput) {
+            searchInput.addEventListener("input", debounce(function () {
+                currentSearchTerm = searchInput.value.trim();
+                if (clearBtn) {
+                    clearBtn.classList.toggle('visible', searchInput.value.trim().length > 0);
+                }
+                fetchAndRender(1);
+            }, 150));
+
+            searchInput.addEventListener("keyup", function (event) {
+                if (event.key === "Escape") {
+                    if (clearBtn) clearBtn.classList.remove('visible');
+                    clearSearch();
+                }
+            });
+
+            searchInput.focus();
+            var len = searchInput.value.length;
+            searchInput.setSelectionRange(len, len);
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener("click", function () {
+                clearBtn.classList.remove('visible');
+                clearSearch();
+            });
+        }
+
+        bindPaginationLinks();
+
+        window.addEventListener('resize', function () {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function () {
+                applyDynamicLimit();
+            }, 300);
+        });
+
+        if (window.DemandeSyncManager) {
+            window.DemandeSyncManager.onStatusUpdate(function (data) {
+                if (data.type === "status-update") {
+                    window.location.reload();
+                }
+            });
+        }
+
+    });
+
+    window.filterByStatus = filterByStatus;
+}());
+</script>
+{% endblock %}

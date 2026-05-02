@@ -7,6 +7,15 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    huggingface.api_key: '%env(string:HUGGINGFACE_API_KEY)%'
+    huggingface.model: '%env(string:HUGGINGFACE_MODEL)%'
+    huggingface.timeout_seconds: 20
+    ml.python_executable_default: 'python'
+    ml.python_executable: '%env(default:ml.python_executable_default:ML_PYTHON_EXECUTABLE)%'
+    ml.demande_ai_script: '%kernel.project_dir%/ml/demande/demande_ai_model.py'
+    ml.demande_decision_script: '%kernel.project_dir%/ml/demande/demande_decision_model.py'
+    news_api_key_default: ''
+
     google_maps_api_key: '%env(GOOGLE_MAPS_API_KEY)%'
     uploads_dir: '%kernel.project_dir%/public/uploads'
 services:
@@ -23,6 +32,22 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
+
+    App\Services\DemandeAiAssistant:
+        arguments:
+            $apiKey: '%huggingface.api_key%'
+            $model: '%huggingface.model%'
+            $timeoutSeconds: '%huggingface.timeout_seconds%'
+            $pythonExecutable: '%ml.python_executable%'
+            $pythonScriptPath: '%ml.demande_ai_script%'
+
+    App\Services\DemandeDecisionAssistant:
+        arguments:
+            $apiKey: '%huggingface.api_key%'
+            $model: '%huggingface.model%'
+            $timeoutSeconds: '%huggingface.timeout_seconds%'
+            $pythonExecutable: '%ml.python_executable%'
+            $pythonScriptPath: '%ml.demande_decision_script%'
 
     App\Services\MailerService:
         bind:
@@ -42,5 +67,9 @@ services:
             $apiKey: '%env(GROQ_API_KEY)%'
             $apiUrl: '%env(GROQ_API_URL)%'
             $model: '%env(GROQ_MODEL)%'
+    App\Service\NewsService:
+        arguments:
+            $newsApiKey: '%env(default:news_api_key_default:NEWS_API_KEY)%'
 
-
+    # add more service definitions when explicit configuration is needed
+    # please note that last definitions always *replace* previous ones

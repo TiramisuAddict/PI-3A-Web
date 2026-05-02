@@ -1,0 +1,107 @@
+/* BadWord Filter UI Styles */
+
+.bad-word-warning-box {
+    animation: slideInDown 0.3s ease-out;
+}
+
+.bad-word-warning-box .alert {
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.15);
+    margin-bottom: 0;
+    background: linear-gradient(135deg, #fff9e6 0%, #fffbf0 100%);
+    border: 1px solid #ffc10733;
+}
+
+.bad-word-warning-box .badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.4rem 0.65rem;
+    white-space: nowrap;
+}
+
+.bad-word-warning-box .alert-heading {
+    color: #856404;
+    font-weight: 700;
+    margin-top: 0;
+}
+
+.bad-word-warning-box .text-muted {
+    color: #856404 !important;
+    font-size: 0.9rem;
+}
+
+/* Shake animation for textarea */
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-5px);
+    }
+    20%, 40%, 60%, 80% {
+        transform: translateX(5px);
+    }
+}
+
+/* Slide down animation */
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Text preview styling */
+.bad-word-warning-box .bg-white {
+    transition: all 0.2s ease;
+}
+
+.bad-word-warning-box .bg-white:hover {
+    background: #f8f9fa !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .bad-word-warning-box .alert {
+        font-size: 0.9rem;
+    }
+
+    .bad-word-warning-box .badge {
+        display: block;
+        margin-top: 0.25rem !important;
+    }
+}
+
+/* Toast container customization */
+.toast-container {
+    z-index: 9999;
+}
+
+.toast {
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Smooth transition for warning dismissal */
+.bad-word-warning-box .alert.show {
+    animation: slideInDown 0.3s ease-out;
+}
+
+.bad-word-warning-box .alert:not(.show) {
+    animation: slideOutUp 0.3s ease-in forwards;
+}
+
+@keyframes slideOutUp {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
