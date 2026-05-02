@@ -269,6 +269,7 @@
   {% endif %}
 
   {# ── Google Calendar sync ── #}
+  {% if active_page is defined and active_page == 'projets' %}
   <div class="mt-auto pt-3 border-top">
     {% if app.session.get('google_linked') %}
       <button type="button"
@@ -485,4 +486,5 @@
     });
   })();
   </script>
+  {% endif %}
 </aside>
