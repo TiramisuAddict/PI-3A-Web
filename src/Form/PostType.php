@@ -6,8 +6,8 @@ use App\Entity\Post;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
-use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
+use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -15,8 +15,7 @@ use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
-use App\Form\EventImageType;
-
+use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * Formulaire CRUD Post : ne mappe pas les associations inverses (like, participation).
@@ -38,7 +37,7 @@ class PostType extends AbstractType
                 'label' => 'Type de publication',
                 'choices' => [
                     'Annonce' => 1,
-                    'Événement' => 2,
+                    'Evenement' => 2,
                 ],
                 'attr' => ['class' => 'form-select'],
             ])
@@ -50,7 +49,7 @@ class PostType extends AbstractType
                 'row_attr' => ['class' => 'mb-0 form-check form-switch'],
             ])
             ->add('date_evenement', DateType::class, [
-                'label' => 'Date début événement',
+                'label' => 'Date debut evenement',
                 'required' => false,
                 'widget' => 'single_text',
                 'input' => 'datetime_immutable',
@@ -58,7 +57,7 @@ class PostType extends AbstractType
                 'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ])
             ->add('date_fin_evenement', DateType::class, [
-                'label' => 'Date fin événement',
+                'label' => 'Date fin evenement',
                 'required' => false,
                 'widget' => 'single_text',
                 'input' => 'datetime_immutable',
@@ -69,22 +68,41 @@ class PostType extends AbstractType
                 'label' => 'Lieu',
                 'required' => false,
                 'attr' => ['class' => 'form-control'],
-                'help' => 'Un lien Google Maps sera généré automatiquement pour les employés.',
+                'help' => 'Un lien Google Maps sera genere automatiquement pour les employes.',
                 'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ])
             ->add('capacite_max', IntegerType::class, [
-                'label' => 'Capacité maximale',
+                'label' => 'Capacite maximale',
                 'required' => false,
                 'attr' => ['class' => 'form-control', 'min' => 1],
                 'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ])
-            ->add('eventImages', CollectionType::class, [
-                'label' => 'Images de l\'événement',
-                'entry_type' => EventImageType::class,
-                'allow_add' => true,
-                'allow_delete' => true,
-                'by_reference' => false,
+            ->add('event_image_files', FileType::class, [
+                'label' => 'Images de l\'evenement',
+                'mapped' => false,
                 'required' => false,
+                'multiple' => true,
+                'attr' => [
+                    'class' => 'form-control',
+                    'accept' => '.jpg,.jpeg,.png,.webp',
+                ],
+                'help' => 'Vous pouvez selectionner 10 images ou plus en une seule fois.',
+                'constraints' => [
+                    new Assert\All([
+                        'constraints' => [
+                            new Assert\File([
+                                'maxSize' => '5M',
+                                'mimeTypes' => [
+                                    'image/jpeg',
+                                    'image/png',
+                                    'image/webp',
+                                ],
+                                'mimeTypesMessage' => 'Veuillez telecharger une image valide (JPG, PNG, WebP).',
+                                'maxSizeMessage' => 'Chaque image doit faire au maximum 5 MB.',
+                            ]),
+                        ],
+                    ]),
+                ],
                 'row_attr' => ['class' => 'mb-3 post-form-row--event'],
             ]);
 
@@ -97,7 +115,7 @@ class PostType extends AbstractType
             $type = isset($data['type_post']) ? (int) $data['type_post'] : 1;
             $data['type_post'] = $type;
 
-            $eventKeys = ['date_evenement', 'date_fin_evenement', 'lieu', 'capacite_max', 'eventImages'];
+            $eventKeys = ['date_evenement', 'date_fin_evenement', 'lieu', 'capacite_max'];
             $dateKeys = ['date_evenement', 'date_fin_evenement'];
 
             if ($type !== 2) {

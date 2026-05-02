@@ -176,7 +176,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
             $em->persist($employe);
             $plainPassword = $passwordGenerator->generatePlain();
             $compte = new Compte();
-            $compte->setMot_de_passe($passwordHasher->hashPassword($compte, $plainPassword));
+                    $compte->setMot_de_passe($passwordGenerator->hash($plainPassword));
             $compte->setEmploye($employe);
             $em->persist($compte);
             $em->flush();

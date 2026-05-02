@@ -1,0 +1,58 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Verification ticket #{{ ticket.id_participation }}{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="page-body">
+        <div class="container-xl py-5">
+            <div class="row justify-content-center">
+                <div class="col-lg-7">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body p-4 p-md-5">
+                            <div class="text-center mb-4">
+                                <div class="avatar avatar-xl mx-auto mb-3 {{ is_valid ? 'bg-green-lt text-green' : 'bg-red-lt text-red' }}">
+                                    <i class="ti {{ is_valid ? 'ti-shield-check' : 'ti-shield-x' }}"></i>
+                                </div>
+                                <h1 class="h2 mb-2">{{ is_valid ? 'Ticket valide' : 'Ticket invalide' }}</h1>
+                                <p class="text-secondary mb-0">
+                                    {{ is_valid
+                                        ? 'La participation a bien ete retrouvee et le QR code correspond a un ticket authentique.'
+                                        : 'Le QR code ne correspond pas a un ticket valide ou a ete modifie.' }}
+                                </p>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="text-secondary small">Employe</div>
+                                    <div class="fw-semibold">{{ ticket_holder }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="text-secondary small">Statut</div>
+                                    <div class="fw-semibold">{{ ticket.statut }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="text-secondary small">Evenement</div>
+                                    <div class="fw-semibold">{{ ticket.post_titre }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="text-secondary small">Date evenement</div>
+                                    <div class="fw-semibold">{{ ticket.date_evenement ? ticket.date_evenement|date('d/m/Y') : '-' }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="text-secondary small">Lieu</div>
+                                    <div class="fw-semibold">{{ ticket.lieu ?: '-' }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="text-secondary small">Participation</div>
+                                    <div class="fw-semibold">{{ ticket.date_action ? ticket.date_action|date('d/m/Y H:i') : '-' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

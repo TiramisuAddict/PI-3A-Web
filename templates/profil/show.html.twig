@@ -147,41 +147,50 @@
                 </div>
               </div>
             </div>
+          {% endif %}
 
+          {% if profile_type == 'employee' %}
             <div class="card shadow-sm mb-4">
               <div class="card-header d-flex align-items-center justify-content-between">
-                <h3 class="card-title mb-0">Identification Face ID</h3>
-                {% set face_enabled = employe.getFaceEmbedding() is not null and employe.getFaceConsent() %}
-                <div class="form-check form-switch m-0 d-flex align-items-center gap-2">
-                  <input class="form-check-input ms-0" type="checkbox" role="switch" id="faceToggleSwitch" {% if face_enabled %}checked{% endif %}>
-                  <label class="form-check-label fw-semibold mb-0" for="faceToggleSwitch" id="faceToggleLabel">
-                    {% if face_enabled %}
-                      Activé
-                    {% else %}
-                      Désactivé
-                    {% endif %}
+                <h3 class="card-title mb-0">Face ID</h3>
+                {% set face_enabled = employe.getFaceEnabled() %}
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" role="switch" id="faceToggle" {% if face_enabled %}checked{% endif %}>
+                  <label class="form-check-label" for="faceToggle" id="faceToggleLabel">
+                    {% if face_enabled %}Activé{% else %}Désactivé{% endif %}
                   </label>
                 </div>
               </div>
               <div class="card-body">
-                <p class="text-muted mb-3">
-                  Activez Face ID pour enregistrer votre empreinte faciale. Ces données seront utilisées lors de la connexion via Face ID.
-                </p>
-                {% if employe.getFaceRegisteredAt() %}
-                  <div class="small text-muted mb-3">
-                    Dernier enregistrement: {{ employe.getFaceRegisteredAt()|date('d/m/Y H:i') }}
-                  </div>
-                {% endif %}
-                <div id="faceEnrollResult" class="mt-3"></div>
+                <p class="text-muted mb-3">Enregistrez votre visage pour une authentification sécurisée.</p>
+                <div id="faceResult" class="mt-3"></div>
               </div>
             </div>
           {% endif %}
-
-          
         </div>
       </div>
     </div>
   </div>
+  </div>
+
+  {# Modal Face ID Registration #}
+  <div id="faceRegisterModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:12px; padding:2rem; max-width:450px; width:90%; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+      <h3 class="mb-3">Enregistrement Face ID</h3>
+      <video 
+        id="faceRegisterVideo" 
+        autoplay 
+        playsinline 
+        muted 
+        style="width:100%; max-height:300px; border-radius:8px; background:#111; border:2px solid #4254D6; margin-bottom:1.5rem;"
+      ></video>
+      <div id="faceRegisterStatus" class="small text-muted mb-2">Chargement...</div>
+      <div id="faceRegisterMsg" class="mb-3"></div>
+      <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+        <button id="faceRegisterCancel" type="button" class="btn btn-secondary">Annuler</button>
+        <button id="faceRegisterSubmit" type="button" class="btn btn-primary" style="display:none;">Enregistrer</button>
+      </div>
+    </div>
   </div>
 
   <style>
@@ -189,65 +198,17 @@
       opacity: 1 !important;
       display: flex !important;
     }
-
-    #faceEnrollVideo {
-      width: 100%;
-      max-height: 320px;
-      border-radius: 12px;
-      background: #111;
-    }
   </style>
 
-  <div class="modal fade" id="faceEnrollModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Activer Face ID</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <p class="text-muted mb-3">Regardez la caméra et bougez légèrement la tête pour la détection de vivacité.</p>
-          <video id="faceEnrollVideo" autoplay playsinline muted></video>
-          <div class="form-check mt-3">
-            <input class="form-check-input" type="checkbox" id="faceConsentCheckbox">
-            <label class="form-check-label" for="faceConsentCheckbox">
-              J'accepte l'utilisation de mon empreinte faciale pour l'authentification.
-            </label>
-          </div>
-          <div id="faceEnrollStatus" class="small text-muted mt-2">Initialisation...</div>
-          <div id="faceEnrollModalResult" class="mt-2"></div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
-          <button type="button" class="btn btn-primary" id="saveFaceIdBtn" disabled>Enregistrer</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const avatarContainer = document.querySelector('.avatar-container');
       const avatarInput = document.getElementById('avatarInput');
       const avatarOverlay = document.querySelector('.avatar-overlay');
-      const faceToggleSwitch = document.getElementById('faceToggleSwitch');
+      const faceToggle = document.getElementById('faceToggle');
       const faceToggleLabel = document.getElementById('faceToggleLabel');
-      const faceEnrollModalEl = document.getElementById('faceEnrollModal');
-      const faceEnrollVideo = document.getElementById('faceEnrollVideo');
-      const faceEnrollStatus = document.getElementById('faceEnrollStatus');
-      const faceEnrollResult = document.getElementById('faceEnrollResult');
-      const faceEnrollModalResult = document.getElementById('faceEnrollModalResult');
-      const faceConsentCheckbox = document.getElementById('faceConsentCheckbox');
-      const saveFaceIdBtn = document.getElementById('saveFaceIdBtn');
-
-      let faceStream = null;
-      let faceDescriptor = null;
-      let faceIsLive = false;
-      let faceBaseX = null;
-      let faceTimer = null;
-      let faceModal = null;
-      let faceEnrollmentSuccess = false;
-      const faceDeactivateUrl = '{{ path('face_deactivate') }}';
+      const faceResult = document.getElementById('faceResult');
 
       if (avatarContainer && avatarInput) {
         avatarContainer.addEventListener('click', function() {
@@ -270,7 +231,6 @@
             .then(response => response.json())
             .then(data => {
               if (data.success) {
-                // Rechargs la page pour voir la nouvelle image
                 location.reload();
               } else {
                 alert('Erreur: ' + (data.error || 'Impossible d\'uploader l\'image'));
@@ -284,279 +244,225 @@
         });
       }
 
-      function setFaceEnrollResult(message, success) {
-        const alertHtml = `<div class="alert ${success ? 'alert-success' : 'alert-danger'} mb-0" role="alert">${message}</div>`;
-
-        if (faceEnrollResult) {
-          faceEnrollResult.innerHTML = alertHtml;
-        }
-
-        if (faceEnrollModalResult) {
-          faceEnrollModalResult.innerHTML = alertHtml;
-        }
+      // Face ID toggle handler
+      if (faceToggle) {
+        faceToggle.addEventListener('change', async function() {
+          if (faceToggle.checked) {
+            // Enable Face ID - need to register
+            const result = await registerFaceId();
+            if (!result.success) {
+              faceToggle.checked = false;
+              faceToggleLabel.textContent = 'Désactivé';
+              showFaceResult(result.message || 'Enregistrement échoué.', false);
+            } else {
+              faceToggleLabel.textContent = 'Activé';
+              showFaceResult('Face ID enregistré avec succès.', true);
+              setTimeout(() => location.reload(), 1500);
+            }
+          } else {
+            // Disable Face ID
+            const result = await deactivateFaceId();
+            faceToggleLabel.textContent = result.success ? 'Désactivé' : 'Activé';
+            showFaceResult(result.message || 'Opération échouée.', result.success);
+            if (result.success) {
+              setTimeout(() => location.reload(), 1500);
+            }
+          }
+        });
       }
 
-      function setFaceToggleState(checked) {
-        if (!faceToggleSwitch) {
-          return;
-        }
-
-        faceToggleSwitch.checked = checked;
-        if (faceToggleLabel) {
-          faceToggleLabel.textContent = checked ? 'Face ID activé' : 'Face ID désactivé';
-        }
+      function showFaceResult(msg, ok) {
+        const alertClass = ok ? 'alert-success' : 'alert-danger';
+        faceResult.innerHTML = `<div class="alert ${alertClass}" role="alert">${msg}</div>`;
       }
 
-      async function parseJsonSafe(response) {
-        const text = await response.text();
+      async function registerFaceId() {
+        const modal = document.getElementById('faceRegisterModal');
+        const video = document.getElementById('faceRegisterVideo');
+        const statusEl = document.getElementById('faceRegisterStatus');
+        const msgEl = document.getElementById('faceRegisterMsg');
+        const submitBtn = document.getElementById('faceRegisterSubmit');
+        const cancelBtn = document.getElementById('faceRegisterCancel');
 
-        if (!text) {
-          return {};
+        return new Promise(async (resolve) => {
+          modal.style.display = 'flex';
+          statusEl.textContent = 'Chargement des modèles...';
+          msgEl.innerHTML = '';
+          submitBtn.style.display = 'none';
+
+          // Load models
+          try {
+            await Promise.all([
+              faceapi.nets.tinyFaceDetector.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'),
+              faceapi.nets.faceLandmark68Net.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'),
+              faceapi.nets.faceRecognitionNet.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models')
+            ]);
+          } catch (e) {
+            statusEl.textContent = 'Erreur';
+            msgEl.innerHTML = '<div class="alert alert-danger py-2" role="alert">Impossible de charger les modèles.</div>';
+            resolve({ success: false, message: 'Erreur chargement.' });
+            return;
+          }
+
+          // Get camera
+          let stream = null;
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: 'user' },
+              audio: false
+            });
+            video.srcObject = stream;
+            statusEl.textContent = 'Recherche du visage...';
+          } catch (e) {
+            statusEl.textContent = 'Erreur caméra';
+            msgEl.innerHTML = '<div class="alert alert-danger py-2" role="alert">Accès à la caméra refusé.</div>';
+            resolve({ success: false, message: 'Accès caméra refusé.' });
+            return;
+          }
+
+          // Detect face
+          let embedding = null;
+          let attempts = 0;
+          const maxAttempts = 50;
+
+          while (!embedding && attempts < maxAttempts) {
+            if (video.readyState >= 2) {
+              try {
+                const detection = await faceapi
+                  .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+                  .withFaceLandmarks()
+                  .withFaceDescriptor();
+
+                if (detection) {
+                  embedding = Array.from(detection.descriptor);
+                  statusEl.textContent = 'Visage détecté. Cliquez sur Enregistrer.';
+                  submitBtn.style.display = 'inline-block';
+                  break;
+                }
+              } catch (e) {
+                console.error('Detection error:', e);
+              }
+            }
+
+            statusEl.textContent = `Recherche (${attempts}/${maxAttempts})...`;
+            attempts++;
+            await new Promise(resolve => setTimeout(resolve, 150));
+          }
+
+          if (!embedding) {
+            // Cleanup camera
+            stream.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+            msgEl.innerHTML = '<div class="alert alert-danger py-2" role="alert">Visage non détecté.</div>';
+            resolve({ success: false, message: 'Détection échouée.' });
+            return;
+          }
+
+          // Wait for user to click Enregistrer
+          submitBtn.onclick = async function() {
+            submitBtn.disabled = true;
+            cancelBtn.disabled = true;
+            statusEl.textContent = 'Envoi en cours...';
+            submitBtn.style.display = 'none';
+
+            // Cleanup camera
+            stream.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+
+            // Send to backend
+            try {
+              const response = await fetch('{{ path('face_register') }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ embedding })
+              });
+
+              const data = await response.json();
+              const alertClass = data.success ? 'alert-success' : 'alert-danger';
+              msgEl.innerHTML = `<div class="alert ${alertClass} py-2" role="alert">${data.message}</div>`;
+
+              if (data.success) {
+                statusEl.textContent = 'Succès!';
+                setTimeout(() => {
+                  modal.style.display = 'none';
+                  msgEl.innerHTML = '';
+                  statusEl.textContent = 'Chargement...';
+                  submitBtn.disabled = false;
+                  cancelBtn.disabled = false;
+                }, 1500);
+              } else {
+                submitBtn.style.display = 'inline-block';
+                submitBtn.disabled = false;
+                cancelBtn.disabled = false;
+                statusEl.textContent = 'Erreur. Cliquez sur Annuler.';
+              }
+
+              resolve({
+                success: data.success,
+                message: data.message || 'Enregistrement échoué.'
+              });
+            } catch (e) {
+              msgEl.innerHTML = `<div class="alert alert-danger py-2" role="alert">Erreur: ${e.message}</div>`;
+              submitBtn.style.display = 'inline-block';
+              submitBtn.disabled = false;
+              cancelBtn.disabled = false;
+              statusEl.textContent = 'Erreur réseau.';
+              resolve({ success: false, message: 'Erreur réseau.' });
+            }
+          };
+        });
+      }
+
+      // Close modal handler
+      document.getElementById('faceRegisterCancel').addEventListener('click', function() {
+        const modal = document.getElementById('faceRegisterModal');
+        const video = document.getElementById('faceRegisterVideo');
+        
+        // Stop any active streams
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach(track => track.stop());
+          video.srcObject = null;
         }
+        
+        modal.style.display = 'none';
+        faceToggle.checked = false;
+        faceToggleLabel.textContent = 'Désactivé';
+      });
 
+      // Close modal on outside click
+      document.getElementById('faceRegisterModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+          const video = document.getElementById('faceRegisterVideo');
+          if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+          }
+          this.style.display = 'none';
+          faceToggle.checked = false;
+          faceToggleLabel.textContent = 'Désactivé';
+        }
+      });
+
+      async function deactivateFaceId() {
         try {
-          return JSON.parse(text);
+          const response = await fetch('{{ path('face_deactivate') }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+
+          const data = await response.json();
+          return {
+            success: data.success,
+            message: data.message || 'Opération échouée.'
+          };
+
         } catch (e) {
           return {
             success: false,
-            message: `Reponse serveur non JSON (HTTP ${response.status}).`
+            message: 'Erreur réseau: ' + e.message
           };
         }
-      }
-
-      async function loadFaceApiModels() {
-        if (window.faceapi) {
-          return;
-        }
-
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-
-      async function startFaceEnrollment() {
-        await loadFaceApiModels();
-
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'),
-          faceapi.nets.faceLandmark68Net.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'),
-          faceapi.nets.faceRecognitionNet.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models')
-        ]);
-
-        faceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-        faceEnrollVideo.srcObject = faceStream;
-        faceEnrollStatus.textContent = 'Regardez la caméra et bougez légèrement la tête.';
-
-        faceDescriptor = null;
-        faceIsLive = false;
-        faceBaseX = null;
-        saveFaceIdBtn.disabled = true;
-
-        faceTimer = window.setInterval(async () => {
-          if (!faceEnrollVideo || faceEnrollVideo.readyState < 2) {
-            return;
-          }
-
-          const detection = await faceapi
-            .detectSingleFace(faceEnrollVideo, new faceapi.TinyFaceDetectorOptions())
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-
-          if (!detection) {
-            faceEnrollStatus.textContent = 'Aucun visage détecté...';
-            saveFaceIdBtn.disabled = true;
-            return;
-          }
-
-          faceDescriptor = Array.from(detection.descriptor);
-          const currentX = detection.detection.box.x;
-          if (faceBaseX === null) {
-            faceBaseX = currentX;
-          }
-
-          if (Math.abs(currentX - faceBaseX) > 12) {
-            faceIsLive = true;
-          }
-
-          saveFaceIdBtn.disabled = !(faceDescriptor && faceConsentCheckbox.checked);
-          faceEnrollStatus.textContent = faceIsLive
-            ? 'Vivacité validée. Vous pouvez enregistrer.'
-            : 'Bougez légèrement la tête (gauche/droite) pour valider la vivacité.';
-        }, 700);
-      }
-
-      function stopFaceEnrollment() {
-        if (faceTimer) {
-          window.clearInterval(faceTimer);
-          faceTimer = null;
-        }
-
-        if (faceStream) {
-          faceStream.getTracks().forEach(track => track.stop());
-          faceStream = null;
-        }
-
-        if (faceEnrollVideo) {
-          faceEnrollVideo.srcObject = null;
-        }
-      }
-
-      if (faceToggleSwitch && faceEnrollModalEl && window.bootstrap) {
-        faceModal = new window.bootstrap.Modal(faceEnrollModalEl);
-
-        faceToggleSwitch.addEventListener('change', async function() {
-          if (faceToggleSwitch.checked) {
-            faceEnrollmentSuccess = false;
-            if (faceEnrollResult) {
-              faceEnrollResult.innerHTML = '';
-            }
-            if (faceEnrollModalResult) {
-              faceEnrollModalResult.innerHTML = '';
-            }
-            faceConsentCheckbox.checked = false;
-            faceModal.show();
-
-            try {
-              await startFaceEnrollment();
-            } catch (e) {
-              faceEnrollmentSuccess = false;
-              setFaceToggleState(false);
-              faceEnrollStatus.textContent = 'Impossible de démarrer la caméra.';
-              setFaceEnrollResult(e.message || 'Erreur de chargement Face ID.', false);
-            }
-            return;
-          }
-
-          try {
-            const response = await fetch(faceDeactivateUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-              }
-            });
-
-            const data = await parseJsonSafe(response);
-
-            if (!response.ok) {
-              setFaceEnrollResult(data.message || `Echec serveur (HTTP ${response.status}).`, false);
-              setFaceToggleState(true);
-              return;
-            }
-
-            setFaceEnrollResult(data.message || 'Face ID desactive.', true);
-            faceEnrollmentSuccess = true;
-            window.setTimeout(function() {
-              window.location.reload();
-            }, 900);
-          } catch (error) {
-            setFaceEnrollResult(`Erreur reseau pendant la désactivation Face ID: ${error.message || 'inconnue'}.`, false);
-            setFaceToggleState(true);
-          }
-        });
-
-        faceEnrollModalEl.addEventListener('hidden.bs.modal', function() {
-          if (!faceEnrollmentSuccess) {
-            setFaceToggleState(false);
-          }
-          stopFaceEnrollment();
-        });
-
-        faceConsentCheckbox.addEventListener('change', function() {
-          saveFaceIdBtn.disabled = !(faceDescriptor && faceConsentCheckbox.checked);
-        });
-
-        saveFaceIdBtn.addEventListener('click', async function() {
-          if (!faceDescriptor) {
-            setFaceEnrollResult('Empreinte faciale indisponible.', false);
-            return;
-          }
-
-          if (!faceConsentCheckbox.checked) {
-            setFaceEnrollResult('Vous devez accepter le consentement.', false);
-            return;
-          }
-
-          if (!faceIsLive) {
-            setFaceEnrollResult('Vivacite non validee. Bougez legerement la tete puis reessayez.', false);
-            return;
-          }
-
-          try {
-            const response = await fetch('{{ path('face_register') }}', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-              },
-              body: JSON.stringify({
-                embedding: faceDescriptor,
-                consent: true,
-                isLive: faceIsLive
-              })
-            });
-
-            const data = await parseJsonSafe(response);
-
-            if (!response.ok) {
-              const defaultMessage = `Echec serveur (HTTP ${response.status}).`;
-              setFaceEnrollResult(data.message || defaultMessage, false);
-              return;
-            }
-
-            if (data.success) {
-              setFaceEnrollResult('Face ID activé avec succès.', true);
-              faceEnrollStatus.textContent = 'Enregistrement termine avec succes.';
-              faceEnrollmentSuccess = true;
-              saveFaceIdBtn.disabled = true;
-              window.setTimeout(function() {
-                faceModal.hide();
-                window.location.reload();
-              }, 1200);
-              return;
-            }
-
-            setFaceEnrollResult(data.message || 'Erreur lors de l\'enregistrement Face ID.', false);
-          } catch (error) {
-            setFaceEnrollResult(`Erreur reseau pendant l'enregistrement Face ID: ${error.message || 'inconnue'}.`, false);
-          }
-        });
-      }
-
-      if (deactivateFaceIdBtn) {
-        deactivateFaceIdBtn.addEventListener('click', async function() {
-          deactivateFaceIdBtn.disabled = true;
-
-          try {
-            const response = await fetch(faceDeactivateUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-              }
-            });
-
-            const data = await parseJsonSafe(response);
-
-            if (!response.ok) {
-              setFaceEnrollResult(data.message || `Echec serveur (HTTP ${response.status}).`, false);
-              deactivateFaceIdBtn.disabled = false;
-              return;
-            }
-
-            setFaceEnrollResult(data.message || 'Face ID desactive.', true);
-            window.setTimeout(function() {
-              window.location.reload();
-            }, 900);
-          } catch (error) {
-            setFaceEnrollResult(`Erreur reseau pendant la désactivation Face ID: ${error.message || 'inconnue'}.`, false);
-            deactivateFaceIdBtn.disabled = false;
-          }
-        });
       }
     });
   </script>

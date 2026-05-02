@@ -103,12 +103,12 @@
                     <h1 class="feed-title">Le fil d'actualite de l'entreprise</h1>
                     <p class="feed-subtitle">Annonces, evenements et conversations utiles, reunis dans une experience plus claire et plus vivante.</p>
                 </div>
-                <div class="dropdown">
-                    <button type="button" class="btn btn-light feed-filter-btn" id="filterDropdownBtn" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                <div class="dropdown position-relative">
+                    <button type="button" class="btn btn-light feed-filter-btn" id="filterDropdownBtn" aria-expanded="false" aria-controls="feedFilterMenu">
                         <i class="ti ti-adjustments-horizontal"></i>
                         <span>Filtrer</span>
                     </button>
-                    <div class="dropdown-menu dropdown-menu-end" aria-labelledby="filterDropdownBtn">
+                    <div id="feedFilterMenu" class="dropdown-menu dropdown-menu-end" aria-labelledby="filterDropdownBtn" hidden>
                         <a class="dropdown-item{% if filter|default('all') == 'all' %} active{% endif %}" href="{{ path('app_employe_feed') }}">Toutes les publications</a>
                         <a class="dropdown-item{% if filter|default('all') == 'annonce' %} active{% endif %}" href="{{ path('app_employe_feed', {filter: 'annonce'}) }}">Annonces uniquement</a>
                         <a class="dropdown-item{% if filter|default('all') == 'evenement' %} active{% endif %}" href="{{ path('app_employe_feed', {filter: 'evenement'}) }}">Evenements uniquement</a>
@@ -130,6 +130,20 @@
                     {% set participating = pid in user_participates_post_ids|default([]) %}
                     {% set author = author_labels[post.utilisateurId]|default('Employe') %}
                     {% set initials = author|slice(0, 2)|upper %}
+                    {% set capacity_percentage = null %}
+                    {% set capacity_status = null %}
+                    {% if is_event and post.capaciteMax is not null and post.capaciteMax > 0 %}
+                        {% set capacity_percentage = ((part_n / post.capaciteMax) * 100)|round(0, 'floor') %}
+                        {% if capacity_percentage < 50 %}
+                            {% set capacity_status = 'available' %}
+                        {% elseif capacity_percentage < 80 %}
+                            {% set capacity_status = 'filling' %}
+                        {% elseif capacity_percentage < 100 %}
+                            {% set capacity_status = 'almost_full' %}
+                        {% else %}
+                            {% set capacity_status = 'full' %}
+                        {% endif %}
+                    {% endif %}
 
                     <article class="feed-post-card" data-post-id="{{ pid }}" data-capacite-max="{{ post.capaciteMax is not null ? post.capaciteMax : '' }}">
                         <div class="feed-post-head">
@@ -222,7 +236,7 @@
 
                         <div class="feed-stats-row">
                             <span class="feed-stat" id="like-count-{{ pid }}">
-                                <i class="ti ti-heart-filled"></i>
+                                <i class="ti ti-heart"></i>
                                 <span>{{ like_n }} j'aime</span>
                             </span>
                             <span class="feed-stat" id="com-count-{{ pid }}">
@@ -235,7 +249,18 @@
                                     <span>{{ part_n }} participant{{ part_n > 1 ? 's' : '' }}</span>
                                 </span>
                                 {% if restantes is not null %}
-                                    <span class="feed-places-badge" id="places-restantes-{{ pid }}">{{ restantes }} places restantes</span>
+                                    <span class="feed-places-badge{% if capacity_status %} is-{{ capacity_status }}{% endif %}" id="places-restantes-{{ pid }}">
+                                        {% if capacity_status == 'available' %}
+                                            <i class="ti ti-circle-check"></i>
+                                        {% elseif capacity_status == 'filling' %}
+                                            <i class="ti ti-trending-up"></i>
+                                        {% elseif capacity_status == 'almost_full' %}
+                                            <i class="ti ti-alert-triangle"></i>
+                                        {% elseif capacity_status == 'full' %}
+                                            <i class="ti ti-lock"></i>
+                                        {% endif %}
+                                        <span>{{ restantes }} places restantes</span>
+                                    </span>
                                 {% endif %}
                             {% endif %}
                         </div>
@@ -249,7 +274,7 @@
                                 data-csrf="{{ csrf_token('feed_like_' ~ pid) }}"
                             >
                                 <span class="feed-action-icon">
-                                    <i class="ti {% if liked %}ti-heart-filled{% else %}ti-heart{% endif %}"></i>
+                                    <i class="ti ti-heart"></i>
                                 </span>
                                 <span class="feed-action-label">J'aime</span>
                             </button>
@@ -275,10 +300,20 @@
                                     data-csrf="{{ csrf_token('feed_participate_' ~ pid) }}"
                                 >
                                     <span class="feed-action-icon">
-                                        <i class="ti {% if participating %}ti-circle-check-filled{% else %}ti-circle-check{% endif %}"></i>
+                                        <i class="ti ti-circle-check"></i>
                                     </span>
                                     <span class="feed-action-label feed-action-text">{% if participating %}Annuler{% else %}Participer{% endif %}</span>
                                 </button>
+                                <a
+                                    href="{{ user_participation_ticket_urls[pid]|default('#') }}"
+                                    class="feed-ticket-link {% if not participating %}d-none{% endif %}"
+                                    id="ticket-link-{{ pid }}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <i class="ti ti-qrcode"></i>
+                                    <span>Mon QR code</span>
+                                </a>
                             {% endif %}
                         </div>
 
@@ -341,6 +376,122 @@
             align-items: flex-end;
             gap: 1rem;
             margin-bottom: 1.5rem;
+        }
+        .feed-news-card {
+            margin-bottom: 1.4rem;
+            padding: 1.1rem 1.2rem;
+            border-radius: 1.4rem;
+            border: 1px solid rgba(14, 116, 144, 0.14);
+            background: linear-gradient(135deg, rgba(236, 254, 255, 0.96), rgba(255, 255, 255, 0.98));
+            box-shadow: 0 18px 42px rgba(15, 23, 42, 0.06);
+        }
+        .feed-news-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 0.95rem;
+        }
+        .feed-news-kicker {
+            margin: 0 0 0.3rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #0f766e;
+        }
+        .feed-news-title {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .feed-news-subtitle {
+            margin: 0.35rem 0 0;
+            max-width: 34rem;
+            color: #64748b;
+        }
+        .feed-news-pill {
+            border-radius: 999px;
+            padding: 0.35rem 0.7rem;
+            background: rgba(13, 148, 136, 0.12);
+            color: #0f766e;
+            font-size: 0.76rem;
+            font-weight: 700;
+        }
+        .feed-news-list {
+            display: grid;
+            gap: 0.75rem;
+        }
+        .feed-ticket-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            min-height: 2.8rem;
+            padding: 0.75rem 1rem;
+            border-radius: 999px;
+            border: 1px solid rgba(59, 130, 246, 0.18);
+            background: rgba(239, 246, 255, 0.92);
+            color: #1d4ed8;
+            font-weight: 700;
+            text-decoration: none;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .feed-ticket-link:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 20px rgba(29, 78, 216, 0.12);
+            color: #1d4ed8;
+        }
+        .feed-news-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.9rem 1rem;
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            color: inherit;
+            text-decoration: none;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+        .feed-news-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+            border-color: rgba(13, 148, 136, 0.22);
+        }
+        .feed-news-item-main {
+            min-width: 0;
+            display: grid;
+            gap: 0.32rem;
+        }
+        .feed-news-item-title {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            color: #0f172a;
+            font-weight: 700;
+            line-height: 1.5;
+        }
+        .feed-news-item-meta {
+            display: inline-flex;
+            color: #64748b;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .feed-news-item-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            color: #0f766e;
+            font-size: 0.82rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .feed-news-empty {
+            margin: 0;
+            color: #64748b;
         }
         .feed-kicker {
             margin: 0 0 0.35rem;
@@ -518,12 +669,48 @@
         }
         .feed-places-badge {
             margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.42rem;
             padding: 0.42rem 0.75rem;
             border-radius: 999px;
             background: rgba(16, 185, 129, 0.12);
             color: #047857;
             font-size: 0.78rem;
             font-weight: 700;
+        }
+        .feed-places-badge.is-available {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+        }
+        .feed-places-badge.is-filling {
+            background: #ffedd5;
+            color: #c2410c;
+            border: 1px solid #fed7aa;
+        }
+        .feed-places-badge.is-almost_full {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+            font-weight: 800;
+            animation: pulse-red 2s infinite;
+        }
+        .feed-places-badge.is-full {
+            background: #450a0a;
+            color: #fef2f2;
+            border: none;
+        }
+        @keyframes pulse-red {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
         }
         .feed-actions-row {
             display: grid;
@@ -742,6 +929,7 @@
                 align-items: stretch;
                 flex-direction: column;
             }
+            .feed-news-head,
             .feed-post-head,
             .feed-comment-head {
                 flex-direction: column;
@@ -763,12 +951,87 @@
                 padding: 0.85rem;
             }
         }
+        
+        /* Bad Word Filter Styles */
+        @keyframes shake {
+            0%, 100% {
+                transform: translateX(0);
+            }
+            10%, 30%, 50%, 70%, 90% {
+                transform: translateX(-5px);
+            }
+            20%, 40%, 60%, 80% {
+                transform: translateX(5px);
+            }
+        }
+        
+        .bad-word-warning-box {
+            animation: slideInDown 0.3s ease-out;
+        }
+        
+        .bad-word-warning-box .alert {
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 24px rgba(220, 38, 38, 0.16);
+            margin-bottom: 0;
+            background: linear-gradient(135deg, #fef2f2 0%, #fff5f5 100%);
+            border: 1px solid rgba(248, 113, 113, 0.28) !important;
+        }
+        
+        .bad-word-warning-box .badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.4rem 0.65rem;
+            white-space: nowrap;
+        }
+        
+        .bad-word-warning-box .alert-heading {
+            color: #991b1b;
+            font-weight: 700;
+            margin-top: 0;
+        }
+        
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
     </style>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
+        function initEmployeFeedPage() {
             var feedRoot = document.getElementById('feed-root');
-            if (!feedRoot) return;
+            if (!feedRoot || feedRoot.dataset.feedInitialized === 'true') return;
+            feedRoot.dataset.feedInitialized = 'true';
+            var filterButton = document.getElementById('filterDropdownBtn');
+            var filterMenu = filterButton ? filterButton.parentElement.querySelector('.dropdown-menu') : null;
+
+            function closeFilterMenu() {
+                if (!filterButton || !filterMenu) return;
+                filterButton.setAttribute('aria-expanded', 'false');
+                filterMenu.hidden = true;
+                filterMenu.classList.remove('show');
+            }
+
+            function openFilterMenu() {
+                if (!filterButton || !filterMenu) return;
+                filterButton.setAttribute('aria-expanded', 'true');
+                filterMenu.hidden = false;
+                filterMenu.classList.add('show');
+            }
+
+            function toggleFilterMenu() {
+                if (!filterButton || !filterMenu) return;
+                if (!filterMenu.hidden) {
+                    closeFilterMenu();
+                } else {
+                    openFilterMenu();
+                }
+            }
 
             function buildUrl(template, value) {
                 return template.replace('__POST__', value).replace('__COMMENT__', value);
@@ -835,7 +1098,7 @@
             function updateLikeSummary(postId, count) {
                 var stats = document.getElementById('like-count-' + postId);
                 if (stats) {
-                    stats.innerHTML = '<i class="ti ti-heart-filled"></i><span>' + count + ' j\'aime</span>';
+                    stats.innerHTML = '<i class="ti ti-heart"></i><span>' + count + ' j\'aime</span>';
                 }
             }
 
@@ -858,7 +1121,53 @@
             function updateRemainingPlaces(postId, remainingPlaces) {
                 var badge = document.getElementById('places-restantes-' + postId);
                 if (badge && remainingPlaces !== null && remainingPlaces !== undefined) {
-                    badge.textContent = remainingPlaces + ' places restantes';
+                    var textNode = badge.querySelector('span');
+                    if (textNode) {
+                        textNode.textContent = remainingPlaces + ' places restantes';
+                    } else {
+                        badge.innerHTML = '<span>' + remainingPlaces + ' places restantes</span>';
+                    }
+                }
+            }
+
+            function updateCapacityBadge(postId, capacityStatus) {
+                var badge = document.getElementById('places-restantes-' + postId);
+                if (!badge) return;
+
+                badge.classList.remove('is-available', 'is-filling', 'is-almost_full', 'is-full');
+                if (capacityStatus) {
+                    badge.classList.add('is-' + capacityStatus);
+                }
+
+                var remainingTextNode = badge.querySelector('span');
+                var remainingText = remainingTextNode ? remainingTextNode.textContent : badge.textContent;
+                var iconClass = '';
+
+                if (capacityStatus === 'available') {
+                    iconClass = 'ti ti-circle-check';
+                } else if (capacityStatus === 'filling') {
+                    iconClass = 'ti ti-trending-up';
+                } else if (capacityStatus === 'almost_full') {
+                    iconClass = 'ti ti-alert-triangle';
+                } else if (capacityStatus === 'full') {
+                    iconClass = 'ti ti-lock';
+                }
+
+                badge.innerHTML = (iconClass ? '<i class="' + iconClass + '"></i>' : '') + '<span>' + escapeHtml(remainingText || '') + '</span>';
+            }
+
+            function updateTicketLink(postId, ticketUrl, shouldShow) {
+                var link = document.getElementById('ticket-link-' + postId);
+                if (!link) {
+                    return;
+                }
+
+                if (shouldShow && ticketUrl) {
+                    link.href = ticketUrl;
+                    link.classList.remove('d-none');
+                } else {
+                    link.href = '#';
+                    link.classList.add('d-none');
                 }
             }
 
@@ -977,6 +1286,75 @@
                 }
             }
 
+            function showBadWordWarning(errorData, form, textarea) {
+                var isHarmfulIntent = errorData.type === 'harmful_intent';
+                var labels = errorData.bad_words_found || [];
+                var heading = isHarmfulIntent ? 'Harmful Intent Detected' : 'Inappropriate Language Detected';
+                var badgeLabel = isHarmfulIntent ? 'Detected signal(s): ' : 'Found ' + labels.length + ' word(s): ';
+                var previewTitle = isHarmfulIntent
+                    ? 'This comment expresses an opinion in a harmful or targeted way:'
+                    : 'Your comment contains these inappropriate words:';
+
+                // Remove existing warning
+                var existingWarning = form.querySelector('.bad-word-warning-box');
+                if (existingWarning) {
+                    existingWarning.remove();
+                }
+
+                // Create warning box
+                var warningBox = document.createElement('div');
+                warningBox.className = 'bad-word-warning-box mb-3';
+                
+                var badWordsHTML = labels
+                    .map(function(word) { 
+                        return '<span class="badge bg-danger ms-1">' + escapeHtml(word) + '</span>'; 
+                    })
+                    .join('');
+
+                warningBox.innerHTML = 
+                    '<div class="alert alert-danger alert-dismissible fade show d-flex gap-3" role="alert">' +
+                        '<i class="ti ti-alert-triangle-filled flex-shrink-0" style="font-size:20px; margin-top:2px;"></i>' +
+                        '<div class="flex-grow-1">' +
+                            '<h6 class="alert-heading mb-2">' + heading + '</h6>' +
+                            '<p class="mb-2 small">' +
+                                badgeLabel +
+                                badWordsHTML +
+                            '</p>' +
+                            '<div class="bg-white p-2 rounded mb-2" style="border-left: 3px solid #dc2626; font-size:0.85rem; word-break: break-word;">' +
+                                '<strong>' + previewTitle + '</strong><br/>' +
+                                '<em class="text-muted">' + escapeHtml(errorData.censored_preview || '') + '</em>' +
+                            '</div>' +
+                            '<small class="text-muted">' + (errorData.suggestion || '') + '</small>' +
+                        '</div>' +
+                        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                    '</div>';
+
+                // Insert warning before form
+                form.parentElement.insertBefore(warningBox, form);
+
+                // Shake animation
+                textarea.style.animation = 'shake 0.4s ease-in-out';
+                setTimeout(function() {
+                    textarea.style.animation = '';
+                }, 400);
+
+                // Scroll into view
+                warningBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                // Auto-dismiss after 10 seconds
+                setTimeout(function() {
+                    var alert = warningBox.querySelector('.alert');
+                    if (alert) {
+                        alert.classList.remove('show');
+                        setTimeout(function() {
+                            if (warningBox.parentElement) {
+                                warningBox.remove();
+                            }
+                        }, 150);
+                    }
+                }, 13000);
+            }
+
             function ensureEmptyState(postId) {
                 var list = document.getElementById('comments-list-' + postId);
                 if (!list) return;
@@ -988,6 +1366,30 @@
                     empty.textContent = "Aucun commentaire pour l'instant. Lancez la conversation.";
                     list.appendChild(empty);
                 }
+            }
+
+            if (filterButton && filterMenu) {
+                filterButton.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    toggleFilterMenu();
+                });
+
+                filterMenu.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                });
+
+                document.addEventListener('click', function (event) {
+                    if (!filterButton.contains(event.target) && !filterMenu.contains(event.target)) {
+                        closeFilterMenu();
+                    }
+                });
+
+                document.addEventListener('keydown', function (event) {
+                    if (event.key === 'Escape') {
+                        closeFilterMenu();
+                    }
+                });
             }
 
             feedRoot.addEventListener('click', async function (event) {
@@ -1024,7 +1426,7 @@
                         if (likeData.success) {
                             actionButton.classList.toggle('is-active', !!likeData.liked);
                             if (likeIcon) {
-                                likeIcon.className = 'ti ' + (likeData.liked ? 'ti-heart-filled' : 'ti-heart');
+                                likeIcon.className = 'ti ti-heart';
                             }
                             updateLikeSummary(likePostId, likeData.count);
                         } else {
@@ -1053,13 +1455,15 @@
                         if (participateData.success) {
                             actionButton.classList.toggle('is-active', !!participateData.participating);
                             if (participateIcon) {
-                                participateIcon.className = 'ti ' + (participateData.participating ? 'ti-circle-check-filled' : 'ti-circle-check');
+                                participateIcon.className = 'ti ti-circle-check';
                             }
                             if (participateText) {
                                 participateText.textContent = participateData.participating ? 'Annuler' : 'Participer';
                             }
                             updateParticipationSummary(participatePostId, participateData.count);
                             updateRemainingPlaces(participatePostId, participateData.remaining_places);
+                            updateCapacityBadge(participatePostId, participateData.capacity_status);
+                            updateTicketLink(participatePostId, participateData.ticket_url || null, !!participateData.participating);
                         } else {
                             alert(participateData.message || 'Erreur lors de la mise a jour de la participation');
                         }
@@ -1168,6 +1572,8 @@
                             updateCommentSummary(postId, commentData.count);
                             textarea.value = '';
                             document.getElementById('comments-section-' + postId).style.display = 'block';
+                        } else if (commentData.type === 'bad_words' || commentData.type === 'harmful_intent') {
+                            showBadWordWarning(commentData, form, textarea);
                         } else {
                             alert(commentData.message || 'Erreur lors de la publication du commentaire');
                         }
@@ -1203,6 +1609,8 @@
                             updateCommentSummary(replyPostId, replyData.count);
                             form.reset();
                             form.style.display = 'none';
+                        } else if (replyData.type === 'bad_words' || replyData.type === 'harmful_intent') {
+                            showBadWordWarning(replyData, form, replyTextareaField);
                         } else {
                             alert(replyData.message || 'Erreur lors de la publication de la reponse');
                         }
@@ -1246,6 +1654,8 @@
                                 var meta = commentCard.querySelector('.feed-comment-meta');
                                 if (meta) meta.appendChild(badge);
                             }
+                        } else if (editData.type === 'bad_words' || editData.type === 'harmful_intent') {
+                            showBadWordWarning(editData, form, editTextareaField);
                         } else {
                             alert(editData.message || 'Erreur lors de la modification du commentaire');
                         }
@@ -1257,6 +1667,9 @@
                     }
                 }
             });
-        });
+        }
+
+        document.addEventListener('DOMContentLoaded', initEmployeFeedPage);
+        document.addEventListener('turbo:load', initEmployeFeedPage);
     </script>
 {% endblock %}

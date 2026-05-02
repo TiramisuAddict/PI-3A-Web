@@ -1,16 +1,24 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Participations — Momentum{% endblock %}
+{% block title %}Participations - Momentum{% endblock %}
 
 {% block body %}
 <div class="page-wrapper">
     <div class="container-xl">
         <div class="page-header d-print-none">
-            <div class="row align-items-center">
+            <div class="row align-items-center g-3">
                 <div class="col">
                     <h2 class="page-title">Participations</h2>
+                    {% if current_post_id %}
+                        <div class="text-secondary mt-1">Filtrees sur la publication #{{ current_post_id }}</div>
+                    {% endif %}
                 </div>
-                <div class="col-auto">
+                <div class="col-auto d-flex gap-2">
+                    {% if current_post_id %}
+                        <a class="btn btn-outline-secondary" href="{{ path('app_participation_index') }}">
+                            <i class="ti ti-list me-1"></i>Toutes les participations
+                        </a>
+                    {% endif %}
                     <a class="btn btn-primary" href="{{ path('app_participation_new') }}"><i class="ti ti-plus me-1"></i>Ajouter une participation</a>
                 </div>
             </div>
@@ -33,12 +41,12 @@
                         {% for participation in participations %}
                             <tr>
                                 <td><span class="badge bg-blue-lt text-blue">{{ participation.statut }}</span></td>
-                                <td class="text-secondary small">{{ participation.dateAction ? participation.dateAction|date('d/m/Y H:i') : '—' }}</td>
-                                <td>{% if participation.post %}<a href="{{ path('app_post_show', {id_post: participation.post.idPost}) }}" class="btn btn-ghost-primary">{{ participation.post.titre|length > 25 ? participation.post.titre|slice(0, 25) ~ '…' : participation.post.titre }}</a>{% else %}—{% endif %}</td>
+                                <td class="text-secondary small">{{ participation.dateAction ? participation.dateAction|date('d/m/Y H:i') : '-' }}</td>
+                                <td>{% if participation.post %}<a href="{{ path('app_post_show', {id_post: participation.post.idPost}) }}" class="btn btn-ghost-primary">{{ participation.post.titre|length > 25 ? participation.post.titre|slice(0, 25) ~ '...' : participation.post.titre }}</a>{% else %}-{% endif %}</td>
                                 <td class="text-end text-nowrap">
                                     <div class="d-flex align-items-center justify-content-end gap-2">
                                         <a href="{{ path('app_participation_show', { id_participation: participation.idParticipation }) }}" class="btn btn-icon btn-ghost-primary" title="Voir"><i class="ti ti-eye" style="font-size: 1.25rem;"></i></a>
-                                        <form class="d-inline" method="post" action="{{ path('app_participation_delete', { id_participation: participation.idParticipation }) }}" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette participation ?');">
+                                        <form class="d-inline" method="post" action="{{ path('app_participation_delete', { id_participation: participation.idParticipation, id_post: current_post_id, page: participations.getCurrentPageNumber }) }}" onsubmit="return confirm('Etes-vous sur de vouloir supprimer cette participation ?');">
                                             <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ participation.idParticipation) }}">
                                             <button type="submit" class="btn btn-icon btn-ghost-danger" title="Supprimer"><i class="ti ti-trash" style="font-size: 1.25rem;"></i></button>
                                         </form>
@@ -50,8 +58,8 @@
                                 <td colspan="4" class="text-center py-4">
                                     <div class="empty">
                                         <div class="empty-header">404</div>
-                                        <div class="empty-title">Aucune participation trouvée</div>
-                                        <div class="empty-subtitle text-secondary">Créez une nouvelle participation pour commencer.</div>
+                                        <div class="empty-title">Aucune participation trouvee</div>
+                                        <div class="empty-subtitle text-secondary">Creez une nouvelle participation pour commencer.</div>
                                         <div class="empty-action">
                                             <a href="{{ path('app_participation_new') }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Ajouter une participation</a>
                                         </div>
@@ -62,6 +70,19 @@
                         </tbody>
                     </table>
                 </div>
+                {% if participations.getTotalItemCount > 0 %}
+                    {% set page_start = ((participations.getCurrentPageNumber - 1) * participations.getItemNumberPerPage) + 1 %}
+                    {% set page_end_candidate = participations.getCurrentPageNumber * participations.getItemNumberPerPage %}
+                    {% set page_end = page_end_candidate < participations.getTotalItemCount ? page_end_candidate : participations.getTotalItemCount %}
+                    <div class="card-footer d-flex flex-column flex-md-row align-items-md-center gap-3">
+                        <div class="text-secondary small">
+                            Affichage de {{ page_start }} a {{ page_end }} sur {{ participations.getTotalItemCount }} participation{{ participations.getTotalItemCount > 1 ? 's' : '' }}
+                        </div>
+                        <div class="ms-md-auto">
+                            {{ knp_pagination_render(participations) }}
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>

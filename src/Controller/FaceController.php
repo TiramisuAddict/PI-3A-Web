@@ -2,201 +2,258 @@
 
 namespace App\Controller;
 
+use App\Entity\Employe;
 use App\Repository\EmployeRepository;
 use App\Services\FaceRecognitionService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/face', name: 'face_')]
 final class FaceController extends AbstractController
 {
-    #[Route('/register-page', name: 'register_page', methods: ['GET'])]
-    public function registerPage(SessionInterface $session): Response
-    {
-        if ($session->get('employe_logged_in') !== true) {
-            return $this->redirectToRoute('login');
-        }
-
-        return $this->render('face/register.html.twig');
-    }
-
-    #[Route('/verify-page', name: 'verify_page', methods: ['GET'])]
-    public function verifyPage(Request $request): Response
-    {
-        return $this->render('face/verify.html.twig', [
-            'prefill_email' => (string) $request->query->get('email', ''),
-        ]);
-    }
+    public function __construct(
+        private EmployeRepository $employeRepository,
+        private EntityManagerInterface $entityManager,
+        private FaceRecognitionService $faceRecognitionService,
+    ) {}
 
     #[Route('/register', name: 'register', methods: ['POST'])]
-    public function register(
-        Request $request,
-        SessionInterface $session,
-        EmployeRepository $employeRepository,
-        EntityManagerInterface $entityManager,
-        FaceRecognitionService $faceRecognitionService
-    ): JsonResponse {
-        if ($session->get('employe_logged_in') !== true) {
-            return $this->json(['success' => false, 'message' => 'Session invalide.'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        $payload = json_decode($request->getContent(), true);
-        if (!is_array($payload)) {
-            return $this->json(['success' => false, 'message' => 'Payload invalide.'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $embedding = $payload['embedding'] ?? null;
-        $consent = (bool) ($payload['consent'] ?? false);
-        $isLive = (bool) ($payload['isLive'] ?? false);
-
-        if (!is_array($embedding)) {
-            return $this->json(['success' => false, 'message' => 'Empreinte faciale manquante.'], Response::HTTP_BAD_REQUEST);
-        }
-
-        if (!$consent) {
-            return $this->json(['success' => false, 'message' => 'Consentement obligatoire.'], Response::HTTP_BAD_REQUEST);
-        }
-
-        if (!$isLive) {
-            return $this->json(['success' => false, 'message' => 'Verification de vivacite echouee.'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $employeId = $session->get('employe_id');
-        $employe = is_numeric($employeId) ? $employeRepository->find((int) $employeId) : null;
-
-        if (!$employe) {
-            return $this->json(['success' => false, 'message' => 'Employe introuvable.'], Response::HTTP_NOT_FOUND);
-        }
-
+    public function register(Request $request, SessionInterface $session): JsonResponse
+    {
         try {
-            $faceRecognitionService->assertEmbedding($embedding);
-        } catch (\InvalidArgumentException $e) {
-            return $this->json(['success' => false, 'message' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+            $data = json_decode($request->getContent(), true);
+            $employeId = $session->get('employe_id', 0);
+            if ($employeId <= 0) {
+                return $this->json(['success' => false,'message' => 'User not authenticated.'], 401);}
+
+            $employe = $this->employeRepository->find($employeId);
+            if (!$employe) {
+                return $this->json(['success' => false,'message' => 'User not found.'], 404);}
+
+            // Validate embedding
+            $embedding = $data['embedding'] ?? null;
+            $validation = $this->faceRecognitionService->validateEmbedding($embedding);
+            if (!$validation['valid']) {
+                return $this->json(['success' => false,'message' => 'Invalid face embedding: ' . $validation['error']], 400);
+            }
+
+            // Store embedding and enable Face ID
+            $employe->setFaceEmbedding($embedding);
+            $employe->setFaceEnabled(true);
+
+            $this->entityManager->flush();
+
+            return $this->json(['success' => true,'message' => 'Face ID registered successfully.'], 200);
+
+        } catch (\Throwable $e) {
+            return $this->json(['success' => false,'message' => 'Registration failed: ' . $e->getMessage()], 500);
         }
-
-        $employe
-            ->setFaceEmbedding(array_values($embedding))
-            ->setFaceRegisteredAt(new \DateTime())
-            ->setFaceConsent(true);
-
-        $entityManager->flush();
-
-        return $this->json([
-            'success' => true,
-            'message' => 'Face ID enregistre avec succes.',
-        ]);
     }
-
-    #[Route('/deactivate', name: 'deactivate', methods: ['POST'])]
-    public function deactivate(
-        Request $request,
-        SessionInterface $session,
-        EmployeRepository $employeRepository,
-        EntityManagerInterface $entityManager
-    ): JsonResponse {
-        if ($session->get('employe_logged_in') !== true) {
-            return $this->json(['success' => false, 'message' => 'Session invalide.'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        $employeId = $session->get('employe_id');
-        $employe = is_numeric($employeId) ? $employeRepository->find((int) $employeId) : null;
-
-        if (!$employe) {
-            return $this->json(['success' => false, 'message' => 'Employe introuvable.'], Response::HTTP_NOT_FOUND);
-        }
-
-        $employe
-            ->setFaceEmbedding(null)
-            ->setFaceRegisteredAt(null)
-            ->setFaceConsent(false);
-
-        $entityManager->flush();
-
-        return $this->json([
-            'success' => true,
-            'message' => 'Face ID desactive avec succes.',
-        ]);
-    }
-
     #[Route('/verify', name: 'verify', methods: ['POST'])]
-    public function verify(
-        Request $request,
-        SessionInterface $session,
-        EmployeRepository $employeRepository,
-        FaceRecognitionService $faceRecognitionService
-    ): JsonResponse {
-        $payload = json_decode($request->getContent(), true);
-        if (!is_array($payload)) {
-            return $this->json(['success' => false, 'message' => 'Payload invalide.'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $email = (string) ($payload['email'] ?? '');
-        $embedding = $payload['embedding'] ?? null;
-        $isLive = (bool) ($payload['isLive'] ?? false);
-
-        if ($email === '' || !is_array($embedding)) {
-            return $this->json(['success' => false, 'message' => 'Email ou empreinte manquant.'], Response::HTTP_BAD_REQUEST);
-        }
-
-        if (!$isLive) {
-            return $this->json(['success' => false, 'message' => 'Verification de vivacite echouee.'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $employe = $employeRepository->findOneBy(['e_mail' => $email]);
-        if (!$employe) {
-            return $this->json(['success' => false, 'message' => 'Employe introuvable.'], Response::HTTP_NOT_FOUND);
-        }
-
-        if ($employe->getFaceConsent() !== true) {
-            return $this->json([
-                'success' => false,
-                'message' => 'Face ID est desactive pour ce compte. Activez-le dans le profil.',
-            ], Response::HTTP_FORBIDDEN);
-        }
-
-        $reference = $employe->getFaceEmbedding();
-        if (!is_array($reference) || $reference === []) {
-            return $this->json(['success' => false, 'message' => 'Aucun Face ID enregistre pour ce compte.'], Response::HTTP_BAD_REQUEST);
-        }
-
+    public function verify(Request $request, SessionInterface $session): JsonResponse
+    {
         try {
-            $result = $faceRecognitionService->compareEmbeddings($embedding, $reference);
-        } catch (\InvalidArgumentException $e) {
-            return $this->json(['success' => false, 'message' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
-        }
+            $data = json_decode($request->getContent(), true);
 
-        if (!$result['match']) {
+            // Get email and embedding from request
+            $email = (string) ($data['email'] ?? '');
+            $embedding = $data['embedding'] ?? null;
+
+            // Validate incoming embedding first
+            $validation = $this->faceRecognitionService->validateEmbedding($embedding);
+            if (!$validation['valid']) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Invalid face embedding: ' . $validation['error']
+                ], 400);
+            }
+
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Email address is required for Face ID login.'
+                ], 400);
+            }
+
+            $employe = $this->employeRepository->findOneBy(['e_mail' => $email]);
+            if (!$employe) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'User not found.'
+                ], 404);
+            }
+
+            if (!$employe->getFaceEnabled() || !$employe->getFaceEmbedding()) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Face ID not enabled for this user.'
+                ], 403);
+            }
+
+            if (!$this->faceRecognitionService->embeddingsMatch($embedding, $employe->getFaceEmbedding())) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Face does not match stored embedding.'
+                ], 403);
+            }
+
+            // Authentication successful - set session
+            $this->clearOtpFlow($session);
+            $session->set('employe_logged_in', true);
+            $session->set('employe_id', $employe->getId_employe());
+            $session->set('employe_email', $employe->getEmail());
+            $session->set('employe_role', $employe->getRole());
+            $session->set('employe_id_entreprise', $employe->getEntreprise()?->getId_entreprise());
+
+            return $this->json([
+                'success' => true,
+                'message' => 'Face ID authentication successful.',
+                'redirect' => $this->generateUrl($this->getRedirectRoute($employe->getRole()))
+            ], 200);
+
+        } catch (\Throwable $e) {
             return $this->json([
                 'success' => false,
-                'message' => 'Visage non reconnu.',
-                'distance' => $result['distance'],
-                'threshold' => $result['threshold'],
-            ], Response::HTTP_UNAUTHORIZED);
+                'message' => 'Verification failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    #[Route('/check-email', name: 'check_email', methods: ['POST'])]
+    public function checkEmail(Request $request): JsonResponse
+    {
+        try {
+            $data = json_decode($request->getContent(), true);
+            $email = (string) ($data['email'] ?? '');
+
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Email address is required for Face ID login.'
+                ], 400);
+            }
+
+            $employe = $this->employeRepository->findOneBy(['e_mail' => $email]);
+            if (!$employe) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'User not found.'
+                ], 404);
+            }
+
+            if (!$employe->getFaceEnabled() || !$employe->getFaceEmbedding()) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Face ID not enabled for this user.'
+                ], 403);
+            }
+
+            return $this->json([
+                'success' => true,
+                'message' => 'Email valid for Face ID.'
+            ], 200);
+        } catch (\Throwable $e) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Email check failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Deactivate Face ID for current user.
+     */
+    #[Route('/deactivate', name: 'deactivate', methods: ['POST'])]
+    public function deactivate(SessionInterface $session): JsonResponse
+    {
+        try {
+            $employeId = (int) $session->get('employe_id', 0);
+            if ($employeId <= 0) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'User not authenticated.'
+                ], 401);
+            }
+
+            $employe = $this->employeRepository->find($employeId);
+            if (!$employe) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'User not found.'
+                ], 404);
+            }
+
+            // Deactivate Face ID
+            $employe->setFaceEnabled(false);
+            $employe->setFaceEmbedding(null);
+
+            $this->entityManager->flush();
+
+            return $this->json([
+                'success' => true,
+                'message' => 'Face ID deactivated successfully.'
+            ], 200);
+
+        } catch (\Throwable $e) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Deactivation failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get Face ID status for current user.
+     */
+    #[Route('/status', name: 'status', methods: ['GET'])]
+    public function status(SessionInterface $session): JsonResponse
+    {
+        $employeId = (int) $session->get('employe_id', 0);
+        if ($employeId <= 0) {
+            return $this->json([
+                'enabled' => false,
+                'registered_at' => null
+            ], 200);
         }
 
-        $session->set('employe_logged_in', true);
-        $session->set('employe_id', $employe->getId_employe());
-        $session->set('employe_email', $employe->getEmail());
-        $session->set('employe_role', $employe->getRole());
-        if ($employe->getEntreprise()) {
-            $session->set('employe_id_entreprise', $employe->getEntreprise()->getId_entreprise());
+        $employe = $this->employeRepository->find($employeId);
+        if (!$employe) {
+            return $this->json([
+                'enabled' => false,
+                'registered_at' => null
+            ], 200);
         }
-
-        $redirectRoute = in_array((string) $employe->getRole(), ['administrateur entreprise', 'RH'], true)
-            ? 'RH_Home'
-            : 'employe_Home';
 
         return $this->json([
-            'success' => true,
-            'message' => 'Authentification Face ID reussie.',
-            'distance' => $result['distance'],
-            'threshold' => $result['threshold'],
-            'redirect' => $this->generateUrl($redirectRoute),
-        ]);
+            'enabled' => $employe->getFaceEnabled(),
+            'has_embedding' => $employe->getFaceEmbedding() !== null
+        ], 200);
     }
+
+    private function clearOtpFlow(SessionInterface $session): void
+    {
+        foreach ([
+            'two_factor_pending',
+            'two_factor_verified',
+            'otp_user_type',
+            'otp_user_id',
+            'otp_destination',
+        ] as $key) {
+            $session->remove($key);
+        }
+    }
+
+    private function getRedirectRoute(string $role): string
+    {
+        return match(strtolower($role)) {
+            'administrateur entreprise' => 'RH_Home',
+            'rh' => 'RH_Home',
+            default => 'employe_Home'
+        };
+    }
+
 }

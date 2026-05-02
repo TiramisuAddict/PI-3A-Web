@@ -13,14 +13,27 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">Tableau de bord</h2>
-                    <p class="text-secondary small mb-0">Statistiques et gestion du backend. <a href="{{ path('app_employe_feed') }}">Voir le fil d'actualité</a></p>
+                    <p class="text-secondary small mb-0">Statistiques et gestion du backend. <a href="{{ path('app_employe_feed') }}">Voir le fil d'actualite</a></p>
+                </div>
+                <div class="col-auto">
+                    <a href="{{ path('app_admin_dashboard_export_pdf') }}" class="btn btn-primary">
+                        <i class="ti ti-file-type-pdf me-1"></i>Exporter le rapport PDF
+                    </a>
                 </div>
             </div>
         </div>
     </div>
     <div class="page-body">
         <div class="container-xl">
-            <!-- Stats Cards -->
+            <div class="alert alert-info mb-4" role="alert">
+                <div class="d-flex">
+                    <div>
+                        <h4 class="alert-title mb-1">Lecture rapide</h4>
+                        <div class="text-secondary">{{ descriptions.overview }}</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row row-cards mb-4">
                 <div class="col-sm-6 col-lg-3">
                     <div class="card">
@@ -76,25 +89,25 @@
                 </div>
             </div>
 
-            <!-- Charts -->
             <div class="row g-4 mb-4">
                 <div class="col-lg-6">
-                    <div class="card">
+                    <div class="card h-100">
                         <div class="card-header pb-0">
-                            <h4 class="card-title">Annonces vs Événements</h4>
+                            <h4 class="card-title">Annonces vs Evenements</h4>
                         </div>
                         <div class="card-body pt-2">
                             <div style="position: relative; height: 200px;">
                                 <canvas id="chartPieTypes" 
                                         data-pie-annonces="{{ pieAnnonces|default(0) }}"
                                         data-pie-evenements="{{ pieEvenements|default(0) }}"
-                                        aria-label="Répartition des types de posts"></canvas>
+                                        aria-label="Repartition des types de posts"></canvas>
                             </div>
+                            <p class="text-secondary small mt-3 mb-0">{{ descriptions.pie }}</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-lg-6">
-                    <div class="card">
+                    <div class="card h-100">
                         <div class="card-header pb-0">
                             <h4 class="card-title">Engagement par publication</h4>
                         </div>
@@ -105,13 +118,14 @@
                                         data-values="{{ chartEngagementValues|default([]) | json_encode }}"
                                         aria-label="Engagement par publication"></canvas>
                             </div>
+                            <p class="text-secondary small mt-3 mb-0">{{ descriptions.engagement }}</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header pb-0">
-                            <h4 class="card-title">Participations aux événements (par jour)</h4>
+                            <h4 class="card-title">Participations aux evenements (par jour)</h4>
                         </div>
                         <div class="card-body pt-2">
                             <div style="position: relative; height: 220px;">
@@ -120,12 +134,12 @@
                                         data-values="{{ chartParticipationValues|default([]) | json_encode }}"
                                         aria-label="Participations par date"></canvas>
                             </div>
+                            <p class="text-secondary small mt-3 mb-0">{{ descriptions.participation }}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Quick Access -->
             <h3 class="my-4">Gestion</h3>
             <div class="row g-3">
                 <div class="col-md-6 col-xl-3">

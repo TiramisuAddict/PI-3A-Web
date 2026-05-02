@@ -23,8 +23,16 @@
                     {% endfor %}
                 </div>
                 <div class="col-12">
-                    {{ form_label(form.description, null, {'label_attr': {'class': 'form-label'}}) }}
-                    {{ form_widget(form.description, {'attr': {'class': descriptionClass, 'placeholder': 'Description de la tache...'}}) }}
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        {{ form_label(form.description, null, {'label_attr': {'class': 'form-label mb-0'}}) }}
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-ai-generate"
+                                data-generate-url="{{ path('app_tache_generate_description') }}"
+                                data-project-name="{{ projet.nom|e('html_attr') }}">
+                            <i class="ti ti-sparkles me-1"></i>Générer avec IA
+                        </button>
+                    </div>
+                    {{ form_widget(form.description, {'attr': {'class': descriptionClass, 'placeholder': 'Description de la tache...', 'id': 'tache_description'}}) }}
+                    <div id="ai-generate-status" class="form-hint d-none"></div>
                     {% for error in form.description.vars.errors %}
                         <div class="invalid-feedback d-block">{{ error.message }}</div>
                     {% endfor %}
@@ -68,8 +76,14 @@
                     {% endfor %}
                 </div>
                 <div class="col-12">
-                    {{ form_label(form.employe, null, {'label_attr': {'class': 'form-label'}}) }}
-                    {{ form_widget(form.employe, {'attr': {'class': employeClass}}) }}
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        {{ form_label(form.employe, null, {'label_attr': {'class': 'form-label mb-0'}}) }}
+                        <button type="button" class="btn btn-sm btn-outline-info" id="btn-workload-suggest"
+                                data-workload-url="{{ path('app_projet_workload', {'id_projet': projet.idProjet}) }}">
+                            <i class="ti ti-brain me-1"></i>Suggérer
+                        </button>
+                    </div>
+                    {{ form_widget(form.employe, {'attr': {'class': employeClass, 'id': 'tache_employe'}}) }}
                     <div class="form-hint">Seuls les membres de l'equipe projet sont proposes.</div>
                     {% for error in form.employe.vars.errors %}
                         <div class="invalid-feedback d-block">{{ error.message }}</div>
@@ -84,3 +98,272 @@
         <a href="{{ path('app_projet_index', {'projet': projet.idProjet}) }}" class="btn btn-outline-secondary">Annuler</a>
     </div>
 {{ form_end(form) }}
+
+{# ── Workload Balancing Modal ───────────────────────────────────────── #}
+<div class="modal modal-blur fade" id="workloadModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="ti ti-brain me-2 text-info"></i>Suggestion d'assignation — Compétences &amp; charge
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0">
+                {# Loading state #}
+                <div id="wl-loading" class="text-center py-5">
+                    <div class="spinner-border text-info" role="status"><span class="visually-hidden">Chargement…</span></div>
+                    <p class="mt-2 text-muted">Analyse en cours…</p>
+                </div>
+                {# Error state #}
+                <div id="wl-error" class="alert alert-danger m-3 d-none"></div>
+                {# Results #}
+                <div id="wl-results" class="d-none">
+                    {# Suggestion banner #}
+                    <div id="wl-suggestion" class="alert alert-info m-3 mb-0 d-flex align-items-start gap-2">
+                        <i class="ti ti-bulb fs-4 flex-shrink-0 mt-1"></i>
+                        <div>
+                            <strong id="wl-suggestion-name"></strong>
+                            <div class="text-muted small mt-1" id="wl-suggestion-reason"></div>
+                        </div>
+                    </div>
+                    {# Team table #}
+                    <div class="table-responsive m-3 mt-2">
+                        <table class="table table-vcenter table-hover card-table">
+                            <thead>
+                                <tr>
+                                    <th>Employé</th>
+                                    <th class="text-center">Disponibilité</th>
+                                    <th class="text-center">Compétences</th>
+                                    <th class="text-center">Score charge</th>
+                                    <th class="text-center">Tâches actives</th>
+                                    <th class="text-center">Urgentes</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="wl-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    const btnSuggest    = document.getElementById('btn-workload-suggest');
+    const selectEmploye = document.getElementById('tache_employe');
+    const modalEl       = document.getElementById('workloadModal');
+
+    if (!btnSuggest || !selectEmploye || !modalEl) { return; }
+
+    let bsModal       = null;
+    const loadingEl   = document.getElementById('wl-loading');
+    const errorEl     = document.getElementById('wl-error');
+    const resultsEl   = document.getElementById('wl-results');
+    const suggNameEl  = document.getElementById('wl-suggestion-name');
+    const suggReasonEl= document.getElementById('wl-suggestion-reason');
+    const tbodyEl     = document.getElementById('wl-tbody');
+
+    function getModal() {
+        if (!bsModal) { bsModal = new bootstrap.Modal(modalEl); }
+        return bsModal;
+    }
+
+    function showState(state) {
+        loadingEl.classList.toggle('d-none', state !== 'loading');
+        errorEl.classList.toggle('d-none',   state !== 'error');
+        resultsEl.classList.toggle('d-none', state !== 'results');
+    }
+
+    function statusBadgeClass(status) {
+        const map = { disponible: 'bg-success-lt text-success', occupe: 'bg-warning-lt text-warning', surcharge: 'bg-danger-lt text-danger' };
+        return map[status] ?? 'bg-secondary-lt';
+    }
+
+    function skillsBadgeClass(score) {
+        if (score === null || score === undefined) { return 'bg-secondary-lt text-muted'; }
+        if (score >= 70) { return 'bg-success-lt text-success'; }
+        if (score >= 40) { return 'bg-info-lt text-info'; }
+        if (score >= 20) { return 'bg-warning-lt text-warning'; }
+        return 'bg-secondary-lt text-muted';
+    }
+
+    function applyEmployee(id) {
+        for (let i = 0; i < selectEmploye.options.length; i++) {
+            if (parseInt(selectEmploye.options[i].value, 10) === id) {
+                selectEmploye.selectedIndex = i;
+                break;
+            }
+        }
+        getModal().hide();
+    }
+
+    async function loadWorkload() {
+        showState('loading');
+        getModal().show();
+
+        const titreEl = document.getElementById('tache_titre');
+        const descEl  = document.getElementById('tache_description');
+        const params  = new URLSearchParams();
+        if (titreEl && titreEl.value.trim()) { params.set('titre', titreEl.value.trim()); }
+        if (descEl  && descEl.value.trim())  { params.set('description', descEl.value.trim()); }
+        const baseUrl = btnSuggest.dataset.workloadUrl;
+        const url     = params.toString() ? baseUrl + '?' + params.toString() : baseUrl;
+        let data;
+        try {
+            const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!resp.ok) { throw new Error('Erreur réseau (' + resp.status + ')'); }
+            data = await resp.json();
+        } catch (err) {
+            errorEl.textContent = 'Impossible de charger les données : ' + err.message;
+            showState('error');
+            return;
+        }
+
+        if (!data.ok) {
+            errorEl.textContent = data.message ?? 'Erreur inconnue.';
+            showState('error');
+            return;
+        }
+
+        if (!data.team || data.team.length === 0) {
+            errorEl.textContent = 'Aucun membre d\'équipe trouvé pour ce projet.';
+            showState('error');
+            return;
+        }
+
+        // Populate suggestion banner
+        if (data.suggestion) {
+            const s = data.suggestion;
+            const skillsInfo = (s.skillsScore !== null && s.skillsScore !== undefined)
+                ? ' · Compétences : ' + (s.skillsLabel ?? '') + ' (' + s.skillsScore + '%)'
+                : '';
+            suggNameEl.textContent  = s.statusLabel + '  ' + s.prenom + ' ' + s.nom + skillsInfo + ' — suggéré';
+            suggReasonEl.textContent = s.reason;
+        }
+
+        // Populate team table
+        tbodyEl.innerHTML = '';
+        const suggestedId = data.suggestion ? data.suggestion.id : null;
+
+        data.team.forEach(function (emp, idx) {
+            const isSuggested = emp.id === suggestedId;
+            const tr = document.createElement('tr');
+            if (isSuggested) { tr.classList.add('table-active'); }
+
+            tr.innerHTML = [
+                '<td>',
+                    isSuggested ? '<i class="ti ti-star-filled text-warning me-1"></i>' : '',
+                    '<strong>' + escHtml(emp.prenom + ' ' + emp.nom) + '</strong>',
+                '</td>',
+                '<td class="text-center"><span class="badge ' + statusBadgeClass(emp.status) + '">' + escHtml(emp.statusLabel) + '</span></td>',
+                '<td class="text-center">' + (emp.skillsScore !== null && emp.skillsScore !== undefined
+                    ? '<span class="badge ' + skillsBadgeClass(emp.skillsScore) + '">' + escHtml(emp.skillsLabel ?? '') + ' (' + emp.skillsScore + '%)</span>'
+                    : '<span class="text-muted">—</span>') + '</td>',
+                '<td class="text-center fw-bold">' + emp.score + '</td>',
+                '<td class="text-center">' + emp.activeTasks + '</td>',
+                '<td class="text-center">' + (emp.urgentTasks > 0 ? '<span class="badge bg-danger-lt text-danger">' + emp.urgentTasks + '</span>' : '0') + '</td>',
+                '<td class="text-end"><button type="button" class="btn btn-sm btn-primary wl-select-btn" data-emp-id="' + emp.id + '">Sélectionner</button></td>',
+            ].join('');
+
+            tbodyEl.appendChild(tr);
+        });
+
+        // Bind select buttons
+        tbodyEl.querySelectorAll('.wl-select-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () { applyEmployee(parseInt(btn.dataset.empId, 10)); });
+        });
+
+        showState('results');
+
+        // Auto-pre-select suggested employee in dropdown (without closing modal)
+        if (suggestedId !== null) {
+            for (let i = 0; i < selectEmploye.options.length; i++) {
+                if (parseInt(selectEmploye.options[i].value, 10) === suggestedId) {
+                    selectEmploye.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+    }
+
+    function escHtml(str) {
+        return String(str).replace(/[&<>"']/g, function (c) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+        });
+    }
+
+    btnSuggest.addEventListener('click', loadWorkload);
+}());
+</script>
+
+<script>
+(function () {
+    'use strict';
+
+    const btnGenerate   = document.getElementById('btn-ai-generate');
+    const titleInput    = document.getElementById('tache_titre');
+    const descTextarea  = document.getElementById('tache_description');
+    const statusEl      = document.getElementById('ai-generate-status');
+
+    if (!btnGenerate || !titleInput || !descTextarea || !statusEl) { return; }
+
+    function setStatus(msg, type) {
+        statusEl.textContent = msg;
+        statusEl.className   = 'form-hint ' + (msg ? '' : 'd-none');
+        statusEl.style.color = type === 'error' ? 'var(--tblr-danger)' : '';
+    }
+
+    btnGenerate.addEventListener('click', async function () {
+        const taskTitle   = titleInput.value.trim();
+        const projectName = btnGenerate.dataset.projectName;
+
+        if (taskTitle === '') {
+            setStatus('Veuillez d\'abord saisir un titre de tâche.', 'error');
+            titleInput.focus();
+            return;
+        }
+
+        btnGenerate.disabled = true;
+        btnGenerate.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Génération…';
+        setStatus('');
+
+        try {
+            const resp = await fetch(btnGenerate.dataset.generateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ taskTitle: taskTitle, projectName: projectName }),
+            });
+
+            const data = await resp.json();
+
+            if (!resp.ok || !data.ok) {
+                const msg = data.message ?? 'Impossible de générer la description.';
+                const isRateLimit = msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('dépassé');
+                setStatus(
+                    isRateLimit
+                        ? 'Quota IA momentanément dépassé — réessayez dans quelques secondes.'
+                        : 'Erreur : ' + msg,
+                    'error'
+                );
+                return;
+            }
+
+            descTextarea.value = data.description;
+            setStatus('Description générée avec succès.', 'success');
+        } catch (err) {
+            setStatus('Erreur réseau : ' + err.message, 'error');
+        } finally {
+            btnGenerate.disabled = false;
+            btnGenerate.innerHTML = '<i class="ti ti-sparkles me-1"></i>Générer avec IA';
+        }
+    });
+}());
+</script>

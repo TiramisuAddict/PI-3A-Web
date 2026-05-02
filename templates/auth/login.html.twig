@@ -40,17 +40,22 @@
           {% endfor %}
         {% endif %}
 
+        {# Face ID inline (sans interface séparée) #}
+        <video id="faceVideo" autoplay playsinline muted style="display:none;"></video>
+
         {{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
+
+        {{ include('components/controleSaisieAlert.html.twig', { form: form }) }}
 
           {# Email #}
           <div class="mb-3">
             {{ form_widget(form.email, {
+              'id': 'email-input',
               'attr': {
                 'class': 'form-control ',
                 'placeholder': 'Email'
               }
             }) }}
-            {{ form_errors(form.email) }}
           </div>
 
           {# Mot de passe #}
@@ -64,13 +69,14 @@
                 }
               }) }}
             </div>
-            {{ form_errors(form.password) }}
           </div>
 
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <a href="{{ path('face_verify_page') }}" class="small fw-semibold" style="color:#4254D6;">Se connecter avec Face ID</a>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <a href="#" id="faceIdLink" class="small " style="color:#4254D6;">Face ID</a>
             <a href="{{ path('forgot_password') }}" class="small" style="color:#4254D6;">Mot de passe oublié ?</a>
           </div>
+          <div id="faceStatusMsg" class="small text-muted text-end mb-1" style="min-height:18px;"></div>
+          <div id="faceResultMsg" class="mb-3"></div>
 
           {# Bouton connexion #}
           <div class="mb-3">
@@ -131,6 +137,208 @@
 
   </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const faceIdLink = document.getElementById('faceIdLink');
+  const faceVideo = document.getElementById('faceVideo');
+  const faceStatusMsg = document.getElementById('faceStatusMsg');
+  const faceResultMsg = document.getElementById('faceResultMsg');
+  const emailInput = document.getElementById('email-input') || document.querySelector('input[type="email"]');
+
+  let stream = null;
+  let detectionInterval = null;
+  let isRunning = false;
+  let isProcessing = false;
+  let modelsLoaded = false;
+
+  async function loadFaceApiModels() {
+    if (modelsLoaded) {
+      return true;
+    }
+
+    try {
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'),
+        faceapi.nets.faceLandmark68Net.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'),
+        faceapi.nets.faceRecognitionNet.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models')
+      ]);
+      modelsLoaded = true;
+      return true;
+    } catch (e) {
+      console.error('Failed to load face-api models:', e);
+      return false;
+    }
+  }
+
+  function setResult(msg, ok) {
+    const alertClass = ok ? 'alert-success' : 'alert-danger';
+    faceResultMsg.innerHTML = `<div class="alert ${alertClass} py-2" role="alert">${msg}</div>`;
+  }
+
+  function setStatus(msg) {
+    faceStatusMsg.textContent = msg;
+  }
+
+  function clearFaceUi() {
+    faceResultMsg.innerHTML = '';
+    faceStatusMsg.textContent = '';
+  }
+
+  async function validateFaceEmail(email) {
+    const response = await fetch('{{ path("face_check_email") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+
+    return response.json();
+  }
+
+  function stopFaceFlow() {
+    if (detectionInterval) {
+      clearInterval(detectionInterval);
+      detectionInterval = null;
+    }
+
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+
+    faceVideo.srcObject = null;
+    isRunning = false;
+    isProcessing = false;
+  }
+
+  function stopDetectionLoop() {
+    if (detectionInterval) {
+      clearInterval(detectionInterval);
+      detectionInterval = null;
+    }
+  }
+
+  async function submitFaceAuth(embedding, email) {
+    try {
+      const response = await fetch('{{ path("face_verify") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ embedding, email })
+      });
+
+      const json = await response.json();
+      setResult(json.message || 'Réponse invalide.', !!json.success);
+
+      if (json.success && json.redirect) {
+        setStatus('Connexion réussie, redirection...');
+        stopFaceFlow();
+        setTimeout(() => {
+          window.location.href = json.redirect;
+        }, 1200);
+        return;
+      }
+
+      stopFaceFlow();
+      setStatus('Échec. Cliquez de nouveau sur Face ID pour réessayer.');
+    } catch (e) {
+      setResult('Erreur réseau: ' + e.message, false);
+      stopFaceFlow();
+      setStatus('Erreur réseau. Cliquez de nouveau sur Face ID pour réessayer.');
+    }
+  }
+
+  async function startFaceFlow() {
+    if (isRunning) {
+      return;
+    }
+
+    const email = (emailInput?.value || '').trim();
+    if (!email) {
+      setResult('Veuillez saisir votre email avant de lancer Face ID.', false);
+      setStatus('');
+      return;
+    }
+
+    setStatus('Vérification de l’email...');
+
+    try {
+      const emailCheck = await validateFaceEmail(email);
+      if (!emailCheck.success) {
+        setResult(emailCheck.message || 'Email invalide pour Face ID.', false);
+        setStatus('');
+        return;
+      }
+    } catch (e) {
+      setResult('Impossible de vérifier l’email.', false);
+      setStatus('');
+      return;
+    }
+
+    clearFaceUi();
+    setStatus('Chargement des modèles Face ID...');
+
+    const loaded = await loadFaceApiModels();
+    if (!loaded) {
+      setResult('Impossible de charger Face ID.', false);
+      setStatus('');
+      return;
+    }
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+        audio: false
+      });
+      faceVideo.srcObject = stream;
+    } catch (e) {
+      console.error('Camera error:', e);
+      setResult('Accès caméra refusé.', false);
+      setStatus('');
+      return;
+    }
+
+    isRunning = true;
+    isProcessing = false;
+    setStatus('Recherche du visage...');
+
+    detectionInterval = setInterval(async () => {
+      if (!isRunning || isProcessing || faceVideo.readyState < 2) {
+        return;
+      }
+
+      try {
+        const detection = await faceapi
+          .detectSingleFace(faceVideo, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (!detection) {
+          setStatus('Recherche du visage...');
+          return;
+        }
+
+        const embedding = Array.from(detection.descriptor);
+        isProcessing = true;
+        stopDetectionLoop();
+        setStatus('Visage détecté. Vérification...');
+        await submitFaceAuth(embedding, email);
+      } catch (e) {
+        console.error('Detection error:', e);
+      }
+    }, 900);
+  }
+
+  faceIdLink.addEventListener('click', async (e) => {
+    e.preventDefault();
+    await startFaceFlow();
+  });
+
+  window.addEventListener('beforeunload', () => {
+    stopFaceFlow();
+  });
+});
+</script>
 
 <script>
 function togglePassword() {

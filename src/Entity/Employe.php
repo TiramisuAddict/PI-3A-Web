@@ -177,15 +177,6 @@ class Employe
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $cv_nom = null;
 
-    #[ORM\Column(type: 'json', nullable: true)]
-    private ?array $face_embedding = null;
-
-    #[ORM\Column(type: 'datetime', nullable: true)]
-    private ?\DateTimeInterface $face_registered_at = null;
-
-    #[ORM\Column(type: 'boolean', options: ['default' => false])]
-    private bool $face_consent = false;
-
     public function getCv_nom(): ?string
     {
         return $this->cv_nom;
@@ -197,46 +188,6 @@ class Employe
         return $this;
     }
 
-    public function getFaceEmbedding(): ?array
-    {
-        return $this->face_embedding;
-    }
-
-    public function setFaceEmbedding(?array $face_embedding): self
-    {
-        $this->face_embedding = $face_embedding;
-
-        return $this;
-    }
-
-    public function getFaceRegisteredAt(): ?\DateTimeInterface
-    {
-        return $this->face_registered_at;
-    }
-
-    public function setFaceRegisteredAt(?\DateTimeInterface $face_registered_at): self
-    {
-        $this->face_registered_at = $face_registered_at;
-
-        return $this;
-    }
-
-    public function hasFaceConsent(): bool
-    {
-        return $this->face_consent;
-    }
-
-    public function getFaceConsent(): bool
-    {
-        return $this->face_consent;
-    }
-
-    public function setFaceConsent(bool $face_consent): self
-    {
-        $this->face_consent = $face_consent;
-
-        return $this;
-    }
 
     #[ORM\OneToMany(targetEntity: Commentaire::class, mappedBy: 'employe')]
     private Collection $commentaires;
@@ -525,6 +476,34 @@ class Employe
     public function removePost1(Post $post): self
     {
         $this->getPosts1()->removeElement($post);
+        return $this;
+    }
+
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $face_embedding = null;
+
+    public function getFaceEmbedding(): ?array
+    {
+        return $this->face_embedding;
+    }
+
+    public function setFaceEmbedding(?array $face_embedding): self
+    {
+        $this->face_embedding = $face_embedding;
+        return $this;
+    }
+
+    #[ORM\Column(type: 'boolean', nullable: false, options: ['default' => false])]
+    private bool $face_enabled = false;
+
+    public function getFaceEnabled(): bool
+    {
+        return $this->face_enabled;
+    }
+
+    public function setFaceEnabled(bool $face_enabled): self
+    {
+        $this->face_enabled = $face_enabled;
         return $this;
     }
 
