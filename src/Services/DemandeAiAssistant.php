@@ -235,7 +235,7 @@ class DemandeAiAssistant
                 continue;
             }
 
-            if ($this->isUnsupportedEmptyCurrentAutreScheduleField($key, $label, $value, $sourceText)) {
+            if ($this->isUnsupportedCurrentAutreScheduleField($key, $label, $value, $sourceText)) {
                 unset($details[$key]);
                 continue;
             }
@@ -410,9 +410,9 @@ class DemandeAiAssistant
         return preg_match('/\btype\b/i', $haystack) === 1 && $this->containsWord($haystack, 'transport');
     }
 
-    private function isUnsupportedEmptyCurrentAutreScheduleField(string $key, string $label, string $value, string $sourceText): bool
+    private function isUnsupportedCurrentAutreScheduleField(string $key, string $label, string $value, string $sourceText): bool
     {
-        if ('' !== trim($value) || '' === trim($sourceText)) {
+        if ('' === trim($sourceText)) {
             return false;
         }
 
@@ -3184,7 +3184,8 @@ class DemandeAiAssistant
 
     private function normalizeForSearch(string $text): string
     {
-        $normalized = mb_strtolower(trim($text), 'UTF-8');
+        $normalized = preg_replace('/([a-z0-9])([A-Z])/', '$1 $2', trim($text)) ?? $text;
+        $normalized = mb_strtolower(trim($normalized), 'UTF-8');
         if ('' === $normalized) {
             return '';
         }
@@ -3202,6 +3203,8 @@ class DemandeAiAssistant
         }
 
         $normalized = preg_replace('/[^a-z0-9]+/', ' ', $normalized) ?? $normalized;
+        $normalized = preg_replace('/\b(?:horriaire|horraire|horairre|horiare|horairee)(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|souhaite|souhaitee|souhaites|souhaitees)\b/', 'horaire $1', $normalized) ?? $normalized;
+        $normalized = preg_replace('/\b(?:horriaire|horraire|horairre|horiare|horairee)\b/', 'horaire', $normalized) ?? $normalized;
         $normalized = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
 
         return trim($normalized);

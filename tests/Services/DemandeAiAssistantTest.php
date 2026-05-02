@@ -1280,6 +1280,142 @@ final class DemandeAiAssistantTest extends TestCase
         );
     }
 
+    public function testLearnedManualCustomFieldSurvivesMinorPromptWordingChange(): void
+    {
+        $repository = $this->createMock(DemandeRepository::class);
+        $repository
+            ->method('fetchAutreFeedbackSamplesFromDatabase')
+            ->willReturn([
+                [
+                    'prompt' => 'je souhaite un horaire reduit: 9h-14h pendant 2 semaines suite convalescence',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-05-01T10:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Horaire reduit',
+                        'description' => 'je souhaite un horaire reduit: 9h-14h pendant 2 semaines suite convalescence',
+                        'priorite' => 'NORMALE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_besoinpersonnalise' => 'horaire reduit',
+                        'ai_horriaireactuel' => '9h-14h',
+                        'ai_periode_concernee' => '2 semaines',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_besoinpersonnalise',
+                                'label' => 'besoinPersonnalise',
+                                'type' => 'text',
+                                'required' => false,
+                                'source' => 'manual',
+                            ],
+                            [
+                                'key' => 'ai_horriaireactuel',
+                                'label' => 'HorriaireActuel',
+                                'type' => 'text',
+                                'required' => false,
+                                'source' => 'manual',
+                            ],
+                            [
+                                'key' => 'ai_periode_concernee',
+                                'label' => 'Periode concernee',
+                                'type' => 'text',
+                                'required' => false,
+                                'source' => 'manual',
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                        'manualMode' => true,
+                    ],
+                ],
+                [
+                    'prompt' => 'je souhaite un horaire reduit: 9h-14h pendant 2 semaines suite',
+                    'confirmed' => true,
+                    'manual' => true,
+                    'createdAt' => '2026-05-01T11:00:00+00:00',
+                    'general' => [
+                        'titre' => 'Horaire reduit',
+                        'description' => 'je souhaite un horaire reduit: 9h-14h pendant 2 semaines suite',
+                        'priorite' => 'NORMALE',
+                        'categorie' => 'Autre',
+                        'typeDemande' => 'Autre',
+                    ],
+                    'details' => [
+                        'ai_horaire_souhaite' => '9h-14h',
+                        'ai_periode_concernee' => '2 semaines',
+                    ],
+                    'fieldPlan' => [
+                        'add' => [
+                            [
+                                'key' => 'ai_horaire_souhaite',
+                                'label' => 'Horaire souhaite',
+                                'type' => 'text',
+                                'required' => true,
+                                'source' => 'manual',
+                            ],
+                            [
+                                'key' => 'ai_periode_concernee',
+                                'label' => 'Periode concernee',
+                                'type' => 'text',
+                                'required' => true,
+                                'source' => 'manual',
+                            ],
+                        ],
+                        'remove' => ['ALL'],
+                        'replaceBase' => true,
+                        'manualMode' => true,
+                    ],
+                ],
+            ])
+        ;
+
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $repository,
+            '',
+            ''
+        );
+
+        $result = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'je souhaite un horaire reduit: 9h-14h pendant 2 semaines suite',
+            ],
+            [],
+            []
+        );
+
+        self::assertSame('horaire reduit', $result['suggestedDetails']['ai_besoinpersonnalise'] ?? null);
+        self::assertSame('9h-14h', $result['suggestedDetails']['ai_horaire_souhaite'] ?? null);
+        self::assertSame('2 semaines', $result['suggestedDetails']['ai_periode_concernee'] ?? null);
+        self::assertArrayNotHasKey('ai_horriaireactuel', $result['suggestedDetails']);
+        self::assertNotContains(
+            'ai_horriaireactuel',
+            array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $result['dynamicFieldPlan']['add'])
+        );
+
+        $shiftResult = $assistant->generateAutreSuggestions(
+            [
+                'typeDemande' => 'Autre',
+                'aiDescriptionPrompt' => 'je veux un shift nuit 22h-6h uniquement pendant la semaine prochaine',
+            ],
+            [],
+            []
+        );
+
+        self::assertArrayNotHasKey('ai_besoinpersonnalise', $shiftResult['suggestedDetails']);
+        self::assertNotContains(
+            'ai_besoinpersonnalise',
+            array_map(static fn (array $field): string => (string) ($field['key'] ?? ''), $shiftResult['dynamicFieldPlan']['add'])
+        );
+        self::assertSame('Shift de nuit', $shiftResult['suggestedDetails']['ai_type_demande'] ?? null);
+    }
+
     public function testManualDurationSchemaIsReusedWhenPromptSupportsIt(): void
     {
         $repository = $this->createMock(DemandeRepository::class);

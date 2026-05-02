@@ -37,6 +37,24 @@ from retrieval import MIN_SCHEMA_MATCH_SCORE, RetrievalMatch, RetrievalResult, f
 MAX_FIELDS = 8
 
 
+def _field_text(field: FieldSpec) -> str:
+    raw = f"{field.key} {field.label}"
+    raw = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", raw)
+    raw = re.sub(
+        r"\b(horriaire|horraire|horairre|horiare|horairee)(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|souhaite|souhaitee|souhaites|souhaitees)\b",
+        r"\1 \2",
+        raw,
+        flags=re.IGNORECASE,
+    )
+    text = norm(raw)
+    text = re.sub(
+        r"\b(?:horriaire|horraire|horairre|horiare|horairee)(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|souhaite|souhaitee|souhaites|souhaitees)\b",
+        r"horaire \1",
+        text,
+    )
+    return re.sub(r"\b(?:horriaire|horraire|horairre|horiare|horairee)\b", "horaire", text)
+
+
 def _field(key: str, label: str, field_type: str = "text", required: bool = False, value: str = "", options: Iterable[str] = (), source: str = "explicit") -> FieldSpec:
     return FieldSpec(
         key=key,
@@ -255,19 +273,21 @@ def _period_value_for_source(source: str, entities: ExtractedEntities) -> str:
 def _date_supported_by_source(source: str, field: FieldSpec, entities: ExtractedEntities) -> bool:
     if not entities.date_start:
         return False
-    key_text = norm(f"{field.key} {field.label}")
+    key_text = _field_text(field)
     if _period_blocks_generic_date(source) and not any(token in key_text for token in ["conge", "absence", "debut", "fin"]):
         return False
     return True
 
 
 def _is_current_time_field(field: FieldSpec) -> bool:
-    key_text = norm(f"{field.key} {field.label}")
-    return any(token in key_text for token in ["actuel", "ancien"])
+    key_text = _field_text(field)
+    return any(token in key_text for token in ["actuel", "ancien"]) and any(
+        token in key_text for token in ["horaire", "heure", "creneau", "shift", "poste"]
+    )
 
 
 def _time_supported_by_source(source: str, field: FieldSpec, entities: ExtractedEntities) -> bool:
-    key_text = norm(f"{field.key} {field.label}")
+    key_text = _field_text(field)
     if "shift" in key_text and "horaire" not in key_text:
         return bool(_extract_shift_value(source, with_prefix=False))
     if any(token in key_text for token in ["debut", "dÃ©but"]):
@@ -280,7 +300,7 @@ def _time_supported_by_source(source: str, field: FieldSpec, entities: Extracted
 
 
 def _extract_category_value(source: str, field: FieldSpec, entities: ExtractedEntities) -> str:
-    key_text = norm(f"{field.key} {field.label}")
+    key_text = _field_text(field)
 
     if "formation" in key_text and "type" in key_text:
         if has_word(source, "certification"):
@@ -329,7 +349,7 @@ def _extract_category_value(source: str, field: FieldSpec, entities: ExtractedEn
 
 
 def extract_value_for_field(source: str, field: FieldSpec, entities: ExtractedEntities, examples: Iterable[FieldSpec] = ()) -> tuple[str, bool]:
-    key_text = norm(f"{field.key} {field.label}")
+    key_text = _field_text(field)
     role = field_role(field)
 
     # Historical values are reusable only when the same value is visibly present.
@@ -455,7 +475,7 @@ def _field_named_explicitly(source: str, field: FieldSpec, entities: ExtractedEn
 
     tokens = [
         token
-        for token in tokenize(f"{field.key} {field.label}", include_bigrams=False)
+        for token in tokenize(_field_text(field), include_bigrams=False)
         if token not in {"ai", "custom", "champ", "demande", "souhaite", "souhaitee", "type", "autre", "concerne", "transport"}
     ]
     return bool(tokens and any(re.search(rf"\b{re.escape(token)}\b", clean) for token in tokens))
@@ -568,7 +588,7 @@ def _dedupe_fields(fields: Iterable[FieldSpec]) -> list[FieldSpec]:
 
 
 def _duplicate_value_keep_score(field: FieldSpec) -> float:
-    key_text = norm(f"{field.key} {field.label}")
+    key_text = _field_text(field)
     role = field_role(field)
     value = normalize_ws(field.value)
     time_like_value = bool(re.search(r"\b\d{1,2}\s*(?:h|:)\s*\d{0,2}\s*[-–]\s*\d{1,2}\s*(?:h|:)\s*\d{0,2}\b", value, flags=re.IGNORECASE))
@@ -659,12 +679,11 @@ def plan_from_retrieval(source: str, result: RetrievalResult, profile: LearningP
         if field.type == "select":
             value = _select_value_from_options(value, field.options, source)
 
-        if not from_anchor and not named_explicit and field_role(field) == "generic":
+        explicit = bool(value) or named_explicit
+        if not from_anchor and not explicit and field_role(field) == "generic":
             continue
 
-        explicit = bool(value) or named_explicit
-        manual_anchor_schema = from_anchor and field_role(field) == "generic" and (result.matches[0].sample.manual or field.source == "manual")
-        inferred_supported = explicit or named_explicit or manual_anchor_schema or (from_anchor and _source_supports_field(source, field, entities))
+        inferred_supported = explicit or named_explicit or (from_anchor and _source_supports_field(source, field, entities))
         if not inferred_supported:
             continue
 
@@ -835,7 +854,7 @@ def priority(source: str) -> tuple[str, str]:
 def build_title(source: str, fields: Iterable[FieldSpec]) -> str:
     field_list = list(fields)
     for field in field_list:
-        key_text = norm(f"{field.key} {field.label}")
+        key_text = _field_text(field)
         value = normalize_ws(field.value)
         if not value:
             continue

@@ -313,6 +313,74 @@ class DemandeLearningEngineTest(unittest.TestCase):
         self.assertNotIn("ai_horaire_actuel", result["details"])
         self.assertNotIn("ai_horaire_actuel", [field["key"] for field in result["custom_fields"]])
 
+    def test_learned_manual_custom_field_survives_minor_prompt_wording_change(self):
+        feedback = [
+            {
+                "prompt": "je souhaite un horaire reduit: 9h-14h pendant 2 semaines suite convalescence",
+                "confirmed": True,
+                "manual": True,
+                "createdAt": "2026-05-01T10:00:00+00:00",
+                "details": {
+                    "ai_besoinpersonnalise": "horaire reduit",
+                    "ai_horriaireactuel": "9h-14h",
+                    "ai_periode_concernee": "2 semaines",
+                },
+                "fieldPlan": {
+                    "add": [
+                        {"key": "ai_besoinpersonnalise", "label": "besoinPersonnalise", "type": "text", "required": False, "source": "manual"},
+                        {"key": "ai_horriaireactuel", "label": "HorriaireActuel", "type": "text", "required": False, "source": "manual"},
+                        {"key": "ai_periode_concernee", "label": "Periode concernee", "type": "text", "required": False, "source": "manual"},
+                    ],
+                    "remove": ["ALL"],
+                    "replaceBase": True,
+                    "manualMode": True,
+                },
+            },
+            {
+                "prompt": "je souhaite un horaire reduit: 9h-14h pendant 2 semaines suite",
+                "confirmed": True,
+                "manual": True,
+                "createdAt": "2026-05-01T11:00:00+00:00",
+                "details": {
+                    "ai_horaire_souhaite": "9h-14h",
+                    "ai_periode_concernee": "2 semaines",
+                },
+                "fieldPlan": {
+                    "add": [
+                        {"key": "ai_horaire_souhaite", "label": "Horaire souhaite", "type": "text", "required": True, "source": "manual"},
+                        {"key": "ai_periode_concernee", "label": "Periode concernee", "type": "text", "required": True, "source": "manual"},
+                    ],
+                    "remove": ["ALL"],
+                    "replaceBase": True,
+                    "manualMode": True,
+                },
+            },
+        ]
+
+        result = adaptive.generate_autre_response(
+            {
+                "text": "je souhaite un horaire reduit: 9h-14h pendant 2 semaines suite",
+                "acceptedAutreFeedback": feedback,
+            }
+        )
+
+        self.assertEqual("horaire reduit", result["details"].get("ai_besoinpersonnalise"))
+        self.assertEqual("9h-14h", result["details"].get("ai_horaire_souhaite"))
+        self.assertEqual("2 semaines", result["details"].get("ai_periode_concernee"))
+        self.assertNotIn("ai_horriaireactuel", result["details"])
+        self.assertNotIn("ai_horriaireactuel", [field["key"] for field in result["custom_fields"]])
+
+        shift_result = adaptive.generate_autre_response(
+            {
+                "text": "je veux un shift nuit 22h-6h uniquement pendant la semaine prochaine",
+                "acceptedAutreFeedback": feedback,
+            }
+        )
+
+        self.assertNotIn("ai_besoinpersonnalise", shift_result["details"])
+        self.assertNotIn("ai_besoinpersonnalise", [field["key"] for field in shift_result["custom_fields"]])
+        self.assertEqual("Shift de nuit", shift_result["details"].get("ai_type_demande"))
+
     def test_schedule_change_with_current_keeps_current_schedule_field(self):
         result = adaptive.generate_autre_response(
             {"text": "je veux passer de 8h-17h a 9h-14h pendant 2 semaines", "acceptedAutreFeedback": []}
