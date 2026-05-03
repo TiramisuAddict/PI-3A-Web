@@ -8,6 +8,9 @@ class TwilioVerifyService
 {
     private const OTP_COOLDOWN_SECONDS = 30;
 
+    /**
+     * @return array<int, string>
+     */
     public function getOtpSessionKeys(string $flow): array
     {
         return [
@@ -23,6 +26,9 @@ class TwilioVerifyService
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function buildOtpSessionData(
         string $flow,
         string $userType,
@@ -75,6 +81,9 @@ class TwilioVerifyService
         return is_array($payload) && ($payload['status'] ?? null) === 'approved';
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function buildTwoFactorSessionData(string $userType, int $userId, string $email, string $destination, ?string $role = null, string $channel = 'sms'): array
     {
         return $this->buildOtpSessionData('two_factor', $userType, $userId, $email, $destination, $role, $channel);
@@ -95,7 +104,7 @@ class TwilioVerifyService
         return time() + self::OTP_COOLDOWN_SECONDS;
     }
 
-    private function client()
+    private function client(): \Symfony\Contracts\HttpClient\HttpClientInterface
     {
         return HttpClient::create();
     }
@@ -134,7 +143,7 @@ class TwilioVerifyService
                 throw new \RuntimeException('Numéro de téléphone invalide pour l’envoi SMS.');
             }
 
-            $countryCode = trim((string) $this->requireEnv('TWILIO_DEFAULT_COUNTRY_CODE'));
+            $countryCode = trim($this->requireEnv('TWILIO_DEFAULT_COUNTRY_CODE'));
             if ($countryCode === '') {
                 throw new \RuntimeException('TWILIO_DEFAULT_COUNTRY_CODE est vide.');
             }
