@@ -29,7 +29,7 @@ final class OffreController extends AbstractController
     
     //Offres
     #[Route('/accueil', name: 'app_offre_home')]
-    public function home(OffreRepository $offre_repository){
+    public function home(OffreRepository $offre_repository) : Response {
         $offres = $offre_repository->findAll();
         return $this->render('offre/home_page.html.twig' , [ //page
             'offres' => $offres
@@ -38,10 +38,15 @@ final class OffreController extends AbstractController
 
     //Liste des offres
     #[Route('/offres', name: 'app_offre_list')]
-    public function listOffres(Request $request, OffreRepository $offre_repository){
-        $q = $request->query->get('q');
-        $category = $request->query->get('category');
-        $contract = $request->query->get('contract');
+    public function listOffres(Request $request, OffreRepository $offre_repository) : Response {
+
+        $qRaw = $request->query->get('q');
+        $categoryRaw = $request->query->get('category');
+        $contractRaw = $request->query->get('contract');
+
+        $q = is_string($qRaw) ? $qRaw : (is_null($qRaw) ? null : (string)$qRaw);
+        $category = is_string($categoryRaw) ? $categoryRaw : (is_null($categoryRaw) ? null : (string)$categoryRaw);
+        $contract = is_string($contractRaw) ? $contractRaw : (is_null($contractRaw) ? null : (string)$contractRaw);
 
         $offres = $offre_repository->findByFilters($q, $category, $contract, 'OUVERT');
 
@@ -54,10 +59,15 @@ final class OffreController extends AbstractController
     #[Route('/offre/dashboard', name: 'app_offre_dashboard')]
     public function dashboard(Request $request, OffreRepository $offre_repository, EmployeRepository $employeRepository, SessionInterface $session): Response
     {
-        $q = $request->query->get('q');
-        $contract = $request->query->get('contract');
-        $etat = $request->query->get('etat');
-        $category = $request->query->get('category');
+        $qRaw = $request->query->get('q');
+        $contractRaw = $request->query->get('contract');
+        $etatRaw = $request->query->get('etat');
+        $categoryRaw = $request->query->get('category');
+
+        $q = is_string($qRaw) ? $qRaw : (is_null($qRaw) ? null : (string)$qRaw);
+        $contract = is_string($contractRaw) ? $contractRaw : (is_null($contractRaw) ? null : (string)$contractRaw);
+        $etat = is_string($etatRaw) ? $etatRaw : (is_null($etatRaw) ? null : (string)$etatRaw);
+        $category = is_string($categoryRaw) ? $categoryRaw : (is_null($categoryRaw) ? null : (string)$categoryRaw);
 
         $offres = $offre_repository->findByFilters($q, $category, $contract, $etat);
         $creatorIds = array_values(array_unique(array_filter(array_map(static fn (Offre $offre): ?int => $offre->getIdEmployer(), $offres), static fn (?int $id): bool => is_int($id) && $id > 0)));
@@ -125,7 +135,7 @@ final class OffreController extends AbstractController
     public function updateOffreForm(Request $request, ManagerRegistry $doctrine, SessionInterface $session, int $id) : Response {
         $offre = $doctrine->getRepository(Offre::class)->find($id);
 
-        if (!$offre) {
+        if ($offre === null) {
             $this->addFlash('error', 'Offre non trouvée.');
             return $this->redirectToRoute('app_offre_dashboard');
         }
@@ -163,7 +173,7 @@ final class OffreController extends AbstractController
     public function deleteOffreForm(Request $request, ManagerRegistry $doctrine, int $id) : Response {
         $offre = $doctrine->getRepository(Offre::class)->find($id);
 
-        if ($offre) {
+        if ($offre !== null) {
             $doctrine->getManager()->remove($offre);
             $doctrine->getManager()->flush();
 

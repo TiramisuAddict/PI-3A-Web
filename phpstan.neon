@@ -1,2 +1,8 @@
 includes:
     - phpstan.dist.neon
+parameters:
+ level: 8
+ paths:
+ - src
+ ignoreErrors:
+ - '#Call to an undefined method#'
