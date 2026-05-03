@@ -420,10 +420,6 @@ class Employe
      */
     public function getDemandes(): Collection
     {
-        if (!$this->demandes instanceof Collection) {
-            $this->demandes = new ArrayCollection();
-        }
-
         return $this->demandes;
     }
 
@@ -456,6 +452,7 @@ class Employe
             new ORM\JoinColumn(name: 'id_projet', referencedColumnName: 'id_projet')
         ]
     )]
+    /** @var Collection<int, Projet> */
     private Collection $projets1;
 
     /**
@@ -490,6 +487,7 @@ class Employe
             new ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post')
         ]
     )]
+    /** @var Collection<int, Post> */
     private Collection $posts1;
 
     /**

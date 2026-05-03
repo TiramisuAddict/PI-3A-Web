@@ -139,5 +139,4 @@ class Visiteur implements PasswordAuthenticatedUserInterface
         return $this;
     }
 
-
 }
