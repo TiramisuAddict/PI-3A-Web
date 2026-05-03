@@ -88,16 +88,16 @@ class Projet
         maxMessage: 'Le nom ne peut pas depasser {{ limit }} caracteres.',
         normalizer: 'trim'
     )]
-    private ?string $nom = null;
+    private string $nom = '';
 
-    public function getNom(): ?string
+    public function getNom(): string
     {
         return $this->nom;
     }
 
-    public function setNom(?string $nom): self
+    public function setNom(string $nom): self
     {
-        $this->nom = $nom !== null ? trim(preg_replace('/\s+/', ' ', $nom) ?? '') : null;
+        $this->nom = trim(preg_replace('/\s+/', ' ', $nom) ?? '');
         return $this;
     }
 
@@ -110,30 +110,30 @@ class Projet
         maxMessage: 'La description ne peut pas depasser {{ limit }} caracteres.',
         normalizer: 'trim'
     )]
-    private ?string $description = null;
+    private string $description = '';
 
-    public function getDescription(): ?string
+    public function getDescription(): string
     {
         return $this->description;
     }
 
-    public function setDescription(?string $description): self
+    public function setDescription(string $description): self
     {
-        $this->description = $description !== null ? trim($description) : null;
+        $this->description = trim($description);
         return $this;
     }
 
     #[ORM\Column(type: 'date', nullable: false)]
     #[Assert\NotNull(message: 'La date de debut est obligatoire.')]
     #[Assert\Type(type: \DateTimeInterface::class, message: 'La date de debut doit etre une date valide.')]
-    private ?\DateTimeInterface $date_debut = null;
+    private \DateTimeInterface $date_debut;
 
-    public function getDate_debut(): ?\DateTimeInterface
+    public function getDate_debut(): \DateTimeInterface
     {
         return $this->date_debut;
     }
 
-    public function setDate_debut(?\DateTimeInterface $date_debut): self
+    public function setDate_debut(\DateTimeInterface $date_debut): self
     {
         $this->date_debut = $date_debut;
         return $this;
@@ -142,14 +142,14 @@ class Projet
     #[ORM\Column(type: 'date', nullable: false)]
     #[Assert\NotNull(message: 'La date de fin prevue est obligatoire.')]
     #[Assert\Type(type: \DateTimeInterface::class, message: 'La date de fin prevue doit etre une date valide.')]
-    private ?\DateTimeInterface $date_fin_prevue = null;
+    private \DateTimeInterface $date_fin_prevue;
 
-    public function getDate_fin_prevue(): ?\DateTimeInterface
+    public function getDate_fin_prevue(): \DateTimeInterface
     {
         return $this->date_fin_prevue;
     }
 
-    public function setDate_fin_prevue(?\DateTimeInterface $date_fin_prevue): self
+    public function setDate_fin_prevue(\DateTimeInterface $date_fin_prevue): self
     {
         $this->date_fin_prevue = $date_fin_prevue;
         return $this;
@@ -173,14 +173,14 @@ class Projet
     #[ORM\Column(type: 'string', nullable: false)]
     #[Assert\NotBlank(message: 'Le statut est obligatoire.')]
     #[Assert\Choice(choices: self::STATUT_VALUES, message: 'Le statut selectionne est invalide.')]
-    private ?string $statut = null;
+    private string $statut = self::STATUT_PLANIFIE;
 
-    public function getStatut(): ?string
+    public function getStatut(): string
     {
         return $this->statut;
     }
 
-    public function setStatut(?string $statut): self
+    public function setStatut(string $statut): self
     {
         $this->statut = $statut;
         return $this;
@@ -189,12 +189,12 @@ class Projet
     #[ORM\Column(type: 'string', nullable: false)]
     #[Assert\NotBlank(message: 'La priorite est obligatoire.')]
     #[Assert\Choice(choices: self::PRIORITE_VALUES, message: 'La priorite selectionnee est invalide.')]
-    private ?string $priorite = null;
+    private string $priorite = self::PRIORITE_MOYENNE;
 
     #[Assert\Callback]
     public function validateBusinessRules(ExecutionContextInterface $context): void
     {
-        if ($this->id_projet === null && $this->date_debut instanceof \DateTimeInterface) {
+        if ($this->id_projet === null) {
             $today = new \DateTime('today');
             if ($this->date_debut < $today) {
                 $context
@@ -204,14 +204,14 @@ class Projet
             }
         }
 
-        if ($this->date_debut instanceof \DateTimeInterface && $this->date_fin_prevue instanceof \DateTimeInterface && $this->date_fin_prevue < $this->date_debut) {
+        if ($this->date_fin_prevue < $this->date_debut) {
             $context
                 ->buildViolation('La date de fin prevue doit etre superieure ou egale a la date de debut.')
                 ->atPath('date_fin_prevue')
                 ->addViolation();
         }
 
-        if ($this->date_debut instanceof \DateTimeInterface && $this->date_fin_reelle instanceof \DateTimeInterface && $this->date_fin_reelle < $this->date_debut) {
+        if ($this->date_fin_reelle instanceof \DateTimeInterface && $this->date_fin_reelle < $this->date_debut) {
             $context
                 ->buildViolation('La date de fin reelle doit etre superieure ou egale a la date de debut.')
                 ->atPath('date_fin_reelle')
@@ -233,12 +233,12 @@ class Projet
         }
     }
 
-    public function getPriorite(): ?string
+    public function getPriorite(): string
     {
         return $this->priorite;
     }
 
-    public function setPriorite(?string $priorite): self
+    public function setPriorite(string $priorite): self
     {
         $this->priorite = $priorite;
         return $this;
@@ -292,6 +292,8 @@ class Projet
     {
         $this->taches = new ArrayCollection();
         $this->membresEquipe = new ArrayCollection();
+        $this->date_debut = new \DateTime();
+        $this->date_fin_prevue = new \DateTime();
     }
 
     /**
@@ -370,24 +372,24 @@ class Projet
         return $this->id_projet;
     }
 
-    public function getDateDebut(): ?\DateTimeInterface
+    public function getDateDebut(): \DateTimeInterface
     {
         return $this->date_debut;
     }
 
-    public function setDateDebut(?\DateTimeInterface $date_debut): static
+    public function setDateDebut(\DateTimeInterface $date_debut): static
     {
         $this->date_debut = $date_debut;
 
         return $this;
     }
 
-    public function getDateFinPrevue(): ?\DateTimeInterface
+    public function getDateFinPrevue(): \DateTimeInterface
     {
         return $this->date_fin_prevue;
     }
 
-    public function setDateFinPrevue(?\DateTimeInterface $date_fin_prevue): static
+    public function setDateFinPrevue(\DateTimeInterface $date_fin_prevue): static
     {
         $this->date_fin_prevue = $date_fin_prevue;
 
