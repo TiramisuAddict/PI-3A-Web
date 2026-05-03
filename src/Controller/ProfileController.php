@@ -25,6 +25,10 @@ final class ProfileController extends AbstractController
      */
     private function decodeSkills(?string $skillsJson): array
     {
+        if ($skillsJson === null || $skillsJson === '') {
+            return [];
+        }
+
         $decoded = json_decode($skillsJson, true);
         if (!is_array($decoded)) {
             return [];
@@ -38,7 +42,7 @@ final class ProfileController extends AbstractController
             }
         }
 
-        return array_unique($skills);
+        return array_values(array_unique($skills));
     }
 
     #[Route('/profil', name: 'profil', methods: ['GET', 'POST'])]
@@ -48,6 +52,9 @@ final class ProfileController extends AbstractController
         if ($session->get('employe_logged_in') === true) {
             $employeId = $session->get('employe_id');
             $employe = $employeId !== null && (int) $employeId > 0 ? $employeRepository->find((int) $employeId) : null;
+            if ($employe === null) {
+                return $this->redirectToRoute('login');
+            }
             $profileForm = $this->createForm(EmployeType::class, $employe);
             $profileForm->remove('poste');
             $profileForm->remove('role');
@@ -68,7 +75,7 @@ final class ProfileController extends AbstractController
                         }
 
                         $employe->setCv_nom($cvFile->getClientOriginalName());
-                        $employe->setCv_data($cvContent);
+                        $employe->setCvData($cvContent);
                     }
 
                     $entityManager->flush();
@@ -132,7 +139,8 @@ final class ProfileController extends AbstractController
         $skills = $this->decodeSkills($competenceEmploye->getSkills());
         if (!in_array($skill, $skills, true)) {
             $skills[] = $skill;
-            $competenceEmploye->setSkills(json_encode($skills, JSON_UNESCAPED_UNICODE));
+            $encodedSkills = json_encode($skills, JSON_UNESCAPED_UNICODE);
+            $competenceEmploye->setSkills($encodedSkills === false ? null : $encodedSkills);
             $entityManager->flush();
             $this->addFlash('success', 'Compétence ajoutée.');
         }
@@ -166,7 +174,8 @@ final class ProfileController extends AbstractController
         $skills = $this->decodeSkills($competenceEmploye->getSkills());
         $skills = array_values(array_filter($skills, static fn (string $value): bool => $value !== $skillToRemove));
 
-        $competenceEmploye->setSkills(json_encode($skills, JSON_UNESCAPED_UNICODE));
+        $encodedSkills = json_encode($skills, JSON_UNESCAPED_UNICODE);
+        $competenceEmploye->setSkills($encodedSkills === false ? null : $encodedSkills);
         $entityManager->flush();
 
         return $this->redirectToRoute('profil');
@@ -177,6 +186,9 @@ final class ProfileController extends AbstractController
 
         $employeId = (int) $session->get('employe_id', 0);
         $employe = $employeId > 0 ? $employeRepository->find($employeId) : null;
+        if ($employe === null) {
+            return new JsonResponse(['success' => false, 'error' => 'Employe introuvable'], 404);
+        }
         $file = $request->files->get('image');
         
         if (!$file instanceof UploadedFile) {
@@ -196,7 +208,12 @@ final class ProfileController extends AbstractController
 
        
             // Créer le répertoire s'il n'existe pas
-            $uploadDir = $this->getParameter('kernel.project_dir') . '/public/images/profils';
+            $projectDirParam = $this->getParameter('kernel.project_dir');
+            if (!is_string($projectDirParam) || $projectDirParam === '') {
+                return new JsonResponse(['success' => false, 'error' => 'Configuration serveur invalide'], 500);
+            }
+            $projectDir = $projectDirParam;
+            $uploadDir = $projectDir . '/public/images/profils';
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0755, true);
             }
@@ -212,7 +229,7 @@ final class ProfileController extends AbstractController
             // Supprimer l'ancienne image si elle existe
             $oldImage = $employe->getImage_profil();
             if ($oldImage !== null && $oldImage !== '') {
-                $oldImagePath = $this->getParameter('kernel.project_dir') . '/public' . $oldImage;
+                $oldImagePath = $projectDir . '/public' . $oldImage;
                 if (file_exists($oldImagePath)) {
                     unlink($oldImagePath);
                 }

@@ -80,6 +80,6 @@ class FaceRecognitionService
     public function hashEmbedding(array $embedding): string
     {
         $json = json_encode($embedding);
-        return hash('sha256', $json);
+        return hash('sha256', $json === false ? '[]' : $json);
     }
 }
