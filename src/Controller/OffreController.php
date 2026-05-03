@@ -30,7 +30,7 @@ final class OffreController extends AbstractController
     //Offres
     #[Route('/accueil', name: 'app_offre_home')]
     public function home(OffreRepository $offre_repository) : Response {
-        $offres = $offre_repository->findLatest(12);
+        $offres = $offre_repository->findBy(['etat' => 'OUVERT'], ['id' => 'DESC'], 12);
         return $this->render('offre/home_page.html.twig' , [ //page
             'offres' => $offres
         ]);
@@ -122,7 +122,7 @@ final class OffreController extends AbstractController
             return $this->redirectToRoute('app_offre_dashboard');
         }
 
-        $offres = $doctrine->getRepository(Offre::class)->findLatest(50);
+        $offres = $doctrine->getRepository(Offre::class)->findBy([], ['id' => 'DESC'], 50);
         return $this->render('offre/dashboard_offre_hr.html.twig', [
             'form' => $form->createView(),
             'offres' => $offres,
@@ -160,7 +160,7 @@ final class OffreController extends AbstractController
             return $this->redirectToRoute('app_offre_dashboard');
         }
 
-        $offres = $doctrine->getRepository(Offre::class)->findLatest(50);
+        $offres = $doctrine->getRepository(Offre::class)->findBy([], ['id' => 'DESC'], 50);
         return $this->render('offre/dashboard_offre_hr.html.twig', [
             'form' => $form->createView(),
             'offres' => $offres,

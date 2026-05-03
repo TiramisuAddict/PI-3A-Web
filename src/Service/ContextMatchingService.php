@@ -3,8 +3,8 @@
     
     class ContextMatchingService {
 
-        private $jobbertApiUrl;
-        private $huggingfaceApiToken;
+        private string $jobbertApiUrl;
+        private string $huggingfaceApiToken;
 
         public function __construct() {
             $this->jobbertApiUrl = $_ENV['JOBBERT_API_URL'];
@@ -16,33 +16,34 @@
 
             $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
             $text = mb_strtolower($text, 'UTF-8');
-            $text = preg_replace('/[^\pL\pN\s]+/u', ' ', $text);
-            $text = preg_replace('/\s+/u', ' ', $text);
+            $text = preg_replace('/[^\pL\pN\s]+/u', ' ', $text) ?? '';
+            $text = preg_replace('/\s+/u', ' ', $text) ?? '';
 
             return trim($text);
         }
 
-        public function extractTextFromPDF($pdfBlob): string {
+        public function extractTextFromPDF(string $pdfBlob): string {
             $parser = new \Smalot\PdfParser\Parser();
             $pdf = $parser->parseContent($pdfBlob);
 
             $text = $pdf->getText();
 
-            $text = preg_replace("/\S+@\S+/", "", $text); // Remove emails
-            $text = preg_replace("/http\S+/", "", $text); // Remove URLs
-            $text = preg_replace("/[^a-zA-Z+#.\\s]/", " ", $text); // Keep letters, numbers, +, #, ., and spaces
+            $text = preg_replace("/\S+@\S+/", "", $text) ?? '';
+            $text = preg_replace("/http\S+/", "", $text) ?? '';
+            $text = preg_replace("/[^a-zA-Z+#.\\s]/", " ", $text) ?? '';
 
             return $text;
         }
 
         public function match(string $offreText, string $resumeText): float {
             try {
-                $jsonBody = json_encode([
+                $jsonEncoded = json_encode([
                     'inputs' => [
                         'source_sentence' => $offreText,
                         'sentences' => [$resumeText]
                     ]
                 ]);
+                $jsonBody = $jsonEncoded !== false ? $jsonEncoded : '';
 
                 $ch = curl_init($this->jobbertApiUrl);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -60,7 +61,7 @@
                 $curlError = curl_error($ch);
                 curl_close($ch);
 
-                if ($response === false || $curlError || $httpCode !== 200) {
+                if (!is_string($response) || $curlError !== '' || $httpCode !== 200) {
                     return 0.0;
                 }
 
