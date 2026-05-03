@@ -6,7 +6,7 @@ use App\Form\LoginType;
 use App\Form\TwoFactorCodeType;
 use App\Repository\AdministrateurSystemeRepository;
 use App\Repository\EmployeRepository;
-use App\Services\TwilioVerifyService;
+use App\Service\TwilioVerifyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,22 +15,6 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class TwoFactorController extends AbstractController
 {
-    private function clearOtpFlow(SessionInterface $session, TwilioVerifyService $twilioVerifyService, string $flow): void
-    {
-        // Nettoie toutes les cles de session OTP du flow (ex: two_factor) apres validation/annulation.
-        foreach ($twilioVerifyService->getOtpSessionKeys($flow) as $key) {
-            $session->remove($key);
-        }
-    }
-
-    private function redirectByRole(string $role): Response
-    {
-        return match($role) {
-            'administrateur entreprise' => $this->redirectToRoute('RH_Home'),
-            'RH' => $this->redirectToRoute('RH_Home'),
-            default => $this->redirectToRoute('employe_Home'),
-        };
-    }
 
     /*
     #[Route('/two-factor', name: 'two_factor_verify', methods: ['GET', 'POST'])]

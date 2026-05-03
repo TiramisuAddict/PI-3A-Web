@@ -18,9 +18,9 @@
         <a href="#" class="nav-link d-flex lh-1 text-reset align-items-center gap-2"
           data-bs-toggle="dropdown">
           {% if avatarEmploye and avatarEmploye.getImage_profil() %}
-            <img src="{{ avatarEmploye.getImage_profil() }}" alt="Avatar" class="avatar avatar-sm" style="object-fit: cover;">
+            <img src="{{ avatarEmploye.getImage_profil() }}" alt="Avatar" class="avatar avatar-sm" style="width:40px; height:40px; border-radius:50%; object-fit: cover;">
           {% else %}
-            <span class="avatar avatar-sm" style="background-color: #4254D6; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.75rem;">
+            <span class="avatar avatar-sm" style="background-color: #4254D6; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.75rem; width:40px; height:40px; border-radius:50%;">
               {% if avatarEmploye %}
                 {{ avatarEmploye.getPrenom()|first }}{{ avatarEmploye.getNom()|first }}
               {% else %}

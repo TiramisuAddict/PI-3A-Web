@@ -33,7 +33,7 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    App\Services\DemandeAiAssistant:
+    App\Service\DemandeAiAssistant:
         arguments:
             $apiKey: '%huggingface.api_key%'
             $model: '%huggingface.model%'
@@ -41,7 +41,7 @@ services:
             $pythonExecutable: '%ml.python_executable%'
             $pythonScriptPath: '%ml.demande_ai_script%'
 
-    App\Services\DemandeDecisionAssistant:
+    App\Service\DemandeDecisionAssistant:
         arguments:
             $apiKey: '%huggingface.api_key%'
             $model: '%huggingface.model%'
@@ -49,7 +49,7 @@ services:
             $pythonExecutable: '%ml.python_executable%'
             $pythonScriptPath: '%ml.demande_decision_script%'
 
-    App\Services\MailerService:
+    App\Service\MailerService:
         bind:
             $mailerFromAddress: '%env(string:MAILER_FROM)%'
 

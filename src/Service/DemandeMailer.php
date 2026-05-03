@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Service;
 
 use App\Entity\Demande;
 use App\Repository\EmployeRepository;
@@ -47,8 +47,8 @@ class DemandeMailer
 
         $subject = sprintf(
             'Mise a jour du statut de votre demande: %s -> %s',
-            (string) ($oldStatus ?? 'Inconnu'),
-            (string) ($newStatus ?? 'Inconnu')
+            $oldStatus ?? 'Inconnu',
+            $newStatus ?? 'Inconnu'
         );
 
         $email = (new TemplatedEmail())
@@ -73,14 +73,14 @@ class DemandeMailer
     private function notifyManagers(Demande $demande, string $event): void
     {
         $entrepriseId = $demande->getEmploye()?->getEntreprise()?->getId_entreprise();
-        if (!$entrepriseId) {
+        if (null === $entrepriseId) {
             $this->logger->warning('Entreprise introuvable pour notification de demande.', [
                 'event' => $event,
             ]);
             return;
         }
 
-        $recipients = $this->employeRepository->findDemandeManagerEmailsByEntrepriseId((int) $entrepriseId);
+        $recipients = $this->employeRepository->findDemandeManagerEmailsByEntrepriseId($entrepriseId);
         if ($recipients === []) {
             $this->logger->warning('Aucun destinataire RH/Admin entreprise trouve pour notification de demande.', [
                 'event' => $event,
@@ -94,13 +94,13 @@ class DemandeMailer
         $email = (new TemplatedEmail())
             ->from($this->getFromAddress())
             ->to(...$recipients)
-            ->subject(sprintf('%s: %s', $actionLabel, (string) ($demande->getTitre() ?? 'Demande')))
+            ->subject(sprintf('%s: %s', $actionLabel, $demande->getTitre() ?? 'Demande'))
             ->htmlTemplate('email/demande/rh_admin_event.html.twig')
             ->context([
                 'demande' => $demande,
                 'event' => $event,
                 'actionLabel' => $actionLabel,
-                'ownerEmail' => (string) ($demande->getEmploye()?->getEmail() ?? ''),
+                'ownerEmail' => $demande->getEmploye()->getEmail() ?? '',
             ]);
 
         $this->sendSafely($email, [
@@ -110,6 +110,9 @@ class DemandeMailer
         ]);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     private function sendSafely(TemplatedEmail $email, array $context): void
     {
         try {

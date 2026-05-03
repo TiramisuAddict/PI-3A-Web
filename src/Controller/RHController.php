@@ -13,10 +13,10 @@ use App\Entity\Employe;
 use App\Form\EmployeType;
 use App\Repository\EntrepriseRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use App\Services\CvExtractionService;
-use App\Services\MailerService;
-use App\Services\PasswordGenerator;
-use App\Services\EmployeCsvImportService;
+use App\Service\CvExtractionService;
+use App\Service\MailerService;
+use App\Service\PasswordGenerator;
+use App\Service\EmployeCsvImportService;
 use App\Entity\Compte;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Mailer\MailerInterface;
@@ -40,11 +40,16 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
         return $this->redirectToRoute('login');
     }
 
-    $idEntreprise = $session->get('employe_id_entreprise');
-    $entreprise = $entrepriseRepo->find($idEntreprise);
+    $idEntreprise = (int) $session->get('employe_id_entreprise', 0);
+    $entreprise = $idEntreprise > 0 ? $entrepriseRepo->find($idEntreprise) : null;
+    if ($entreprise === null) {
+        return $this->redirectToRoute('login');
+    }
 
-    $search = $request->query->get('search');
-    $role = $request->query->get('role');
+    $searchValue = $request->query->get('search');
+    $roleValue = $request->query->get('role');
+    $search = is_string($searchValue) && trim($searchValue) !== '' ? $searchValue : null;
+    $role = is_string($roleValue) && trim($roleValue) !== '' ? $roleValue : null;
     $employes = $paginator->paginate(
         $employeRepo->createFilteredQueryBuilder($entreprise, $search, $role),
         max(1, (int) $request->query->get('page', 1)),
@@ -78,12 +83,15 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
         }
 
         $employe = $employeRepo->find($id);
+        if ($employe === null) {
+            throw $this->createNotFoundException('Employé introuvable.');
+        }
         $form = $this->createForm(EmployeType::class, $employe);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $cvFile = $form->get('cv_data')->getData();
-            if ($cvFile) {
+            if ($cvFile instanceof UploadedFile) {
                 $cvContent = file_get_contents($cvFile->getPathname());
                 if ($cvContent === false) {
                     $this->addFlash('error', 'Impossible de lire le fichier CV uploadé.');
@@ -111,10 +119,15 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
             return $this->redirectToRoute('employe_details', ['id' => $id]);
         }
 
-        $idEntreprise = $session->get('employe_id_entreprise');
-        $entreprise = $entrepriseRepo->find($idEntreprise);
-        $search = $request->query->get('search');
-        $role = $request->query->get('role');
+        $idEntreprise = (int) $session->get('employe_id_entreprise', 0);
+        $entreprise = $idEntreprise > 0 ? $entrepriseRepo->find($idEntreprise) : null;
+        if ($entreprise === null) {
+            return $this->redirectToRoute('login');
+        }
+        $searchValue = $request->query->get('search');
+        $roleValue = $request->query->get('role');
+        $search = is_string($searchValue) && trim($searchValue) !== '' ? $searchValue : null;
+        $role = is_string($roleValue) && trim($roleValue) !== '' ? $roleValue : null;
         $employes = $paginator->paginate(
             $employeRepo->createFilteredQueryBuilder($entreprise, $search, $role),
             max(1, (int) $request->query->get('page', 1)),
@@ -146,7 +159,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
 
         if ($form->isSubmitted() && $form->isValid()) {
             $cvFile = $form->get('cv_data')->getData();
-            if ($cvFile) {
+            if ($cvFile instanceof UploadedFile) {
                 $cvContent = file_get_contents($cvFile->getPathname());
                 if ($cvContent === false) {
                     $this->addFlash('error', 'Impossible de lire le fichier CV uploadé.');
@@ -169,8 +182,12 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
                 }
             }
 
-            $idEntreprise = $session->get('employe_id_entreprise');
-            $entreprise   = $entrepriseRepo->find($idEntreprise);
+            $idEntreprise = (int) $session->get('employe_id_entreprise', 0);
+            $entreprise   = $idEntreprise > 0 ? $entrepriseRepo->find($idEntreprise) : null;
+            if ($entreprise === null) {
+                $this->addFlash('error', 'Entreprise introuvable pour cet utilisateur.');
+                return $this->redirectToRoute('RH_Home');
+            }
             $employe->setEntreprise($entreprise);
 
             $em->persist($employe);
@@ -198,10 +215,15 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
             return $this->redirectToRoute('RH_Home');
         }
 
-        $idEntreprise = $session->get('employe_id_entreprise');
-        $entreprise = $entrepriseRepo->find($idEntreprise);
-        $search = $request->query->get('search');
-        $role = $request->query->get('role');
+        $idEntreprise = (int) $session->get('employe_id_entreprise', 0);
+        $entreprise = $idEntreprise > 0 ? $entrepriseRepo->find($idEntreprise) : null;
+        if ($entreprise === null) {
+            return $this->redirectToRoute('login');
+        }
+        $searchValue = $request->query->get('search');
+        $roleValue = $request->query->get('role');
+        $search = is_string($searchValue) && trim($searchValue) !== '' ? $searchValue : null;
+        $role = is_string($roleValue) && trim($roleValue) !== '' ? $roleValue : null;
         $employes = $paginator->paginate(
             $employeRepo->createFilteredQueryBuilder($entreprise, $search, $role),
             max(1, (int) $request->query->get('page', 1)),
@@ -232,9 +254,9 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
             return $this->redirectToRoute('employe_ajouter');
         }
 
-        $idEntreprise = $session->get('employe_id_entreprise');
-        $entreprise = $entrepriseRepo->find($idEntreprise);
-        if (!$entreprise) {
+        $idEntreprise = (int) $session->get('employe_id_entreprise', 0);
+        $entreprise = $idEntreprise > 0 ? $entrepriseRepo->find($idEntreprise) : null;
+        if ($entreprise === null) {
             $this->addFlash('error', 'Entreprise introuvable pour cet utilisateur.');
             return $this->redirectToRoute('RH_Home');
         }
@@ -273,7 +295,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
         }
 
         $employe = $employeRepo->find($id);
-        if (!$employe) {
+        if ($employe === null) {
             throw $this->createNotFoundException('Employé introuvable.');
         }
 
@@ -298,11 +320,14 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
         $employe = $employeRepo->find($id);
         $cvData = $employe?->getCvData();
 
-        if (!$employe || !$cvData) {
+        if ($employe === null || $cvData === null || $cvData === '') {
             throw $this->createNotFoundException('CV introuvable.');
         }
 
-        $filename = $employe->getCv_nom() ?: ('cv-employe-' . $id . '.pdf');
+        $filename = $employe->getCv_nom();
+        if ($filename === null || $filename === '') {
+            $filename = 'cv-employe-' . $id . '.pdf';
+        }
 
         $response = new Response($cvData);
         $response->headers->set('Content-Type', 'application/pdf');

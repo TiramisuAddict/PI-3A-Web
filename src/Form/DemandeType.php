@@ -4,7 +4,7 @@ namespace App\Form;
 
 use App\Entity\Demande;
 use App\Entity\Employe;
-use App\Services\DemandeFormHelper;
+use App\Service\DemandeFormHelper;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
@@ -28,10 +28,10 @@ class DemandeType extends AbstractType
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $isEdit = $options['is_edit'];
-        $includeEmploye = $options['include_employe'];
-        $employeChoices = $options['employe_choices'];
-        $statusChoicesOption = $options['status_choices'];
+        $isEdit = true === ($options['is_edit'] ?? false);
+        $includeEmploye = true === ($options['include_employe'] ?? false);
+        $employeChoices = is_array($options['employe_choices'] ?? null) ? $options['employe_choices'] : [];
+        $statusChoicesOption = is_array($options['status_choices'] ?? null) ? $options['status_choices'] : [];
         $categories = $this->formHelper->getCategoryTypes();
         $priorites = $this->formHelper->getPriorites();
         $statuses = $this->formHelper->getStatuses();
@@ -112,7 +112,7 @@ class DemandeType extends AbstractType
 
         if ($isEdit) {
             $statusChoices = [];
-            $sourceStatuses = !empty($statusChoicesOption) ? $statusChoicesOption : $statuses;
+            $sourceStatuses = [] !== $statusChoicesOption ? $statusChoicesOption : $statuses;
             foreach ($sourceStatuses as $status) {
                 $statusChoices[$status] = $status;
             }
@@ -135,7 +135,7 @@ class DemandeType extends AbstractType
 
         $formModifier = function (FormInterface $form, ?string $categorie) {
             $types = [];
-            if ($categorie) {
+            if (null !== $categorie && '' !== trim($categorie)) {
                 $categoryTypes = $this->formHelper->getCategoryTypes();
                 if (isset($categoryTypes[$categorie])) {
                     foreach ($categoryTypes[$categorie] as $type) {
@@ -146,7 +146,7 @@ class DemandeType extends AbstractType
 
             $form->add('typeDemande', ChoiceType::class, [
                 'choices' => $types,
-                'placeholder' => empty($types) ? '-- Choisir d\'abord une categorie --' : '-- Choisir un type --',
+                'placeholder' => ([] === $types) ? '-- Choisir d\'abord une categorie --' : '-- Choisir un type --',
                 'label' => 'Type de demande',
                 'required' => true,
                 'constraints' => [
@@ -157,7 +157,7 @@ class DemandeType extends AbstractType
 
         $builder->addEventListener(FormEvents::PRE_SET_DATA, function (FormEvent $event) use ($formModifier) {
             $data = $event->getData();
-            $categorie = $data ? $data->getCategorie() : null;
+            $categorie = $data instanceof Demande ? $data->getCategorie() : null;
             $formModifier($event->getForm(), $categorie);
         });
 

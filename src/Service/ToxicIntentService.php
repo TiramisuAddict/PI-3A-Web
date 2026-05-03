@@ -34,6 +34,7 @@ class ToxicIntentService
             '/\b(your\s+kind\s+(should|must)\s+(leave|go\s+away))\b/i',
         ],
     ];
+    /** @var array<string, mixed>|null */
     private static ?array $exportedModel = null;
 
     public function __construct(
@@ -116,9 +117,14 @@ class ToxicIntentService
         }
 
         arsort($labels);
+        $topLabelScore = reset($labels);
+        if (false === $topLabelScore) {
+            $topLabelScore = 0.0;
+        }
+
         $score = isset($result['score']) && is_numeric($result['score'])
             ? round(max(0.0, min(1.0, (float) $result['score'])), 4)
-            : (float) (reset($labels) ?: 0.0);
+            : $topLabelScore;
 
         return [
             'available' => (bool) ($result['available'] ?? true),
@@ -175,7 +181,11 @@ class ToxicIntentService
         }
 
         arsort($labels);
-        $score = (float) (reset($labels) ?: 0.0);
+        $topLabelScore = reset($labels);
+        if (false === $topLabelScore) {
+            $topLabelScore = 0.0;
+        }
+        $score = $topLabelScore;
         $result = [
             'available' => true,
             'engine' => 'php-heuristic-fallback',
@@ -241,6 +251,9 @@ class ToxicIntentService
         ];
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function loadExportedModel(): ?array
     {
         if (self::$exportedModel !== null) {
@@ -276,7 +289,7 @@ class ToxicIntentService
         }
 
         preg_match_all('/\b\w\w+\b/u', $normalized, $matches);
-        $tokens = $matches[0] ?? [];
+        $tokens = $matches[0];
         $terms = [];
 
         foreach ($tokens as $token) {
@@ -306,7 +319,11 @@ class ToxicIntentService
         }
 
         arsort($labels);
-        $score = max($primary['score'], $secondary['score'], (float) (reset($labels) ?: 0.0));
+        $topLabelScore = reset($labels);
+        if (false === $topLabelScore) {
+            $topLabelScore = 0.0;
+        }
+        $score = max($primary['score'], $secondary['score'], $topLabelScore);
 
         return [
             'available' => true,
@@ -315,22 +332,6 @@ class ToxicIntentService
             'is_toxic' => $score >= self::BLOCK_THRESHOLD,
             'needs_review' => $score >= self::REVIEW_THRESHOLD,
             'labels' => $labels,
-        ];
-    }
-
-    /**
-     * @return array{available: bool, engine: string, score: float, is_toxic: bool, needs_review: bool, labels: array<string, float>, error: string}
-     */
-    private function unavailableResult(string $error): array
-    {
-        return [
-            'available' => false,
-            'engine' => 'unavailable',
-            'score' => 0.0,
-            'is_toxic' => false,
-            'needs_review' => false,
-            'labels' => [],
-            'error' => $error,
         ];
     }
 
@@ -348,7 +349,10 @@ class ToxicIntentService
 
         $localAppData = getenv('LOCALAPPDATA');
         if (is_string($localAppData) && trim($localAppData) !== '') {
-            $pythonCorePaths = glob($localAppData . DIRECTORY_SEPARATOR . 'Python' . DIRECTORY_SEPARATOR . 'pythoncore-*' . DIRECTORY_SEPARATOR . 'python.exe') ?: [];
+            $pythonCorePaths = glob($localAppData . DIRECTORY_SEPARATOR . 'Python' . DIRECTORY_SEPARATOR . 'pythoncore-*' . DIRECTORY_SEPARATOR . 'python.exe');
+            if (!is_array($pythonCorePaths)) {
+                $pythonCorePaths = [];
+            }
             rsort($pythonCorePaths);
             $candidates = array_merge($candidates, $pythonCorePaths);
             $candidates[] = $localAppData . DIRECTORY_SEPARATOR . 'Python' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python.exe';
@@ -403,7 +407,12 @@ class ToxicIntentService
     private function formatProcessError(\Throwable $exception): string
     {
         if ($exception instanceof ProcessFailedException) {
-            return trim($exception->getProcess()->getErrorOutput()) ?: $exception->getMessage();
+            $error = trim($exception->getProcess()->getErrorOutput());
+            if ('' === $error) {
+                return $exception->getMessage();
+            }
+
+            return $error;
         }
 
         return $exception->getMessage();

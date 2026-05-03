@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Service;
 
 use App\Entity\CompetenceEmploye;
 use App\Entity\Employe;
@@ -10,6 +10,9 @@ use Symfony\Component\HttpClient\HttpClient;
 
 final class CvExtractionService
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function extractAndPersistForEmploye(Employe $employe, EntityManagerInterface $entityManager): array
     {
         $groqApiUrl = $this->readEnv('GROQ_API_URL');
@@ -24,7 +27,21 @@ final class CvExtractionService
         }
 
         $cvBinary = $employe->getCvData();
+        if ($cvBinary === null || $cvBinary === '') {
+            return [
+                'success' => false,
+                'error' => 'CV manquant pour cet employe.',
+            ];
+        }
+
         $cvText = $this->extractTextFromCvBinary($cvBinary);
+        if ($cvText === null || trim($cvText) === '') {
+            return [
+                'success' => false,
+                'error' => 'Impossible d\'extraire le texte du CV.',
+            ];
+        }
+
         $extracted = $this->extractWithGroq($cvText, $groqApiUrl, $groqApiKey, $groqModel);
         if (isset($extracted['error'])) {
             return [
@@ -39,14 +56,18 @@ final class CvExtractionService
 
         $competenceRepo = $entityManager->getRepository(CompetenceEmploye::class);
         $competenceEmploye = $competenceRepo->findOneBy(['employe' => $employe]);
-        if (!$competenceEmploye) {
+        if ($competenceEmploye === null) {
             $competenceEmploye = new CompetenceEmploye();
             $competenceEmploye->setEmploye($employe);
         }
 
-        $competenceEmploye->setSkills(json_encode(array_values($skills), JSON_UNESCAPED_UNICODE));
-        $competenceEmploye->setFormations(json_encode(array_values($formations), JSON_UNESCAPED_UNICODE));
-        $competenceEmploye->setExperience(json_encode(array_values($experience), JSON_UNESCAPED_UNICODE));
+        $skillsJson = json_encode(array_values($skills), JSON_UNESCAPED_UNICODE);
+        $formationsJson = json_encode(array_values($formations), JSON_UNESCAPED_UNICODE);
+        $experienceJson = json_encode(array_values($experience), JSON_UNESCAPED_UNICODE);
+
+        $competenceEmploye->setSkills($skillsJson === false ? null : $skillsJson);
+        $competenceEmploye->setFormations($formationsJson === false ? null : $formationsJson);
+        $competenceEmploye->setExperience($experienceJson === false ? null : $experienceJson);
 
         $entityManager->persist($competenceEmploye);
 
@@ -60,6 +81,9 @@ final class CvExtractionService
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function extractWithGroq(string $cvText, string $groqApiUrl, string $groqApiKey, string $groqModel): array
     {
         $systemMessage = "You are a strict data extraction tool. Return only a valid JSON object with the exact required structure and keys. No markdown, no explanations, no extra fields.";
@@ -124,6 +148,9 @@ final class CvExtractionService
         return $structured;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function decodeModelJson(string $rawText): ?array
     {
         $direct = json_decode($rawText, true);
@@ -171,7 +198,7 @@ final class CvExtractionService
             $pdf = $parser->parseContent($cvBinary);
             $text = $pdf->getText();
 
-            return is_string($text) ? $text : null;
+            return $text;
         } catch (\Throwable) {
             return null;
         }

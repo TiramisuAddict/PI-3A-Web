@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Service;
 
 use App\Entity\Compte;
 use App\Entity\Employe;
@@ -18,7 +18,7 @@ class EmployeCsvImportService
      */
     public function import(UploadedFile $file,Entreprise $entreprise,EmployeRepository $employeRepository,EntityManagerInterface $entityManager,PasswordGenerator $passwordGenerator,MailerInterface $mailer,MailerService $mailerService,UserPasswordHasherInterface $passwordHasher): array
     {
-        $extension = strtolower((string) $file->getClientOriginalExtension());
+        $extension = strtolower($file->getClientOriginalExtension());
         if ($extension !== 'csv') {
             return [
                 'imported' => 0,
@@ -55,7 +55,7 @@ class EmployeCsvImportService
         while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
             $lineNumber++;
 
-            if ($row === [null] || count(array_filter($row, static fn($value) => trim((string) $value) !== '')) === 0) {
+            if (count(array_filter($row, static fn($value) => trim((string) $value) !== '')) === 0) {
                 continue;
             }
 
@@ -64,9 +64,7 @@ class EmployeCsvImportService
             }
 
             $row = array_map(static fn($value) => trim((string) $value), $row);
-            if (isset($row[0])) {
-                $row[0] = preg_replace('/^\xEF\xBB\xBF/', '', $row[0]) ?? $row[0];
-            }
+            $row[0] = preg_replace('/^\xEF\xBB\xBF/', '', $row[0]) ?? $row[0];
             $row = array_pad($row, 7, '');
 
             [$nom, $prenom, $email, $telephone, $poste, $role, $dateEmbaucheRaw] = $row;
@@ -76,7 +74,7 @@ class EmployeCsvImportService
                 continue;
             }
 
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
                 $errors[] = sprintf('Ligne %d ignorée: email invalide (%s).', $lineNumber, $email);
                 continue;
             }
@@ -146,13 +144,13 @@ class EmployeCsvImportService
                 try {
                     $mailerService->sendTemporaryPassword(
                         $mailer,
-                        (string) $pendingEmail['email'],
-                        (string) $pendingEmail['prenom'],
-                        (string) $pendingEmail['nom'],
-                        (string) $pendingEmail['password']
+                        $pendingEmail['email'],
+                        $pendingEmail['prenom'],
+                        $pendingEmail['nom'],
+                        $pendingEmail['password']
                     );
                 } catch (\Throwable $exception) {
-                    $errors[] = sprintf('Envoi e-mail échoué pour %s.', (string) $pendingEmail['email']);
+                    $errors[] = sprintf('Envoi e-mail échoué pour %s.', $pendingEmail['email']);
                 }
             }
         }
@@ -164,9 +162,12 @@ class EmployeCsvImportService
         ];
     }
 
+    /**
+      * @param array<int|string, string|null> $row
+     */
     private function isCsvHeader(array $row): bool
     {
-        $header = strtolower(implode(',', array_map(static fn($value) => trim((string) $value), $row)));
+          $header = strtolower(implode(',', array_map(static fn($value) => trim((string) $value), $row)));
 
         return str_contains($header, 'nom')
             && str_contains($header, 'prenom')
@@ -200,6 +201,9 @@ class EmployeCsvImportService
         return null;
     }
 
+    /**
+     * @param resource $handle
+     */
     private function detectDelimiter($handle): string
     {
         $line = '';
@@ -223,6 +227,10 @@ class EmployeCsvImportService
         arsort($separators);
         $best = array_key_first($separators);
 
-        return ($best !== null && $separators[$best] > 0) ? $best : ',';
+        if ($separators[$best] > 0) {
+            return $best;
+        }
+
+        return ',';
     }
 }

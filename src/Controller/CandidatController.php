@@ -57,13 +57,12 @@ final class CandidatController extends AbstractController
             }
         }
 
-        if (!$selectedOffre && !empty($offres)) {
+        if ($selectedOffre === null && count($offres) > 0) {
             $selectedOffre = $offres[0];
             $selectedOffreId = $selectedOffre->getId() ?? 0;
         }
 
-        $candidats = $selectedOffre
-            ? $candidatRepository->findByOffreId((int) $selectedOffre->getId()) : [];
+        $candidats = ($selectedOffre !== null) ? $candidatRepository->findByOffreId((int) $selectedOffre->getId()) : [];
 
         $selectedCandidat = null;
         foreach ($candidats as $candidat) {
@@ -73,7 +72,7 @@ final class CandidatController extends AbstractController
             }
         }
 
-        if (!$selectedCandidat && !empty($candidats)) {
+        if ($selectedCandidat === null && count($candidats) > 0) {
             $selectedCandidat = $candidats[0];
             $selectedCandidatId = $selectedCandidat->getId() ?? 0;
         }
@@ -95,7 +94,7 @@ final class CandidatController extends AbstractController
     {
         $candidature = $candidatRepository->findOneBy(['code_candidature' => $code]);
 
-        if (!$candidature) {
+        if ($candidature === null) {
             throw $this->createNotFoundException('Candidature introuvable.');
         }
 
@@ -111,11 +110,11 @@ final class CandidatController extends AbstractController
         $candidat = $candidatRepository->find($id);
         $cvData = $candidat?->getCvData();
 
-        if (!$candidat || !$cvData) {
+        if ($candidat === null || $cvData === null) {
             throw $this->createNotFoundException('CV introuvable.');
         }
 
-        $filename = $candidat->getCvNom() ?: ('cv-candidat-' . $id . '.pdf');
+        $filename = $candidat->getCvNom() ?? ('cv-candidat-' . $id . '.pdf');
 
         $response = new Response($cvData);
         $response->headers->set('Content-Type', 'application/pdf');
@@ -130,11 +129,11 @@ final class CandidatController extends AbstractController
         $candidat = $candidatRepository->find($id);
         $lettreData = $candidat?->getLettreMotivationData();
 
-        if (!$candidat || !$lettreData) {
+        if ($candidat === null || $lettreData === null) {
             throw $this->createNotFoundException('Lettre de motivation introuvable.');
         }
 
-        $filename = $candidat->getLettreMotivationNom() ?: ('lettre-motivation-candidat-' . $id . '.pdf');
+        $filename = $candidat->getLettreMotivationNom() ?? ('lettre-motivation-candidat-' . $id . '.pdf');
 
         $response = new Response($lettreData);
         $response->headers->set('Content-Type', 'application/pdf');
@@ -167,7 +166,7 @@ final class CandidatController extends AbstractController
         $offre = $offreRepository->find($offreId);
         $visiteur = $visiteurRepository->find($sessionVisiteurId);
 
-        if (!$offre || !$visiteur) {
+        if ($offre === null || $visiteur === null) {
             return new Response('Offre ou visiteur introuvable.', Response::HTTP_NOT_FOUND);
         }
 
@@ -186,21 +185,25 @@ final class CandidatController extends AbstractController
             $cvFile = $form->get('cv_data')->getData();
             $lettreFile = $form->get('lettre_motivation_data')->getData();
 
-            if (!$cvFile) {
+            if ($cvFile === null) {
                 $this->addFlash('error', 'Le CV est requis.');
                 return $this->redirectToRoute('app_offre_list');
             }
 
             $cvContent = file_get_contents($cvFile->getPathname());
-            $lettreContent = null;
-
-            if ($lettreFile) {
-                $lettreContent = file_get_contents($lettreFile->getPathname());
+            if ($cvContent === false) {
+                $this->addFlash('error', 'Impossible de lire le fichier CV.');
+                return $this->redirectToRoute('app_offre_list');
             }
 
-            if ($cvContent === false || ($lettreFile && $lettreContent === false)) {
-                $this->addFlash('error', 'Impossible de lire les fichiers uploades.');
-                return $this->redirectToRoute('app_offre_list');
+            $lettreContent = null;
+            if ($lettreFile !== null) {
+                $lettreContentRaw = file_get_contents($lettreFile->getPathname());
+                if ($lettreContentRaw === false) {
+                    $this->addFlash('error', 'Impossible de lire le fichier lettre de motivation.');
+                    return $this->redirectToRoute('app_offre_list');
+                }
+                $lettreContent = $lettreContentRaw;
             }
 
             $code = strtoupper(base_convert((string) round(microtime(true) * 1000), 10, 36));
@@ -212,7 +215,7 @@ final class CandidatController extends AbstractController
                 ->setDateCandidature(new \DateTime())
                 ->setCvNom($cvFile->getClientOriginalName())
                 ->setCvData($cvContent)
-                ->setLettreMotivationNom($lettreFile ? $lettreFile->getClientOriginalName() : null)
+                ->setLettreMotivationNom($lettreFile !== null ? $lettreFile->getClientOriginalName() : null)
                 ->setLettreMotivationData($lettreContent)
                 ->setOffre($offre)
                 ->setVisiteur($visiteur);
@@ -232,10 +235,10 @@ final class CandidatController extends AbstractController
     }
 
     #[Route ('/candidature/modifier/{id}', name: 'app_candidature_modifier')]
-    public function modifierCandidature(Request $request, ManagerRegistry $doctrine, $id){
+    public function modifierCandidature(Request $request, ManagerRegistry $doctrine, int $id): Response {
         $candidat = $doctrine->getRepository(Candidat::class)->find($id);
 
-        if (!$candidat) {
+        if ($candidat === null) {
             throw $this->createNotFoundException('Candidature introuvable.');
         }
 
@@ -249,12 +252,12 @@ final class CandidatController extends AbstractController
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $candidat = $form->getData();
-            $doctrine->getManager()->flush($candidat);
+            $doctrine->getManager()->flush();
 
             $this->addFlash('success', 'Candidature modifiee avec succes.');
 
             $referer = $request->headers->get('referer');
-            if ($referer) {
+            if ($referer !== null) {
                 return $this->redirect($referer);
             }
 
@@ -278,9 +281,13 @@ final class CandidatController extends AbstractController
         $i = 0;
 
         $offre = $doctrine->getRepository(Offre::class)->find($offreId);
+        if ($offre === null) {
+            $this->addFlash('error', 'Offre introuvable.');
+            return $this->redirectToRoute('app_candidat_dashboard');
+        }
 
         $offreDescription = $offre->getDescription();
-        $processedOffreDescription = $matchingService->preprocessRichText($offreDescription);
+        $processedOffreDescription = $matchingService->preprocessRichText($offreDescription ?? '');
 
         $offreCandidats = $offre->getCandidats();
         $scoredCandidats = [];
@@ -340,7 +347,7 @@ final class CandidatController extends AbstractController
         $entityManager = $doctrine->getManager();
         $candidat = $doctrine->getRepository(Candidat::class)->find($candidatId);
 
-        if (!$candidat) {
+        if ($candidat === null) {
             $this->addFlash('error', 'Candidat introuvable.');
             return $this->redirectToRoute('app_candidat_dashboard', ['offreId' => $offreId]);
         }
@@ -358,7 +365,7 @@ final class CandidatController extends AbstractController
             $visitorEmailRaw = $candidat->getVisiteur()?->getEmail();
             $visitorEmail = is_string($visitorEmailRaw) ? mb_strtolower(trim($visitorEmailRaw)) : null;
 
-            if (!$visitorEmail || !filter_var($visitorEmail, FILTER_VALIDATE_EMAIL)) {
+            if ($visitorEmail === null || filter_var($visitorEmail, FILTER_VALIDATE_EMAIL) === false) {
                 $this->addFlash('error', 'Invitation non envoyee: email candidat invalide ou manquant.');
                 return $this->redirectToRoute('app_candidat_dashboard', ['offreId' => $offreId, 'candidatId' => $candidatId]);
             }
@@ -394,6 +401,9 @@ final class CandidatController extends AbstractController
         return $this->redirectToRoute('app_candidat_dashboard', ['offreId' => $offreId, 'candidatId' => $candidatId]);
     }
 
+    /**
+     * @param array<string, mixed> $meeting
+     */
     private function appendMeetingLinkToCandidateNote(Candidat $candidat, array $meeting, ?string $visitorEmail): bool {
         $meetingLink = is_string($meeting['meetLink'] ?? null) && $meeting['meetLink'] !== ''
             ? $meeting['meetLink']
@@ -401,7 +411,7 @@ final class CandidatController extends AbstractController
 
         if ($meetingLink === '') { return false; }
         
-        $existingNote = trim((string) ($candidat->getNote() ?? ''));
+        $existingNote = trim(($candidat->getNote() ?? ''));
         $line = sprintf(
             'Meeting link [%s]: %s%s',
             (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Paris')))->format('Y-m-d H:i'),
@@ -429,13 +439,13 @@ final class CandidatController extends AbstractController
             }
         }
 
-        if (!$selectedOffre && !empty($offres)) {
+        if ($selectedOffre === null && count($offres) > 0) {
             $selectedOffre = $offres[0];
             $selectedOffreId = $selectedOffre->getId() ?? 0;
         }
 
         $selectedOffreCandidats = [];
-        if ($selectedOffre) {
+        if ($selectedOffre !== null && $selectedOffre->getId() !== null) {
             $selectedOffreCandidats = $candidat_repository->findByOffreId($selectedOffre->getId());
         }
 

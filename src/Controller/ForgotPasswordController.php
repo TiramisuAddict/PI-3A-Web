@@ -8,7 +8,7 @@ use App\Form\ResetPasswordType;
 use App\Form\TwoFactorCodeType;
 use App\Repository\AdministrateurSystemeRepository;
 use App\Repository\EmployeRepository;
-use App\Services\TwilioVerifyService;
+use App\Service\TwilioVerifyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -51,20 +51,20 @@ final class ForgotPasswordController extends AbstractController
             $userId = 0;
             $destination = '';
 
-            if ($admin) {
+            if ($admin !== null) {
                 $userType = 'admin';
                 $userId =  $admin->getId();
-                $destination =$admin->getTelephone();
+                $destination = (string) $admin->getTelephone();
             }
 
             if ($userType === null) {
                 $employe = $employeRepo->findOneBy(['e_mail' => $email]);
-                if ($employe) {
+                if ($employe !== null) {
                     $compte = $employe->getComptes()->first();
-                    if ($compte) {
+                    if ($compte !== false) {
                         $userType = 'employe';
                         $userId =$employe->getId_employe();
-                        $destination = $employe->getTelephone();
+                        $destination = (string) $employe->getTelephone();
                     }
                 }
             }
@@ -133,7 +133,7 @@ final class ForgotPasswordController extends AbstractController
             return $this->redirectToRoute('forgot_password');
         }
 
-        if (!$this->isCsrfTokenValid('forgot_password_resend', $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('forgot_password_resend', (string) $request->request->get('_token'))) {
             return $this->redirectToRoute('forgot_password_verify');
         }
 
@@ -175,7 +175,7 @@ final class ForgotPasswordController extends AbstractController
 
             if ($userType === 'admin') {
                 $admin = $adminRepo->find($userId);
-                if ($admin) {
+                if ($admin !== null) {
                     $admin->setMot_de_passe($passwordGenerator->hash($newPassword));
                     $entityManager->flush();
                 }
@@ -183,9 +183,9 @@ final class ForgotPasswordController extends AbstractController
 
             if ($userType === 'employe') {
                 $employe = $employeRepo->find($userId);
-                if ($employe) {
+                if ($employe !== null) {
                     $compte = $employe->getComptes()->first();
-                    if ($compte) {
+                    if ($compte !== false) {
                         $compte->setMot_de_passe($passwordGenerator->hash($newPassword));
                         $entityManager->flush();
                     }

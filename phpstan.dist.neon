@@ -6,6 +6,4 @@ parameters:
     level: 8
     treatPhpDocTypesAsCertain: false
     paths:
-        - src/Services/DemandeFormHelper.php
-        - tests/Services/DemandeFormHelperTest.php
-        - tests/Services/DemandeDecisionAssistantTest.php
+        - src

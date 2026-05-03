@@ -14,6 +14,24 @@ from learning_store import FieldSpec, LearningProfile, TrainingSample, build_lea
 MIN_SCHEMA_MATCH_SCORE = 0.52
 
 
+def _field_text(field: FieldSpec) -> str:
+    raw = f"{field.key} {field.label}"
+    raw = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", raw)
+    raw = re.sub(
+        r"\b(horriaire|horraire|horairre|horiare|horairee)(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|souhaite|souhaitee|souhaites|souhaitees)\b",
+        r"\1 \2",
+        raw,
+        flags=re.IGNORECASE,
+    )
+    text = norm(raw)
+    text = re.sub(
+        r"\b(?:horriaire|horraire|horairre|horiare|horairee)(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|souhaite|souhaitee|souhaites|souhaitees)\b",
+        r"horaire \1",
+        text,
+    )
+    return re.sub(r"\b(?:horriaire|horraire|horairre|horiare|horairee)\b", "horaire", text)
+
+
 @dataclass(frozen=True)
 class RetrievalMatch:
     score: float
@@ -37,7 +55,7 @@ class RetrievalResult:
 
 
 def field_role(field: FieldSpec) -> str:
-    haystack = norm(f"{field.key} {field.label}")
+    haystack = _field_text(field)
     if field.type == "date" or any(token in haystack for token in ["date", "jour", "echeance", "deadline"]):
         return "date"
     if field.type == "number" or any(token in haystack for token in ["montant", "prix", "cout", "quantite", "nombre", "total"]):

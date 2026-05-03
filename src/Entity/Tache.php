@@ -71,7 +71,7 @@ class Tache
 
     #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'taches')]
     #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
-    #[Assert\NotNull(message: 'Veuillez choisir un employe.')] 
+    #[Assert\NotNull(message: 'Veuillez choisir un employe.')]
     private ?Employe $employe = null;
 
     public function getEmploye(): ?Employe
@@ -160,7 +160,7 @@ class Tache
         return $this->date_deb;
     }
 
-    public function setDate_deb(?\DateTimeInterface $date_deb): self
+    public function setDate_deb(?\DateTimeInterface $date_deb): static
     {
         $this->date_deb = $date_deb instanceof \DateTimeImmutable
             ? \DateTime::createFromImmutable($date_deb)
@@ -178,7 +178,7 @@ class Tache
         return $this->date_limite;
     }
 
-    public function setDate_limite(?\DateTimeInterface $date_limite): self
+    public function setDate_limite(?\DateTimeInterface $date_limite): static
     {
         $this->date_limite = $date_limite instanceof \DateTimeImmutable
             ? \DateTime::createFromImmutable($date_limite)

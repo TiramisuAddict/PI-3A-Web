@@ -2,30 +2,46 @@
 
 namespace App\Controller;
 
-use App\Services\DemandeAiAssistant;
-use App\Services\DemandeFormHelper;
+use App\Service\DemandeAiAssistant;
+use App\Service\DemandeFormHelper;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class DemandeApiController extends AbstractController
 {
+    private const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
+    private const NOMINATIM_HEADERS = [
+        'Accept' => 'application/json',
+        'User-Agent' => 'MomentumPiDev/1.0 demande-place-picker',
+    ];
+
     private DemandeFormHelper $formHelper;
     private DemandeAiAssistant $aiAssistant;
+    private HttpClientInterface $httpClient;
+    private LoggerInterface $logger;
 
-    public function __construct(DemandeFormHelper $formHelper, DemandeAiAssistant $aiAssistant)
-    {
+    public function __construct(
+        DemandeFormHelper $formHelper,
+        DemandeAiAssistant $aiAssistant,
+        HttpClientInterface $httpClient,
+        LoggerInterface $logger
+    ) {
         $this->formHelper = $formHelper;
         $this->aiAssistant = $aiAssistant;
+        $this->httpClient = $httpClient;
+        $this->logger = $logger;
     }
 
     #[Route('/demande-api/fields/{type}', name: 'demande_api_fields', methods: ['GET'])]
     public function getFields(string $type): JsonResponse
     {
         $resolvedType = $this->formHelper->resolveCanonicalType($type);
-        $fields = $this->formHelper->getFieldsForType((string) ($resolvedType ?? $type));
+        $fields = $this->formHelper->getFieldsForType($resolvedType ?? $type);
         return new JsonResponse($fields);
     }
 
@@ -33,8 +49,85 @@ class DemandeApiController extends AbstractController
     public function getTypesForCategory(string $categorie): JsonResponse
     {
         $resolvedCategory = $this->formHelper->resolveCanonicalCategory($categorie);
-        $types = $this->formHelper->getTypesForCategory((string) ($resolvedCategory ?? $categorie));
+        $types = $this->formHelper->getTypesForCategory($resolvedCategory ?? $categorie);
         return new JsonResponse($types);
+    }
+
+    #[Route('/demande-api/geocode/reverse', name: 'demande_api_geocode_reverse', methods: ['GET'])]
+    public function reverseGeocode(Request $request, SessionInterface $session): JsonResponse
+    {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return new JsonResponse(['success' => false, 'message' => 'Vous devez etre connecte.'], 401);
+        }
+
+        $lat = $this->parseCoordinate($request->query->get('lat'), -90.0, 90.0);
+        $lon = $this->parseCoordinate($request->query->get('lon'), -180.0, 180.0);
+        if (null === $lat || null === $lon) {
+            return new JsonResponse(['success' => false, 'message' => 'Coordonnees invalides.'], 400);
+        }
+
+        $data = $this->requestNominatim('/reverse', [
+            'format' => 'jsonv2',
+            'lat' => (string) $lat,
+            'lon' => (string) $lon,
+            'zoom' => '18',
+            'addressdetails' => '1',
+            'accept-language' => 'fr',
+        ]);
+
+        if (null === $data) {
+            return new JsonResponse(['success' => false, 'message' => 'Geocodage indisponible.'], 502);
+        }
+
+        return new JsonResponse([
+            'success' => true,
+            'lat' => $lat,
+            'lon' => $lon,
+            'name' => $this->normalizePlaceName($data, $lat, $lon),
+        ]);
+    }
+
+    #[Route('/demande-api/geocode/search', name: 'demande_api_geocode_search', methods: ['GET'])]
+    public function searchGeocode(Request $request, SessionInterface $session): JsonResponse
+    {
+        if (!$this->isEmployeLoggedIn($session)) {
+            return new JsonResponse(['success' => false, 'message' => 'Vous devez etre connecte.'], 401);
+        }
+
+        $query = trim((string) $request->query->get('q', ''));
+        if ('' === $query) {
+            return new JsonResponse(['success' => false, 'message' => 'Recherche vide.'], 400);
+        }
+
+        $data = $this->requestNominatim('/search', [
+            'format' => 'jsonv2',
+            'q' => substr($query, 0, 180),
+            'limit' => '1',
+            'addressdetails' => '1',
+            'accept-language' => 'fr',
+        ]);
+
+        if (null === $data) {
+            return new JsonResponse(['success' => false, 'message' => 'Recherche indisponible.'], 502);
+        }
+
+        $firstResult = $data[0] ?? null;
+        if (!is_array($firstResult)) {
+            return new JsonResponse(['success' => false, 'message' => 'Aucun resultat trouve.'], 404);
+        }
+
+        $lat = $this->parseCoordinate($firstResult['lat'] ?? null, -90.0, 90.0);
+        $lon = $this->parseCoordinate($firstResult['lon'] ?? null, -180.0, 180.0);
+        if (null === $lat || null === $lon) {
+            return new JsonResponse(['success' => false, 'message' => 'Resultat de recherche invalide.'], 502);
+        }
+
+        return new JsonResponse([
+            'success' => true,
+            'lat' => $lat,
+            'lon' => $lon,
+            'name' => $this->normalizePlaceName($firstResult, $lat, $lon),
+        ]);
     }
 
     #[Route('/demande-api/suggest-classification', name: 'demande_api_suggest_classification', methods: ['POST'])]
@@ -232,5 +325,82 @@ class DemandeApiController extends AbstractController
     {
         $employeId = $session->get('employe_id');
         return is_numeric($employeId) ? (int) $employeId : null;
+    }
+
+    private function parseCoordinate(mixed $value, float $min, float $max): ?float
+    {
+        if (!is_scalar($value) || '' === trim((string) $value) || !is_numeric($value)) {
+            return null;
+        }
+
+        $coordinate = (float) $value;
+        if ($coordinate < $min || $coordinate > $max) {
+            return null;
+        }
+
+        return $coordinate;
+    }
+
+    /**
+     * @param array<string, string> $query
+     * @return array<mixed>|null
+     */
+    private function requestNominatim(string $path, array $query): ?array
+    {
+        try {
+            $response = $this->httpClient->request('GET', self::NOMINATIM_BASE_URL . $path, [
+                'query' => $query,
+                'headers' => self::NOMINATIM_HEADERS,
+                'timeout' => 8,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            if ($statusCode < 200 || $statusCode >= 300) {
+                $this->logger->warning('Nominatim geocoding request failed.', [
+                    'path' => $path,
+                    'status_code' => $statusCode,
+                ]);
+                return null;
+            }
+
+            $data = $response->toArray(false);
+            return $data;
+        } catch (\Throwable $exception) {
+            $this->logger->warning('Nominatim geocoding request error.', [
+                'path' => $path,
+                'error' => $exception->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * @param array<mixed> $place
+     */
+    private function normalizePlaceName(array $place, ?float $lat = null, ?float $lon = null): string
+    {
+        $displayName = trim((string) ($place['display_name'] ?? ''));
+        if ('' !== $displayName) {
+            return $displayName;
+        }
+
+        $address = is_array($place['address'] ?? null) ? $place['address'] : [];
+        $parts = [];
+        foreach (['road', 'pedestrian', 'footway', 'neighbourhood', 'suburb', 'city', 'town', 'village', 'municipality', 'state', 'country'] as $key) {
+            $value = trim((string) ($address[$key] ?? ''));
+            if ('' !== $value && !in_array($value, $parts, true)) {
+                $parts[] = $value;
+            }
+        }
+
+        if ([] !== $parts) {
+            return implode(', ', $parts);
+        }
+
+        if (null !== $lat && null !== $lon) {
+            return sprintf('%.5F, %.5F', $lat, $lon);
+        }
+
+        return 'Lieu selectionne';
     }
 }

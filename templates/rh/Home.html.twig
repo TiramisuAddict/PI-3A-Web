@@ -91,9 +91,9 @@
             onmouseover="this.style.borderColor='#4254D6'; this.style.cursor='pointer';"
             onmouseout="this.style.borderColor='{% if employe_select is defined and employe_select.getId_employe() == emp.getId_employe() %}#4254D6{% else %}#dee2e6{% endif %}'">
             {% if emp.getImage_profil() %}
-              <img src="{{ emp.getImage_profil() }}" alt="Avatar" class="avatar avatar-sm" style="flex-shrink:0; width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+              <img src="{{ emp.getImage_profil() }}" alt="Avatar" class="avatar avatar-sm" style="flex-shrink:0; width: 40px; height: 40px; border-radius:50%; object-fit: cover;">
             {% else %}
-              <span class="avatar avatar-sm bg-blue-lt text-blue fw-bold" style="flex-shrink:0;">
+              <span class="avatar avatar-sm bg-blue-lt text-blue fw-bold" style="flex-shrink:0; display:flex; align-items:center; justify-content:center; width:40px; height:40px; border-radius:50%;">
                 {{ emp.getPrenom()|first }}{{ emp.getNom()|first }}
               </span>
             {% endif %}

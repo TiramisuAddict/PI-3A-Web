@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Services\TwilioVerifyService;
+use App\Service\TwilioVerifyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -33,7 +33,7 @@ final class AuthController extends AbstractController
     }
 
     #[Route('/login', name: 'login', methods: ['GET', 'POST'])]
-    public function login(Request $request, AdministrateurSystemeRepository $adminRepo, EmployeRepository $employeRepo, VisiteurRepository $visiteurRepo, SessionInterface $session, TwilioVerifyService $twilioVerifyService, \App\Services\PasswordGenerator $passwordGenerator): Response
+    public function login(Request $request, AdministrateurSystemeRepository $adminRepo, EmployeRepository $employeRepo, VisiteurRepository $visiteurRepo, SessionInterface $session, TwilioVerifyService $twilioVerifyService, \App\Service\PasswordGenerator $passwordGenerator): Response
     {
         $cancelTwoFactor = $request->query->getBoolean('cancel_2fa');
         if ($cancelTwoFactor) {
@@ -45,7 +45,7 @@ final class AuthController extends AbstractController
         }
 
         if ($session->get('employe_logged_in') === true) {
-            return $this->redirectByRole($session->get('employe_role'));
+            return $this->redirectByRole((string) $session->get('employe_role'));
         }
 
         if ($session->get('visiteur_logged_in') === true) {
@@ -82,7 +82,7 @@ final class AuthController extends AbstractController
 
             // Vérification admin système (SHA-256)
             $admin = $adminRepo->findOneBy(['e_mail' => $email]);
-            if ($admin && $admin->getMot_de_passe() === $passwordGenerator->hash($password)) {
+            if ($admin !== null && $admin->getMot_de_passe() === $passwordGenerator->hash($password)) {
                 /*
                 $destination = $admin->getTelephone();
                 if ($destination === '') {
@@ -108,17 +108,18 @@ final class AuthController extends AbstractController
             }
 
             $employe = $employeRepo->findOneBy(['e_mail' => $email]);
-                if ($employe) {
+            if ($employe !== null) {
                 $compte = null;
                 foreach ($employe->getComptes() as $c) {
                     // Accept SHA-256 hashed passwords; keep legacy checks as fallback
-                    if ($c->getMot_de_passe() === $passwordGenerator->hash($password) || password_verify($password, $c->getMot_de_passe()) || $c->getMot_de_passe() === $password) {
+                    $storedHash = $c->getMot_de_passe();
+                    if ($storedHash !== null && ($storedHash === $passwordGenerator->hash($password) || password_verify($password, $storedHash) || $storedHash === $password)) {
                         $compte = $c;
                         break;
                     }
                 }
 
-                if ($compte) {
+                if ($compte !== null) {
                     /*
                     $destination =$employe->getTelephone();
                     if ($destination === '') {
@@ -140,14 +141,16 @@ final class AuthController extends AbstractController
                     $session->set('employe_logged_in', true);
                     $session->set('employe_id', $employe->getId_employe());
                     $session->set('employe_email', $employe->getEmail());
-                    $session->set('employe_role', $employe->getRole());
-                    $session->set('employe_id_entreprise', $employe->getEntreprise()->getId_entreprise());
-                    return $this->redirectByRole($employe->getRole());
+                    $session->set('employe_role', (string) $employe->getRole());
+                    $session->set('employe_id_entreprise', (int) $employe->getEntreprise()?->getId_entreprise());
+                    return $this->redirectByRole((string) $employe->getRole());
                 }
             }
 
             $visiteur = $visiteurRepo->findOneBy(['e_mail' => $email]);
-            if ($visiteur && password_verify($password,$visiteur->getMotdepasse())) {
+            if ($visiteur !== null) {
+                $visiteurHash = $visiteur->getMotdepasse();
+                if ($visiteurHash !== null && password_verify($password, $visiteurHash)) {
                 $this->clearOtpFlow($session, $twilioVerifyService, 'two_factor');
                 $session->set('visiteur_logged_in', true);
                 $session->set('visiteur_id', $visiteur->getId_visiteur());
@@ -156,6 +159,7 @@ final class AuthController extends AbstractController
                 $session->set('visiteur_email', $visiteur->getEmail());
 
                 return $this->redirectToRoute('app_offre_home');
+                }
             }
 
             $form->addError(new FormError('Email ou mot de passe incorrect.'));

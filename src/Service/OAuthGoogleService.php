@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Service;
 
 use App\Entity\Visiteur;
 use App\Repository\VisiteurRepository;
@@ -10,6 +10,16 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class OAuthGoogleService
 {
+    private function readGoogleStringValue(object $googleUser, string $method): ?string
+    {
+        if (!is_callable([$googleUser, $method])) {
+            return null;
+        }
+
+        $value = call_user_func([$googleUser, $method]);
+        return is_string($value) ? $value : null;
+    }
+
     public function clearCurrentLoginSession(SessionInterface $session): void
     {
         foreach ([
@@ -39,8 +49,11 @@ class OAuthGoogleService
         $session->set('visiteur_email', $visiteur->getEmail());
     }
 
+    /**
+     * @return array<string, Visiteur|string|null>
+     */
     public function findOrCreateVisiteurFromGoogle(string $mode,object $googleUser,VisiteurRepository $visiteurRepository,EntityManagerInterface $entityManager,UserPasswordHasherInterface $passwordHasher): array {
-        $email = strtolower($googleUser->getEmail());
+        $email = strtolower($this->readGoogleStringValue($googleUser, 'getEmail') ?? '');
         if ($email === '') {
             return [
                 'visiteur' => null,
@@ -50,23 +63,28 @@ class OAuthGoogleService
 
         $visiteur = $visiteurRepository->findOneBy(['e_mail' => $email]);
 
-        if ($mode === 'register' && $visiteur) {
+        if ($mode === 'register' && $visiteur !== null) {
             return [
                 'visiteur' => null,
                 'error' => 'Ce compte Google est deja associe a un visiteur.',
             ];
         }
 
-        if (!$visiteur) {
-            $firstName = $googleUser->getFirstName() ?? '';
-            $lastName = $googleUser->getLastName() ?? '';
+        if ($visiteur === null) {
+            $firstName = $this->readGoogleStringValue($googleUser, 'getFirstName') ?? '';
+            $lastName = $this->readGoogleStringValue($googleUser, 'getLastName') ?? '';
 
             if ($firstName === '' && $lastName === '') {
-                $fullName =($googleUser->getName() ?? '');
+                $fullName = $this->readGoogleStringValue($googleUser, 'getName') ?? '';
                 if ($fullName !== '') {
                     $parts = preg_split('/\s+/', $fullName);
-                    $firstName = $parts[0] ?? 'Visiteur';
-                    $lastName = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : 'Google';
+                    if ($parts === false) {
+                        $firstName = 'Visiteur';
+                        $lastName = 'Google';
+                    } else {
+                        $firstName = $parts[0];
+                        $lastName = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : 'Google';
+                    }
                 }
             }
 
@@ -82,7 +100,7 @@ class OAuthGoogleService
             $visiteur->setPrenom($firstName);
             $visiteur->setNom($lastName);
             $visiteur->setEmail($email);
-            $visiteur->setTelephone(0);
+            $visiteur->setTelephone((int) '0');
             $visiteur->setMotdepasse($passwordHasher->hashPassword($visiteur, bin2hex(random_bytes(24))));
 
             $entityManager->persist($visiteur);
@@ -95,7 +113,7 @@ class OAuthGoogleService
         ];
     }
 
-    public function updateVisiteurPhone(Visiteur $visiteur, string $telephone, EntityManagerInterface $entityManager): void
+    public function updateVisiteurPhone(Visiteur $visiteur, int $telephone, EntityManagerInterface $entityManager): void
     {
         $visiteur->setTelephone($telephone);
         $entityManager->flush();

@@ -20,16 +20,23 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final class ProfileController extends AbstractController
 {
+    /**
+     * @return list<string>
+     */
     private function decodeSkills(?string $skillsJson): array
     {
-        $decoded = json_decode((string) $skillsJson, true);
+        if ($skillsJson === null || $skillsJson === '') {
+            return [];
+        }
+
+        $decoded = json_decode($skillsJson, true);
         if (!is_array($decoded)) {
             return [];
         }
 
         $skills = [];
         foreach ($decoded as $skill) {
-            $value = trim((string) $skill);
+            $value = trim($skill);
             if ($value !== '') {
                 $skills[] = $value;
             }
@@ -44,7 +51,10 @@ final class ProfileController extends AbstractController
 
         if ($session->get('employe_logged_in') === true) {
             $employeId = $session->get('employe_id');
-            $employe = $employeId ? $employeRepository->find($employeId) : null;
+            $employe = $employeId !== null && (int) $employeId > 0 ? $employeRepository->find((int) $employeId) : null;
+            if ($employe === null) {
+                return $this->redirectToRoute('login');
+            }
             $profileForm = $this->createForm(EmployeType::class, $employe);
             $profileForm->remove('poste');
             $profileForm->remove('role');
@@ -53,11 +63,11 @@ final class ProfileController extends AbstractController
 
             if ($profileForm->isSubmitted() && $profileForm->isValid()) {
                 $otherEmploye = $employeRepository->findOneBy(['e_mail' => $employe->getEmail()]);
-                if ($otherEmploye && $otherEmploye->getId_employe() !== $employe->getId_employe()) {
+                if ($otherEmploye !== null && $otherEmploye->getId_employe() !== $employe->getId_employe()) {
                     $profileForm->get('e_mail')->addError(new FormError('Cet email est déjà utilisé.'));
                 } else {
                     $cvFile = $profileForm->get('cv_data')->getData();
-                    if ($cvFile) {
+                    if ($cvFile instanceof UploadedFile) {
                         $cvContent = file_get_contents($cvFile->getPathname());
                         if ($cvContent === false) {
                             $this->addFlash('error', 'Impossible de lire le fichier CV uploadé.');
@@ -65,7 +75,7 @@ final class ProfileController extends AbstractController
                         }
 
                         $employe->setCv_nom($cvFile->getClientOriginalName());
-                        $employe->setCv_data($cvContent);
+                        $employe->setCvData($cvContent);
                     }
 
                     $entityManager->flush();
@@ -114,12 +124,12 @@ final class ProfileController extends AbstractController
 
         $employeId = (int) $session->get('employe_id', 0);
         $employe = $employeId > 0 ? $employeRepository->find($employeId) : null;
-        if (!$employe) {
+        if ($employe === null) {
             return $this->redirectToRoute('login');
         }
 
         $competenceEmploye = $employe->getCompetenceEmploye();
-        if (!$competenceEmploye) {
+        if ($competenceEmploye === null) {
             $competenceEmploye = new CompetenceEmploye();
             $competenceEmploye->setEmploye($employe);
             $employe->setCompetenceEmploye($competenceEmploye);
@@ -129,7 +139,8 @@ final class ProfileController extends AbstractController
         $skills = $this->decodeSkills($competenceEmploye->getSkills());
         if (!in_array($skill, $skills, true)) {
             $skills[] = $skill;
-            $competenceEmploye->setSkills(json_encode(array_values($skills), JSON_UNESCAPED_UNICODE));
+            $encodedSkills = json_encode($skills, JSON_UNESCAPED_UNICODE);
+            $competenceEmploye->setSkills($encodedSkills === false ? null : $encodedSkills);
             $entityManager->flush();
             $this->addFlash('success', 'Compétence ajoutée.');
         }
@@ -155,7 +166,7 @@ final class ProfileController extends AbstractController
 
         $employeId = (int) $session->get('employe_id', 0);
         $employe = $employeId > 0 ? $employeRepository->find($employeId) : null;
-        if (!$employe || !$employe->getCompetenceEmploye()) {
+        if ($employe === null || $employe->getCompetenceEmploye() === null) {
             return $this->redirectToRoute('profil');
         }
 
@@ -163,7 +174,8 @@ final class ProfileController extends AbstractController
         $skills = $this->decodeSkills($competenceEmploye->getSkills());
         $skills = array_values(array_filter($skills, static fn (string $value): bool => $value !== $skillToRemove));
 
-        $competenceEmploye->setSkills(json_encode($skills, JSON_UNESCAPED_UNICODE));
+        $encodedSkills = json_encode($skills, JSON_UNESCAPED_UNICODE);
+        $competenceEmploye->setSkills($encodedSkills === false ? null : $encodedSkills);
         $entityManager->flush();
 
         return $this->redirectToRoute('profil');
@@ -172,8 +184,11 @@ final class ProfileController extends AbstractController
     #[Route('/profil/upload-image', name: 'profil_upload_image', methods: ['POST'])]
     public function uploadImage( Request $request, SessionInterface $session,EmployeRepository $employeRepository,EntityManagerInterface $entityManager,SluggerInterface $slugger): JsonResponse {
 
-        $employeId = $session->get('employe_id');
-        $employe = $employeId ? $employeRepository->find($employeId) : null;
+        $employeId = (int) $session->get('employe_id', 0);
+        $employe = $employeId > 0 ? $employeRepository->find($employeId) : null;
+        if ($employe === null) {
+            return new JsonResponse(['success' => false, 'error' => 'Employe introuvable'], 404);
+        }
         $file = $request->files->get('image');
         
         if (!$file instanceof UploadedFile) {
@@ -193,7 +208,12 @@ final class ProfileController extends AbstractController
 
        
             // Créer le répertoire s'il n'existe pas
-            $uploadDir = $this->getParameter('kernel.project_dir') . '/public/images/profils';
+            $projectDirParam = $this->getParameter('kernel.project_dir');
+            if (!is_string($projectDirParam) || $projectDirParam === '') {
+                return new JsonResponse(['success' => false, 'error' => 'Configuration serveur invalide'], 500);
+            }
+            $projectDir = $projectDirParam;
+            $uploadDir = $projectDir . '/public/images/profils';
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0755, true);
             }
@@ -208,8 +228,8 @@ final class ProfileController extends AbstractController
 
             // Supprimer l'ancienne image si elle existe
             $oldImage = $employe->getImage_profil();
-            if ($oldImage) {
-                $oldImagePath = $this->getParameter('kernel.project_dir') . '/public' . $oldImage;
+            if ($oldImage !== null && $oldImage !== '') {
+                $oldImagePath = $projectDir . '/public' . $oldImage;
                 if (file_exists($oldImagePath)) {
                     unlink($oldImagePath);
                 }
