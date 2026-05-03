@@ -157,7 +157,7 @@ class DemandeType extends AbstractType
 
         $builder->addEventListener(FormEvents::PRE_SET_DATA, function (FormEvent $event) use ($formModifier) {
             $data = $event->getData();
-            $categorie = $data ? $data->getCategorie() : null;
+            $categorie = $data instanceof Demande ? $data->getCategorie() : null;
             $formModifier($event->getForm(), $categorie);
         });
 
