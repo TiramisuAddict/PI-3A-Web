@@ -83,7 +83,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
 
         if ($form->isSubmitted() && $form->isValid()) {
             $cvFile = $form->get('cv_data')->getData();
-            if ($cvFile) {
+            if ($cvFile instanceof UploadedFile) {
                 $cvContent = file_get_contents($cvFile->getPathname());
                 if ($cvContent === false) {
                     $this->addFlash('error', 'Impossible de lire le fichier CV uploadé.');
@@ -146,7 +146,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
 
         if ($form->isSubmitted() && $form->isValid()) {
             $cvFile = $form->get('cv_data')->getData();
-            if ($cvFile) {
+            if ($cvFile instanceof UploadedFile) {
                 $cvContent = file_get_contents($cvFile->getPathname());
                 if ($cvContent === false) {
                     $this->addFlash('error', 'Impossible de lire le fichier CV uploadé.');
@@ -234,7 +234,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
 
         $idEntreprise = $session->get('employe_id_entreprise');
         $entreprise = $entrepriseRepo->find($idEntreprise);
-        if (!$entreprise) {
+        if ($entreprise === null) {
             $this->addFlash('error', 'Entreprise introuvable pour cet utilisateur.');
             return $this->redirectToRoute('RH_Home');
         }
@@ -273,7 +273,7 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
         }
 
         $employe = $employeRepo->find($id);
-        if (!$employe) {
+        if ($employe === null) {
             throw $this->createNotFoundException('Employé introuvable.');
         }
 
@@ -298,11 +298,14 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
         $employe = $employeRepo->find($id);
         $cvData = $employe?->getCvData();
 
-        if (!$employe || !$cvData) {
+        if ($employe === null || $cvData === null || $cvData === '') {
             throw $this->createNotFoundException('CV introuvable.');
         }
 
-        $filename = $employe->getCv_nom() ?: ('cv-employe-' . $id . '.pdf');
+        $filename = $employe->getCv_nom();
+        if ($filename === null || $filename === '') {
+            $filename = 'cv-employe-' . $id . '.pdf';
+        }
 
         $response = new Response($cvData);
         $response->headers->set('Content-Type', 'application/pdf');

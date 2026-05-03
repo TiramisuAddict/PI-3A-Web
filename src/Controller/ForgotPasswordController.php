@@ -51,7 +51,7 @@ final class ForgotPasswordController extends AbstractController
             $userId = 0;
             $destination = '';
 
-            if ($admin) {
+            if ($admin !== null) {
                 $userType = 'admin';
                 $userId =  $admin->getId();
                 $destination =$admin->getTelephone();
@@ -59,9 +59,9 @@ final class ForgotPasswordController extends AbstractController
 
             if ($userType === null) {
                 $employe = $employeRepo->findOneBy(['e_mail' => $email]);
-                if ($employe) {
+                if ($employe !== null) {
                     $compte = $employe->getComptes()->first();
-                    if ($compte) {
+                    if ($compte !== false) {
                         $userType = 'employe';
                         $userId =$employe->getId_employe();
                         $destination = $employe->getTelephone();
@@ -175,7 +175,7 @@ final class ForgotPasswordController extends AbstractController
 
             if ($userType === 'admin') {
                 $admin = $adminRepo->find($userId);
-                if ($admin) {
+                if ($admin !== null) {
                     $admin->setMot_de_passe($passwordGenerator->hash($newPassword));
                     $entityManager->flush();
                 }
@@ -183,9 +183,9 @@ final class ForgotPasswordController extends AbstractController
 
             if ($userType === 'employe') {
                 $employe = $employeRepo->find($userId);
-                if ($employe) {
+                if ($employe !== null) {
                     $compte = $employe->getComptes()->first();
-                    if ($compte) {
+                    if ($compte !== false) {
                         $compte->setMot_de_passe($passwordGenerator->hash($newPassword));
                         $entityManager->flush();
                     }

@@ -118,7 +118,7 @@ final class AdminController extends AbstractController
             $barRows[] = [
                 $status,
                 $totalByStatus,
-                $statusColorMap[$status] ?? '#4254D6',
+                $statusColorMap[$status],
             ];
         }
         if (count($barRows) === 1) {
@@ -195,7 +195,7 @@ final class AdminController extends AbstractController
             $action = $request->request->get('action');
 
             $entreprise = $entrepriseRepo->find($id);
-            if ($entreprise) {
+            if ($entreprise !== null) {
                if ($action === 'accepter') {
                     $recipientEmail = $entreprise->getEmail();
                     $entreprise->setStatut('acceptée');

@@ -23,6 +23,9 @@ final class CurrentEmployeExtension extends AbstractExtension
         ];
     }
 
+    /**
+     * @return array<string, Employe|null>
+     */
     public function getGlobals(): array
     {
         return [
@@ -33,16 +36,15 @@ final class CurrentEmployeExtension extends AbstractExtension
     public function getCurrentEmploye(): ?Employe
     {
         $session = $this->requestStack->getSession();
-
-        if (!$session || $session->get('employe_logged_in') !== true) {
+        if ($session->get('employe_logged_in') !== true) {
             return null;
         }
 
         $employeId = $session->get('employe_id');
-        if (!$employeId) {
+        if (!is_numeric($employeId)) {
             return null;
         }
 
-        return $this->employeRepository->find($employeId);
+        return $this->employeRepository->find((int) $employeId);
     }
 }

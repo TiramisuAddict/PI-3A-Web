@@ -8,11 +8,11 @@ class EmployeManager
 {
     public function validate(Employe $employe): bool
     {
-        if (empty($employe->getNom())) {
+        if ($employe->getNom() === '') {
             throw new \InvalidArgumentException('Le nom est obligatoire');
         }
 
-        if (empty($employe->getPrenom())) {
+        if ($employe->getPrenom() === '') {
             throw new \InvalidArgumentException('Le prénom est obligatoire');
         }
 
@@ -28,11 +28,11 @@ class EmployeManager
             throw new \InvalidArgumentException('Le téléphone doit contenir exactement 8 chiffres');
         }
 
-        if (empty($employe->getPoste())) {
+        if ($employe->getPoste() === '') {
             throw new \InvalidArgumentException('Le poste est obligatoire');
         }
 
-        if (empty($employe->getRole())) {
+        if ($employe->getRole() === '') {
             throw new \InvalidArgumentException('Le rôle est obligatoire');
         }
 
