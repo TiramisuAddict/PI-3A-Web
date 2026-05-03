@@ -19,15 +19,15 @@ class TacheType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
-        $isEdit = $options['is_edit'] ?? false;
-        $employeeSelfUpdate = $options['employee_self_update'] ?? false;
+        $isEdit = (bool) ($options['is_edit'] ?? false);
+        $employeeSelfUpdate = (bool) ($options['employee_self_update'] ?? false);
         $statusChoices = [
             'A faire' => Tache::STATUT_A_FAIRE,
             'En cours' => Tache::STATUT_EN_COURS,
             'Bloquee' => Tache::STATUT_BLOQUEE,
         ];
 
-        if ($options['allow_completed_status']) {
+        if ((bool) $options['allow_completed_status']) {
             $statusChoices['Terminee'] = Tache::STATUT_TERMINEE;
         }
 
@@ -35,6 +35,7 @@ class TacheType extends AbstractType
             ->add('titre', TextType::class, [
                 'required' => true,
                 'disabled' => $employeeSelfUpdate,
+                'empty_data' => '',
                 'attr' => [
                     'maxlength' => 150,
                 ],
@@ -42,6 +43,7 @@ class TacheType extends AbstractType
             ->add('description', TextareaType::class, [
                 'required' => true,
                 'disabled' => $employeeSelfUpdate,
+                'empty_data' => '',
                 'attr' => [
                     'rows' => 5,
                     'maxlength' => 1000,
@@ -50,8 +52,6 @@ class TacheType extends AbstractType
             ->add('priorite', ChoiceType::class, [
                 'required' => true,
                 'disabled' => $employeeSelfUpdate,
-                'placeholder' => 'Choisir une priorite',
-                'empty_data' => '',
                 'choices' => [
                     'Basse' => Tache::PRIORITE_BASSE,
                     'Moyenne' => Tache::PRIORITE_MOYENNE,
@@ -76,8 +76,6 @@ class TacheType extends AbstractType
             ])
             ->add('statut_tache', ChoiceType::class, [
                 'required' => true,
-                'placeholder' => 'Choisir un statut',
-                'empty_data' => '',
                 'choices' => $statusChoices,
             ])
             ->add('progression', IntegerType::class, [

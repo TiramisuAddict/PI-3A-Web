@@ -336,7 +336,7 @@ final class ProjetController extends AbstractController
         $tache->setProgression(0);
 
         $requestedDate = trim((string) $request->query->get('date', ''));
-        if ($requestedDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)) {
+        if ($requestedDate !== '' && (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)) {
             try {
                 $dateObj = new \DateTime($requestedDate);
                 $tache->setDateDeb($dateObj);
@@ -699,23 +699,9 @@ final class ProjetController extends AbstractController
         return $chefProjets;
     }
 
-    private function statusToProgression(?string $status): int
-    {
-        return match ($status) {
-            Tache::STATUT_TERMINEE => 100,
-            Tache::STATUT_EN_COURS => 50,
-            Tache::STATUT_BLOQUEE => 50,
-            default => 0,
-        };
-    }
-
     private function synchronizeTaskProgressionAndStatus(Tache $tache): void
     {
-        if ($tache->getProgression() === null) {
-            $tache->setProgression($this->statusToProgression($tache->getStatutTache()));
-        }
-
-        $progression = $tache->getProgression() ?? 0;
+        $progression = $tache->getProgression();
         $status = $tache->getStatutTache();
 
         if ($progression >= 100) {
@@ -785,8 +771,7 @@ final class ProjetController extends AbstractController
 
                 // Due date urgency bonus
                 $dateLimite = $tache->getDateLimite();
-                if ($dateLimite !== null) {
-                    $diff = $today->diff($dateLimite);
+                $diff = $today->diff($dateLimite);
                     $daysLeft = (int) $diff->days;
                     $isOverdue = $diff->invert === 1;
 
@@ -796,7 +781,6 @@ final class ProjetController extends AbstractController
                     } elseif ($daysLeft <= 7) {
                         $score += 1.0;
                     }
-                }
 
                 // Blocked tasks are not consuming active effort — small deduction
                 if ($tache->getStatutTache() === Tache::STATUT_BLOQUEE) {
@@ -881,7 +865,7 @@ final class ProjetController extends AbstractController
 
         // Build the top suggestion with a human-readable reason
         $suggestion = null;
-        if (!empty($results)) {
+        if ($results !== []) {
             $top = $results[0];
             if ($hasSkillsData && $top['skillsScore'] !== null) {
                 $reason = sprintf(
@@ -977,8 +961,7 @@ final class ProjetController extends AbstractController
             };
 
             if ($statut !== Tache::STATUT_TERMINEE) {
-                $dateLimite = $tache->getDateLimite();
-                if ($dateLimite !== null && $dateLimite < $today) {
+                if ($tache->getDateLimite() < $today) {
                     ++$retardCount;
                 }
             }
@@ -987,11 +970,8 @@ final class ProjetController extends AbstractController
         $completionPct = $totalTasks > 0 ? (int) round(($termineesCount / $totalTasks) * 100) : 0;
 
         $dateFinPrevue = $projet->getDateFinPrevue();
-        $daysLeft      = null;
-        if ($dateFinPrevue !== null) {
-            $diff     = $today->diff($dateFinPrevue);
-            $daysLeft = $diff->invert === 1 ? -(int) $diff->days : (int) $diff->days;
-        }
+        $diff          = $today->diff($dateFinPrevue);
+        $daysLeft      = $diff->invert === 1 ? -(int) $diff->days : (int) $diff->days;
 
         // Build structured team workload array
         $teamData  = [];
@@ -1053,11 +1033,11 @@ final class ProjetController extends AbstractController
         }
 
         $conclusionData = [
-            'name'           => $projet->getNom() ?? '',
-            'statut'         => $projet->getStatut() ?? 'inconnu',
+            'name'           => $projet->getNom(),
+            'statut'         => $projet->getStatut(),
             'priorite'       => $projet->getPriorite(),
-            'dateDebut'      => $projet->getDateDebut()?->format('d/m/Y'),
-            'dateFinPrevue'  => $dateFinPrevue?->format('d/m/Y'),
+            'dateDebut'      => $projet->getDateDebut()->format('d/m/Y'),
+            'dateFinPrevue'  => $dateFinPrevue->format('d/m/Y'),
             'daysLeft'       => $daysLeft,
             'totalTasks'     => $totalTasks,
             'termineesCount' => $termineesCount,
@@ -1086,9 +1066,9 @@ final class ProjetController extends AbstractController
                 'retard'        => $retardCount,
                 'completionPct' => $completionPct,
                 'daysLeft'      => $daysLeft,
-                'dateFinPrevue' => $dateFinPrevue?->format('d/m/Y'),
+                'dateFinPrevue' => $dateFinPrevue->format('d/m/Y'),
                 'projectName'   => $projet->getNom(),
-                'statut'        => $projet->getStatut() ?? 'inconnu',
+                'statut'        => $projet->getStatut(),
             ],
             'team'       => $teamData,
             'conclusion' => $conclusion,
