@@ -11,9 +11,6 @@ use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
-use Symfony\Component\Form\FormError;
-use Symfony\Component\Form\FormEvent;
-use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class ProjetType extends AbstractType
@@ -21,7 +18,7 @@ class ProjetType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
-        $isEdit = $options['is_edit'] ?? false;
+        $isEdit = (bool) ($options['is_edit'] ?? false);
         $chefProjetChoices = $options['chef_projets_choices'];
 
         if ($chefProjetChoices === [] && isset($options['responsables_choices']) && is_array($options['responsables_choices'])) {
@@ -31,9 +28,11 @@ class ProjetType extends AbstractType
         $builder
             ->add('nom', TextType::class, [
                 'required' => true,
+                'empty_data' => '',
             ])
             ->add('description', TextareaType::class, [
                 'required' => true,
+                'empty_data' => '',
             ])
             ->add('date_debut', DateType::class, [
                 'widget' => 'single_text',
@@ -66,7 +65,6 @@ class ProjetType extends AbstractType
                     Projet::STATUT_TERMINE => Projet::STATUT_TERMINE,
                 ],
                 'required' => true,
-                'placeholder' => 'Choisir un statut',
             ])
             ->add('priorite', ChoiceType::class, [
                 'choices' => [
@@ -75,7 +73,6 @@ class ProjetType extends AbstractType
                     Projet::PRIORITE_HAUTE => Projet::PRIORITE_HAUTE,
                 ],
                 'required' => true,
-                'placeholder' => 'Choisir une priorite',
             ])
             ->add('responsable', EntityType::class, [
                 'class' => Employe::class,
@@ -94,23 +91,6 @@ class ProjetType extends AbstractType
                 'required' => false,
                 'by_reference' => false,
             ]);
-
-        $builder->addEventListener(FormEvents::POST_SUBMIT, static function (FormEvent $event): void {
-            $form = $event->getForm();
-            $projet = $event->getData();
-
-            if (!$projet instanceof Projet) {
-                return;
-            }
-
-            if ($projet->getPriorite() === null || trim($projet->getPriorite()) === '') {
-                $form->get('priorite')->addError(new FormError('Veuillez choisir une priorite.'));
-            }
-
-            if ($projet->getStatut() === null || trim($projet->getStatut()) === '') {
-                $form->get('statut')->addError(new FormError('Veuillez choisir un statut.'));
-            }
-        });
     }
 
     public function configureOptions(OptionsResolver $resolver): void
