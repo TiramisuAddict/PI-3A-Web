@@ -34,10 +34,6 @@ final class InscriptionCalendarSubscriber implements EventSubscriberInterface
         }
 
         $session = $request->getSession();
-        if ($session === null) {
-            return;
-        }
-
         $employeeId = (int) $session->get('employe_id', 0);
         if ($employeeId <= 0) {
             return;
@@ -53,11 +49,11 @@ final class InscriptionCalendarSubscriber implements EventSubscriberInterface
                 continue;
             }
 
-            if ($formation === null || $formation->getDateDebut() === null) {
+            if ($formation === null) {
                 continue;
             }
 
-            $title = (string) ($formation->getTitre() ?? 'Formation');
+            $title = $formation->getTitre();
             $start = $formation->getDateDebut();
             $end = $formation->getDateFin();
             if ($end !== null) {
@@ -71,8 +67,8 @@ final class InscriptionCalendarSubscriber implements EventSubscriberInterface
             $event->addOption('textColor', '#ffffff');
             $event->addOption('extendedProps', [
                 'statut' => $inscription->getStatut(),
-                'organisme' => (string) ($formation->getOrganisme() ?? ''),
-                'lieu' => (string) ($formation->getLieu() ?? ''),
+                'organisme' => $formation->getOrganisme(),
+                'lieu' => $formation->getLieu(),
             ]);
 
             $calendar->addEvent($event);
