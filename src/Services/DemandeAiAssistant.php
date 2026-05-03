@@ -62,7 +62,7 @@ class DemandeAiAssistant
             $requiredKeys[$key] = (bool) ($field['required'] ?? false);
             $fieldLabels[$key] = (string) ($field['label'] ?? $key);
 
-            if (($field['type'] ?? null) === 'select' && !empty($field['options']) && is_array($field['options'])) {
+            if (($field['type'] ?? null) === 'select' && is_array($field['options'] ?? null) && [] !== $field['options']) {
                 $selectOptions[$key] = array_values(array_map('strval', $field['options']));
             }
         }
@@ -85,7 +85,7 @@ class DemandeAiAssistant
             $requiredKeys[$manualKey] = (bool) ($manualField['required'] ?? false);
             $fieldLabels[$manualKey] = (string) ($manualField['label'] ?? $manualKey);
 
-            if (($manualField['type'] ?? null) === 'select' && !empty($manualField['options']) && is_array($manualField['options'])) {
+            if (($manualField['type'] ?? null) === 'select' && is_array($manualField['options'] ?? null) && [] !== $manualField['options']) {
                 $selectOptions[$manualKey] = array_values(array_map('strval', $manualField['options']));
             }
         }
@@ -156,7 +156,9 @@ class DemandeAiAssistant
                 ? $parsed['dynamicFieldConfidence']
                 : ['score' => 0, 'label' => 'Faible', 'tone' => 'info', 'message' => 'Aucun apprentissage confirme similaire n a ete retrouve.'],
             'skipConfirmationRestriction' => $this->toBooleanFlag($parsed['skipConfirmationRestriction'] ?? false),
-            'model' => trim((string) ($parsed['_model'] ?? '')) ?: 'local-ml:demande/demande_adaptive_model.py',
+            'model' => '' !== trim((string) ($parsed['_model'] ?? ''))
+                ? trim((string) ($parsed['_model'] ?? ''))
+                : 'local-ml:demande/demande_adaptive_model.py',
         ];
     }
 
@@ -965,9 +967,10 @@ class DemandeAiAssistant
     }
 
     /**
-     * @param array<string, mixed> $general
-     * @param array<string, mixed> $details
-     * @param array<string, mixed> $fieldPlan
+    * @param array<string, mixed> $general
+    * @param array<string, mixed> $details
+    * @param array<string, mixed> $fieldPlan
+    * @param array<string, mixed> $generatedSnapshot
      */
     public function recordAcceptedAutreFeedback(
         string $prompt,
@@ -1411,6 +1414,14 @@ class DemandeAiAssistant
         return [] !== $meaningfulFieldTerms && $this->containsAnyWord($normalizedText, $meaningfulFieldTerms);
     }
 
+    /**
+     * @param array<string, mixed> $generalContext
+     * @param array<string, string> $currentDetails
+     * @param array<int, string> $allowedKeys
+     * @param array<string, bool> $requiredKeys
+     * @param array<string, string> $fieldLabels
+     * @param array<string, array<int, string>> $selectOptions
+     */
     private function buildPrompt(
         array $generalContext,
         array $currentDetails,
@@ -1908,7 +1919,12 @@ class DemandeAiAssistant
                 $process->run();
 
                 if (!$process->isSuccessful()) {
-                    $lastError = trim($process->getErrorOutput() ?: $process->getOutput());
+                    $processError = trim($process->getErrorOutput());
+                    if ('' === $processError) {
+                        $processError = trim($process->getOutput());
+                    }
+
+                    $lastError = $processError;
                     continue;
                 }
 
@@ -1919,7 +1935,7 @@ class DemandeAiAssistant
                     continue;
                 }
 
-                if (!($decoded['ok'] ?? false)) {
+                if (($decoded['ok'] ?? false) !== true) {
                     $lastError = (string) ($decoded['error'] ?? 'Unknown Python AI runner error.');
                     continue;
                 }
@@ -3069,6 +3085,9 @@ class DemandeAiAssistant
         return $scores;
     }
 
+    /**
+     * @param array<int, string> $keywords
+     */
     private function containsAny(string $text, array $keywords): bool
     {
         foreach ($keywords as $keyword) {
@@ -3104,6 +3123,9 @@ class DemandeAiAssistant
         return 1 === preg_match('/(?<![a-z0-9])' . $escaped . '(?![a-z0-9])/', $haystack);
     }
 
+    /**
+     * @param array<int, string> $keywords
+     */
     private function containsAnyWord(string $text, array $keywords): bool
     {
         foreach ($keywords as $keyword) {
@@ -3901,6 +3923,9 @@ class DemandeAiAssistant
         return $dates;
     }
 
+    /**
+     * @param array<int, string> $dates
+     */
     private function extractDaysCount(string $text, array $dates): string
     {
         if (preg_match('/\b(\d+)\s+jours?\b/i', $text, $matches) === 1) {
@@ -3921,6 +3946,9 @@ class DemandeAiAssistant
         return '';
     }
 
+    /**
+     * @param array<int, string> $keywords
+     */
     private function extractIntegerNearKeywords(string $text, array $keywords): string
     {
         foreach ($keywords as $keyword) {
@@ -4012,6 +4040,10 @@ class DemandeAiAssistant
 
     /**
      * @param array<int, string> $options
+     */
+    /**
+     * @param array<int, string> $options
+     * @param array<int, string> $specialKeywords
      */
     private function matchMonthOption(array $options, int $months, string $text, string $specialOption = '', array $specialKeywords = []): string
     {
@@ -4793,6 +4825,9 @@ class DemandeAiAssistant
         return $fields;
     }
 
+    /**
+     * @param array<int, string> $keywords
+     */
     private function extractLeadClauseBeforeKeywords(string $text, array $keywords): string
     {
         $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
@@ -4808,6 +4843,9 @@ class DemandeAiAssistant
         return $this->truncateCustomFieldText($clean, 120);
     }
 
+    /**
+     * @param array<int, string> $keywords
+     */
     private function extractTailClauseAfterKeywords(string $text, array $keywords): string
     {
         $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));

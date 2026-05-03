@@ -1,15 +1,19 @@
 <?php
 
-namespace App\Validator;
+namespace App\Validator\Constraints;
 
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 
 class DateFinAfterDateDebutValidator extends ConstraintValidator
 {
-    public function validate($value, Constraint $constraint): void
+    public function validate(mixed $value, Constraint $constraint): void
     {
         if (!$value instanceof \DateTimeInterface) {
+            return;
+        }
+
+        if (!$constraint instanceof DateFinAfterDateDebut) {
             return;
         }
 
@@ -30,7 +34,7 @@ class DateFinAfterDateDebutValidator extends ConstraintValidator
             }
         }
 
-        if ($startDate && $value < $startDate) {
+        if (null !== $startDate && $value < $startDate) {
             $this->context->buildViolation($constraint->message)
                 ->addViolation();
         }

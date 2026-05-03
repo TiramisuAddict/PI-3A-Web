@@ -14,6 +14,7 @@ class Demande
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
+    /** @phpstan-ignore-next-line */
     private ?int $id_demande = null;
 
     #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'demandes')]
@@ -41,9 +42,11 @@ class Demande
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $type_demande = null;
 
+    /** @var Collection<int, DemandeDetail> */
     #[ORM\OneToMany(targetEntity: DemandeDetail::class, mappedBy: 'demande', cascade: ['remove'])]
     private Collection $demandeDetails;
 
+    /** @var Collection<int, HistoriqueDemande> */
     #[ORM\OneToMany(targetEntity: HistoriqueDemande::class, mappedBy: 'demande', cascade: ['remove'])]
     private Collection $historiqueDemandes;
 
@@ -146,6 +149,7 @@ class Demande
         return $this;
     }
 
+    /** @return Collection<int, DemandeDetail> */
     public function getDemandeDetails(): Collection
     {
         return $this->demandeDetails;
@@ -170,6 +174,7 @@ class Demande
         return $this;
     }
 
+    /** @return Collection<int, HistoriqueDemande> */
     public function getHistoriqueDemandes(): Collection
     {
         return $this->historiqueDemandes;

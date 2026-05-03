@@ -41,7 +41,7 @@ class DemandeApiController extends AbstractController
     public function getFields(string $type): JsonResponse
     {
         $resolvedType = $this->formHelper->resolveCanonicalType($type);
-        $fields = $this->formHelper->getFieldsForType((string) ($resolvedType ?? $type));
+        $fields = $this->formHelper->getFieldsForType($resolvedType ?? $type);
         return new JsonResponse($fields);
     }
 
@@ -49,7 +49,7 @@ class DemandeApiController extends AbstractController
     public function getTypesForCategory(string $categorie): JsonResponse
     {
         $resolvedCategory = $this->formHelper->resolveCanonicalCategory($categorie);
-        $types = $this->formHelper->getTypesForCategory((string) ($resolvedCategory ?? $categorie));
+        $types = $this->formHelper->getTypesForCategory($resolvedCategory ?? $categorie);
         return new JsonResponse($types);
     }
 
@@ -364,7 +364,7 @@ class DemandeApiController extends AbstractController
             }
 
             $data = $response->toArray(false);
-            return is_array($data) ? $data : null;
+            return $data;
         } catch (\Throwable $exception) {
             $this->logger->warning('Nominatim geocoding request error.', [
                 'path' => $path,

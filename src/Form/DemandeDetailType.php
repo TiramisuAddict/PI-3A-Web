@@ -17,13 +17,13 @@ class DemandeDetailType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $fields = $options['fields'];
-        $existingDetails = $options['existing_details'];
+        $fields = is_array($options['fields'] ?? null) ? $options['fields'] : [];
+        $existingDetails = is_array($options['existing_details'] ?? null) ? $options['existing_details'] : [];
 
         foreach ($fields as $field) {
             $key = $field['key'];
             $label = $field['label'];
-            $required = $field['required'] ?? false;
+            $required = true === ($field['required'] ?? false);
             $type = $field['type'] ?? 'text';
             $fieldOptions = $field['options'] ?? [];
 
@@ -95,9 +95,9 @@ class DemandeDetailType extends AbstractType
                     }
 
                     $dateValue = null;
-                    if ($defaultValue) {
+                    if (isset($defaultValue) && '' !== trim((string) $defaultValue)) {
                         try {
-                            $dateValue = new \DateTime($defaultValue);
+                            $dateValue = new \DateTime((string) $defaultValue);
                         } catch (\Exception $e) {
                             $dateValue = null;
                         }

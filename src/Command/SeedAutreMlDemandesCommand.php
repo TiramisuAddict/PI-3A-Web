@@ -43,9 +43,10 @@ class SeedAutreMlDemandesCommand extends Command
         $limit = max(1, min(5000, (int) $input->getOption('limit')));
         $dryRun = (bool) $input->getOption('dry-run');
 
-        $employeeExists = (int) $connection->fetchOne('SELECT COUNT(*) FROM employe WHERE id_employe = ?', [$employeeId]) > 0;
-        if (!$employeeExists) {
-            if (!$input->getOption('create-employee')) {
+        $employeeExists = ((int) $connection->fetchOne('SELECT COUNT(*) FROM employe WHERE id_employe = ?', [$employeeId])) > 0;
+        $createEmployee = true === ($input->getOption('create-employee') ?? false);
+        if (false === $employeeExists) {
+            if (false === $createEmployee) {
                 $io->error(sprintf('Employe #%d introuvable. Relancez avec --create-employee pour creer un compte seed minimal.', $employeeId));
 
                 return Command::FAILURE;
@@ -58,7 +59,7 @@ class SeedAutreMlDemandesCommand extends Command
                 return Command::FAILURE;
             }
 
-            if (!$dryRun) {
+            if (false === $dryRun) {
                 $connection->insert('employe', [
                     'id_employe' => $employeeId,
                     'nom' => 'Seed',

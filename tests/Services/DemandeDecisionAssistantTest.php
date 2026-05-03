@@ -107,7 +107,6 @@ final class DemandeDecisionAssistantTest extends TestCase
             ['key' => 'ai_motif', 'label' => 'Motif', 'type' => 'textarea', 'required' => true],
         ]);
 
-        self::assertIsArray($result);
         self::assertSame([], $result['missingRequired']);
         self::assertArrayHasKey('mlSignals', $result);
     }

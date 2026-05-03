@@ -116,7 +116,7 @@ class DemandeController extends AbstractController
         }
 
         $employe = $this->em->getRepository(Employe::class)->find($this->getLoggedInEmployeId($session));
-        if (!$employe) {
+        if (null === $employe) {
             throw $this->createAccessDeniedException('Employe connecte introuvable.');
         }
 
@@ -198,7 +198,7 @@ class DemandeController extends AbstractController
 
             $demande->setEmploye($employe);
 
-            if ($form->isValid() && empty($detailErrors)) {
+            if ($form->isValid() && [] === $detailErrors) {
                 if ($this->requiresAutreAiConfirmation($submittedType, $aiGenerated, $manualFieldMode, $aiConfirmed)) {
                     $this->addFlash('warning', $manualFieldMode
                         ? 'Veuillez confirmer les champs manuels avant de creer la demande.'
@@ -212,7 +212,7 @@ class DemandeController extends AbstractController
                     $this->em->persist($demande);
                     $this->em->flush();
 
-                    if (!empty($submittedDetails)) {
+                    if ([] !== $submittedDetails) {
                         $persistedDetails = $submittedDetails;
                         $isAcceptedAutreFeedback = $this->isAcceptedAutreFeedback($submittedType, $aiGenerated, $manualFieldMode, $aiConfirmed);
                         if ($isAcceptedAutreFeedback) {
@@ -246,8 +246,8 @@ class DemandeController extends AbstractController
 
                     if ($aiGenerated && $aiConfirmed) {
                         $this->demandeAiAssistant->recordAcceptedDescriptionFeedback(
-                            (string) ($demande->getTitre() ?? ''),
-                            (string) ($demande->getDescription() ?? ''),
+                            $demande->getTitre() ?? '',
+                            $demande->getDescription() ?? '',
                             $demande->getTypeDemande(),
                             $demande->getCategorie(),
                             $employe->getId_employe()
@@ -258,11 +258,11 @@ class DemandeController extends AbstractController
                         $this->demandeAiAssistant->recordAcceptedAutreFeedback(
                             '' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription,
                             [
-                                'titre' => (string) ($demande->getTitre() ?? ''),
-                                'description' => (string) ($demande->getDescription() ?? ''),
-                                'priorite' => (string) ($demande->getPriorite() ?? ''),
-                                'categorie' => (string) ($demande->getCategorie() ?? ''),
-                                'typeDemande' => (string) ($demande->getTypeDemande() ?? ''),
+                                'titre' => $demande->getTitre() ?? '',
+                                'description' => $demande->getDescription() ?? '',
+                                'priorite' => $demande->getPriorite() ?? '',
+                                'categorie' => $demande->getCategorie() ?? '',
+                                'typeDemande' => $demande->getTypeDemande() ?? '',
                             ],
                             $submittedDetails,
                             $submittedAiFieldPlan,
@@ -344,7 +344,7 @@ class DemandeController extends AbstractController
         try {
             $demande = $this->demandeRepository->find($id);
 
-            if (!$demande) {
+            if (null === $demande) {
                 return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
             }
 
@@ -352,7 +352,7 @@ class DemandeController extends AbstractController
             $newStatus   = $data['status'] ?? null;
             $commentaire = $data['commentaire'] ?? '';
 
-            if (!$newStatus) {
+            if (null === $newStatus || '' === (string) $newStatus) {
                 return new JsonResponse(['success' => false, 'message' => 'Statut requis'], 400);
             }
 
@@ -417,7 +417,7 @@ class DemandeController extends AbstractController
 
         $demande = $this->demandeRepository->find($id);
 
-        if (!$demande) {
+        if (null === $demande) {
             $this->addFlash('danger', 'Demande non trouvee.');
             return $this->redirectToRoute('demande_index');
         }
@@ -466,7 +466,7 @@ class DemandeController extends AbstractController
 
         $demande = $this->demandeRepository->find($id);
 
-        if (!$demande) {
+        if (null === $demande) {
             $this->addFlash('danger', 'Demande non trouvee.');
             return $this->redirectToRoute('demande_index');
         }
@@ -487,7 +487,7 @@ class DemandeController extends AbstractController
 
         $demande = $this->demandeRepository->find($id);
 
-        if (!$demande) {
+        if (null === $demande) {
             throw $this->createNotFoundException('Demande non trouvee');
         }
 
@@ -550,7 +550,7 @@ class DemandeController extends AbstractController
 
         $demande = $this->demandeRepository->find($id);
 
-        if (!$demande) {
+        if (null === $demande) {
             $this->addFlash('danger', 'Demande non trouvee.');
             return $this->redirectToRoute('demande_index');
         }
@@ -558,7 +558,7 @@ class DemandeController extends AbstractController
         $newStatus   = $request->request->get('status');
         $commentaire = trim((string) $request->request->get('commentaire', ''));
 
-        if (!$newStatus) {
+        if (null === $newStatus || '' === (string) $newStatus) {
             $this->addFlash('danger', 'Statut manquant.');
             return $this->redirectToRoute('demande_show', ['id' => $id]);
         }
@@ -605,7 +605,7 @@ class DemandeController extends AbstractController
 
         $demande = $this->demandeRepository->find($id);
 
-        if (!$demande) {
+        if (null === $demande) {
             throw $this->createNotFoundException('Demande non trouvee');
         }
 
@@ -665,7 +665,7 @@ class DemandeController extends AbstractController
                     : $this->validateDetails($submittedType, $submittedDetails);
             }
 
-            if ($form->isValid() && empty($detailErrors)) {
+            if ($form->isValid() && [] === $detailErrors) {
                 $oldStatus   = $this->em->getUnitOfWork()->getOriginalEntityData($demande)['status'] ?? $demande->getStatus();
                 $newStatus   = $demande->getStatus();
                 $commentaire = $form->get('commentaire')->getData();
@@ -688,8 +688,8 @@ class DemandeController extends AbstractController
                     $this->em->persist($historique);
                 }
 
-                if (!empty($submittedDetails) || $usesStoredAiSchema) {
-                    if (!empty($existingDetails)) {
+                if ([] !== $submittedDetails || $usesStoredAiSchema) {
+                    if ([] !== $existingDetails) {
                         foreach ($existingDetails as $detailKey => $detailValue) {
                             $detailKey = (string) $detailKey;
                             if ($this->isTechnicalDetailKey($detailKey) && !array_key_exists($detailKey, $submittedDetails)) {
@@ -818,7 +818,7 @@ class DemandeController extends AbstractController
     {
         $visible = [];
         foreach ($details as $key => $value) {
-            $detailKey = trim((string) $key);
+            $detailKey = trim($key);
             if ('' === $detailKey || $this->isTechnicalDetailKey($detailKey) || str_ends_with($detailKey, 'Lat') || str_ends_with($detailKey, 'Lon')) {
                 continue;
             }
@@ -842,7 +842,7 @@ class DemandeController extends AbstractController
     {
         $filtered = [];
         foreach ($details as $key => $value) {
-            $detailKey = trim((string) $key);
+            $detailKey = trim($key);
             if ('' === $detailKey || $this->isTechnicalDetailKey($detailKey)) {
                 continue;
             }
@@ -946,7 +946,7 @@ class DemandeController extends AbstractController
 
         $filtered = [];
         foreach ($details as $key => $value) {
-            $detailKey = trim((string) $key);
+            $detailKey = trim($key);
             if ('' === $detailKey || !isset($allowedKeys[$detailKey])) {
                 continue;
             }
@@ -1025,7 +1025,7 @@ class DemandeController extends AbstractController
                     $previousIndex = $seenValues[$valueKey]['index'];
                     $previousScore = $seenValues[$valueKey]['score'];
                     if ($score > $previousScore && isset($add[$previousIndex])) {
-                        $previousKey = trim((string) ($add[$previousIndex]['key'] ?? ''));
+                        $previousKey = trim($add[$previousIndex]['key']);
                         if ('' !== $previousKey) {
                             unset($seenKeys[$previousKey]);
                         }
@@ -1075,7 +1075,7 @@ class DemandeController extends AbstractController
         }
 
         $normalized = preg_replace('/[^a-z0-9\/\- ]+/', ' ', $normalized) ?? $normalized;
-        $normalized = trim((string) (preg_replace('/\s+/', ' ', $normalized) ?? $normalized));
+        $normalized = trim(preg_replace('/\s+/', ' ', $normalized) ?? $normalized);
         if (strlen($normalized) < 3) {
             return '';
         }
@@ -1227,9 +1227,14 @@ class DemandeController extends AbstractController
         $normalized = preg_replace('/\b(?:horriaire|horraire|horairre|horiare|horairee)(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|souhaite|souhaitee|souhaites|souhaitees)\b/', 'horaire $1', $normalized) ?? $normalized;
         $normalized = preg_replace('/\b(?:horriaire|horraire|horairre|horiare|horairee)\b/', 'horaire', $normalized) ?? $normalized;
 
-        return trim((string) (preg_replace('/\s+/', ' ', $normalized) ?? $normalized));
+        return trim(preg_replace('/\s+/', ' ', $normalized) ?? $normalized);
     }
 
+    /**
+     * @param string $typeDemande
+     * @param array<string,mixed> $details
+     * @return array<int, array{field:string,message:string,type:string}>
+     */
     private function validateDetails(string $typeDemande, array $details): array
     {
         $errors = [];
@@ -1240,7 +1245,7 @@ class DemandeController extends AbstractController
         foreach ($fields as $field) {
             $key      = $field['key'];
             $label    = $field['label'];
-            $required = $field['required'] ?? false;
+            $required = true === ($field['required'] ?? false);
             $type     = $field['type'] ?? 'text';
             $value    = $details[$key] ?? null;
 
@@ -1298,8 +1303,8 @@ class DemandeController extends AbstractController
                     if ($isEndDate) {
                         $startKeys = ['dateDebut', 'dateDebutTeletravail', 'dateDebutHoraires', 'dateDebutFormation'];
                         foreach ($startKeys as $startKey) {
-                            if (!empty($details[$startKey])) {
-                                $startDate = new \DateTime($details[$startKey]);
+                            if (isset($details[$startKey]) && '' !== trim((string) ($details[$startKey] ?? ''))) {
+                                $startDate = new \DateTime((string) $details[$startKey]);
                                 $startDate->setTime(0, 0, 0);
                                 if ($date < $startDate) {
                                     $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" doit etre superieur ou egal a la date de debut.', 'type' => 'format'];
@@ -1331,6 +1336,11 @@ class DemandeController extends AbstractController
         return $errors;
     }
 
+    /**
+     * @param array<string,mixed> $details
+     * @param array<string,mixed> $aiFieldPlan
+     * @return array<int, array{field:string,message:string,type:string}>
+     */
     private function validateAiCustomDetails(array $details, array $aiFieldPlan): array
     {
         $errors = [];

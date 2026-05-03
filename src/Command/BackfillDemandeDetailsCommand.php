@@ -74,8 +74,8 @@ class BackfillDemandeDetailsCommand extends Command
         foreach ($demandes as $demande) {
             ++$stats['scanned'];
 
-            $originalCategory = (string) $demande->getCategorie();
-            $originalType = (string) $demande->getTypeDemande();
+            $originalCategory = $demande->getCategorie();
+            $originalType = $demande->getTypeDemande();
             $canonicalType = $this->formHelper->resolveCanonicalType($originalType, $originalCategory) ?? $originalType;
             $canonicalCategory = $this->formHelper->resolveCanonicalCategory($originalCategory, $canonicalType) ?? $originalCategory;
 
@@ -146,12 +146,12 @@ class BackfillDemandeDetailsCommand extends Command
         $io->table(
             ['Mesure', 'Valeur'],
             [
-                ['Demandes scannees', (string) $stats['scanned']],
-                ['Demandes modifiees', (string) $stats['changed']],
-                ['Details crees', (string) $stats['created_details']],
-                ['Categories normalisees', (string) $stats['updated_category']],
-                ['Types normalises', (string) $stats['updated_type']],
-                ['Payloads details mis a jour', (string) $stats['updated_payload']],
+                ['Demandes scannees', $stats['scanned']],
+                ['Demandes modifiees', $stats['changed']],
+                ['Details crees', $stats['created_details']],
+                ['Categories normalisees', $stats['updated_category']],
+                ['Types normalises', $stats['updated_type']],
+                ['Payloads details mis a jour', $stats['updated_payload']],
             ]
         );
 
@@ -199,10 +199,12 @@ class BackfillDemandeDetailsCommand extends Command
         }
 
         $sourceText = trim(implode(' ', array_filter([
-            (string) $demande->getTitre(),
-            (string) $demande->getDescription(),
+            $demande->getTitre() ?? '',
+            $demande->getDescription() ?? '',
             $this->flattenScalarDetails($details),
-        ])));
+        ], function ($v) {
+            return '' !== trim($v);
+        })));
 
         $suggested = $this->aiAssistant->extractSuggestedDetailsForType($sourceText, $canonicalType, $fields);
         foreach ($suggested as $key => $value) {
@@ -221,7 +223,7 @@ class BackfillDemandeDetailsCommand extends Command
             }
 
             $fallback = $this->buildRequiredFallback($demande, $canonicalType, $field, $normalized);
-            if (null !== $fallback && '' !== trim((string) $fallback)) {
+            if (null !== $fallback && '' !== trim($fallback)) {
                 $normalized[$key] = $fallback;
             }
 
@@ -307,7 +309,7 @@ class BackfillDemandeDetailsCommand extends Command
         }
 
         if (!$this->hasMeaningfulValue($details['joursParSemaine'] ?? null) && $this->hasMeaningfulValue($details['jours'] ?? null)) {
-            $count = count(array_filter(array_map('trim', explode(',', (string) $details['jours']))));
+            $count = count(array_filter(array_map('trim', explode(',', (string) $details['jours'])), fn($v) => '' !== $v));
             if ($count >= 1 && $count <= 4) {
                 $details['joursParSemaine'] = $count . ' jour' . ($count > 1 ? 's' : '');
             }
@@ -451,11 +453,11 @@ class BackfillDemandeDetailsCommand extends Command
         }
 
         return match ($key) {
-            'justification', 'justificationLogiciel', 'justificationCertif' => (string) ($demande->getDescription() ?: $demande->getTitre()),
-            'descriptionProbleme', 'motif', 'motifTeletravail', 'details', 'objectif', 'objectifFormation' => (string) ($demande->getDescription() ?: $demande->getTitre()),
-            'systeme', 'nomLogiciel', 'nomFormationExt', 'nomFormation', 'nomCertification' => (string) ($demande->getTitre() ?: $canonicalType),
+            'justification', 'justificationLogiciel', 'justificationCertif' => $demande->getDescription() ?? $demande->getTitre(),
+            'descriptionProbleme', 'motif', 'motifTeletravail', 'details', 'objectif', 'objectifFormation' => $demande->getDescription() ?? $demande->getTitre(),
+            'systeme', 'nomLogiciel', 'nomFormationExt', 'nomFormation', 'nomCertification' => $demande->getTitre() ?? $canonicalType,
             'lieuFormation', 'lieuExamen', 'lieuMutation', 'adresseTeletravail' => 'A confirmer',
-            default => ('text' === $type || 'textarea' === $type) ? (string) ($demande->getTitre() ?: $canonicalType) : null,
+            default => ('text' === $type || 'textarea' === $type) ? ($demande->getTitre() ?? $canonicalType) : null,
         };
     }
 

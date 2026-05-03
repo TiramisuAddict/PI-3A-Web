@@ -50,7 +50,7 @@ class DemandeDecisionAssistant
             }
 
             ++$requiredCount;
-            $value = trim((string) ($details[$key] ?? ''));
+            $value = trim($details[$key] ?? '');
             if ('' === $value) {
                 $missingRequired[] = $label;
                 continue;
@@ -262,7 +262,7 @@ class DemandeDecisionAssistant
     {
         $normalized = [];
         foreach ($details as $key => $value) {
-            $detailKey = trim((string) $key);
+            $detailKey = trim($key);
             if ('' === $detailKey || str_starts_with($detailKey, '_ai_') || str_starts_with($detailKey, '__ai_')) {
                 continue;
             }
@@ -281,7 +281,7 @@ class DemandeDecisionAssistant
     private function buildRepeatTypePenalty(Demande $demande): array
     {
         $employeId = $demande->getEmploye()?->getId_employe();
-        $typeDemande = trim((string) $demande->getTypeDemande());
+        $typeDemande = trim($demande->getTypeDemande());
         $dateCreation = $demande->getDateCreation();
         $demandeId = $demande->getIdDemande();
 
@@ -305,7 +305,7 @@ class DemandeDecisionAssistant
 
         $windowDays = 7;
         $recentCount = $this->demandeRepository->countRecentSameTypeForEmploye(
-            (int) $employeId,
+            $employeId,
             $typeDemande,
             $dateCreation,
             $windowDays,
@@ -358,6 +358,10 @@ class DemandeDecisionAssistant
             'details' => $details,
             'fieldDefinitions' => $fieldDefinitions,
             'trainingSamples' => $this->fetchDecisionTrainingSamples(),
+            'runnerConfig' => [
+                'apiKey' => $this->apiKey,
+                'model' => $this->model,
+            ],
         ];
 
         $lastError = '';
@@ -373,12 +377,17 @@ class DemandeDecisionAssistant
                 $process->run();
 
                 if (!$process->isSuccessful()) {
-                    $lastError = trim($process->getErrorOutput() ?: $process->getOutput());
+                    $processError = trim($process->getErrorOutput());
+                    if ('' === $processError) {
+                        $processError = trim($process->getOutput());
+                    }
+
+                    $lastError = $processError;
                     continue;
                 }
 
                 $decoded = json_decode(trim($process->getOutput()), true);
-                if (!is_array($decoded) || !($decoded['ok'] ?? false)) {
+                if (!is_array($decoded) || (($decoded['ok'] ?? false) !== true)) {
                     $lastError = 'Decision ML Python runner returned invalid payload.';
                     continue;
                 }
@@ -507,7 +516,7 @@ class DemandeDecisionAssistant
             $paths = glob($localAppData . DIRECTORY_SEPARATOR . 'Programs' . DIRECTORY_SEPARATOR . 'Python' . DIRECTORY_SEPARATOR . 'Python*' . DIRECTORY_SEPARATOR . 'python.exe');
             if (is_array($paths)) {
                 foreach ($paths as $path) {
-                    if (is_string($path) && is_file($path)) {
+                    if (is_file($path)) {
                         $candidates[] = $path;
                     }
                 }
@@ -657,8 +666,9 @@ class DemandeDecisionAssistant
     }
 
     /**
-     * @param array<int, string> $missingRequired
-     * @param array<int, string> $warnings
+    * @param array<int, string> $missingRequired
+    * @param array<int, string> $weakRequired
+    * @param array<int, string> $warnings
      */
     private function buildSummary(string $recommendedStatus, array $missingRequired, array $weakRequired, array $warnings): string
     {
@@ -724,12 +734,16 @@ class DemandeDecisionAssistant
         }
 
         $lettersOnly = preg_replace('/[^a-zà-ÿ]/u', '', $text) ?? '';
-        $uniqueChars = count(array_unique(preg_split('//u', $lettersOnly, -1, PREG_SPLIT_NO_EMPTY) ?: []));
+        $letters = preg_split('//u', $lettersOnly, -1, PREG_SPLIT_NO_EMPTY);
+        $uniqueChars = count(array_unique(is_array($letters) ? $letters : []));
         if ('' !== $lettersOnly && mb_strlen($lettersOnly) >= 4 && $uniqueChars <= 2) {
             return true;
         }
 
-        $tokens = preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $tokens = preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
+        if (!is_array($tokens)) {
+            $tokens = [];
+        }
         if ([] !== $tokens) {
             $uniqueTokens = count(array_unique($tokens));
             if (count($tokens) >= 2 && $uniqueTokens <= 1) {
@@ -772,7 +786,7 @@ class DemandeDecisionAssistant
                 continue;
             }
 
-            if ($this->isLowQualityValue((string) $value, (string) $key, (string) $key, 'text')) {
+            if ($this->isLowQualityValue((string) $value, $key, $key, 'text')) {
                 $score += 6;
             }
         }
@@ -829,7 +843,7 @@ class DemandeDecisionAssistant
             in_array($recommendedStatus, ['En attente', 'Rejetee'], true)
             || [] !== $missingRequired
             || [] !== $weakRequired
-            || ($repeatPenalty['count'] ?? 0) > 0
+            || $repeatPenalty['count'] > 0
         ) {
             $uniqueReasons = array_values(array_filter(
                 $uniqueReasons,

@@ -7,6 +7,9 @@ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Demande>
+ */
 class DemandeRepository extends ServiceEntityRepository
 {
     private const RESOLVED_STATUS_VARIANTS = ['Resolue', 'Résolue', 'Resolu', 'Résolu'];
@@ -16,6 +19,10 @@ class DemandeRepository extends ServiceEntityRepository
         parent::__construct($registry, Demande::class);
     }
 
+    /**
+     * @param array<string,mixed> $filters
+     * @return Demande[]
+     */
     public function findWithFilters(array $filters, ?int $employeId = null): array
     {
         return $this->createFilteredQueryBuilder($filters, $employeId)
@@ -24,6 +31,9 @@ class DemandeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @param array<string,mixed> $filters
+     */
     public function countAll(?int $employeId = null, array $filters = []): int
     {
         return (int) $this->createFilteredQueryBuilder($filters, $employeId)
@@ -32,6 +42,10 @@ class DemandeRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /**
+     * @param array<string,mixed> $filters
+     * @return array<string,int>
+     */
     public function countGroupByStatus(?int $employeId = null, array $filters = []): array
     {
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
@@ -51,6 +65,10 @@ class DemandeRepository extends ServiceEntityRepository
         return $grouped;
     }
 
+    /**
+     * @param array<string,mixed> $filters
+     * @return array<string,int>
+     */
     public function countGroupByPriorite(?int $employeId = null, array $filters = []): array
     {
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
@@ -66,6 +84,10 @@ class DemandeRepository extends ServiceEntityRepository
         return $grouped;
     }
 
+    /**
+     * @param array<string,mixed> $filters
+     * @return array<string,int>
+     */
     public function countGroupByType(?int $employeId = null, array $filters = []): array
     {
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
@@ -81,6 +103,10 @@ class DemandeRepository extends ServiceEntityRepository
         return $grouped;
     }
 
+    /**
+     * @param array<string,mixed> $filters
+     * @return array<string,int>
+     */
     public function countGroupByCategorie(?int $employeId = null, array $filters = []): array
     {
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
@@ -96,6 +122,9 @@ class DemandeRepository extends ServiceEntityRepository
         return $grouped;
     }
 
+    /**
+     * @param array<string,mixed> $filters
+     */
     public function createFilteredQueryBuilder(array $filters = [], ?int $employeId = null): QueryBuilder
     {
         $qb = $this->createQueryBuilder('d');
@@ -105,13 +134,13 @@ class DemandeRepository extends ServiceEntityRepository
                ->setParameter('employeId', $employeId);
         }
 
-        if (!empty($filters['categorie'])) {
+        if (isset($filters['categorie']) && '' !== trim((string) $filters['categorie'])) {
             $qb->andWhere('d.categorie = :categorie')
                ->setParameter('categorie', $filters['categorie']);
         }
 
-        if (!empty($filters['status'])) {
-            if ($this->isResolvedStatus($filters['status'])) {
+        if (isset($filters['status']) && '' !== trim((string) $filters['status'])) {
+            if ($this->isResolvedStatus((string) $filters['status'])) {
                 $qb->andWhere('d.status IN (:statusVariants)')
                    ->setParameter('statusVariants', self::RESOLVED_STATUS_VARIANTS);
             } else {
@@ -120,12 +149,12 @@ class DemandeRepository extends ServiceEntityRepository
             }
         }
 
-        if (!empty($filters['priorite'])) {
+        if (isset($filters['priorite']) && '' !== trim((string) $filters['priorite'])) {
             $qb->andWhere('d.priorite = :priorite')
                ->setParameter('priorite', $filters['priorite']);
         }
 
-        if (!empty($filters['search'])) {
+        if (isset($filters['search']) && '' !== trim((string) $filters['search'])) {
             $qb->andWhere(
                 'd.titre LIKE :search OR d.description LIKE :search OR d.type_demande LIKE :search OR d.categorie LIKE :search OR d.status LIKE :search'
             )->setParameter('search', '%' . $filters['search'] . '%');
@@ -199,6 +228,7 @@ class DemandeRepository extends ServiceEntityRepository
             if (!in_array($priorite, ['HAUTE', 'NORMALE', 'BASSE'], true)) {
                 $priorite = 'NORMALE';
             }
+
 
             $samples[] = [
                 'text' => $text,
@@ -294,13 +324,11 @@ class DemandeRepository extends ServiceEntityRepository
                 $prompt = $description;
             }
 
-            $feedbackDetails = is_array($details)
-                ? array_filter(
-                    $details,
-                    static fn ($detailKey): bool => !str_starts_with((string) $detailKey, '_ai_') && !str_starts_with((string) $detailKey, '__ai_'),
-                    ARRAY_FILTER_USE_KEY
-                )
-                : [];
+            $feedbackDetails = array_filter(
+                $details,
+                static fn ($detailKey): bool => !str_starts_with((string) $detailKey, '_ai_') && !str_starts_with((string) $detailKey, '__ai_'),
+                ARRAY_FILTER_USE_KEY
+            );
 
             $general = [
                 'titre' => trim((string) ($row['titre'] ?? '')),
@@ -409,16 +437,36 @@ class DemandeRepository extends ServiceEntityRepository
                 );
             }
 
-            $hasSignal = '' !== $prompt || [] !== $feedbackDetails || '' !== $general['description'] || '' !== $general['titre'];
+            $hasSignal = false;
+            if ('' !== $prompt) {
+                $hasSignal = true;
+            }
+            if (!$hasSignal && count($feedbackDetails) > 0) {
+                $hasSignal = true;
+            }
+            if (!$hasSignal && '' !== $general['description']) {
+                $hasSignal = true;
+            }
+            if (!$hasSignal && '' !== $general['titre']) {
+                $hasSignal = true;
+            }
+
             if (!$hasSignal) {
                 continue;
             }
+
+            $replaceBase = [] !== $planAdd;
+            if (!$replaceBase && (($storedFieldPlan['replaceBase'] ?? null) === true)) {
+                $replaceBase = true;
+            }
+
+            $confirmed = $isConfirmedAiFeedback || $isManualFields;
 
             $samples[] = [
                 'prompt' => $prompt,
                 'general' => $general,
                 'details' => $feedbackDetails,
-                'confirmed' => $isConfirmedAiFeedback || $isManualFields,
+                'confirmed' => $confirmed,
                 'manual' => $isManualFields,
                 'createdAt' => $row['createdAt'] instanceof \DateTimeInterface
                     ? $row['createdAt']->format(DATE_ATOM)
@@ -428,7 +476,7 @@ class DemandeRepository extends ServiceEntityRepository
                     'remove' => is_array($storedFieldPlan['remove'] ?? null)
                         ? array_values(array_map('strval', $storedFieldPlan['remove']))
                         : [],
-                    'replaceBase' => [] !== $planAdd || true === ($storedFieldPlan['replaceBase'] ?? false),
+                    'replaceBase' => $replaceBase,
                     'manualMode' => $isManualFields,
                 ],
                 'generatedSnapshot' => $generatedSnapshot,

@@ -12,6 +12,7 @@ class HistoriqueDemande
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
+    /** @phpstan-ignore-next-line */
     private ?int $id_historique = null;
 
     #[ORM\ManyToOne(targetEntity: Demande::class, inversedBy: 'historiqueDemandes')]
