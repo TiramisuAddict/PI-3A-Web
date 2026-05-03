@@ -113,6 +113,41 @@ final class DemandeAiAssistantTest extends TestCase
         self::assertStringNotContainsString('soumettre une demande', strtolower($corrected));
     }
 
+    public function testGenerateDescriptionFromTitleFallsBackToDeterministicTextWhenNoAiModelIsConfigured(): void
+    {
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(DemandeRepository::class),
+            '',
+            ''
+        );
+
+        $result = $assistant->generateDescriptionFromTitle('Demande de badge acces');
+
+        self::assertSame('deterministic:description-from-title', $result['model']);
+        self::assertStringStartsWith('Bonjour, je souhaite demander badge acces.', $result['description']);
+        self::assertStringContainsString('cadre de mon travail', $result['description']);
+    }
+
+    public function testGenerateClassificationSuggestionRejectsEmptyText(): void
+    {
+        $assistant = new DemandeAiAssistant(
+            $this->createMock(HttpClientInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(DemandeRepository::class),
+            'test-key',
+            'test-model'
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Ajoutez une description avant de lancer la suggestion intelligente.');
+
+        $assistant->generateClassificationSuggestion('', [
+            'Ressources Humaines' => ['Conge'],
+        ], ['NORMALE']);
+    }
+
     public function testGenerateAutreSuggestionsReusesConfirmedFieldPlanWithoutDefaultAutreFields(): void
     {
         $repository = $this->createMock(DemandeRepository::class);
@@ -1716,7 +1751,7 @@ final class DemandeAiAssistantTest extends TestCase
         $expectedNextWeek = (new \DateTimeImmutable('today'))->modify('+7 days')->format('Y-m-d');
 
         self::assertSame('Shift de nuit', $result['suggestedDetails']['ai_type_demande'] ?? null);
-        self::assertFalse(str_starts_with((string) ($result['suggestedDetails']['ai_type_demande'] ?? ''), 'Je veux'));
+        self::assertFalse(str_starts_with($result['suggestedDetails']['ai_type_demande'] ?? '', 'Je veux'));
         self::assertSame('Nuit', $result['suggestedDetails']['ai_shift_souhaite'] ?? null);
         self::assertSame('22h-7h', $result['suggestedDetails']['ai_horaire_souhaite'] ?? null);
         self::assertSame($expectedNextWeek, $result['suggestedDetails']['ai_periode_concernee'] ?? null);

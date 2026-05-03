@@ -55,6 +55,24 @@ class DemandeAdaptiveModelTest(unittest.TestCase):
         self.assertNotIn("ai_type_formation", result["details"])
         self.assertFalse(result["needsLlmFallback"])
 
+    def test_validate_autre_llm_candidate_falls_back_to_description_libre(self):
+        result = adaptive.validate_autre_llm_candidate(
+            {
+                "text": "demande simple sans champ specifique",
+                "llmCandidate": {},
+            }
+        )
+
+        self.assertEqual("demande simple sans champ specifique", result["correctedText"])
+        self.assertEqual("Demande simple sans champ specifique", result["general"]["titre"])
+        self.assertEqual("demande simple sans champ specifique", result["general"]["description"])
+        self.assertEqual("Autre", result["general"]["categorie"])
+        self.assertEqual("Autre", result["general"]["typeDemande"])
+        self.assertEqual([], result["custom_fields"])
+        self.assertEqual({}, result["details"])
+        self.assertEqual(["ALL"], result["remove_fields"])
+        self.assertTrue(result["replace_base"])
+
     def test_optional_field_without_prompt_evidence_is_not_selected(self):
         result = adaptive.generate_autre_response(
             {
