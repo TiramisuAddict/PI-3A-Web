@@ -17,6 +17,7 @@ class EmployeTest extends TestCase
         $employe->setTelephone(61234567);
         $employe->setPoste('Developpeuse');
         $employe->setRole('Employe');
+        $employe->setDateEmbauche(new \DateTime('today'));
 
         $manager = new EmployeManager();
 
@@ -129,21 +130,6 @@ class EmployeTest extends TestCase
 
         $manager = new EmployeManager();
         $manager->validate($employe);
-    }
-
-    public function testDateEmbaucheTodayOrPastIsValid(): void
-    {
-        $employe = new Employe();
-        $employe->setNom('Dupont');
-        $employe->setPrenom('Alice');
-        $employe->setEmail('alice.dupont@gmail.com');
-        $employe->setTelephone(61234567);
-        $employe->setPoste('Developpeuse');
-        $employe->setRole('Employe');
-        $employe->setDateEmbauche(new \DateTime('today'));
-
-        $manager = new EmployeManager();
-        $this->assertTrue($manager->validate($employe));
     }
 
     public function testDateEmbaucheFutureIsInvalid(): void
