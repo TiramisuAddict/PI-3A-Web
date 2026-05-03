@@ -19,7 +19,20 @@ class OffreRepository extends ServiceEntityRepository
     /**
      * @return Offre[]
      */
-    public function findByFilters(?string $query, ?string $category, ?string $contract, ?string $etat): array
+    public function findLatest(int $limit = 50): array
+    {
+        return $this->createQueryBuilder('o')
+            ->orderBy('o.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->enableResultCache(300)
+            ->getResult();
+    }
+
+    /**
+     * @return Offre[]
+     */
+    public function findByFilters(?string $query, ?string $category, ?string $contract, ?string $etat, int $limit = 50): array
     {
         $qb = $this->createQueryBuilder('o');
 
@@ -29,26 +42,31 @@ class OffreRepository extends ServiceEntityRepository
         $etat = trim((string) $etat);
 
         if ($query !== '') {
-            $qb->andWhere('LOWER(o.titre_poste) LIKE :query')
-                ->setParameter('query', '%'.mb_strtolower($query).'%');
+            $qb->andWhere($qb->expr()->like('LOWER(o.titre_poste)', ':query'))
+                ->setParameter('query', sprintf('%%%s%%', mb_strtolower($query)));
         }
 
         if ($category !== '') {
-            $qb->andWhere('o.categorie = :category')
+            $qb->andWhere($qb->expr()->eq('o.categorie', ':category'))
                 ->setParameter('category', $category);
         }
 
         if ($contract !== '') {
-            $qb->andWhere('o.type_contrat = :contract')
+            $qb->andWhere($qb->expr()->eq('o.type_contrat', ':contract'))
                 ->setParameter('contract', $contract);
         }
 
         if ($etat !== '') {
-            $qb->andWhere('o.etat = :etat')
+            $qb->andWhere($qb->expr()->eq('o.etat', ':etat'))
                 ->setParameter('etat', $etat);
         }
 
-        return $qb->orderBy('o.id', 'DESC')->getQuery()->getResult();
+        return $qb
+            ->orderBy('o.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->enableResultCache(300)
+            ->getResult();
     }
 
 //    /**

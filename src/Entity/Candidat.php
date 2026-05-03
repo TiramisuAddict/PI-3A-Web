@@ -35,9 +35,9 @@ class Candidat
     }
 
     #[ORM\Column(type: 'string', length: 50, nullable: false)]
-    private ?string $code_candidature = null;
+    private string $code_candidature;
 
-    public function getCodeCandidature(): ?string
+    public function getCodeCandidature(): string
     {
         return $this->code_candidature;
     }
@@ -62,8 +62,9 @@ class Candidat
         return $this;
     }
 
+    /** @var string|resource|null */
     #[ORM\Column(type: 'blob', columnDefinition: 'MEDIUMBLOB DEFAULT NULL', nullable: true)]
-    private  mixed $cv_data = null;
+    private $cv_data = null;
 
     public function getCvData(): ?string
     {
@@ -82,7 +83,7 @@ class Candidat
     }
 
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
-    private mixed $lettre_motivation_nom = null;
+    private ?string $lettre_motivation_nom = null;
 
     public function getLettreMotivationNom(): ?string
     {
@@ -95,8 +96,9 @@ class Candidat
         return $this;
     }
 
+    /** @var string|resource|null */
     #[ORM\Column(type: 'blob', columnDefinition: 'MEDIUMBLOB DEFAULT NULL', nullable: true)]
-    private  mixed $lettre_motivation_data = null;
+    private $lettre_motivation_data = null;
 
     public function getLettreMotivationData(): ?string
     {
