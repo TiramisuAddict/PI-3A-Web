@@ -244,6 +244,7 @@ class Projet
         return $this;
     }
 
+    /** @var Collection<int, Tache> */
     #[ORM\OneToMany(targetEntity: Tache::class, mappedBy: 'projet')]
     private Collection $taches;
 
@@ -252,13 +253,10 @@ class Projet
      */
     public function getTaches(): Collection
     {
-        if (!$this->taches instanceof Collection) {
-            $this->taches = new ArrayCollection();
-        }
         return $this->taches;
     }
 
-    public function addTache(Tache $tache): self
+    public function addTache(Tache $tache): static
     {
         if (!$this->getTaches()->contains($tache)) {
             $this->getTaches()->add($tache);
@@ -268,7 +266,7 @@ class Projet
         return $this;
     }
 
-    public function removeTache(Tache $tache): self
+    public function removeTache(Tache $tache): static
     {
         if ($this->getTaches()->removeElement($tache) && $tache->getProjet() === $this) {
             $tache->setProjet(null);
@@ -287,6 +285,7 @@ class Projet
             new ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')
         ]
     )]
+    /** @var Collection<int, Employe> */
     private Collection $membresEquipe;
 
     public function __construct()
@@ -300,14 +299,10 @@ class Projet
      */
     public function getMembresEquipe(): Collection
     {
-        if (!$this->membresEquipe instanceof Collection) {
-            $this->membresEquipe = new ArrayCollection();
-        }
-
         return $this->membresEquipe;
     }
 
-    public function addMembreEquipe(Employe $employe): self
+    public function addMembreEquipe(Employe $employe): static
     {
         if (!$this->getMembresEquipe()->contains($employe)) {
             $this->getMembresEquipe()->add($employe);
@@ -317,7 +312,7 @@ class Projet
         return $this;
     }
 
-    public function removeMembreEquipe(Employe $employe): self
+    public function removeMembreEquipe(Employe $employe): static
     {
         if ($this->getMembresEquipe()->removeElement($employe)) {
             $employe->removeProjetEquipe($this);
@@ -360,12 +355,12 @@ class Projet
         return $this->getMembresEquipe();
     }
 
-    public function addEmploye(Employe $employe): self
+    public function addEmploye(Employe $employe): static
     {
         return $this->addMembreEquipe($employe);
     }
 
-    public function removeEmploye(Employe $employe): self
+    public function removeEmploye(Employe $employe): static
     {
         return $this->removeMembreEquipe($employe);
     }
@@ -375,7 +370,7 @@ class Projet
         return $this->id_projet;
     }
 
-    public function getDateDebut(): ?\DateTime
+    public function getDateDebut(): ?\DateTimeInterface
     {
         return $this->date_debut;
     }
@@ -387,7 +382,7 @@ class Projet
         return $this;
     }
 
-    public function getDateFinPrevue(): ?\DateTime
+    public function getDateFinPrevue(): ?\DateTimeInterface
     {
         return $this->date_fin_prevue;
     }
@@ -399,7 +394,7 @@ class Projet
         return $this;
     }
 
-    public function getDateFinReelle(): ?\DateTime
+    public function getDateFinReelle(): ?\DateTimeInterface
     {
         return $this->date_fin_reelle;
     }

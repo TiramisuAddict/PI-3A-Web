@@ -58,6 +58,9 @@
         "twig/twig": "^2.12|^3.24"
     },
     "require-dev": {
+        "phpstan/phpstan": "*",
+        "phpstan/phpstan-phpunit": "*",
+        "phpstan/phpstan-strict-rules": "*",
         "phpunit/phpunit": "^9.6.34",
         "symfony/browser-kit": "6.4.*",
         "symfony/css-selector": "6.4.*",
