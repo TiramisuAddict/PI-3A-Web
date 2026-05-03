@@ -33,7 +33,7 @@ final class AuthController extends AbstractController
     }
 
     #[Route('/login', name: 'login', methods: ['GET', 'POST'])]
-    public function login(Request $request, AdministrateurSystemeRepository $adminRepo, EmployeRepository $employeRepo, VisiteurRepository $visiteurRepo, SessionInterface $session, TwilioVerifyService $twilioVerifyService, \App\Services\PasswordGenerator $passwordGenerator): Response
+    public function login(Request $request, AdministrateurSystemeRepository $adminRepo, EmployeRepository $employeRepo, VisiteurRepository $visiteurRepo, SessionInterface $session, TwilioVerifyService $twilioVerifyService, \App\Service\PasswordGenerator $passwordGenerator): Response
     {
         $cancelTwoFactor = $request->query->getBoolean('cancel_2fa');
         if ($cancelTwoFactor) {
