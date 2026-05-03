@@ -192,6 +192,9 @@ class Employe
     #[ORM\OneToMany(targetEntity: Commentaire::class, mappedBy: 'employe')]
     private Collection $commentaires;
 
+    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employe')]
+    private Collection $demandes;
+
     /**
      * @return Collection<int, Commentaire>
      */
@@ -373,6 +376,7 @@ class Employe
     public function __construct()
     {
         $this->comptes = new ArrayCollection();
+        $this->demandes = new ArrayCollection();
         $this->projetsResponsables = new ArrayCollection();
         $this->projetsEquipe = new ArrayCollection();
         $this->taches = new ArrayCollection();
@@ -402,6 +406,37 @@ class Employe
     public function removeTache(Tache $tache): self
     {
         $this->getTaches()->removeElement($tache);
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Demande>
+     */
+    public function getDemandes(): Collection
+    {
+        if (!$this->demandes instanceof Collection) {
+            $this->demandes = new ArrayCollection();
+        }
+
+        return $this->demandes;
+    }
+
+    public function addDemande(Demande $demande): self
+    {
+        if (!$this->getDemandes()->contains($demande)) {
+            $this->getDemandes()->add($demande);
+            $demande->setEmploye($this);
+        }
+
+        return $this;
+    }
+
+    public function removeDemande(Demande $demande): self
+    {
+        if ($this->getDemandes()->removeElement($demande) && $demande->getEmploye() === $this) {
+            $demande->setEmploye(null);
+        }
+
         return $this;
     }
 

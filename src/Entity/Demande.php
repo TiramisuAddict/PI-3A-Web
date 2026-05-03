@@ -18,40 +18,41 @@ class Demande
     private ?int $id_demande = null;
 
     #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'demandes')]
-    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
+    #[ORM\JoinColumn(name: 'employe_id', referencedColumnName: 'id_employe', nullable: false, onDelete: 'CASCADE')]
     private ?Employe $employe = null;
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $categorie = null;
+    private string $categorie = '';
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $titre = null;
+    private string $titre = '';
 
-    #[ORM\Column(type: 'string', nullable: true)]
-    private ?string $description = null;
+    #[ORM\Column(type: 'string', nullable: false)]
+    private string $description = '';
 
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $priorite = null;
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $status = null;
+    private string $status = 'Nouvelle';
 
     #[ORM\Column(type: 'date', nullable: false)]
-    private ?\DateTimeInterface $date_creation = null;
+    private \DateTimeInterface $date_creation;
 
-    #[ORM\Column(type: 'string', nullable: true)]
-    private ?string $type_demande = null;
+    #[ORM\Column(type: 'string', nullable: false)]
+    private string $type_demande = '';
 
     /** @var Collection<int, DemandeDetail> */
-    #[ORM\OneToMany(targetEntity: DemandeDetail::class, mappedBy: 'demande', cascade: ['remove'])]
+    #[ORM\OneToMany(targetEntity: DemandeDetail::class, mappedBy: 'demande', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $demandeDetails;
 
     /** @var Collection<int, HistoriqueDemande> */
-    #[ORM\OneToMany(targetEntity: HistoriqueDemande::class, mappedBy: 'demande', cascade: ['remove'])]
+    #[ORM\OneToMany(targetEntity: HistoriqueDemande::class, mappedBy: 'demande', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $historiqueDemandes;
 
     public function __construct()
     {
+        $this->date_creation = new \DateTimeImmutable();
         $this->demandeDetails = new ArrayCollection();
         $this->historiqueDemandes = new ArrayCollection();
     }
@@ -72,34 +73,34 @@ class Demande
         return $this;
     }
 
-    public function getCategorie(): ?string
+    public function getCategorie(): string
     {
         return $this->categorie;
     }
 
-    public function setCategorie(?string $categorie): self
+    public function setCategorie(string $categorie): self
     {
         $this->categorie = $categorie;
         return $this;
     }
 
-    public function getTitre(): ?string
+    public function getTitre(): string
     {
         return $this->titre;
     }
 
-    public function setTitre(?string $titre): self
+    public function setTitre(string $titre): self
     {
         $this->titre = $titre;
         return $this;
     }
 
-    public function getDescription(): ?string
+    public function getDescription(): string
     {
         return $this->description;
     }
 
-    public function setDescription(?string $description): self
+    public function setDescription(string $description): self
     {
         $this->description = $description;
         return $this;
@@ -116,18 +117,18 @@ class Demande
         return $this;
     }
 
-    public function getStatus(): ?string
+    public function getStatus(): string
     {
         return $this->status;
     }
 
-    public function setStatus(?string $status): self
+    public function setStatus(string $status): self
     {
         $this->status = $status;
         return $this;
     }
 
-    public function getDateCreation(): ?\DateTimeInterface
+    public function getDateCreation(): \DateTimeInterface
     {
         return $this->date_creation;
     }
@@ -138,12 +139,12 @@ class Demande
         return $this;
     }
 
-    public function getTypeDemande(): ?string
+    public function getTypeDemande(): string
     {
         return $this->type_demande;
     }
 
-    public function setTypeDemande(?string $type_demande): self
+    public function setTypeDemande(string $type_demande): self
     {
         $this->type_demande = $type_demande;
         return $this;
