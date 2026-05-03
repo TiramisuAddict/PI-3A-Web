@@ -7,6 +7,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: EvaluationFormationRepository::class)]
 #[ORM\Table(name: 'evaluation_formation')]
+#[ORM\HasLifecycleCallbacks]
 class EvaluationFormation
 {
     #[ORM\Id]
@@ -89,10 +90,11 @@ class EvaluationFormation
         return $this->dateEvaluation;
     }
 
-    public function setDateEvaluation(?\DateTimeInterface $dateEvaluation): static
+    #[ORM\PrePersist]
+    public function initializeDateEvaluation(): void
     {
-        $this->dateEvaluation = $dateEvaluation;
-
-        return $this;
+        if ($this->dateEvaluation === null) {
+            $this->dateEvaluation = new \DateTimeImmutable();
+        }
     }
 }

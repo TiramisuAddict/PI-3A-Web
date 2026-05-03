@@ -19,12 +19,30 @@ class CandidatRepository extends ServiceEntityRepository
     /**
      * @return Candidat[]
      */
-    public function findByOffreId(int $offreId): array
+    public function findLatest(int $limit = 50): array
     {
         return $this->createQueryBuilder('c')
-            ->andWhere('c.offre = :offreId')
-            ->setParameter('offreId', $offreId)
+            ->orderBy('c.id', 'DESC')
+            ->setMaxResults($limit)
             ->getQuery()
+            ->enableResultCache(300)
+            ->getResult();
+    }
+
+    /**
+     * @return Candidat[]
+     */
+    public function findByOffreId(int $offreId, int $limit = 100): array
+    {
+        $qb = $this->createQueryBuilder('c');
+
+        return $qb
+            ->andWhere($qb->expr()->eq('c.offre', ':offreId'))
+            ->setParameter('offreId', $offreId)
+            ->orderBy('c.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->enableResultCache(300)
             ->getResult();
     }
 

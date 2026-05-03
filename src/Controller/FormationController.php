@@ -34,8 +34,8 @@ final class FormationController extends AbstractController
             'id' => $formation->getId(),
             'titre' => $formation->getTitre(),
             'organisme' => $formation->getOrganisme(),
-            'dateDebut' => $formation->getDateDebut()?->format('Y-m-d'),
-            'dateFin' => $formation->getDateFin()?->format('Y-m-d'),
+            'dateDebut' => $formation->getDateDebut()->format('Y-m-d'),
+            'dateFin' => $formation->getDateFin()->format('Y-m-d'),
             'lieu' => $formation->getLieu(),
             'capacite' => $formation->getCapacite(),
             'pending' => (int) $pending,
@@ -81,16 +81,19 @@ final class FormationController extends AbstractController
             return $this->redirectToRoute('employe_Home');
         }
 
-        $selectedFormation = $selectedFormationId > 0 ? $formationRepository->find($selectedFormationId) : null;
+                $selectedFormation = $selectedFormationId > 0 ? $formationRepository->find($selectedFormationId) : null;
 
-        $pendingInscriptions = $connection->fetchAllAssociative(
-            'SELECT i.id_inscription, i.id_employe, i.raison, i.statut, f.id_formation AS formation_id, f.titre AS formation_titre, COALESCE(e.prenom, "") AS prenom, COALESCE(e.nom, "") AS nom
-             FROM inscription_formation i
-             INNER JOIN formation f ON f.id_formation = i.id_formation
-               LEFT JOIN employe e ON e.id_employe = i.id_employe
-             WHERE i.statut = "EN_ATTENTE"
-             ORDER BY i.id_inscription DESC'
-        );
+                // Limit number of pending inscriptions fetched to avoid loading entire table
+                $pendingLimit = 50;
+                $pendingInscriptions = $connection->fetchAllAssociative(
+                                                'SELECT i.id_inscription, i.id_employe, i.raison, i.statut, f.id_formation AS formation_id, f.titre AS formation_titre, COALESCE(e.prenom, "") AS prenom, COALESCE(e.nom, "") AS nom
+                         FROM inscription_formation i
+                                                 INNER JOIN formation f ON f.id_formation = i.id_formation
+                             LEFT JOIN employe e ON e.id_employe = i.id_employe
+                         WHERE i.statut = "EN_ATTENTE"
+                         ORDER BY i.id_inscription DESC
+                         LIMIT ' . (int) $pendingLimit
+                );
 
         $pendingByFormation = [];
         $pendingInscriptionByFormation = [];

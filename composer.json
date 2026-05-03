@@ -57,17 +57,10 @@
         "twig/twig": "^2.12|^3.24"
     },
     "require-dev": {
-<<<<<<< HEAD
-        "ahmed-bhs/doctrine-doctor": "1.0.5",
-        "phpstan/phpstan": "*",
-        "phpstan/phpstan-phpunit": "*",
-        "phpstan/phpstan-strict-rules": "*",
-=======
         "ahmed-bhs/doctrine-doctor": "^1.0",
         "phpstan/phpstan": "^1.0",
         "phpstan/phpstan-phpunit": "^1.0",
         "phpstan/phpstan-strict-rules": "^1.0",
->>>>>>> 4cc009b6a2d5b4fee35e6fbbbac5a0b97a457087
         "phpunit/phpunit": "^9.6.34",
         "symfony/browser-kit": "6.4.*",
         "symfony/css-selector": "6.4.*",

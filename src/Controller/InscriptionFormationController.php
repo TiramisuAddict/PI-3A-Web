@@ -56,7 +56,7 @@ final class InscriptionFormationController extends AbstractController
             return new Response('Certificat indisponible.', 403);
         }
 
-        $isFinished = $formation->getDateFin() !== null && $formation->getDateFin() < new \DateTimeImmutable();
+        $isFinished = $formation->getDateFin() < new \DateTimeImmutable();
         if (!$isFinished) {
             return new Response('Certificat disponible uniquement apres la fin de la formation.', 403);
         }
@@ -110,7 +110,7 @@ final class InscriptionFormationController extends AbstractController
             return $this->redirectToRoute('app_inscription_employe', ['formation' => $formationId]);
         }
 
-        $isFinished = $formation->getDateFin() !== null && $formation->getDateFin() < new \DateTimeImmutable();
+        $isFinished = $formation->getDateFin() < new \DateTimeImmutable();
         if (!$isFinished) {
             $this->addFlash('error', 'Certificat disponible uniquement apres la fin de la formation.');
             return $this->redirectToRoute('app_inscription_employe', ['formation' => $formationId]);
@@ -129,10 +129,6 @@ final class InscriptionFormationController extends AbstractController
 
     private function buildCertificatePdfResponse(Formation $formation, int $employeeId, EntityManagerInterface $entityManager, bool $inline, ?string $qrUrl = null): Response
     {
-        if ($formation->getId() === null) {
-            return new Response('Formation introuvable.', 404);
-        }
-
         $employee = $entityManager->find(Employe::class, $employeeId);
         $prenom = $employee?->getPrenom() ?? '';
         $nom = $employee?->getNom() ?? '';
@@ -146,9 +142,9 @@ final class InscriptionFormationController extends AbstractController
         $qrPayload = implode(' | ', [
             'Reference: ' . $certificateReference,
             'Employe: ' . $employeeName,
-            'Formation: ' . (string) $formation->getTitre(),
-            'Organisme: ' . (string) $formation->getOrganisme(),
-            'Date fin: ' . ($formation->getDateFin()?->format('d/m/Y') ?? '-'),
+            'Formation: ' . $formation->getTitre(),
+            'Organisme: ' . $formation->getOrganisme(),
+            'Date fin: ' . $formation->getDateFin()->format('d/m/Y'),
             'Delivre le: ' . $issuedAt->format('d/m/Y'),
         ]);
         $qrTarget = $qrUrl ?? $qrPayload;
@@ -243,8 +239,8 @@ final class InscriptionFormationController extends AbstractController
                 'id' => $formation->getId(),
                 'titre' => $formation->getTitre(),
                 'organisme' => $formation->getOrganisme(),
-                'dateDebut' => $formation->getDateDebut()?->format('Y-m-d'),
-                'dateFin' => $formation->getDateFin()?->format('Y-m-d'),
+                'dateDebut' => $formation->getDateDebut()->format('Y-m-d'),
+                'dateFin' => $formation->getDateFin()->format('Y-m-d'),
             ],
             'reviews' => $reviews,
             'summary' => $summary,
@@ -285,7 +281,7 @@ final class InscriptionFormationController extends AbstractController
                 return $this->redirectToRoute('app_formation_rh');
             }
 
-            $remainingCapacity = (int) ($formation->getCapacite() ?? 0);
+            $remainingCapacity = $formation->getCapacite();
             if ($remainingCapacity <= 0) {
                 $this->addFlash('error', 'Formation complete. Aucune place disponible.');
 
@@ -319,7 +315,7 @@ final class InscriptionFormationController extends AbstractController
         if ($inscription->getStatut() === StatutInscription::EN_ATTENTE->value) {
             $formation = $inscription->getFormation();
             if ($formation !== null) {
-                $formation->setCapacite((int) ($formation->getCapacite() ?? 0) + 1);
+                $formation->setCapacite($formation->getCapacite() + 1);
             }
         }
 
@@ -394,7 +390,7 @@ final class InscriptionFormationController extends AbstractController
                     return $this->redirectToRoute('app_inscription_employe');
                 }
 
-                $remainingCapacity = (int) ($formation->getCapacite() ?? 0);
+                $remainingCapacity = $formation->getCapacite();
                 if ($remainingCapacity <= 0) {
                     $this->addFlash('error', 'Cette formation est complete.');
 
@@ -457,7 +453,7 @@ final class InscriptionFormationController extends AbstractController
 
                 $formation = $inscription->getFormation();
                 if ($formation !== null) {
-                    $formation->setCapacite((int) ($formation->getCapacite() ?? 0) + 1);
+                    $formation->setCapacite($formation->getCapacite() + 1);
                 }
 
                 $entityManager->remove($inscription);
@@ -552,7 +548,7 @@ final class InscriptionFormationController extends AbstractController
                 $evaluation
                     ->setNote($note)
                     ->setCommentaire($commentaire !== '' ? $commentaire : null)
-                    ->setDateEvaluation(new \DateTime());
+                ;
 
                 $entityManager->flush();
                 $this->addFlash('success', 'Evaluation enregistree avec succes.');
@@ -562,13 +558,14 @@ final class InscriptionFormationController extends AbstractController
         }
         $selectedFormation = $selectedFormationId > 0 ? $formationRepository->find($selectedFormationId) : null;
 
-        $formations = $formationRepository->findBy([], ['dateDebut' => 'DESC']);
+        // Avoid loading entire formations table; fetch a reasonable cap for the view
+        $formations = $formationRepository->findForRhDashboard('', 'date_desc', 0, 'all', 50, 0);
 
-        $reviewStatsRows = $connection->fetchAllAssociative(
-            'SELECT ev.id_formation AS formation_id, COUNT(ev.id_evaluation) AS reviews_count, ROUND(AVG(ev.note), 2) AS average_note
-             FROM evaluation_formation ev
-             GROUP BY ev.id_formation'
-        );
+                $reviewStatsRows = $connection->fetchAllAssociative(
+                            'SELECT ev.id_formation AS formation_id, COUNT(ev.id_evaluation) AS reviews_count, ROUND(AVG(ev.note), 2) AS average_note
+                         FROM evaluation_formation ev
+                             GROUP BY ev.id_formation'
+                );
 
         $reviewStatsByFormation = [];
         foreach ($reviewStatsRows as $row) {
@@ -593,9 +590,9 @@ final class InscriptionFormationController extends AbstractController
 
             if ($searchLower !== '') {
                 $haystack = mb_strtolower(trim(implode(' ', [
-                    (string) $formation->getTitre(),
-                    (string) $formation->getOrganisme(),
-                    (string) $formation->getLieu(),
+                    $formation->getTitre(),
+                    $formation->getOrganisme(),
+                    $formation->getLieu(),
                 ])));
 
                 if (!str_contains($haystack, $searchLower)) {
@@ -617,10 +614,10 @@ final class InscriptionFormationController extends AbstractController
             $rightStats = $reviewStatsByFormation[$right->getId()] ?? ['reviews_count' => 0, 'average_note' => 0.0];
 
             return match ($sort) {
-                'rating_desc' => ($cmp = ($rightStats['average_note'] <=> $leftStats['average_note'])) !== 0 ? $cmp : (($cmp = ($rightStats['reviews_count'] <=> $leftStats['reviews_count'])) !== 0 ? $cmp : strcmp($left->getTitre() ?? '', $right->getTitre() ?? '')),
-                'reviews_desc' => ($cmp = ($rightStats['reviews_count'] <=> $leftStats['reviews_count'])) !== 0 ? $cmp : (($cmp = ($rightStats['average_note'] <=> $leftStats['average_note'])) !== 0 ? $cmp : strcmp($left->getTitre() ?? '', $right->getTitre() ?? '')),
-                'title_asc' => strcmp($left->getTitre() ?? '', $right->getTitre() ?? ''),
-                default => (($right->getDateDebut()?->getTimestamp() ?? 0) <=> ($left->getDateDebut()?->getTimestamp() ?? 0)),
+                'rating_desc' => ($cmp = ($rightStats['average_note'] <=> $leftStats['average_note'])) !== 0 ? $cmp : (($cmp = ($rightStats['reviews_count'] <=> $leftStats['reviews_count'])) !== 0 ? $cmp : strcmp($left->getTitre(), $right->getTitre())),
+                'reviews_desc' => ($cmp = ($rightStats['reviews_count'] <=> $leftStats['reviews_count'])) !== 0 ? $cmp : (($cmp = ($rightStats['average_note'] <=> $leftStats['average_note'])) !== 0 ? $cmp : strcmp($left->getTitre(), $right->getTitre())),
+                'title_asc' => strcmp($left->getTitre(), $right->getTitre()),
+                default => ($right->getDateDebut()->getTimestamp() <=> $left->getDateDebut()->getTimestamp()),
             };
         });
 
@@ -631,8 +628,8 @@ final class InscriptionFormationController extends AbstractController
             'finished' => 0,
         ];
         foreach ($formations as $formation) {
-            $isFinished = $formation->getDateFin() !== null && $formation->getDateFin() < new \DateTimeImmutable();
-            $isFull = ($formation->getCapacite() ?? 0) <= 0;
+            $isFinished = $formation->getDateFin() < new \DateTimeImmutable();
+            $isFull = $formation->getCapacite() <= 0;
 
             if ($isFinished) {
                 $formationSummary['finished']++;
@@ -710,7 +707,11 @@ final class InscriptionFormationController extends AbstractController
                             'raison' => $inscription->getRaison(),
                         ];
 
-                        $isFinished = $formation->getDateFin() !== null && $formation->getDateFin() < new \DateTimeImmutable();
+                        if (!$formation instanceof Formation) {
+                            continue;
+                        }
+
+                        $isFinished = $formation->getDateFin() < new \DateTimeImmutable();
                         if ($inscription->getStatut() === StatutInscription::ACCEPTEE->value && $isFinished) {
                             $expires = (new \DateTimeImmutable('+30 days'))->getTimestamp();
                             $signature = $this->buildCertificateSignature($inscriptionId, $formationId, $inscription->getEmployeeId(), $expires);

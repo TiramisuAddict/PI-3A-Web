@@ -34,7 +34,7 @@ final class CandidatController extends AbstractController
     #[Route('/suivre', name: 'app_suivre_candidature')]
     public function suivre_candidature(CandidatRepository $candidat_repository): Response
     {
-        $candidatures = $candidat_repository->findAll();
+        $candidatures = $candidat_repository->findLatest(50);
 
         return $this->render('candidat/suivre_candidature_page.html.twig', [
             'candidatures' => $candidatures,
@@ -44,7 +44,7 @@ final class CandidatController extends AbstractController
     #[Route('/candidats/dashboard', name: 'app_candidat_dashboard', methods: ['GET'])]
     public function dashboard(Request $request, OffreRepository $offreRepository, CandidatRepository $candidatRepository, SessionInterface $session): Response
     {
-        $offres = $offreRepository->findAll();
+        $offres = $offreRepository->findLatest(50);
 
         $selectedOffreId = $request->query->getInt('offreId', 0);
         $selectedCandidatId = $request->query->getInt('candidatId', 0);
@@ -62,7 +62,7 @@ final class CandidatController extends AbstractController
             $selectedOffreId = $selectedOffre->getId() ?? 0;
         }
 
-        $candidats = ($selectedOffre !== null) ? $candidatRepository->findByOffreId((int) $selectedOffre->getId()) : [];
+        $candidats = ($selectedOffre !== null) ? $candidatRepository->findByOffreId((int) $selectedOffre->getId(), 100) : [];
 
         $selectedCandidat = null;
         foreach ($candidats as $candidat) {
@@ -426,8 +426,8 @@ final class CandidatController extends AbstractController
 
     #[Route('/recrutement/dashboard/statistiques', name: 'app_recrutement_statistiques')]
     public function statNav(Request $request, CandidatRepository $candidat_repository, OffreRepository $offre_repository, SessionInterface $session): Response {
-        $candidats = $candidat_repository->findAll();
-        $offres = $offre_repository->findAll();
+        $candidats = $candidat_repository->findLatest(500);
+        $offres = $offre_repository->findLatest(50);
 
         $selectedOffreId = $request->query->getInt('offreId', 0);
         $selectedOffre = null;
@@ -446,7 +446,7 @@ final class CandidatController extends AbstractController
 
         $selectedOffreCandidats = [];
         if ($selectedOffre !== null && $selectedOffre->getId() !== null) {
-            $selectedOffreCandidats = $candidat_repository->findByOffreId($selectedOffre->getId());
+            $selectedOffreCandidats = $candidat_repository->findByOffreId($selectedOffre->getId(), 500);
         }
 
         $totalOffres = count($offres);
