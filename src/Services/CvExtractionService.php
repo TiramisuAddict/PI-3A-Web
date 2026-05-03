@@ -10,6 +10,9 @@ use Symfony\Component\HttpClient\HttpClient;
 
 final class CvExtractionService
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function extractAndPersistForEmploye(Employe $employe, EntityManagerInterface $entityManager): array
     {
         $groqApiUrl = $this->readEnv('GROQ_API_URL');
@@ -39,7 +42,7 @@ final class CvExtractionService
 
         $competenceRepo = $entityManager->getRepository(CompetenceEmploye::class);
         $competenceEmploye = $competenceRepo->findOneBy(['employe' => $employe]);
-        if (!$competenceEmploye) {
+        if ($competenceEmploye === null) {
             $competenceEmploye = new CompetenceEmploye();
             $competenceEmploye->setEmploye($employe);
         }
@@ -60,6 +63,9 @@ final class CvExtractionService
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function extractWithGroq(string $cvText, string $groqApiUrl, string $groqApiKey, string $groqModel): array
     {
         $systemMessage = "You are a strict data extraction tool. Return only a valid JSON object with the exact required structure and keys. No markdown, no explanations, no extra fields.";
@@ -124,6 +130,9 @@ final class CvExtractionService
         return $structured;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function decodeModelJson(string $rawText): ?array
     {
         $direct = json_decode($rawText, true);
@@ -171,7 +180,7 @@ final class CvExtractionService
             $pdf = $parser->parseContent($cvBinary);
             $text = $pdf->getText();
 
-            return is_string($text) ? $text : null;
+            return $text;
         } catch (\Throwable) {
             return null;
         }

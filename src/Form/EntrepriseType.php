@@ -20,19 +20,45 @@ class EntrepriseType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
-            ->add('nom_entreprise')
-            ->add('pays')
-            ->add('ville')
-            ->add('nom')
-            ->add('prenom')
-            ->add('matricule_fiscale')
+            ->add('nom_entreprise', TextType::class, [
+                'label' => 'Nom de l\'entreprise',
+                'constraints' => [
+                    new Assert\NotBlank(message: 'Le nom de l\'entreprise est obligatoire.'),
+                ],
+            ])
+            ->add('pays', TextType::class, [
+                'constraints' => [
+                    new Assert\NotBlank(message: 'Le pays est obligatoire.'),
+                ],
+            ])
+            ->add('ville', TextType::class, [
+                'constraints' => [
+                    new Assert\NotBlank(message: 'La ville est obligatoire.'),
+                ],
+            ])
+            ->add('nom', TextType::class, [
+                'constraints' => [
+                    new Assert\NotBlank(message: 'Le nom est obligatoire.'),
+                ],
+            ])
+            ->add('prenom', TextType::class, [
+                'constraints' => [
+                    new Assert\NotBlank(message: 'Le prénom est obligatoire.'),
+                ],
+            ])
+            ->add('matricule_fiscale', TextType::class, [
+                'constraints' => [
+                    new Assert\NotBlank(message: 'Le matricule fiscale est obligatoire.'),
+                ],
+            ])
             ->add('telephone', TelType::class, [
                 'label' => 'Téléphone',
                 'attr'  => ['placeholder' => 'Téléphone'],
                 'constraints' => [
+                    new Assert\NotBlank(message: 'Le téléphone est obligatoire.'),
                     new Assert\Regex(
-                        pattern: '/^[0-9]+$/',
-                        message: 'Le téléphone doit contenir uniquement des chiffres .'
+                        pattern: '/^[0-9]{8}$/',
+                        message: 'Le téléphone doit contenir exactement 8 chiffres.'
                     ),
                 ],
             ])
@@ -40,6 +66,7 @@ class EntrepriseType extends AbstractType
                 'label' => 'Email',
                 'attr'  => ['placeholder' => 'Email'],
                 'constraints' => [
+                    new Assert\NotBlank(message: 'L\'email est obligatoire.'),
                     new Assert\Email(message: 'Format email invalide'),
                 ],
             ])

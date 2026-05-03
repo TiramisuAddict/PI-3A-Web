@@ -9,8 +9,8 @@ class FaceRecognitionService
     /**
      * Validate face embedding format and content.
      *
-     * @param array|null $embedding Face embedding array (usually 128D vector)
-     * @return array ['valid' => bool, 'error' => string|null]
+     * @param array<int|string, float|int>|null $embedding Face embedding array (usually 128D vector)
+     * @return array<string, bool|string|null> ['valid' => bool, 'error' => string|null]
      */
     public function validateEmbedding(?array $embedding): array
     {
@@ -18,18 +18,8 @@ class FaceRecognitionService
             return ['valid' => false, 'error' => 'Embedding is null.'];
         }
 
-        if (!is_array($embedding)) {
-            return ['valid' => false, 'error' => 'Embedding must be an array.'];
-        }
-
         if (count($embedding) < self::EMBEDDING_MIN_LENGTH) {
             return ['valid' => false, 'error' => 'Embedding dimension too small (< ' . self::EMBEDDING_MIN_LENGTH . ').'];
-        }
-
-        foreach ($embedding as $value) {
-            if (!is_numeric($value)) {
-                return ['valid' => false, 'error' => 'Embedding contains non-numeric values.'];
-            }
         }
 
         return ['valid' => true, 'error' => null];
@@ -38,8 +28,8 @@ class FaceRecognitionService
     /**
      * Compare two face embeddings using Euclidean distance.
      *
-     * @param array $embedding1 First embedding vector
-     * @param array $embedding2 Second embedding vector
+     * @param array<int|string, float|int> $embedding1 First embedding vector
+     * @param array<int|string, float|int> $embedding2 Second embedding vector
      * @return float Distance score (0 = identical, 1 = completely different)
      */
     public function compareEmbeddings(array $embedding1, array $embedding2): float
@@ -61,8 +51,8 @@ class FaceRecognitionService
     /**
      * Check if two embeddings match based on threshold.
      *
-     * @param array $embedding1 First embedding vector
-     * @param array $embedding2 Second embedding vector
+     * @param array<int|string, float|int> $embedding1 First embedding vector
+     * @param array<int|string, float|int> $embedding2 Second embedding vector
      * @return bool True if embeddings match (distance < threshold)
      */
     public function embeddingsMatch(array $embedding1, array $embedding2): bool
@@ -84,7 +74,7 @@ class FaceRecognitionService
     /**
      * Hash an embedding for storage (optional second layer).
      *
-     * @param array $embedding Face embedding array
+     * @param array<int|string, float|int> $embedding Face embedding array
      * @return string Hashed representation (for logging/audit purposes)
      */
     public function hashEmbedding(array $embedding): string
