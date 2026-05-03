@@ -134,13 +134,15 @@ final class InscriptionFormationController extends AbstractController
         }
 
         $employee = $entityManager->find(Employe::class, $employeeId);
-        $employeeName = trim((string) (($employee?->getPrenom() ?? '') . ' ' . ($employee?->getNom() ?? '')));
+        $prenom = $employee?->getPrenom() ?? '';
+        $nom = $employee?->getNom() ?? '';
+        $employeeName = trim($prenom . ' ' . $nom);
         if ($employeeName === '') {
-            $employeeName = 'Employe #' . $employeeId;
+            $employeeName = 'Employe #' . (string) $employeeId;
         }
 
         $issuedAt = new \DateTimeImmutable();
-        $certificateReference = sprintf('CERT-%d-%d-%s', (int) $formation->getId(), $employeeId, $issuedAt->format('YmdHis'));
+        $certificateReference = sprintf('CERT-%d-%d-%s', $formation->getId(), $employeeId, $issuedAt->format('YmdHis'));
         $qrPayload = implode(' | ', [
             'Reference: ' . $certificateReference,
             'Employe: ' . $employeeName,
@@ -166,7 +168,7 @@ final class InscriptionFormationController extends AbstractController
         $dompdf->setPaper('A4', 'landscape');
         $dompdf->render();
 
-        $filename = 'certificat-formation-' . (int) $formation->getId() . '.pdf';
+        $filename = 'certificat-formation-' . $formation->getId() . '.pdf';
         $disposition = $inline ? 'inline' : 'attachment';
 
         return new Response($dompdf->output(), 200, [
@@ -175,9 +177,15 @@ final class InscriptionFormationController extends AbstractController
         ]);
     }
 
-    private function buildPublicCertificateUrl(string $route, array $parameters): string
+    /**
+     * @param array<string, mixed> $parameters
+     */
+    private function buildPublicCertificateUrl(string $route, array $parameters = []): string
     {
-        $publicBaseUrl = trim((string) ($_ENV['QR_PUBLIC_BASE_URL'] ?? $_SERVER['QR_PUBLIC_BASE_URL'] ?? getenv('QR_PUBLIC_BASE_URL') ?: ''));
+        $env = ($_ENV['QR_PUBLIC_BASE_URL'] ?? null);
+        $server = ($_SERVER['QR_PUBLIC_BASE_URL'] ?? null);
+        $getenv = getenv('QR_PUBLIC_BASE_URL');
+        $publicBaseUrl = trim((string) ($env ?? $server ?? ($getenv !== false ? $getenv : null) ?? ''));
         if ($publicBaseUrl !== '') {
             return rtrim($publicBaseUrl, '/') . $this->generateUrl($route, $parameters, UrlGeneratorInterface::ABSOLUTE_PATH);
         }
@@ -204,19 +212,31 @@ final class InscriptionFormationController extends AbstractController
         );
 
         $reviews = [];
+        $summaryInput = [];
         foreach ($formationReviews as $review) {
-            $analysis = $feedbackAnalysisService->analyzeReview((string) ($review['commentaire'] ?? ''), (int) ($review['note'] ?? 0));
+            $note = (int) ($review['note'] ?? 0);
+            $commentaire = array_key_exists('commentaire', $review) && $review['commentaire'] !== null
+                ? (string) $review['commentaire']
+                : null;
+
+            $analysis = $feedbackAnalysisService->analyzeReview($commentaire, $note);
+
             $reviews[] = [
-                'note' => (int) ($review['note'] ?? 0),
-                'commentaire' => (string) ($review['commentaire'] ?? ''),
+                'note' => $note,
+                'commentaire' => $commentaire ?? '',
                 'prenom' => (string) ($review['prenom'] ?? ''),
                 'nom' => (string) ($review['nom'] ?? ''),
                 'label' => $analysis['label'],
-                'problems' => $analysis['problems'] ?? [],
+                'problems' => $analysis['problems'],
+            ];
+
+            $summaryInput[] = [
+                'note' => $note,
+                'commentaire' => $commentaire,
             ];
         }
 
-        $summary = $feedbackAnalysisService->summarizeReviews($formationReviews);
+        $summary = $feedbackAnalysisService->summarizeReviews($summaryInput);
 
         return new JsonResponse([
             'formation' => [
@@ -395,7 +415,7 @@ final class InscriptionFormationController extends AbstractController
                 }
 
                 $analysisResult = $reasonAssistantService->correctReason($raison);
-                $reasonToStore = trim($analysisResult->correctedText) !== '' ? $analysisResult->correctedText : $raison;
+                $reasonToStore = $analysisResult->correctedText !== $analysisResult->originalText ? $analysisResult->correctedText : $raison;
 
                 $inscription = new InscriptionFormation();
                 $inscription->setFormation($formation);
@@ -479,7 +499,7 @@ final class InscriptionFormationController extends AbstractController
                 }
 
                 $analysisResult = $reasonAssistantService->correctReason($raison);
-                $reasonToStore = trim($analysisResult->correctedText) !== '' ? $analysisResult->correctedText : $raison;
+                $reasonToStore = $analysisResult->correctedText !== $analysisResult->originalText ? $analysisResult->correctedText : $raison;
 
                 $inscription->setRaison($reasonToStore !== '' ? $reasonToStore : null);
                 $entityManager->flush();
@@ -593,17 +613,13 @@ final class InscriptionFormationController extends AbstractController
         }));
 
         usort($formations, function (Formation $left, Formation $right) use ($sort, $reviewStatsByFormation): int {
-            $leftStats = $reviewStatsByFormation[(int) $left->getId()] ?? ['reviews_count' => 0, 'average_note' => 0.0];
-            $rightStats = $reviewStatsByFormation[(int) $right->getId()] ?? ['reviews_count' => 0, 'average_note' => 0.0];
+            $leftStats = $reviewStatsByFormation[$left->getId()] ?? ['reviews_count' => 0, 'average_note' => 0.0];
+            $rightStats = $reviewStatsByFormation[$right->getId()] ?? ['reviews_count' => 0, 'average_note' => 0.0];
 
             return match ($sort) {
-                'rating_desc' => ($rightStats['average_note'] <=> $leftStats['average_note'])
-                    ?: ($rightStats['reviews_count'] <=> $leftStats['reviews_count'])
-                    ?: strcmp((string) $left->getTitre(), (string) $right->getTitre()),
-                'reviews_desc' => ($rightStats['reviews_count'] <=> $leftStats['reviews_count'])
-                    ?: ($rightStats['average_note'] <=> $leftStats['average_note'])
-                    ?: strcmp((string) $left->getTitre(), (string) $right->getTitre()),
-                'title_asc' => strcmp((string) $left->getTitre(), (string) $right->getTitre()),
+                'rating_desc' => ($cmp = ($rightStats['average_note'] <=> $leftStats['average_note'])) !== 0 ? $cmp : (($cmp = ($rightStats['reviews_count'] <=> $leftStats['reviews_count'])) !== 0 ? $cmp : strcmp($left->getTitre() ?? '', $right->getTitre() ?? '')),
+                'reviews_desc' => ($cmp = ($rightStats['reviews_count'] <=> $leftStats['reviews_count'])) !== 0 ? $cmp : (($cmp = ($rightStats['average_note'] <=> $leftStats['average_note'])) !== 0 ? $cmp : strcmp($left->getTitre() ?? '', $right->getTitre() ?? '')),
+                'title_asc' => strcmp($left->getTitre() ?? '', $right->getTitre() ?? ''),
                 default => (($right->getDateDebut()?->getTimestamp() ?? 0) <=> ($left->getDateDebut()?->getTimestamp() ?? 0)),
             };
         });
@@ -647,21 +663,32 @@ final class InscriptionFormationController extends AbstractController
                  WHERE ev.id_formation = ?
                  ORDER BY ev.date_evaluation DESC
                  LIMIT 10',
-                [(int) $selectedFormation->getId()]
+                [$selectedFormation->getId()]
             );
 
+            $summaryInput = [];
             foreach ($formationReviews as $index => $review) {
-                $analysis = $feedbackAnalysisService->analyzeReview((string) ($review['commentaire'] ?? ''), (int) ($review['note'] ?? 0));
+                $note = (int) ($review['note'] ?? 0);
+                $commentaire = array_key_exists('commentaire', $review) && $review['commentaire'] !== null
+                    ? (string) $review['commentaire']
+                    : null;
+
+                $analysis = $feedbackAnalysisService->analyzeReview($commentaire, $note);
                 $formationReviews[$index]['analysis'] = $analysis;
+
+                $summaryInput[] = [
+                    'note' => $note,
+                    'commentaire' => $commentaire,
+                ];
             }
 
-            $formationReviewSummary = $feedbackAnalysisService->summarizeReviews($formationReviews);
+            $formationReviewSummary = $feedbackAnalysisService->summarizeReviews($summaryInput);
         }
 
         $inscriptionByFormation = [];
         $evaluationByFormation = [];
         $certificateQrPathByFormation = [];
-        if ($employeeLogged) {
+        if ($session->get('employe_logged_in') === true && in_array($employeeRole, ['employé', 'employe'], true)) {
             $myInscriptions = $inscriptionRepository->findBy(['employeeId' => $employeeId]);
             foreach ($myInscriptions as $inscription) {
                 try {
@@ -672,8 +699,9 @@ final class InscriptionFormationController extends AbstractController
                 }
 
                 try {
-                    if ($formation !== null && $formation->getId() !== null) {
-                        $formationId = (int) $formation->getId();
+                    $formationIdRaw = $formation?->getId();
+                    if ($formationIdRaw !== null) {
+                        $formationId = (int) $formationIdRaw;
                         $inscriptionId = (int) ($inscription->getId() ?? 0);
 
                         $inscriptionByFormation[$formationId] = [
@@ -683,7 +711,7 @@ final class InscriptionFormationController extends AbstractController
                         ];
 
                         $isFinished = $formation->getDateFin() !== null && $formation->getDateFin() < new \DateTimeImmutable();
-                        if ($inscriptionId > 0 && $inscription->getStatut() === StatutInscription::ACCEPTEE->value && $isFinished) {
+                        if ($inscription->getStatut() === StatutInscription::ACCEPTEE->value && $isFinished) {
                             $expires = (new \DateTimeImmutable('+30 days'))->getTimestamp();
                             $signature = $this->buildCertificateSignature($inscriptionId, $formationId, $inscription->getEmployeeId(), $expires);
                             $certificateQrPathByFormation[$formationId] = $this->generateUrl('app_inscription_employe_certificate_public', [
@@ -717,11 +745,14 @@ final class InscriptionFormationController extends AbstractController
         }
 
         $alreadyInscrit = false;
-        if ($employeeLogged && $selectedFormation instanceof Formation) {
+        if ($session->get('employe_logged_in') === true && in_array($employeeRole, ['employé', 'employe'], true) && $selectedFormation instanceof Formation) {
             $alreadyInscrit = $inscriptionRepository->findOneByFormationAndEmployee((int) $selectedFormation->getId(), $employeeId) !== null;
         }
 
-        $qrPublicBaseUrl = trim((string) ($_ENV['QR_PUBLIC_BASE_URL'] ?? $_SERVER['QR_PUBLIC_BASE_URL'] ?? getenv('QR_PUBLIC_BASE_URL') ?: ''));
+        $env = ($_ENV['QR_PUBLIC_BASE_URL'] ?? null);
+        $server = ($_SERVER['QR_PUBLIC_BASE_URL'] ?? null);
+        $getenv = getenv('QR_PUBLIC_BASE_URL');
+        $qrPublicBaseUrl = trim((string) ($env ?? $server ?? ($getenv !== false ? $getenv : null) ?? ''));
         if ($qrPublicBaseUrl !== '') {
             $qrPublicBaseUrl = rtrim($qrPublicBaseUrl, '/');
         }
@@ -754,7 +785,10 @@ final class InscriptionFormationController extends AbstractController
 
     private function buildCertificateSignature(int $inscriptionId, int $formationId, int $employeeId, int $expires): string
     {
-        $secret = (string) ($_ENV['APP_SECRET'] ?? $_SERVER['APP_SECRET'] ?? getenv('APP_SECRET') ?: 'change-me-app-secret');
+        $env = ($_ENV['APP_SECRET'] ?? null);
+        $server = ($_SERVER['APP_SECRET'] ?? null);
+        $getenv = getenv('APP_SECRET');
+        $secret = (string) ($env ?? $server ?? ($getenv !== false ? $getenv : null) ?? 'change-me-app-secret');
         $payload = $inscriptionId . '|' . $formationId . '|' . $employeeId . '|' . $expires;
 
         return hash_hmac('sha256', $payload, $secret);
