@@ -27,7 +27,21 @@ final class CvExtractionService
         }
 
         $cvBinary = $employe->getCvData();
+        if ($cvBinary === null || $cvBinary === '') {
+            return [
+                'success' => false,
+                'error' => 'CV manquant pour cet employe.',
+            ];
+        }
+
         $cvText = $this->extractTextFromCvBinary($cvBinary);
+        if ($cvText === null || trim($cvText) === '') {
+            return [
+                'success' => false,
+                'error' => 'Impossible d\'extraire le texte du CV.',
+            ];
+        }
+
         $extracted = $this->extractWithGroq($cvText, $groqApiUrl, $groqApiKey, $groqModel);
         if (isset($extracted['error'])) {
             return [
@@ -47,9 +61,13 @@ final class CvExtractionService
             $competenceEmploye->setEmploye($employe);
         }
 
-        $competenceEmploye->setSkills(json_encode(array_values($skills), JSON_UNESCAPED_UNICODE));
-        $competenceEmploye->setFormations(json_encode(array_values($formations), JSON_UNESCAPED_UNICODE));
-        $competenceEmploye->setExperience(json_encode(array_values($experience), JSON_UNESCAPED_UNICODE));
+        $skillsJson = json_encode(array_values($skills), JSON_UNESCAPED_UNICODE);
+        $formationsJson = json_encode(array_values($formations), JSON_UNESCAPED_UNICODE);
+        $experienceJson = json_encode(array_values($experience), JSON_UNESCAPED_UNICODE);
+
+        $competenceEmploye->setSkills($skillsJson === false ? null : $skillsJson);
+        $competenceEmploye->setFormations($formationsJson === false ? null : $formationsJson);
+        $competenceEmploye->setExperience($experienceJson === false ? null : $experienceJson);
 
         $entityManager->persist($competenceEmploye);
 

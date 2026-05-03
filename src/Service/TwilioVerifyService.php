@@ -153,7 +153,7 @@ class TwilioVerifyService
             return $countryCode . $digits;
         }
 
-        if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
+        if (filter_var($value, FILTER_VALIDATE_EMAIL) === false) {
             throw new \RuntimeException('Adresse e-mail invalide pour l’envoi OTP.');
         }
 

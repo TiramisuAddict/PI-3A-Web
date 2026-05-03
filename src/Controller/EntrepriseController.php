@@ -24,7 +24,12 @@ final class EntrepriseController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $logoFile = $form->get('logo')->getData();
             if ($logoFile instanceof UploadedFile) {
-                $uploadDir = $this->getParameter('kernel.project_dir') . '/public/images/entreprises';
+                $projectDirParam = $this->getParameter('kernel.project_dir');
+                if (!is_string($projectDirParam) || $projectDirParam === '') {
+                    throw new \RuntimeException('Invalid project directory parameter.');
+                }
+                $projectDir = $projectDirParam;
+                $uploadDir = $projectDir . '/public/images/entreprises';
                 if (!is_dir($uploadDir)) {
                     mkdir($uploadDir, 0755, true);
                 }

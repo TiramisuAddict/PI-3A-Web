@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Controller;
-
 use App\Entity\AdministrateurSysteme;
 use App\Form\LoginType;
 use App\Entity\Entreprise;
@@ -184,9 +183,10 @@ final class AdminController extends AbstractController
         $status = $request->query->get('status', '');
 
         $allFilteredEntreprises = $entrepriseRepo->findByFilters($search, $status);
+        $page = max(1, (int) $request->query->get('page', 1));
         $entreprises = $paginator->paginate(
             $entrepriseRepo->createByFiltersQueryBuilder($search, $status),
-            max(1,  $request->query->get('page', 1)),
+            $page,
             6
         );
 
@@ -197,12 +197,12 @@ final class AdminController extends AbstractController
             $entreprise = $entrepriseRepo->find($id);
             if ($entreprise !== null) {
                if ($action === 'accepter') {
-                    $recipientEmail = $entreprise->getEmail();
+                    $recipientEmail = (string) $entreprise->getEmail();
                     $entreprise->setStatut('acceptée');
                     $employe = new Employe();
-                    $employe->setNom($entreprise->getNom());
-                    $employe->setPrenom($entreprise->getPrenom());
-                    $employe->setTelephone($entreprise->getTelephone());
+                    $employe->setNom((string) $entreprise->getNom());
+                    $employe->setPrenom((string) $entreprise->getPrenom());
+                    $employe->setTelephone((int) $entreprise->getTelephone());
                     $employe->setEmail($recipientEmail);
                     $employe->setRole('administrateur entreprise');
                     $employe->setPoste('CEO');
@@ -218,7 +218,7 @@ final class AdminController extends AbstractController
                     $em->flush();
 
                     try {
-                        if (!filter_var($recipientEmail, FILTER_VALIDATE_EMAIL)) {
+                        if (filter_var($recipientEmail, FILTER_VALIDATE_EMAIL) === false) {
                             throw new \InvalidArgumentException('Adresse e-mail invalide: ' . $recipientEmail);
                         }
 

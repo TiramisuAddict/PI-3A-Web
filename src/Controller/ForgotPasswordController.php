@@ -54,7 +54,7 @@ final class ForgotPasswordController extends AbstractController
             if ($admin !== null) {
                 $userType = 'admin';
                 $userId =  $admin->getId();
-                $destination =$admin->getTelephone();
+                $destination = (string) $admin->getTelephone();
             }
 
             if ($userType === null) {
@@ -64,7 +64,7 @@ final class ForgotPasswordController extends AbstractController
                     if ($compte !== false) {
                         $userType = 'employe';
                         $userId =$employe->getId_employe();
-                        $destination = $employe->getTelephone();
+                        $destination = (string) $employe->getTelephone();
                     }
                 }
             }
@@ -133,7 +133,7 @@ final class ForgotPasswordController extends AbstractController
             return $this->redirectToRoute('forgot_password');
         }
 
-        if (!$this->isCsrfTokenValid('forgot_password_resend', $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('forgot_password_resend', (string) $request->request->get('_token'))) {
             return $this->redirectToRoute('forgot_password_verify');
         }
 

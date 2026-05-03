@@ -74,7 +74,7 @@ class EmployeCsvImportService
                 continue;
             }
 
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
                 $errors[] = sprintf('Ligne %d ignorée: email invalide (%s).', $lineNumber, $email);
                 continue;
             }
@@ -163,11 +163,11 @@ class EmployeCsvImportService
     }
 
     /**
-     * @param array<string|int, string> $row
+      * @param array<int|string, string|null> $row
      */
     private function isCsvHeader(array $row): bool
     {
-        $header = strtolower(implode(',', array_map(static fn($value) => trim($value), $row)));
+          $header = strtolower(implode(',', array_map(static fn($value) => trim((string) $value), $row)));
 
         return str_contains($header, 'nom')
             && str_contains($header, 'prenom')
