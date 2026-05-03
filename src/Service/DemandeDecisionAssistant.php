@@ -281,7 +281,7 @@ class DemandeDecisionAssistant
     private function buildRepeatTypePenalty(Demande $demande): array
     {
         $employeId = $demande->getEmploye()?->getId_employe();
-        $typeDemande = trim($demande->getTypeDemande());
+        $typeDemande = trim((string) $demande->getTypeDemande());
         $dateCreation = $demande->getDateCreation();
         $demandeId = $demande->getIdDemande();
 

@@ -32,15 +32,15 @@ class DemandeAiAssistant
      */
     public function generateAutreSuggestions(array $generalContext, array $currentDetails, array $autreFields): array
     {
-        $typeDemande = trim((string) ($generalContext['typeDemande'] ?? 'Autre'));
+        $typeDemande = trim(($generalContext['typeDemande'] ?? 'Autre'));
         if ('' !== $typeDemande && 'Autre' !== $typeDemande) {
             throw new \RuntimeException('L assistant de generation de champs est reserve au type Autre.');
         }
 
         $sourceText = $this->firstNonEmpty(
-            trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-            trim((string) ($generalContext['description'] ?? '')),
-            trim((string) ($generalContext['titre'] ?? ''))
+            trim(($generalContext['aiDescriptionPrompt'] ?? '')),
+            trim(($generalContext['description'] ?? '')),
+            trim(($generalContext['titre'] ?? ''))
         );
 
         if ('' === $sourceText && [] === $currentDetails) {
@@ -76,7 +76,7 @@ class DemandeAiAssistant
         $manualOnlyMode = $manualFieldMode;
 
         foreach ($manualFields as $manualField) {
-            $manualKey = trim((string) ($manualField['key'] ?? ''));
+            $manualKey = trim(($manualField['key'] ?? ''));
             if ('' === $manualKey) {
                 continue;
             }
@@ -115,7 +115,7 @@ class DemandeAiAssistant
             $llmFallback = $this->tryGenerateAutreWithLlmFallback(
                 $generalContext,
                 $currentDetails,
-                array_values(array_unique($allowedKeys)),
+                $allowedKeys,
                 $requiredKeys,
                 $fieldLabels,
                 $selectOptions
@@ -126,38 +126,34 @@ class DemandeAiAssistant
             }
         }
 
-        $generalPayload = isset($parsed['general']) && is_array($parsed['general']) ? $parsed['general'] : [];
-        $detailsPayload = isset($parsed['details']) && is_array($parsed['details']) ? $parsed['details'] : [];
-        $customPayload = isset($parsed['custom_fields']) && is_array($parsed['custom_fields']) ? $parsed['custom_fields'] : [];
-        $removePayload = isset($parsed['remove_fields']) && is_array($parsed['remove_fields']) ? $parsed['remove_fields'] : [];
-
+        $generalPayload = $this->normalizeAssocArrayValue($parsed['general'] ?? null);
+        $detailsPayload = $this->normalizeAssocArrayValue($parsed['details'] ?? null);
+        $customPayload = $this->normalizeListArrayValue($parsed['custom_fields'] ?? null);
+        $removePayload = $this->normalizeListArrayValue($parsed['remove_fields'] ?? null);
         $normalizedModelPayload = $this->normalizeAutreModelPayload(
             $detailsPayload,
             $customPayload,
-            array_values(array_unique($allowedKeys)),
+            $allowedKeys,
             $sourceText
         );
         $detailsPayload = $normalizedModelPayload['suggestedDetails'];
         $customPayload = $normalizedModelPayload['customFields'];
 
         $planPayload = [
-            'add' => array_values(array_filter($customPayload, static fn ($item): bool => is_array($item))),
+            'add' => array_values($customPayload),
             'remove' => array_values(array_filter(array_map('strval', $removePayload), static fn (string $item): bool => '' !== trim($item))),
             'replaceBase' => $this->toBooleanFlag($parsed['replace_base'] ?? false),
         ];
-
         return [
-            'correctedText' => trim((string) ($parsed['correctedText'] ?? '')),
-            'generatedDescription' => trim((string) ($parsed['generatedDescription'] ?? ($generalPayload['description'] ?? ''))),
+            'correctedText' => trim($parsed['correctedText'] ?? ''),
+            'generatedDescription' => trim($parsed['generatedDescription'] ?? ($generalPayload['description'] ?? '')),
             'suggestedGeneral' => $generalPayload,
             'suggestedDetails' => $detailsPayload,
             'dynamicFieldPlan' => $planPayload,
-            'dynamicFieldConfidence' => isset($parsed['dynamicFieldConfidence']) && is_array($parsed['dynamicFieldConfidence'])
-                ? $parsed['dynamicFieldConfidence']
-                : ['score' => 0, 'label' => 'Faible', 'tone' => 'info', 'message' => 'Aucun apprentissage confirme similaire n a ete retrouve.'],
+            'dynamicFieldConfidence' => $parsed['dynamicFieldConfidence'] ?? ['score' => 0, 'label' => 'Faible', 'tone' => 'info', 'message' => 'Aucun apprentissage confirme similaire n a ete retrouve.'],
             'skipConfirmationRestriction' => $this->toBooleanFlag($parsed['skipConfirmationRestriction'] ?? false),
-            'model' => '' !== trim((string) ($parsed['_model'] ?? ''))
-                ? trim((string) ($parsed['_model'] ?? ''))
+            'model' => '' !== trim(($parsed['_model'] ?? ''))
+                ? trim(($parsed['_model'] ?? ''))
                 : 'local-ml:demande/demande_adaptive_model.py',
         ];
     }
@@ -210,7 +206,7 @@ class DemandeAiAssistant
         $customKeys = [];
 
         foreach ($customFields as $field) {
-            $key = trim((string) ($field['key'] ?? ''));
+            $key = trim(($field['key'] ?? ''));
             if ('' !== $key) {
                 $customKeys[$key] = true;
             }
@@ -221,16 +217,16 @@ class DemandeAiAssistant
                 continue;
             }
 
-            if ($this->isAutreDateField((string) $key, '', '') && '' !== trim((string) $value)) {
-                $seenDateValues[trim((string) $value)] = true;
+            if ($this->isAutreDateField((string) $key, '', '') && '' !== trim($value)) {
+                $seenDateValues[trim($value)] = true;
             }
         }
 
         foreach ($customFields as $field) {
-            $key = trim((string) ($field['key'] ?? ''));
-            $label = trim((string) ($field['label'] ?? ''));
-            $type = strtolower(trim((string) ($field['type'] ?? 'text')));
-            $value = trim((string) ($field['value'] ?? ''));
+            $key = trim(($field['key'] ?? ''));
+            $label = trim(($field['label'] ?? ''));
+            $type = strtolower(trim(($field['type'] ?? 'text')));
+            $value = trim(($field['value'] ?? ''));
             $required = true === ($field['required'] ?? false);
 
             if ('' === $key) {
@@ -268,7 +264,7 @@ class DemandeAiAssistant
                     $previousIndex = $seenComparableValues[$comparableValue]['index'];
                     $previousScore = $seenComparableValues[$comparableValue]['score'];
                     if ($currentScore > $previousScore && isset($cleaned[$previousIndex])) {
-                        $previousKey = trim((string) ($cleaned[$previousIndex]['key'] ?? ''));
+                        $previousKey = trim(($cleaned[$previousIndex]['key'] ?? ''));
                         if ('' !== $previousKey) {
                             unset($details[$previousKey]);
                         }
@@ -344,7 +340,7 @@ class DemandeAiAssistant
 
     private function isGeneratedAutreFieldSource(mixed $source): bool
     {
-        $normalized = strtolower(trim((string) $source));
+        $normalized = strtolower(trim($source));
         if ('' === $normalized || 'manual' === $normalized) {
             return false;
         }
@@ -431,7 +427,7 @@ class DemandeAiAssistant
 
         return preg_match('/\b(actuel|actuelle|actuels|actuelles|ancien|ancienne|anciens|anciennes|actuellement)\b/u', $source) !== 1
             && !str_contains($source, 'au lieu de')
-            && !preg_match('/\bpasser\s+de\b/u', $source);
+            && preg_match('/\bpasser\s+de\b/u', $source) !== 1;
     }
 
     private function isGenericAutreObjectValue(string $normalizedValue): bool
@@ -491,9 +487,9 @@ class DemandeAiAssistant
 
         $parsed = $this->callLocalSuggestionModel([
             'text' => $normalizedText,
-            'categories' => array_values(array_keys($categoryTypes)),
+            'categories' => array_keys($categoryTypes),
             'typeMap' => $categoryTypes,
-            'priorities' => array_values($priorities),
+            'priorities' => $priorities,
             'trainingSamples' => $this->fetchClassificationTrainingSamples(),
         ]);
 
@@ -513,15 +509,30 @@ class DemandeAiAssistant
             throw new \RuntimeException('Ajoutez un titre avant de lancer la generation de description.');
         }
 
-        $parsed = $this->callLocalDescriptionModel([
-            'title' => $normalizedTitle,
-            'typeDemande' => trim((string) ($typeDemande ?? '')),
-            'categorie' => trim((string) ($categorie ?? '')),
-        ]);
+        $prompt = $this->buildDescriptionFromTitlePrompt($normalizedTitle, $typeDemande, $categorie, null);
+
+        try {
+            $rawResponse = $this->callHuggingFace($prompt);
+            $parsed = $this->parseJsonResponse($rawResponse);
+            $description = trim($parsed['description'] ?? '');
+
+            if ('' === $description) {
+                $description = $this->buildDeterministicDescriptionFromTitle($normalizedTitle);
+            }
+
+            return [
+                'description' => $this->normalizeGeneratedDescriptionFromTitle($description, $normalizedTitle),
+                'model' => trim($this->apiKey) !== '' ? 'hf-or-python:description-from-title' : 'deterministic:description-from-title',
+            ];
+        } catch (\RuntimeException $e) {
+            $this->logger->warning('Description generation unavailable, falling back to deterministic output.', [
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return [
-            'description' => trim((string) ($parsed['description'] ?? '')),
-            'model' => 'local-ml:demande_description_model.py',
+            'description' => $this->normalizeGeneratedDescriptionFromTitle($this->buildDeterministicDescriptionFromTitle($normalizedTitle), $normalizedTitle),
+            'model' => 'deterministic:description-from-title',
         ];
     }
 
@@ -563,7 +574,7 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $key = trim((string) ($field['key'] ?? ''));
+            $key = trim(($field['key'] ?? ''));
             if ('' === $key) {
                 continue;
             }
@@ -573,7 +584,7 @@ class DemandeAiAssistant
                 trim((string) ($field['value'] ?? ''))
             );
 
-            $type = strtolower(trim((string) ($field['type'] ?? 'text')));
+            $type = strtolower(trim(($field['type'] ?? 'text')));
             if (!in_array($type, ['text', 'textarea', 'select', 'number', 'date'], true)) {
                 $type = 'text';
             }
@@ -584,7 +595,7 @@ class DemandeAiAssistant
 
             $customField = [
                 'key' => $key,
-                'label' => trim((string) ($field['label'] ?? $key)),
+                'label' => trim(($field['label'] ?? $key)),
                 'type' => $type,
                 'required' => true === ($field['required'] ?? false),
                 'value' => $value,
@@ -592,9 +603,8 @@ class DemandeAiAssistant
             ];
 
             if ('select' === $type) {
-                $customField['options'] = is_array($field['options'] ?? null)
-                    ? array_values(array_filter(array_map('strval', $field['options']), static fn (string $option): bool => '' !== trim($option)))
-                    : [];
+                $options = is_array($field['options'] ?? null) ? $field['options'] : [];
+                $customField['options'] = array_values(array_filter(array_map('strval', $options), static fn (string $option): bool => '' !== trim($option)));
             }
 
             $customFields[] = $customField;
@@ -603,12 +613,12 @@ class DemandeAiAssistant
         $customFields = $this->cleanAutreDuplicateAndNoisyFields($customFields, $details);
 
         $title = $this->firstNonEmpty(
-            trim((string) ($generalContext['titre'] ?? '')),
+            trim(($generalContext['titre'] ?? '')),
             $this->extractLeadClauseBeforeKeywords($sourceText, ['pour', 'car', 'parce que', 'afin de']),
             $sourceText
         );
         $description = $this->firstNonEmpty(
-            trim((string) ($generalContext['description'] ?? '')),
+            trim(($generalContext['description'] ?? '')),
             $sourceText
         );
 
@@ -618,9 +628,9 @@ class DemandeAiAssistant
             'suggestedGeneral' => [
                 'titre' => $title,
                 'description' => $description,
-                'priorite' => trim((string) ($generalContext['priorite'] ?? 'NORMALE')),
-                'categorie' => trim((string) ($generalContext['categorie'] ?? 'Autre')),
-                'typeDemande' => trim((string) ($generalContext['typeDemande'] ?? 'Autre')),
+                'priorite' => trim(($generalContext['priorite'] ?? 'NORMALE')),
+                'categorie' => trim(($generalContext['categorie'] ?? 'Autre')),
+                'typeDemande' => trim(($generalContext['typeDemande'] ?? 'Autre')),
             ],
             'suggestedDetails' => $details,
             'dynamicFieldPlan' => [
@@ -628,12 +638,7 @@ class DemandeAiAssistant
                 'remove' => ['ALL'],
                 'replaceBase' => [] !== $customFields,
             ],
-            'dynamicFieldConfidence' => [
-                'score' => 100,
-                'label' => 'Elevee',
-                'tone' => 'success',
-                'message' => 'Champs configures manuellement. Les valeurs detectees dans le texte ont ete appliquees sans changer le plan.',
-            ],
+            'dynamicFieldConfidence' => $this->buildAutrePlanConfidence($customFields, ['ALL'], false, $sourceText, $description),
             'skipConfirmationRestriction' => false,
             'model' => 'manual-fields:autre-configured',
         ];
@@ -647,7 +652,7 @@ class DemandeAiAssistant
         $normalizedSource = $this->normalizeForSearch($sourceText);
         $normalizedOptions = [];
         foreach ($options as $option) {
-            $optionText = trim((string) $option);
+            $optionText = trim($option);
             if ('' === $optionText) {
                 continue;
             }
@@ -661,10 +666,11 @@ class DemandeAiAssistant
 
         $genericOptionTokens = array_fill_keys(['autre', 'demande', 'formation', 'type', 'categorie', 'category', 'nature', 'option'], true);
         foreach ($normalizedOptions as [$optionText, $normalizedOption]) {
-            $tokens = preg_split('/\s+/', $normalizedOption) ?: [];
+            $tokens = preg_split('/\s+/', $normalizedOption);
+            $tokens = is_array($tokens) ? $tokens : [];
             $meaningfulTokens = [];
             foreach ($tokens as $token) {
-                $token = trim((string) $token);
+                $token = trim($token);
                 if (strlen($token) < 3 || isset($genericOptionTokens[$token])) {
                     continue;
                 }
@@ -754,7 +760,7 @@ class DemandeAiAssistant
         $normalized = mb_strtolower($normalized);
         $normalized = preg_replace('/[^a-z0-9\s\/+#.:-]+/u', ' ', $normalized) ?? $normalized;
 
-        return trim((string) (preg_replace('/\s+/u', ' ', $normalized) ?? $normalized));
+        return trim((preg_replace('/\s+/u', ' ', $normalized) ?? $normalized));
     }
 
     /**
@@ -762,7 +768,8 @@ class DemandeAiAssistant
      */
     private function tokenizeAutocorrectComparisonText(string $text): array
     {
-        $tokens = preg_split('/[^a-z0-9+#\/.-]+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $tokens = preg_split('/[^a-z0-9+#\/.-]+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
+        $tokens = is_array($tokens) ? $tokens : [];
         $tokens = array_values(array_unique(array_filter(array_map(
             static fn (string $token): string => trim($token),
             $tokens
@@ -783,14 +790,9 @@ class DemandeAiAssistant
                 'timeout' => $this->timeoutSeconds,
             ]);
 
-            /** @var mixed $payload */
             $payload = $response->toArray(false);
-            if (!is_array($payload)) {
-                return '';
-            }
-
-            $matches = $payload['matches'] ?? null;
-            if (!is_array($matches) || [] === $matches) {
+            $matches = $this->normalizeListArrayValue($payload['matches'] ?? null);
+            if ([] === $matches) {
                 return '';
             }
 
@@ -803,17 +805,17 @@ class DemandeAiAssistant
 
                 $offset = isset($match['offset']) ? (int) $match['offset'] : -1;
                 $length = isset($match['length']) ? (int) $match['length'] : 0;
-                $replacements = $match['replacements'] ?? null;
-                if ($offset < 0 || $length < 0 || !is_array($replacements) || [] === $replacements) {
+                $replacements = $this->normalizeListArrayValue($match['replacements'] ?? null);
+                if ($offset < 0 || $length < 0 || [] === $replacements) {
                     continue;
                 }
 
-                $first = $replacements[0] ?? null;
-                if (!is_array($first)) {
+                $first = $this->normalizeAssocArrayValue($replacements[0] ?? null);
+                if ([] === $first) {
                     continue;
                 }
 
-                $value = trim((string) ($first['value'] ?? ''));
+                $value = trim(($first['value'] ?? ''));
                 if ('' === $value) {
                     continue;
                 }
@@ -831,20 +833,20 @@ class DemandeAiAssistant
 
             usort(
                 $edits,
-                static fn(array $a, array $b): int => (int) $b['offset'] <=> (int) $a['offset']
+                static fn(array $a, array $b): int => $b['offset'] <=> $a['offset']
             );
 
             foreach ($edits as $edit) {
-                $offset = (int) $edit['offset'];
-                $length = (int) $edit['length'];
-                $value = (string) $edit['value'];
+                $offset = $edit['offset'];
+                $length = $edit['length'];
+                $value = $edit['value'];
 
                 $prefix = mb_substr($corrected, 0, $offset, 'UTF-8');
                 $suffix = mb_substr($corrected, $offset + $length, null, 'UTF-8');
                 $corrected = $prefix . $value . $suffix;
             }
 
-            $normalized = trim((string) (preg_replace('/\s+/u', ' ', $corrected) ?? $corrected));
+            $normalized = trim((preg_replace('/\s+/u', ' ', $corrected) ?? $corrected));
             if ('' === $normalized || 0 === strcasecmp($normalized, trim($text))) {
                 return '';
             }
@@ -912,13 +914,13 @@ class DemandeAiAssistant
 
         $parsed = $this->callLocalDescriptionModel([
             'title' => $normalizedTitle,
-            'typeDemande' => trim((string) ($typeDemande ?? '')),
-            'categorie' => trim((string) ($categorie ?? '')),
+            'typeDemande' => trim(($typeDemande ?? '')),
+            'categorie' => trim(($categorie ?? '')),
             'employeId' => $employeId,
         ]);
 
         return [
-            'description' => trim((string) ($parsed['description'] ?? '')),
+            'description' => trim(($parsed['description'] ?? '')),
             'model' => 'local-ml:demande_description_model.py',
         ];
     }
@@ -930,8 +932,8 @@ class DemandeAiAssistant
         ?string $categorie = null,
         ?int $employeId = null
     ): void {
-        $normalizedTitle = trim((string) (preg_replace('/\s+/u', ' ', $title) ?? $title));
-        $normalizedDescription = trim((string) (preg_replace('/\s+/u', ' ', $description) ?? $description));
+        $normalizedTitle = trim((preg_replace('/\s+/u', ' ', $title) ?? $title));
+        $normalizedDescription = trim((preg_replace('/\s+/u', ' ', $description) ?? $description));
 
         if ('' === $normalizedTitle || '' === $normalizedDescription) {
             return;
@@ -952,8 +954,8 @@ class DemandeAiAssistant
             'createdAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
             'employeId' => $employeId,
             'title' => $normalizedTitle,
-            'typeDemande' => trim((string) ($typeDemande ?? '')),
-            'categorie' => trim((string) ($categorie ?? '')),
+            'typeDemande' => trim(($typeDemande ?? '')),
+            'categorie' => trim(($categorie ?? '')),
             'description' => $normalizedDescription,
         ];
 
@@ -980,9 +982,9 @@ class DemandeAiAssistant
         ?int $employeId = null,
         array $generatedSnapshot = []
     ): void {
-        $normalizedPrompt = trim((string) (preg_replace('/\s+/u', ' ', $prompt) ?? $prompt));
-        $generalTitle = trim((string) ($general['titre'] ?? ''));
-        $generalDescription = trim((string) ($general['description'] ?? ''));
+        $normalizedPrompt = trim((preg_replace('/\s+/u', ' ', $prompt) ?? $prompt));
+        $generalTitle = trim(($general['titre'] ?? ''));
+        $generalDescription = trim(($general['description'] ?? ''));
 
         if ('' === $normalizedPrompt && '' === $generalTitle && '' === $generalDescription) {
             return;
@@ -1000,7 +1002,7 @@ class DemandeAiAssistant
         $normalizedGeneratedSnapshot = $this->normalizeGeneratedAutreSnapshot($generatedSnapshot);
         $isManualFields = true === ($fieldPlan['manualMode'] ?? false);
         foreach ((is_array($fieldPlan['add'] ?? null) ? $fieldPlan['add'] : []) as $field) {
-            if (is_array($field) && 'manual' === strtolower(trim((string) ($field['source'] ?? '')))) {
+            if (is_array($field) && 'manual' === strtolower(trim(($field['source'] ?? '')))) {
                 $isManualFields = true;
                 break;
             }
@@ -1016,9 +1018,9 @@ class DemandeAiAssistant
             'general' => [
                 'titre' => $generalTitle,
                 'description' => $generalDescription,
-                'priorite' => trim((string) ($general['priorite'] ?? '')),
-                'categorie' => trim((string) ($general['categorie'] ?? '')),
-                'typeDemande' => trim((string) ($general['typeDemande'] ?? 'Autre')),
+                'priorite' => trim(($general['priorite'] ?? '')),
+                'categorie' => trim(($general['categorie'] ?? '')),
+                'typeDemande' => trim(($general['typeDemande'] ?? 'Autre')),
             ],
             'details' => $sanitizedDetails,
             'fieldPlan' => $normalizedFieldPlan,
@@ -1055,7 +1057,7 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $key = trim((string) ($field['key'] ?? ''));
+            $key = trim(($field['key'] ?? ''));
             if ($manualMode && $this->isGeneratedAutreFieldSource($field['source'] ?? null)) {
                 if ('' !== $key) {
                     unset($sanitizedDetails[$key]);
@@ -1074,23 +1076,23 @@ class DemandeAiAssistant
             $keptKeys[$key] = true;
             if ($manualMode) {
                 $valueKey = $this->duplicateAutreFieldValueKey(
-                    strtolower(trim((string) ($field['type'] ?? 'text'))),
-                    trim((string) ($sanitizedDetails[$key] ?? ''))
+                    strtolower(trim(($field['type'] ?? 'text'))),
+                    trim(($sanitizedDetails[$key] ?? ''))
                 );
                 if ('' !== $valueKey) {
                     $score = $this->duplicateAutreFieldPreferenceScore(
                         $key,
-                        trim((string) ($field['label'] ?? $key)),
-                        strtolower(trim((string) ($field['type'] ?? 'text'))),
+                        trim(($field['label'] ?? $key)),
+                        strtolower(trim(($field['type'] ?? 'text'))),
                         true === ($field['required'] ?? false),
-                        trim((string) ($sanitizedDetails[$key] ?? ''))
+                        trim(($sanitizedDetails[$key] ?? ''))
                     );
 
                     if (isset($seenValues[$valueKey])) {
                         $previousIndex = $seenValues[$valueKey]['index'];
                         $previousScore = $seenValues[$valueKey]['score'];
                         if ($score > $previousScore && isset($normalizedAdd[$previousIndex])) {
-                            $previousKey = trim((string) ($normalizedAdd[$previousIndex]['key'] ?? ''));
+                            $previousKey = trim(($normalizedAdd[$previousIndex]['key'] ?? ''));
                             if ('' !== $previousKey) {
                                 unset($sanitizedDetails[$previousKey]);
                             }
@@ -1141,23 +1143,23 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $key = trim((string) ($field['key'] ?? ''));
+            $key = trim(($field['key'] ?? ''));
             if ('' === $key || isset($seen[$key])) {
                 continue;
             }
 
             $seen[$key] = true;
-            $type = strtolower(trim((string) ($field['type'] ?? 'text')));
+            $type = strtolower(trim(($field['type'] ?? 'text')));
             if (!in_array($type, ['text', 'textarea', 'select', 'number', 'date'], true)) {
                 $type = 'text';
             }
 
             $normalizedField = [
                 'key' => $key,
-                'label' => trim((string) ($field['label'] ?? $key)),
+                'label' => trim(($field['label'] ?? $key)),
                 'type' => $type,
                 'required' => true === ($field['required'] ?? false),
-                'value' => trim((string) ($details[$key] ?? ($field['value'] ?? ''))),
+                'value' => trim(($details[$key] ?? ($field['value'] ?? ''))),
             ];
 
             if ('select' === $type && is_array($field['options'] ?? null)) {
@@ -1207,9 +1209,9 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $key = trim((string) ($field['key'] ?? ''));
-            $type = trim((string) ($field['type'] ?? 'text'));
-            $label = trim((string) ($field['label'] ?? $key));
+            $key = trim(($field['key'] ?? ''));
+            $type = trim(($field['type'] ?? 'text'));
+            $label = trim(($field['label'] ?? $key));
             $options = isset($field['options']) && is_array($field['options'])
                 ? array_values(array_map('strval', $field['options']))
                 : [];
@@ -1231,7 +1233,7 @@ class DemandeAiAssistant
                 'dateFin', 'dateFinTeletravail' => $allDates[1] ?? '',
                 'nombreJours' => $this->extractDaysCount($normalizedText, $allDates),
                 'motif', 'motifHoraires', 'motifTeletravail', 'motifHeuresSup', 'objectif', 'objectifFormation', 'justification', 'justificationLogiciel', 'justificationCertif', 'descriptionProbleme', 'details' => $text,
-                'nombreExemplaires' => $this->extractIntegerNearKeywords($normalizedText, ['exemplaire', 'copie']) ?: '1',
+                'nombreExemplaires' => '' !== ($count = $this->extractIntegerNearKeywords($normalizedText, ['exemplaire', 'copie'])) ? $count : '1',
                 'motifAttestation' => $this->matchOptionByKeywords($options, $normalizedText, [
                     'Banque' => ['banque', 'credit', 'crédit', 'pret', 'prêt'],
                     'Visa' => ['visa', 'consulat', 'ambassade'],
@@ -1349,7 +1351,7 @@ class DemandeAiAssistant
                 default => $this->inferGenericFieldValue($key, $type, $label, $options, $text, $normalizedText, $allDates, $amount, $location),
             };
 
-            $value = trim((string) $value);
+            $value = trim($value);
             if ('' !== $value && $this->shouldApplySuggestedDetailFromPrompt($key, $type, $label, $options, $value, $text)) {
                 $details[$key] = $value;
             }
@@ -1386,7 +1388,8 @@ class DemandeAiAssistant
                     return true;
                 }
 
-                $tokens = preg_split('/\s+/', $optionNorm) ?: [];
+                $tokens = preg_split('/\s+/', $optionNorm);
+                $tokens = is_array($tokens) ? $tokens : [];
                 $meaningfulTokens = array_values(array_filter($tokens, static function (string $token): bool {
                     return strlen($token) >= 3 && !in_array($token, ['autre', 'demande', 'type', 'option', 'oui', 'non'], true);
                 }));
@@ -1406,7 +1409,8 @@ class DemandeAiAssistant
             return true;
         }
 
-        $fieldTerms = preg_split('/\s+/', $this->normalizeForSearch($key . ' ' . $label)) ?: [];
+        $fieldTerms = preg_split('/\s+/', $this->normalizeForSearch($key . ' ' . $label));
+        $fieldTerms = is_array($fieldTerms) ? $fieldTerms : [];
         $meaningfulFieldTerms = array_values(array_filter($fieldTerms, static function (string $token): bool {
             return strlen($token) >= 4 && !in_array($token, ['demande', 'champ', 'type', 'autre'], true);
         }));
@@ -1472,7 +1476,7 @@ class DemandeAiAssistant
 
         $optionalFieldKeys = [];
         foreach ($allowedKeys as $key) {
-            if (empty($requiredKeys[$key])) {
+            if (!($requiredKeys[$key] ?? false)) {
                 $optionalFieldKeys[] = $key;
             }
         }
@@ -1481,7 +1485,7 @@ class DemandeAiAssistant
             . "Renvoie STRICTEMENT un JSON valide, sans markdown, sans texte avant/apres.\n"
             . "Tu dois renvoyer un objet JSON racine avec les cles: correctedText, general, details, remove_fields, custom_fields, replace_base.\n"
             . "Les cles details autorisees sont: " . json_encode(array_values($allowedKeys), JSON_UNESCAPED_UNICODE) . "\n"
-            . "Cles details obligatoires: " . json_encode(array_values(array_filter($allowedKeys, fn($k) => !empty($requiredKeys[$k]))), JSON_UNESCAPED_UNICODE) . "\n"
+            . "Cles details obligatoires: " . json_encode(array_values(array_filter($allowedKeys, static fn (string $key): bool => (bool) ($requiredKeys[$key] ?? false))), JSON_UNESCAPED_UNICODE) . "\n"
             . "Cles details optionnelles supprimables: " . json_encode($optionalFieldKeys, JSON_UNESCAPED_UNICODE) . "\n"
             . "Contraintes:\n"
             . "- correctedText: correction orthographique et grammaticale du userPromptAutre, ton professionnel, sens conserve. IMPORTANT: correctedText ne doit JAMAIS contenir de structure template comme 'Bonjour, je souhaite soumettre une demande liee a...'. Renvoie seulement le texte corrige.\n"
@@ -1503,52 +1507,6 @@ class DemandeAiAssistant
             . "Libelles metiers des champs: " . json_encode($fieldLabels, JSON_UNESCAPED_UNICODE) . "\n"
             . "Contexte utilisateur: " . json_encode($context, JSON_UNESCAPED_UNICODE) . "\n"
             . "Exemple de forme attendue: " . json_encode($rootSchemaExample, JSON_UNESCAPED_UNICODE);
-    }
-
-    /**
-     * @param array<string, array<int, string>> $categoryTypes
-     * @param array<int, string> $priorities
-     */
-    private function buildClassificationPrompt(string $rawText, array $categoryTypes, array $priorities): string
-    {
-        $availableCategories = array_values(array_keys($categoryTypes));
-        $typeMap = [];
-
-        foreach ($categoryTypes as $category => $types) {
-            $typeMap[(string) $category] = array_values(array_map('strval', $types));
-        }
-
-        $example = [
-            'correctedText' => 'Je souhaite obtenir un acces a Salesforce pour mon nouveau poste.',
-            'categorie' => 'Informatique',
-            'typeDemande' => 'Acces systeme',
-            'priorite' => 'NORMALE',
-            'titre' => 'Demande d acces a Salesforce',
-            'description' => 'Le collaborateur demande un acces a Salesforce dans le cadre de sa nouvelle prise de poste.',
-            'confidence' => 0.93,
-        ];
-
-        return "Tu es un assistant de classification de demandes internes en francais.\n"
-            . "Ta mission:\n"
-            . "1. Corriger l orthographe, la grammaire et les fautes de frappe du texte utilisateur.\n"
-            . "2. Conserver le sens metier du besoin.\n"
-            . "3. Choisir la meilleure categorie, le meilleur type de demande et la priorite la plus adaptee.\n"
-            . "4. Produire un titre court et une description propre pour un stockage fiable.\n"
-            . "Renvoie STRICTEMENT un JSON valide, sans markdown.\n"
-            . "Clés obligatoires: correctedText, categorie, typeDemande, priorite, titre, description, confidence.\n"
-            . "Categories autorisees: " . json_encode($availableCategories, JSON_UNESCAPED_UNICODE) . "\n"
-            . "Types autorises par categorie: " . json_encode($typeMap, JSON_UNESCAPED_UNICODE) . "\n"
-            . "Priorites autorisees: " . json_encode(array_values($priorities), JSON_UNESCAPED_UNICODE) . "\n"
-            . "Regles:\n"
-            . "- correctedText: texte corrige, naturel et professionnel.\n"
-            . "- categorie: une seule categorie autorisee.\n"
-            . "- typeDemande: un seul type appartenant a la categorie choisie.\n"
-            . "- priorite: uniquement une valeur autorisee.\n"
-            . "- titre: court, clair, exploitable en base.\n"
-            . "- description: 1 a 3 phrases propres, sans inventer des details absents.\n"
-            . "- confidence: nombre entre 0 et 1.\n"
-            . "Texte utilisateur brut: " . json_encode($rawText, JSON_UNESCAPED_UNICODE) . "\n"
-            . "Exemple attendu: " . json_encode($example, JSON_UNESCAPED_UNICODE);
     }
 
     private function buildDescriptionFromTitlePrompt(string $title, ?string $typeDemande, ?string $categorie, ?int $employeId): string
@@ -1576,8 +1534,8 @@ class DemandeAiAssistant
             . "- Priorite absolue au titre utilisateur: les mots du titre priment sur toute generalisation.\n"
             . "- Ne pas copier mot a mot les exemples de style; inspire-toi seulement de leur ton et structure.\n"
             . "Titre: " . json_encode($title, JSON_UNESCAPED_UNICODE) . "\n"
-            . "Type de demande: " . json_encode((string) ($typeDemande ?? ''), JSON_UNESCAPED_UNICODE) . "\n"
-            . "Categorie: " . json_encode((string) ($categorie ?? ''), JSON_UNESCAPED_UNICODE) . "\n"
+            . "Type de demande: " . json_encode($typeDemande ?? '', JSON_UNESCAPED_UNICODE) . "\n"
+            . "Categorie: " . json_encode($categorie ?? '', JSON_UNESCAPED_UNICODE) . "\n"
             . "Contexte adaptatif appris: " . json_encode($adaptiveContext, JSON_UNESCAPED_UNICODE) . "\n"
             . "Exemple attendu: " . json_encode($example, JSON_UNESCAPED_UNICODE);
     }
@@ -1595,15 +1553,11 @@ class DemandeAiAssistant
             ];
         }
 
-        $normalizedType = $this->normalizeLooseLabel((string) ($typeDemande ?? ''));
-        $normalizedCategorie = $this->normalizeLooseLabel((string) ($categorie ?? ''));
+        $normalizedType = $this->normalizeLooseLabel($typeDemande ?? '');
+        $normalizedCategorie = $this->normalizeLooseLabel($categorie ?? '');
 
         $ranked = [];
         foreach ($samples as $sample) {
-            if (!is_array($sample)) {
-                continue;
-            }
-
             $score = 0;
             $sampleEmploye = isset($sample['employeId']) && is_numeric((string) $sample['employeId'])
                 ? (int) $sample['employeId']
@@ -1630,13 +1584,13 @@ class DemandeAiAssistant
 
         $picked = [];
         foreach ($ranked as $item) {
-            $description = trim((string) (($item['sample']['description'] ?? '')));
+            $description = trim((string) ($item['sample']['description'] ?? ''));
             if ('' === $description) {
                 continue;
             }
 
             $picked[] = [
-                'score' => (int) ($item['score'] ?? 0),
+                'score' => $item['score'],
                 'typeDemande' => (string) (($item['sample']['typeDemande'] ?? '')),
                 'categorie' => (string) (($item['sample']['categorie'] ?? '')),
                 'description' => $this->truncateText($description, 260),
@@ -1649,7 +1603,7 @@ class DemandeAiAssistant
 
         $wordCounts = [];
         foreach ($picked as $sample) {
-            $wordCounts[] = str_word_count((string) ($sample['description'] ?? ''));
+            $wordCounts[] = str_word_count($sample['description']);
         }
 
         $avgWords = [] !== $wordCounts ? (int) round(array_sum($wordCounts) / count($wordCounts)) : 0;
@@ -1684,8 +1638,8 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $description = trim((string) ($decoded['description'] ?? ''));
-            $title = trim((string) ($decoded['title'] ?? ''));
+            $description = trim(($decoded['description'] ?? ''));
+            $title = trim(($decoded['title'] ?? ''));
             if ('' === $description || '' === $title) {
                 continue;
             }
@@ -1731,13 +1685,13 @@ class DemandeAiAssistant
     {
         $sanitized = [];
         foreach ($values as $key => $value) {
-            $normalizedKey = trim((string) $key);
+            $normalizedKey = trim($key);
             if ('' === $normalizedKey) {
                 continue;
             }
 
             if (is_scalar($value)) {
-                $clean = trim((string) (preg_replace('/\s+/u', ' ', (string) $value) ?? (string) $value));
+                $clean = trim((preg_replace('/\s+/u', ' ', (string) $value) ?? (string) $value));
                 if ('' === $clean) {
                     continue;
                 }
@@ -1751,12 +1705,12 @@ class DemandeAiAssistant
                     $clean = preg_replace('/\b(?:car|parce\s+que|afin\s+de|pour)\b.*$/u', '', $clean) ?? $clean;
                     $clean = preg_replace('/\b(?:tot|t[oô]t)\s+le\s+matin\b.*$/u', '', $clean) ?? $clean;
                     $clean = preg_replace('/\b(?:matin|apres\s*midi|soir|nuit)\b.*$/u', '', $clean) ?? $clean;
-                    $clean = trim((string) (preg_replace('/\s+/u', ' ', $clean) ?? $clean), " ,;:-");
+                    $clean = trim((preg_replace('/\s+/u', ' ', $clean) ?? $clean), " ,;:-");
                     if ('' !== $clean) {
                         $clean = mb_strtoupper(mb_substr($clean, 0, 1, 'UTF-8'), 'UTF-8') . mb_substr($clean, 1, null, 'UTF-8');
                     }
                 } elseif ('ai_horaire_arrivee' === $normalizedKey) {
-                    $clean = trim((string) (preg_replace('/\s+/u', ' ', $clean) ?? $clean));
+                    $clean = trim((preg_replace('/\s+/u', ' ', $clean) ?? $clean));
                 }
 
                 if ('' !== $clean) {
@@ -1770,7 +1724,7 @@ class DemandeAiAssistant
 
     private function normalizeLooseLabel(string $value): string
     {
-        $normalized = trim((string) (preg_replace('/\s+/u', ' ', $value) ?? $value));
+        $normalized = trim((preg_replace('/\s+/u', ' ', $value) ?? $value));
         $normalized = strtolower($normalized);
         if (!function_exists('iconv')) {
             return $normalized;
@@ -1783,7 +1737,7 @@ class DemandeAiAssistant
 
     private function truncateText(string $text, int $maxLength): string
     {
-        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        $clean = trim((preg_replace('/\s+/u', ' ', $text) ?? $text));
         if (strlen($clean) <= $maxLength) {
             return $clean;
         }
@@ -1793,7 +1747,7 @@ class DemandeAiAssistant
 
     private function normalizeGeneratedDescriptionFromTitle(string $description, string $title): string
     {
-        $clean = trim((string) (preg_replace('/\s+/u', ' ', $description) ?? $description));
+        $clean = trim((preg_replace('/\s+/u', ' ', $description) ?? $description));
 
         if ('' === $clean) {
             return $this->buildDeterministicDescriptionFromTitle($title);
@@ -1804,58 +1758,16 @@ class DemandeAiAssistant
             $clean = 'Bonjour, ' . ltrim($clean, ',;:. ');
         }
 
-        if (!preg_match('/[.!?]$/', $clean)) {
+        if (preg_match('/[.!?]$/', $clean) !== 1) {
             $clean .= '.';
         }
 
         return $clean;
     }
 
-    private function generateDescriptionFromTitleWithFallback(
-        string $title,
-        ?string $typeDemande,
-        ?string $categorie,
-        ?int $employeId
-    ): string {
-        $prompt = $this->buildDescriptionFromTitlePrompt($title, $typeDemande, $categorie, $employeId);
-
-        if ('' !== trim($this->apiKey)) {
-            try {
-                $temperature = random_int(58, 78) / 100;
-                $rawResponse = $this->callHuggingFaceViaHttp($prompt, $temperature, 320);
-                $parsed = $this->parseJsonResponse($rawResponse);
-                $description = trim((string) ($parsed['description'] ?? ''));
-                if ('' !== $description) {
-                    return $this->normalizeGeneratedDescriptionFromTitle($description, $title);
-                }
-            } catch (\RuntimeException $e) {
-                $this->logger->warning('Generation description via HTTP indisponible, tentative fallback local.', [
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        if ($this->canUsePythonRunner()) {
-            try {
-                $rawResponse = $this->callHuggingFace($prompt);
-                $parsed = $this->parseJsonResponse($rawResponse);
-                $description = trim((string) ($parsed['description'] ?? ''));
-                if ('' !== $description) {
-                    return $this->normalizeGeneratedDescriptionFromTitle($description, $title);
-                }
-            } catch (\RuntimeException $e) {
-                $this->logger->warning('Generation description via runner local indisponible, fallback deterministe.', [
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        return $this->buildDeterministicDescriptionFromTitle($title);
-    }
-
     private function buildDeterministicDescriptionFromTitle(string $title): string
     {
-        $cleanTitle = trim((string) (preg_replace('/\s+/u', ' ', $title) ?? $title));
+        $cleanTitle = trim((preg_replace('/\s+/u', ' ', $title) ?? $title));
         if ('' === $cleanTitle) {
             return 'Bonjour, je souhaite soumettre une demande. Je reste disponible pour fournir les informations complementaires necessaires.';
         }
@@ -1940,7 +1852,7 @@ class DemandeAiAssistant
                     continue;
                 }
 
-                $text = trim((string) ($decoded['text'] ?? ''));
+                $text = trim(($decoded['text'] ?? ''));
                 if ('' === $text) {
                     $lastError = 'Python AI runner returned an empty text response.';
                     continue;
@@ -2031,9 +1943,9 @@ class DemandeAiAssistant
             }
 
             $sourceText = $this->firstNonEmpty(
-                trim((string) ($generalContext['aiDescriptionPrompt'] ?? '')),
-                trim((string) ($generalContext['description'] ?? '')),
-                trim((string) ($generalContext['titre'] ?? ''))
+                trim(($generalContext['aiDescriptionPrompt'] ?? '')),
+                trim(($generalContext['description'] ?? '')),
+                trim(($generalContext['titre'] ?? ''))
             );
 
             $parsed = $this->callLocalGenerationModel([
@@ -2084,7 +1996,7 @@ class DemandeAiAssistant
                 $process->run();
 
                 if (!$process->isSuccessful()) {
-                    $lastError = trim($process->getErrorOutput() ?: $process->getOutput());
+                    $lastError = trim('' !== trim($process->getErrorOutput()) ? $process->getErrorOutput() : $process->getOutput());
                     continue;
                 }
 
@@ -2201,7 +2113,7 @@ class DemandeAiAssistant
         $normalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $configured);
         $hasPathSeparator = str_contains($normalized, DIRECTORY_SEPARATOR);
 
-        if ($hasPathSeparator && !preg_match('/^[A-Za-z]:\\\\|^\//', $normalized)) {
+        if ($hasPathSeparator && preg_match('/^[A-Za-z]:\\\\|^\//', $normalized) !== 1) {
             $normalized = $projectRoot . DIRECTORY_SEPARATOR . ltrim($normalized, DIRECTORY_SEPARATOR);
         }
 
@@ -2248,7 +2160,7 @@ class DemandeAiAssistant
             $paths = glob($localAppData . DIRECTORY_SEPARATOR . 'Programs' . DIRECTORY_SEPARATOR . 'Python' . DIRECTORY_SEPARATOR . 'Python*' . DIRECTORY_SEPARATOR . 'python.exe');
             if (is_array($paths)) {
                 foreach ($paths as $path) {
-                    if (is_string($path) && is_file($path)) {
+                    if (is_file($path)) {
                         $candidates[] = $path;
                     }
                 }
@@ -2291,25 +2203,22 @@ class DemandeAiAssistant
         $deduped = [];
         $seen = [];
         foreach ($samples as $sample) {
-            if (!is_array($sample)) {
-                continue;
-            }
-
             $prompt = trim((string) ($sample['prompt'] ?? ''));
-            $general = is_array($sample['general'] ?? null) ? $sample['general'] : [];
-            $details = is_array($sample['details'] ?? null) ? $sample['details'] : [];
-            $fieldPlan = is_array($sample['fieldPlan'] ?? null) ? $sample['fieldPlan'] : [];
-            $generatedSnapshot = is_array($sample['generatedSnapshot'] ?? null) ? $sample['generatedSnapshot'] : [];
+            $general = $sample['general'] ?? [];
+            $details = $sample['details'] ?? [];
+            $fieldPlan = $sample['fieldPlan'] ?? [];
+            $generatedSnapshot = $sample['generatedSnapshot'] ?? [];
 
             if ('' === $prompt && [] === $general && [] === $details) {
                 continue;
             }
 
-            $signature = md5(json_encode([
+            $encodedSignature = json_encode([
                 'prompt' => $prompt,
                 'general' => $general,
                 'details' => $details,
-            ], JSON_UNESCAPED_UNICODE) ?: $prompt);
+            ], JSON_UNESCAPED_UNICODE);
+            $signature = md5(false !== $encodedSignature ? $encodedSignature : $prompt);
 
             if (isset($seen[$signature])) {
                 continue;
@@ -2378,7 +2287,6 @@ class DemandeAiAssistant
                 'timeout' => $this->timeoutSeconds,
             ]);
 
-            /** @var mixed $payload */
             $payload = $response->toArray(false);
 
             if (isset($payload['error']) && is_string($payload['error'])) {
@@ -2397,20 +2305,19 @@ class DemandeAiAssistant
                 return $payload['generated_text'];
             }
 
-            if (is_array($payload) && isset($payload[0]['generated_text']) && is_string($payload[0]['generated_text'])) {
+            if (isset($payload[0]['generated_text']) && is_string($payload[0]['generated_text'])) {
                 return $payload[0]['generated_text'];
             }
 
             if (
                 isset($payload['choices']) &&
-                is_array($payload['choices']) &&
-                isset($payload['choices'][0]['message']['content']) &&
-                is_string($payload['choices'][0]['message']['content'])
+                isset($payload['choices'][0]['message']['content'])
             ) {
-                return $payload['choices'][0]['message']['content'];
+                return (string) $payload['choices'][0]['message']['content'];
             }
 
-            return json_encode($payload, JSON_UNESCAPED_UNICODE) ?: '';
+            $encodedPayload = json_encode($payload, JSON_UNESCAPED_UNICODE);
+            return false !== $encodedPayload ? $encodedPayload : '';
         } catch (\RuntimeException $e) {
             $rawMessage = $e->getMessage();
             $this->logger->error('Erreur Hugging Face description', ['exception' => $rawMessage]);
@@ -2486,10 +2393,31 @@ class DemandeAiAssistant
 
         return false;
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeAssocArrayValue(mixed $value): array
+    {
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function normalizeListArrayValue(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        return array_values($value);
+    }
+
     /**
      * @param array<int, array<string, mixed>> $customFields
      * @param array<int, string> $removeFields
-     * @return array<string, string|int>
+     * @return array<string, int|string>
      */
     private function buildAutrePlanConfidence(
         array $customFields,
@@ -2505,10 +2433,6 @@ class DemandeAiAssistant
         $filledCount = 0;
 
         foreach ($customFields as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
             if (true === ($field['required'] ?? false)) {
                 ++$requiredCount;
             }
@@ -2571,91 +2495,13 @@ class DemandeAiAssistant
     private function extractAmountFromText(string $text): ?float
     {
         if (preg_match('/\b(\d+(?:[\.,]\d{1,2})?)\s*(dt|tnd|dinar|dinars)\b/i', $text, $matches) === 1) {
-            $value = str_replace(',', '.', (string) ($matches[1] ?? ''));
+            $value = str_replace(',', '.', $matches[1]);
             if (is_numeric($value)) {
                 return (float) $value;
             }
         }
 
         return null;
-    }
-
-    private function inferFormationType(string $text): string
-    {
-        if ($this->isFormationNoiseOnlyContext($text)) {
-            return '';
-        }
-
-        $explicitType = $this->extractExplicitFormationType($text);
-        if ('' !== $explicitType) {
-            return $explicitType;
-        }
-
-        if ($this->containsWord($text, 'certification')) {
-            return 'Certification';
-        }
-
-        if ($this->containsWord($text, 'formation interne') || ($this->containsWord($text, 'formation') && $this->containsWord($text, 'interne'))) {
-            return 'Formation interne';
-        }
-
-        if ($this->containsWord($text, 'formation externe') || ($this->containsWord($text, 'formation') && $this->containsWord($text, 'externe'))) {
-            return 'Formation externe';
-        }
-
-        if (
-            $this->containsWord($text, 'type de formation') ||
-            preg_match('/formation\s+est\s+une\s+formation/iu', $text) === 1
-        ) {
-            return 'Autre';
-        }
-
-        if ($this->containsAnyWord($text, ['formation', 'cours', 'training'])) {
-            return 'Formation externe';
-        }
-
-        return '';
-    }
-
-    private function inferDefaultFormationType(string $text, string $formationName): string
-    {
-        $normalizedName = $this->normalizeForSearch($formationName);
-        if ('' !== $normalizedName) {
-            if (
-                str_contains($normalizedName, 'certif') ||
-                str_contains($normalizedName, 'certification') ||
-                str_contains($normalizedName, 'iso')
-            ) {
-                return 'Certification';
-            }
-
-            // For named topics like Java/UI/UX, default to external training.
-            return 'Formation externe';
-        }
-
-        return $this->containsAnyWord($text, ['formation', 'cours', 'training'])
-            ? 'Formation externe'
-            : '';
-    }
-
-    private function extractExplicitFormationType(string $text): string
-    {
-        $normalized = $this->normalizeForSearch($text);
-        if ('' === $normalized) {
-            return '';
-        }
-
-        if (preg_match('/type de formation\s*(?:est|:|-)?\s*(interne|externe|certification|autre)\b/i', $normalized, $matches) === 1) {
-            return match (strtolower((string) ($matches[1] ?? ''))) {
-                'interne' => 'Formation interne',
-                'externe' => 'Formation externe',
-                'certification' => 'Certification',
-                'autre' => 'Autre',
-                default => '',
-            };
-        }
-
-        return '';
     }
 
     private function extractCurrentLocation(string $rawText): string
@@ -2671,11 +2517,11 @@ class DemandeAiAssistant
         }
 
         if (preg_match('/(?:lieu\s+de\s+d[ée]part(?:\s+actuel)?|depart\s+actuel|d[ée]part\s+de)\s*[:\-]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:vers|a|à|pour|la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
-            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation($matches[1]);
         }
 
         if (preg_match('/(?:actuellement|je\s+suis\s+actuellement|je\s+suis|situee?|située?)\s+(?:a|à|dans)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80})/iu', $rawText, $matches) === 1) {
-            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation($matches[1]);
         }
 
         return '';
@@ -2689,23 +2535,23 @@ class DemandeAiAssistant
         }
 
         if (preg_match('/(?:lieu\s+de\s+d[ée]part(?:\s+actuel)?\s*[:\-]?\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?\s+vers\s+|\bvers\s+)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est|je\b|j\b|nous\b|on\b)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
-            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation($matches[1]);
         }
 
         if (preg_match('/formation\s+(?:a|à|dans)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
-            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation($matches[1]);
         }
 
         if (preg_match('/(?:vers|destination\s*:?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
-            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation($matches[1]);
         }
 
         if (preg_match('/\b(?:a|à|dans)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:qui|que|dont|le|du|de|pour|afin|car|avec|des|a\s+partir|depuis|jusqu|debut|debute|commence)\b|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
-            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation($matches[1]);
         }
 
         if (preg_match('/\bdans\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:la\s+formation|le\s+type|type\s+de\s+formation|formation\s+est)|[\.,;"\'»”]|$)/iu', $rawText, $matches) === 1) {
-            return $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
+            return $this->sanitizeLikelyLocation($matches[1]);
         }
 
         return '';
@@ -2719,7 +2565,7 @@ class DemandeAiAssistant
         $compactText = $this->normalizeForSearch($rawText);
 
         if (preg_match('/\bvers\s+([a-z0-9\- ]{2,60}?)(?=\b(?:pour|afin|car|avec|la|le|je|j|nous|on|formation|certification|transport)\b|$)/iu', $compactText, $toMatch) === 1) {
-            $to = $this->sanitizeLikelyLocation((string) ($toMatch[1] ?? ''));
+            $to = $this->sanitizeLikelyLocation($toMatch[1]);
             $from = $this->extractLocationFromDeparturePhrase($rawText);
 
             if ('' !== $from && '' !== $to) {
@@ -2730,13 +2576,13 @@ class DemandeAiAssistant
         if (
             preg_match('/(.{0,220}?)\bvers\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80}?)(?=\s+(?:pour|afin|car|avec|depuis|du|dés|type\s+de\s+formation|formation\s+est|le\s+type|la\s+formation|je\b|j\b|nous\b|on\b)\b|[\.,;"\'»”]|$)/iu', $rawText, $contextMatch) === 1
         ) {
-            $leftContext = trim((string) ($contextMatch[1] ?? ''));
-            $to = $this->sanitizeLikelyLocation((string) ($contextMatch[2] ?? ''));
+            $leftContext = trim($contextMatch[1]);
+            $to = $this->sanitizeLikelyLocation($contextMatch[2]);
 
             if (
                 preg_match('/(?:de|du|des|d[\'’]|depuis)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’\- ]{1,80})$/iu', $leftContext, $fromMatch) === 1
             ) {
-                $from = $this->sanitizeLikelyLocation((string) ($fromMatch[1] ?? ''));
+                $from = $this->sanitizeLikelyLocation($fromMatch[1]);
                 if ('' !== $from && '' !== $to) {
                     return ['from' => $from, 'to' => $to];
                 }
@@ -2750,8 +2596,8 @@ class DemandeAiAssistant
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $rawText, $matches) === 1) {
-                $from = $this->sanitizeLikelyLocation((string) ($matches[1] ?? ''));
-                $to = $this->sanitizeLikelyLocation((string) ($matches[2] ?? ''));
+                $from = $this->sanitizeLikelyLocation($matches[1]);
+                $to = $this->sanitizeLikelyLocation($matches[2]);
 
                 if ('' === $from || '' === $to) {
                     continue;
@@ -2773,7 +2619,7 @@ class DemandeAiAssistant
 
         // Prefer structural route phrase "de X vers Y" when present.
         if (preg_match('/\b(?:de|du|des|d)\s+([a-z0-9\- ]{2,60}?)\s+vers\b/iu', $compactText, $routeMatch) === 1) {
-            $routeCandidate = $this->sanitizeLikelyLocation((string) ($routeMatch[1] ?? ''));
+            $routeCandidate = $this->sanitizeLikelyLocation($routeMatch[1]);
             if ('' !== $routeCandidate) {
                 return $routeCandidate;
             }
@@ -2784,15 +2630,15 @@ class DemandeAiAssistant
             return '';
         }
 
-        $candidates = $matches[1] ?? [];
-        if (!is_array($candidates) || [] === $candidates) {
+        $candidates = $matches[1];
+        if ([] === $candidates) {
             return '';
         }
 
         // Iterate from first to last to avoid grabbing trailing reason clauses
         // like "de visiter ma famille".
         foreach ($candidates as $candidateRaw) {
-            $candidate = $this->sanitizeLikelyLocation((string) ($candidateRaw ?? ''));
+            $candidate = $this->sanitizeLikelyLocation($candidateRaw);
             if ('' !== $candidate) {
                 return $candidate;
             }
@@ -2811,7 +2657,7 @@ class DemandeAiAssistant
         $clean = preg_replace('/^(?:transport|deplacement|déplacement|voyage|trajet)\s+/iu', '', $clean) ?? $clean;
 
         if (preg_match('/\bvers\s+(.+)$/iu', $clean, $routeMatch) === 1) {
-            $clean = trim((string) ($routeMatch[1] ?? ''));
+            $clean = trim($routeMatch[1]);
         }
 
         $clean = preg_replace('/^(?:de|du|des|d[\'’])\s+/iu', '', $clean) ?? $clean;
@@ -2827,7 +2673,7 @@ class DemandeAiAssistant
 
         $parts = preg_split('/\s+(?:et|mais|car|pour|puis|avec|qui|que)\s+/iu', $clean);
         if (is_array($parts) && isset($parts[0])) {
-            $clean = trim((string) $parts[0]);
+            $clean = trim($parts[0]);
         }
 
         return substr($clean, 0, 80);
@@ -2890,7 +2736,7 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $candidate = trim((string) ($matches[1] ?? ''));
+            $candidate = trim($matches[1]);
             $candidate = preg_replace('/\s+/', ' ', $candidate) ?? $candidate;
             $candidate = preg_replace('/[\.,;:]+$/', '', $candidate) ?? $candidate;
             $candidate = $this->cleanupTrainingNameCandidate($candidate);
@@ -2943,7 +2789,7 @@ class DemandeAiAssistant
         }
 
         if (preg_match("/[\"'«](.{12,260}?)[\"'»]/u", $text, $matches) === 1) {
-            $quoted = trim((string) ($matches[1] ?? ''));
+            $quoted = trim($matches[1]);
             if ('' !== $quoted) {
                 return $quoted;
             }
@@ -2955,38 +2801,10 @@ class DemandeAiAssistant
         $clean = preg_replace('/\bcette\s+demande\s+correspond\s+.*$/iu', '', $clean) ?? $clean;
         $clean = preg_replace('/\s+/', ' ', $clean) ?? $clean;
 
-        return trim((string) substr($clean, 0, 280));
+        return trim(substr($clean, 0, 280));
     }
 
-    private function extractParkingZone(string $text): string
-    {
-        if (preg_match("/\b(?:proche|pres|pr[eè]s|a\s+cote\s+de|a\s+proximite\s+de)\s+([A-Za-zÀ-ÿ0-9'’\- ]{2,80})/iu", $text, $matches) === 1) {
-            return $this->cleanupLocationCandidate((string) ($matches[1] ?? ''));
-        }
 
-        if ($this->containsWord($text, 'entree')) {
-            return 'Entree principale';
-        }
-
-        if ($this->containsWord($text, 'parking')) {
-            return 'Parking principal';
-        }
-
-        return '';
-    }
-
-    private function extractPreferredArrivalTime(string $text): string
-    {
-        if (preg_match('/\b([01]?\d|2[0-3])[:h]([0-5]\d)\b/u', $text, $matches) === 1) {
-            return sprintf('%02d:%02d', (int) ($matches[1] ?? 0), (int) ($matches[2] ?? 0));
-        }
-
-        if ($this->containsAnyWord($text, ['jarrive tot', 'j arrive tot', 'arrive tot', 'arrivee tot', 'tres tot'])) {
-            return 'Tot le matin';
-        }
-
-        return '';
-    }
 
     /**
      * @param array<string, mixed> $generalContext
@@ -3077,26 +2895,12 @@ class DemandeAiAssistant
             $scores[$category] = 0;
             foreach ($keywords as $keyword => $weight) {
                 if ($this->containsWord($text, $keyword)) {
-                    $scores[$category] += (int) $weight;
+                    $scores[$category] += $weight;
                 }
             }
         }
 
         return $scores;
-    }
-
-    /**
-     * @param array<int, string> $keywords
-     */
-    private function containsAny(string $text, array $keywords): bool
-    {
-        foreach ($keywords as $keyword) {
-            if ($this->containsWord($text, (string) $keyword)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function containsFragment(string $text, string $fragment): bool
@@ -3168,42 +2972,6 @@ class DemandeAiAssistant
         return 1 === preg_match('/(?<![a-z0-9])' . $escaped . '(?![a-z0-9])/', $haystack);
     }
 
-    private function hasExplicitFormationSignal(string $text): bool
-    {
-        return $this->containsAnyWord($text, [
-            'formation',
-            'formation interne',
-            'formation externe',
-            'type de formation',
-            'certification',
-            'cours',
-            'atelier',
-            'coaching',
-            'training',
-            'organisme de formation',
-        ]);
-    }
-
-    private function isFormationNoiseOnlyContext(string $text): bool
-    {
-        if ($this->hasExplicitFormationSignal($text)) {
-            return false;
-        }
-
-        return $this->containsAnyWord($text, [
-            'information',
-            'informations',
-            'complement d information',
-            'complements d information',
-            'renseignement',
-            'renseignements',
-            'procedure',
-            'procedures',
-            'explication',
-            'explications',
-        ]);
-    }
-
     private function normalizeForSearch(string $text): string
     {
         $normalized = preg_replace('/([a-z0-9])([A-Z])/', '$1 $2', trim($text)) ?? $text;
@@ -3248,7 +3016,7 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $rawKey = strtolower(trim((string) ($candidate['key'] ?? '')));
+            $rawKey = strtolower(trim(($candidate['key'] ?? '')));
             $slug = preg_replace('/[^a-z0-9_]+/', '_', $rawKey) ?? '';
             $slug = trim($slug, '_');
             if ('' === $slug) {
@@ -3263,19 +3031,19 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $type = strtolower(trim((string) ($candidate['type'] ?? 'text')));
+            $type = strtolower(trim(($candidate['type'] ?? 'text')));
             if (!in_array($type, $allowedTypes, true)) {
                 $type = 'text';
             }
 
-            $label = trim((string) ($candidate['label'] ?? 'Champ complementaire'));
+            $label = trim(($candidate['label'] ?? 'Champ complementaire'));
             if ('' === $label) {
                 $label = 'Champ complementaire';
             }
 
-            $value = trim((string) ($candidate['value'] ?? ''));
+            $value = trim(($candidate['value'] ?? ''));
 
-            if ('date' === $type && '' !== $value && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            if ('date' === $type && '' !== $value && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
                 $value = '';
             }
 
@@ -3291,7 +3059,7 @@ class DemandeAiAssistant
                 'value' => substr($value, 0, 500),
             ];
 
-            $source = strtolower(trim((string) ($candidate['source'] ?? '')));
+            $source = strtolower(trim(($candidate['source'] ?? '')));
             if (in_array($source, ['manual', 'learned', 'generated'], true) || str_starts_with($source, 'llm')) {
                 $field['source'] = $source;
             }
@@ -3301,7 +3069,7 @@ class DemandeAiAssistant
                 $rawOptions = $candidate['options'] ?? [];
                 if (is_array($rawOptions)) {
                     foreach ($rawOptions as $optionRaw) {
-                        $option = trim((string) $optionRaw);
+                        $option = trim($optionRaw);
                         if ('' === $option) {
                             continue;
                         }
@@ -3345,30 +3113,6 @@ class DemandeAiAssistant
      * @param mixed $value
      * @param array<int, string> $options
      */
-    private function normalizeValue(string $key, mixed $value, array $options): string
-    {
-        $text = trim((string) $value);
-
-        if ('' === $text) {
-            return '';
-        }
-
-        if ('dateSouhaiteeAutre' === $key) {
-            return preg_match('/^\d{4}-\d{2}-\d{2}$/', $text) ? $text : '';
-        }
-
-        if ('niveauUrgenceAutre' === $key) {
-            foreach ($options as $option) {
-                if (strtolower($text) === strtolower($option)) {
-                    return $option;
-                }
-            }
-
-            return $options[1] ?? $options[0] ?? 'Normale';
-        }
-
-        return $text;
-    }
 
     /**
      * @param array<string, mixed> $parsed
@@ -3378,18 +3122,18 @@ class DemandeAiAssistant
      */
     private function normalizeClassificationSuggestion(array $parsed, string $rawText, array $categoryTypes, array $priorities): array
     {
-        $correctedText = trim((string) ($parsed['correctedText'] ?? ''));
+        $correctedText = trim(($parsed['correctedText'] ?? ''));
         if ('' === $correctedText) {
             $correctedText = $this->autoCorrectSuggestionText($rawText);
         } else {
             $correctedText = $this->autoCorrectSuggestionText($correctedText);
         }
 
-        $categorie = trim((string) ($parsed['categorie'] ?? ''));
-        $typeDemande = trim((string) ($parsed['typeDemande'] ?? ''));
-        $priorite = strtoupper(trim((string) ($parsed['priorite'] ?? 'NORMALE')));
-        $titre = trim((string) ($parsed['titre'] ?? ''));
-        $description = trim((string) ($parsed['description'] ?? ''));
+        $categorie = trim(($parsed['categorie'] ?? ''));
+        $typeDemande = trim(($parsed['typeDemande'] ?? ''));
+        $priorite = strtoupper(trim(($parsed['priorite'] ?? 'NORMALE')));
+        $titre = trim(($parsed['titre'] ?? ''));
+        $description = trim(($parsed['description'] ?? ''));
         $confidence = (float) ($parsed['confidence'] ?? 0.0);
 
         $categorie = $this->resolveKnownCategoryAlias($categorie, $categoryTypes);
@@ -3473,7 +3217,7 @@ class DemandeAiAssistant
 
     private function autoCorrectSuggestionText(string $text): string
     {
-        $clean = trim((string) (preg_replace('/\s+/u', ' ', str_replace([',', ';'], ' ', $text)) ?? $text));
+        $clean = trim((preg_replace('/\s+/u', ' ', str_replace([',', ';'], ' ', $text)) ?? $text));
         if ('' === $clean) {
             return '';
         }
@@ -3481,7 +3225,7 @@ class DemandeAiAssistant
         $clean = preg_replace('/\s+([,.!?;:])/u', '$1', $clean) ?? $clean;
         $clean = preg_replace('/([,.!?;:])(\S)/u', '$1 $2', $clean) ?? $clean;
 
-        return trim((string) (preg_replace('/\s+/u', ' ', $clean) ?? $clean));
+        return trim((preg_replace('/\s+/u', ' ', $clean) ?? $clean));
     }
 
     /**
@@ -3539,9 +3283,12 @@ class DemandeAiAssistant
                 $scores[$typeLabel] += 6;
             }
 
-            $tokens = preg_split('/\s+/', $normalizedType) ?: [];
+            $tokens = preg_split('/\s+/', $normalizedType);
+            if (false === $tokens) {
+                $tokens = [];
+            }
             foreach ($tokens as $token) {
-                $token = trim((string) $token);
+                $token = trim($token);
                 if (strlen($token) < 3 || in_array($token, ['de', 'du', 'des', 'sur'], true)) {
                     continue;
                 }
@@ -3613,7 +3360,7 @@ class DemandeAiAssistant
                 if ($score > $bestScore) {
                     $bestScore = (int) $score;
                     $bestCategory = (string) $category;
-                    $bestType = (string) $type;
+                    $bestType = $type;
                 }
             }
         }
@@ -3796,26 +3543,26 @@ class DemandeAiAssistant
             $bucket[] = sprintf('%04d-%02d-%02d', $year, $month, $day);
         };
 
-        if (preg_match_all('/\b(\d{4})-(\d{2})-(\d{2})\b/', $normalized, $isoMatches, PREG_SET_ORDER) === 1 || !empty($isoMatches)) {
+        if (preg_match_all('/\b(\d{4})-(\d{2})-(\d{2})\b/', $normalized, $isoMatches, PREG_SET_ORDER) === 1 || [] !== $isoMatches) {
             foreach ($isoMatches as $match) {
-                $pushDate((int) ($match[3] ?? 0), (int) ($match[2] ?? 0), (int) ($match[1] ?? 0), $dates);
+                $pushDate((int) $match[3], (int) $match[2], (int) $match[1], $dates);
             }
         }
 
-        if (preg_match_all('/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/', $normalized, $fullNumeric, PREG_SET_ORDER) === 1 || !empty($fullNumeric)) {
+        if (preg_match_all('/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/', $normalized, $fullNumeric, PREG_SET_ORDER) === 1 || [] !== $fullNumeric) {
             foreach ($fullNumeric as $match) {
-                $year = (int) ($match[3] ?? 0);
+                $year = (int) $match[3];
                 if ($year > 0 && $year < 100) {
                     $year += 2000;
                 }
-                $pushDate((int) ($match[1] ?? 0), (int) ($match[2] ?? 0), $year, $dates);
+                $pushDate((int) $match[1], (int) $match[2], $year, $dates);
             }
         }
 
-        if (preg_match_all('/\b(\d{1,2})[\/\-](\d{1,2})\b/', $normalized, $shortNumeric, PREG_SET_ORDER) === 1 || !empty($shortNumeric)) {
+        if (preg_match_all('/\b(\d{1,2})[\/\-](\d{1,2})\b/', $normalized, $shortNumeric, PREG_SET_ORDER) === 1 || [] !== $shortNumeric) {
             foreach ($shortNumeric as $match) {
-                $day = (int) ($match[1] ?? 0);
-                $month = (int) ($match[2] ?? 0);
+                $day = (int) $match[1];
+                $month = (int) $match[2];
                 $year = (int) $today->format('Y');
                 if ($month < (int) $today->format('m') || ($month === (int) $today->format('m') && $day < (int) $today->format('d'))) {
                     ++$year;
@@ -3824,15 +3571,15 @@ class DemandeAiAssistant
             }
         }
 
-        if (preg_match_all('/\b(\d{1,2})\s+(janvier|janv|fevrier|fevr|fev|mars|avril|avr|mai|juin|juillet|juil|aout|septembre|sept|octobre|oct|novembre|nov|decembre|dec)(?:\s+(\d{4}))?\b/', $normalized, $namedMatches, PREG_SET_ORDER) === 1 || !empty($namedMatches)) {
+        if (preg_match_all('/\b(\d{1,2})\s+(janvier|janv|fevrier|fevr|fev|mars|avril|avr|mai|juin|juillet|juil|aout|septembre|sept|octobre|oct|novembre|nov|decembre|dec)(?:\s+(\d{4}))?\b/', $normalized, $namedMatches, PREG_SET_ORDER) === 1 || [] !== $namedMatches) {
             foreach ($namedMatches as $match) {
-                $day = (int) ($match[1] ?? 0);
-                $month = $monthMap[(string) ($match[2] ?? '')] ?? 0;
-                $year = isset($match[3]) && '' !== (string) $match[3]
+                $day = (int) $match[1];
+                $month = $monthMap[$match[2]];
+                $year = isset($match[3])
                     ? (int) $match[3]
                     : (int) $today->format('Y');
 
-                if (!isset($match[3]) || '' === (string) $match[3]) {
+                if (!isset($match[3])) {
                     if ($month < (int) $today->format('m') || ($month === (int) $today->format('m') && $day < (int) $today->format('d'))) {
                         ++$year;
                     }
@@ -3894,18 +3641,18 @@ class DemandeAiAssistant
             }
         };
 
-        if (preg_match_all('/\b(?:dans|d ici|sous|a partir de|a compter de)\s+(un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|\d+)\s+(jour|jours|semaine|semaines|mois)\b/', $normalized, $relativeMatches, PREG_SET_ORDER) === 1 || !empty($relativeMatches)) {
+        if (preg_match_all('/\b(?:dans|d ici|sous|a partir de|a compter de)\s+(un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|\d+)\s+(jour|jours|semaine|semaines|mois)\b/', $normalized, $relativeMatches, PREG_SET_ORDER) === 1 || [] !== $relativeMatches) {
             foreach ($relativeMatches as $match) {
-                $quantity = $quantityToInt((string) ($match[1] ?? '0'));
-                $unit = (string) ($match[2] ?? '');
+                $quantity = $quantityToInt($match[1]);
+                $unit = $match[2];
                 $pushRelative($quantity, $unit, $today, $dates);
             }
         }
 
-        if (preg_match_all('/\b(?:apres|au bout de)\s+(un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|\d+)\s+(jour|jours|semaine|semaines|mois)\b/', $normalized, $afterMatches, PREG_SET_ORDER) === 1 || !empty($afterMatches)) {
+        if (preg_match_all('/\b(?:apres|au bout de)\s+(un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|\d+)\s+(jour|jours|semaine|semaines|mois)\b/', $normalized, $afterMatches, PREG_SET_ORDER) === 1 || [] !== $afterMatches) {
             foreach ($afterMatches as $match) {
-                $quantity = $quantityToInt((string) ($match[1] ?? '0'));
-                $unit = (string) ($match[2] ?? '');
+                $quantity = $quantityToInt($match[1]);
+                $unit = $match[2];
                 $pushRelative($quantity, $unit, $today, $dates);
             }
         }
@@ -3929,7 +3676,7 @@ class DemandeAiAssistant
     private function extractDaysCount(string $text, array $dates): string
     {
         if (preg_match('/\b(\d+)\s+jours?\b/i', $text, $matches) === 1) {
-            return (string) ((int) ($matches[1] ?? 0));
+            return (string) ((int) $matches[1]);
         }
 
         if (count($dates) >= 2) {
@@ -3937,7 +3684,10 @@ class DemandeAiAssistant
                 $start = new \DateTimeImmutable($dates[0]);
                 $end = new \DateTimeImmutable($dates[1]);
                 if ($end >= $start) {
-                    return (string) ($start->diff($end)->days + 1);
+                    $daysDiff = $start->diff($end)->days;
+                    if (false !== $daysDiff) {
+                        return (string) ($daysDiff + 1);
+                    }
                 }
             } catch (\Throwable) {
             }
@@ -3953,7 +3703,7 @@ class DemandeAiAssistant
     {
         foreach ($keywords as $keyword) {
             if (preg_match('/\b(\d+)\s+' . preg_quote($keyword, '/') . 's?\b/i', $text, $matches) === 1) {
-                return (string) ((int) ($matches[1] ?? 0));
+                return (string) ((int) $matches[1]);
             }
         }
 
@@ -3963,7 +3713,7 @@ class DemandeAiAssistant
     private function extractFirstInteger(string $text): string
     {
         if (preg_match('/\b(\d+)\b/', $text, $matches) === 1) {
-            return (string) ((int) ($matches[1] ?? 0));
+            return (string) ((int) $matches[1]);
         }
 
         return '';
@@ -3972,11 +3722,11 @@ class DemandeAiAssistant
     private function extractRecipient(string $text): string
     {
         if (preg_match('/(?:destinataire|pour)\s*[:\-]?\s*([A-Za-z0-9À-ÿ\'\-\s]{3,80})/u', $text, $matches) === 1) {
-            $value = trim((string) ($matches[1] ?? ''));
+            $value = trim($matches[1]);
             $value = preg_replace('/\b(?:le|la|les|du|de|des)\s+\d{1,2}(?:[\/\-]\d{1,2})?(?:[\/\-]\d{2,4})?\b.*$/iu', '', $value) ?? $value;
             $value = preg_replace('/\b\d{1,2}\s+(?:janvier|janv|fevrier|fevr|fev|mars|avril|avr|mai|juin|juillet|juil|aout|septembre|sept|octobre|novembre|decembre|dec)(?:\s+\d{4})?\b.*$/iu', '', $value) ?? $value;
             $value = preg_replace('/\b(?:avant|apres|après|a\s+partir|à\s+partir|urgent|svp|merci)\b.*$/iu', '', $value) ?? $value;
-            $value = trim((string) (preg_replace('/\s+/u', ' ', $value) ?? $value), " ,;:-");
+            $value = trim((preg_replace('/\s+/u', ' ', $value) ?? $value), " ,;:-");
 
             return $value;
         }
@@ -3992,7 +3742,7 @@ class DemandeAiAssistant
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $text, $matches) === 1) {
-                return trim((string) ($matches[1] ?? ''));
+                return trim($matches[1]);
             }
         }
 
@@ -4002,7 +3752,7 @@ class DemandeAiAssistant
     private function extractTargetRole(string $text): string
     {
         if (preg_match('/(?:poste|fonction|role)\s*(?:souhaite|demand[ée])?\s*[:\-]?\s*([A-Za-zÀ-ÿ0-9\'\-\s]{3,80})/iu', $text, $matches) === 1) {
-            return trim((string) ($matches[1] ?? ''));
+            return trim($matches[1]);
         }
 
         return '';
@@ -4011,7 +3761,7 @@ class DemandeAiAssistant
     private function extractMonthDuration(string $text): int
     {
         if (preg_match('/\b(\d+)\s*mois\b/i', $text, $matches) === 1) {
-            return (int) ($matches[1] ?? 0);
+            return (int) $matches[1];
         }
 
         return 0;
@@ -4099,7 +3849,7 @@ class DemandeAiAssistant
     private function extractPhoneNumber(string $text): string
     {
         if (preg_match('/(\+?\d[\d\s]{6,}\d)/', $text, $matches) === 1) {
-            return trim((string) ($matches[1] ?? ''));
+            return trim($matches[1]);
         }
 
         return '';
@@ -4108,7 +3858,7 @@ class DemandeAiAssistant
     private function extractEmailAddress(string $text): string
     {
         if (preg_match('/([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})/i', $text, $matches) === 1) {
-            return trim((string) ($matches[1] ?? ''));
+            return trim($matches[1]);
         }
 
         return '';
@@ -4117,7 +3867,7 @@ class DemandeAiAssistant
     private function extractSystemName(string $text): string
     {
         if (preg_match('/(?:acces|acc[èe]s|sur|application|logiciel|outil)\s+(?:a|à|au|aux|de)?\s*([A-Za-z0-9._\- ]{2,60})/iu', $text, $matches) === 1) {
-            return trim((string) ($matches[1] ?? ''));
+            return trim($matches[1]);
         }
 
         return '';
@@ -4126,7 +3876,7 @@ class DemandeAiAssistant
     private function extractVersion(string $text): string
     {
         if (preg_match('/\b(v(?:ersion)?\s*\d+(?:\.\d+)*)\b/i', $text, $matches) === 1) {
-            return trim((string) ($matches[1] ?? ''));
+            return trim($matches[1]);
         }
 
         return '';
@@ -4146,7 +3896,7 @@ class DemandeAiAssistant
             }
 
             foreach ($allMatches as $matches) {
-                $candidate = $this->cleanupTrainingNameCandidate((string) ($matches[1] ?? ''));
+                $candidate = $this->cleanupTrainingNameCandidate($matches[1]);
                 if ('' !== $candidate) {
                     return $candidate;
                 }
@@ -4163,7 +3913,7 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $candidate = $this->cleanupTrainingNameCandidate((string) ($matches[1] ?? ''));
+            $candidate = $this->cleanupTrainingNameCandidate($matches[1]);
             if ('' !== $candidate) {
                 return $candidate;
             }
@@ -4234,9 +3984,9 @@ class DemandeAiAssistant
     private function extractOrganization(string $text): string
     {
         if (preg_match('/(?:organisme(?:\s+de\s+formation)?|chez)\s*[:\-]?\s*([A-Za-z0-9À-ÿ\'\-\s]{3,80})/iu', $text, $matches) === 1) {
-            $value = trim((string) ($matches[1] ?? ''));
+            $value = trim($matches[1]);
             $value = preg_replace('/\b(?:je\s+reste\s+disponible|je\s+vous\s+remercie|merci|cordialement|avance\s+pour\s+votre\s+retour)\b.*$/iu', '', $value) ?? $value;
-            $value = trim((string) $value);
+            $value = trim($value);
 
             return $value;
         }
@@ -4277,7 +4027,7 @@ class DemandeAiAssistant
         }
 
         if (preg_match('/\b(\d+)\s*jours?\b/i', $text, $matches) === 1) {
-            $days = (int) ($matches[1] ?? 0);
+            $days = (int) $matches[1];
             foreach ($options as $option) {
                 if (str_contains(strtolower($option), (string) $days)) {
                     return $option;
@@ -4304,7 +4054,10 @@ class DemandeAiAssistant
     private function extractTimeWindow(string $text, string $key): string
     {
         preg_match_all('/\b(\d{1,2}[:h]\d{2}|\d{1,2}h)\b/i', $text, $matches);
-        $times = array_values(array_unique(array_map(static fn($t) => str_replace('h', ':', strtolower((string) $t)), $matches[1] ?? [])));
+        $times = array_values(array_unique(array_map(
+            static fn(string $time): string => str_replace('h', ':', strtolower($time)),
+            $matches[1]
+        )));
 
         if ([] === $times) {
             return '';
@@ -4326,7 +4079,7 @@ class DemandeAiAssistant
     private function extractAccessZones(string $text): string
     {
         if (preg_match('/(?:zone|zones|acces a|acc[èe]s a)\s*[:\-]?\s*([A-Za-z0-9À-ÿ\'\-\s,]{3,100})/iu', $text, $matches) === 1) {
-            return trim((string) ($matches[1] ?? ''));
+            return trim($matches[1]);
         }
 
         return '';
@@ -4404,7 +4157,7 @@ class DemandeAiAssistant
             return '';
         }
 
-        $type = strtolower(trim((string) ($field['type'] ?? 'text')));
+        $type = strtolower(trim(($field['type'] ?? 'text')));
         if ('select' === $type) {
             return $this->inferManualSelectValue($text, is_array($field['options'] ?? null) ? $field['options'] : []);
         }
@@ -4563,8 +4316,8 @@ class DemandeAiAssistant
 
         if (in_array($type, ['text', 'textarea'], true)) {
             $named = $this->extractNamedValueFromPrompt($text, array_values(array_filter([
-                trim((string) ($field['label'] ?? '')),
-                trim((string) ($field['key'] ?? '')),
+                trim(($field['label'] ?? '')),
+                trim(($field['key'] ?? '')),
             ], static fn (string $item): bool => '' !== $item)));
             if ('' !== $named) {
                 return $named;
@@ -4586,10 +4339,10 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $fromHour = (int) ($matches[1] ?? 0);
-            $fromMinute = trim((string) ($matches[2] ?? ''));
-            $toHour = (int) ($matches[3] ?? 0);
-            $toMinute = trim((string) ($matches[4] ?? ''));
+            $fromHour = (int) $matches[1];
+            $fromMinute = trim($matches[2]);
+            $toHour = (int) $matches[3];
+            $toMinute = trim(($matches[4] ?? ''));
 
             return $this->formatHourForAutre($fromHour, $fromMinute) . '-' . $this->formatHourForAutre($toHour, $toMinute);
         }
@@ -4600,15 +4353,15 @@ class DemandeAiAssistant
     private function extractExplicitAutreLearningTime(string $sourceText): string
     {
         if (preg_match('/\b([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?\b/iu', $sourceText, $matches) === 1) {
-            $hour = (int) ($matches[1] ?? 0);
-            $minute = trim((string) ($matches[2] ?? ''));
+            $hour = (int) $matches[1];
+            $minute = trim(($matches[2] ?? ''));
 
             return '' !== $minute ? sprintf('%02dh%s', $hour, $minute) : sprintf('%02dh', $hour);
         }
 
         if (preg_match('/\b([01]?\d|2[0-3])\s+heures?(?:\s+([0-5]\d))?\b/iu', $sourceText, $matches) === 1) {
-            $hour = (int) ($matches[1] ?? 0);
-            $minute = trim((string) ($matches[2] ?? ''));
+            $hour = (int) $matches[1];
+            $minute = trim(($matches[2] ?? ''));
 
             return '' !== $minute ? sprintf('%02dh%s', $hour, $minute) : sprintf('%02dh', $hour);
         }
@@ -4622,12 +4375,12 @@ class DemandeAiAssistant
             return '';
         }
 
-        $count = (int) ($matches[1] ?? 0);
+        $count = (int) $matches[1];
         if ($count <= 0) {
             return '';
         }
 
-        $unit = mb_strtolower(trim((string) ($matches[2] ?? '')), 'UTF-8');
+        $unit = mb_strtolower(trim($matches[2]), 'UTF-8');
         $unit = match (true) {
             str_starts_with($unit, 'min') => $count > 1 ? 'minutes' : 'minute',
             str_starts_with($unit, 'heure') => $count > 1 ? 'heures' : 'heure',
@@ -4704,7 +4457,7 @@ class DemandeAiAssistant
 
     private function extractSpecificationFromPrompt(string $text): string
     {
-        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        $clean = trim((preg_replace('/\s+/u', ' ', $text) ?? $text));
         if ('' === $clean) {
             return '';
         }
@@ -4717,7 +4470,7 @@ class DemandeAiAssistant
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $clean, $matches) === 1) {
-                return $this->truncateCustomFieldText((string) ($matches[1] ?? ''), 80);
+                return $this->truncateCustomFieldText($matches[1], 80);
             }
         }
 
@@ -4726,20 +4479,20 @@ class DemandeAiAssistant
 
     private function extractRequestedObjectFromPrompt(string $text): string
     {
-        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        $clean = trim((preg_replace('/\s+/u', ' ', $text) ?? $text));
         if ('' === $clean) {
             return '';
         }
 
         if (preg_match('/\b(?:un|une|des)?\s*(clavier|souris|ecran|ordinateur|pc|laptop|casque|webcam|imprimante)(?:\s+[A-Za-zÀ-ÿ0-9\'’\-]+){0,3}\b/iu', $clean, $materialMatch) === 1) {
-            $material = trim((string) ($materialMatch[0] ?? ''));
+            $material = trim($materialMatch[0]);
             $material = preg_replace('/^(?:un|une|des)\s+/iu', '', $material) ?? $material;
             return $this->truncateCustomFieldText($material, 80);
         }
 
         $candidate = $clean;
         if (preg_match('/\b(?:je\s+veux|je\s+souhaite|j[\'’]ai\s+besoin\s+de|besoin\s+de|demande\s+de|demande\s+d[\'’]?)\s+(.{2,120})/iu', $clean, $matches) === 1) {
-            $candidate = (string) ($matches[1] ?? $candidate);
+            $candidate = $matches[1];
         }
 
         $candidate = preg_replace('/\b(?:materiel|equipement)\s+qui\s+est\s+(?:un|une|des)?\s*/iu', '', $candidate) ?? $candidate;
@@ -4759,7 +4512,7 @@ class DemandeAiAssistant
      */
     private function extractNamedValueFromPrompt(string $text, array $labels): string
     {
-        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        $clean = trim((preg_replace('/\s+/u', ' ', $text) ?? $text));
         if ('' === $clean) {
             return '';
         }
@@ -4770,7 +4523,7 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $value = trim((string) ($matches[1] ?? ''));
+            $value = trim(($matches[1] ?? ''));
             $value = preg_replace('/\b(?:pour|car|avec)\b.*$/iu', '', $value) ?? $value;
             $value = preg_replace('/^(?:de|du|des|d[\'’]|le|la|les|l[\'’])\s+/iu', '', $value) ?? $value;
             $value = trim($value, " \t\n\r\0\x0B,.;:-");
@@ -4796,8 +4549,8 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $key = trim((string) ($candidate['key'] ?? ''));
-            $label = trim((string) ($candidate['label'] ?? $key));
+            $key = trim(($candidate['key'] ?? ''));
+            $label = trim(($candidate['label'] ?? $key));
             if ('' === $key || '' === $label) {
                 continue;
             }
@@ -4806,7 +4559,7 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $type = strtolower(trim((string) ($candidate['type'] ?? 'text')));
+            $type = strtolower(trim(($candidate['type'] ?? 'text')));
             if (!in_array($type, ['text', 'textarea', 'number', 'date', 'select'], true)) {
                 $type = 'text';
             }
@@ -4817,7 +4570,7 @@ class DemandeAiAssistant
                 'type' => $type,
                 'required' => true === ($candidate['required'] ?? false),
                 'options' => is_array($candidate['options'] ?? null) ? array_values(array_map('strval', $candidate['options'])) : [],
-                'value' => trim((string) ($candidate['value'] ?? '')),
+                'value' => trim(($candidate['value'] ?? '')),
                 'source' => 'manual',
             ];
         }
@@ -4830,42 +4583,22 @@ class DemandeAiAssistant
      */
     private function extractLeadClauseBeforeKeywords(string $text, array $keywords): string
     {
-        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        $clean = trim((preg_replace('/\s+/u', ' ', $text) ?? $text));
         if ('' === $clean) {
             return '';
         }
 
         $pattern = '/^(.{3,160}?)(?=\s+(?:' . implode('|', array_map(static fn (string $keyword): string => preg_quote($keyword, '/'), $keywords)) . ')\b|[\.,;:!?]|$)/iu';
         if (preg_match($pattern, $clean, $matches) === 1) {
-            return $this->truncateCustomFieldText((string) ($matches[1] ?? ''), 120);
+            return $this->truncateCustomFieldText($matches[1], 120);
         }
 
         return $this->truncateCustomFieldText($clean, 120);
     }
 
-    /**
-     * @param array<int, string> $keywords
-     */
-    private function extractTailClauseAfterKeywords(string $text, array $keywords): string
-    {
-        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
-        if ('' === $clean) {
-            return '';
-        }
-
-        foreach ($keywords as $keyword) {
-            $pattern = '/\b' . preg_quote($keyword, '/') . '\b\s+(.{2,120}?)(?=[\.,;:!?]|$)/iu';
-            if (preg_match($pattern, $clean, $matches) === 1) {
-                return $this->truncateCustomFieldText((string) ($matches[1] ?? ''), 120);
-            }
-        }
-
-        return '';
-    }
-
     private function extractDynamicReasonClause(string $text): string
     {
-        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        $clean = trim((preg_replace('/\s+/u', ' ', $text) ?? $text));
         if ('' === $clean) {
             return '';
         }
@@ -4880,9 +4613,9 @@ class DemandeAiAssistant
                 continue;
             }
 
-            $candidate = trim((string) ($matches[1] ?? ''));
+            $candidate = trim($matches[1]);
             $candidate = preg_replace('/^(?:de|du|des|d[\'’])\s+/iu', '', $candidate) ?? $candidate;
-            $candidate = trim((string) (preg_replace('/\s+/u', ' ', $candidate) ?? $candidate), " ,;:-");
+            $candidate = trim((preg_replace('/\s+/u', ' ', $candidate) ?? $candidate), " ,;:-");
             if ('' === $candidate) {
                 continue;
             }
@@ -4895,7 +4628,7 @@ class DemandeAiAssistant
 
     private function truncateCustomFieldText(string $text, int $maxLength): string
     {
-        $clean = trim((string) (preg_replace('/\s+/u', ' ', $text) ?? $text));
+        $clean = trim((preg_replace('/\s+/u', ' ', $text) ?? $text));
         if ('' === $clean) {
             return '';
         }
@@ -4907,5 +4640,3 @@ class DemandeAiAssistant
         return rtrim(substr($clean, 0, max(0, $maxLength - 3))) . '...';
     }
 }
-
-
