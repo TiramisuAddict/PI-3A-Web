@@ -3,8 +3,6 @@ includes:
     - vendor/phpstan/phpstan-strict-rules/rules.neon
 
 parameters:
-    level: 6
+    level: 8
     paths:
-        - src/Services/DemandeFormHelper.php
-        - tests/Services/DemandeFormHelperTest.php
-        - tests/Services/DemandeDecisionAssistantTest.php
+        - src

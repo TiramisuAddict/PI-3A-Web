@@ -3,37 +3,3 @@ includes:
 
 parameters:
     treatPhpDocTypesAsCertain: false
-    ignoreErrors:
-        -
-            identifier: cast.useless
-            path: src/Service/DemandeAiAssistant.php
-        -
-            identifier: nullCoalesce.offset
-            path: src/Service/DemandeAiAssistant.php
-        -
-            identifier: nullCoalesce.variable
-            path: src/Service/DemandeAiAssistant.php
-        -
-            identifier: function.alreadyNarrowedType
-            path: src/Service/DemandeAiAssistant.php
-        -
-            identifier: arrayValues.list
-            path: src/Service/DemandeAiAssistant.php
-        -
-            identifier: ternary.shortNotAllowed
-            path: src/Service/DemandeAiAssistant.php
-        -
-            identifier: empty.notAllowed
-            path: src/Service/DemandeAiAssistant.php
-        -
-            identifier: method.unused
-            path: src/Service/DemandeAiAssistant.php
-        -
-            identifier: varTag.nativeType
-            path: src/Service/DemandeAiAssistant.php
-        -
-            identifier: identical.alwaysFalse
-            path: src/Service/DemandeAiAssistant.php
-        -
-            identifier: notIdentical.alwaysTrue
-            path: src/Service/DemandeAiAssistant.php
