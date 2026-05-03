@@ -2,4 +2,6 @@ includes:
     - phpstan.dist.neon
 
 parameters:
-    treatPhpDocTypesAsCertain: false
+    level: 8
+    paths:
+        - src

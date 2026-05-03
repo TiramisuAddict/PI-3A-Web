@@ -28,7 +28,7 @@ final class FormationController extends AbstractController
         $pending = $connection->fetchOne(
             'SELECT COUNT(i.id_inscription) FROM inscription_formation i WHERE i.id_formation = ? AND i.statut = ?',
             [$id, 'EN_ATTENTE']
-        ) ?: 0;
+        ) ?? 0;
 
         return new JsonResponse([
             'id' => $formation->getId(),

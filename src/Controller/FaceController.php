@@ -65,14 +65,15 @@ final class FaceController extends AbstractController
 
             // Validate incoming embedding first
             $validation = $this->faceRecognitionService->validateEmbedding($embedding);
-            if (!$validation['valid']) {
+            $isValid = ($validation['valid'] ?? false) === true;
+            if ($isValid !== true) {
                 return $this->json([
                     'success' => false,
                     'message' => 'Invalid face embedding: ' . $validation['error']
                 ], 400);
             }
 
-            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
                 return $this->json([
                     'success' => false,
                     'message' => 'Email address is required for Face ID login.'
@@ -112,7 +113,7 @@ final class FaceController extends AbstractController
             return $this->json([
                 'success' => true,
                 'message' => 'Face ID authentication successful.',
-                'redirect' => $this->generateUrl($this->getRedirectRoute($employe->getRole()))
+                'redirect' => $this->generateUrl($this->getRedirectRoute((string) $employe->getRole()))
             ], 200);
 
         } catch (\Throwable $e) {
@@ -130,7 +131,7 @@ final class FaceController extends AbstractController
             $data = json_decode($request->getContent(), true);
             $email = (string) ($data['email'] ?? '');
 
-            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
                 return $this->json([
                     'success' => false,
                     'message' => 'Email address is required for Face ID login.'

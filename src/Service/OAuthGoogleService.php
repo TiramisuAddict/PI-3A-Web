@@ -10,6 +10,16 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class OAuthGoogleService
 {
+    private function readGoogleStringValue(object $googleUser, string $method): ?string
+    {
+        if (!is_callable([$googleUser, $method])) {
+            return null;
+        }
+
+        $value = call_user_func([$googleUser, $method]);
+        return is_string($value) ? $value : null;
+    }
+
     public function clearCurrentLoginSession(SessionInterface $session): void
     {
         foreach ([
@@ -43,7 +53,7 @@ class OAuthGoogleService
      * @return array<string, Visiteur|string|null>
      */
     public function findOrCreateVisiteurFromGoogle(string $mode,object $googleUser,VisiteurRepository $visiteurRepository,EntityManagerInterface $entityManager,UserPasswordHasherInterface $passwordHasher): array {
-        $email = strtolower($googleUser->getEmail());
+        $email = strtolower($this->readGoogleStringValue($googleUser, 'getEmail') ?? '');
         if ($email === '') {
             return [
                 'visiteur' => null,
@@ -61,15 +71,20 @@ class OAuthGoogleService
         }
 
         if ($visiteur === null) {
-            $firstName = $googleUser->getFirstName() ?? '';
-            $lastName = $googleUser->getLastName() ?? '';
+            $firstName = $this->readGoogleStringValue($googleUser, 'getFirstName') ?? '';
+            $lastName = $this->readGoogleStringValue($googleUser, 'getLastName') ?? '';
 
             if ($firstName === '' && $lastName === '') {
-                $fullName =($googleUser->getName() ?? '');
+                $fullName = $this->readGoogleStringValue($googleUser, 'getName') ?? '';
                 if ($fullName !== '') {
                     $parts = preg_split('/\s+/', $fullName);
-                    $firstName = $parts[0] ?? 'Visiteur';
-                    $lastName = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : 'Google';
+                    if ($parts === false) {
+                        $firstName = 'Visiteur';
+                        $lastName = 'Google';
+                    } else {
+                        $firstName = $parts[0];
+                        $lastName = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : 'Google';
+                    }
                 }
             }
 

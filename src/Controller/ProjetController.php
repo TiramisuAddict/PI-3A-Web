@@ -50,6 +50,9 @@ final class ProjetController extends AbstractController
         return in_array(mb_strtolower(trim($role)), self::MANAGER_ROLES, true);
     }
 
+    /**
+     * @return array{currentEmploye: ?Employe, currentEmployeId: ?int, canManageProjects: bool, canManageTasks: bool, email: string, role: string}
+     */
     private function buildRbacContext(SessionInterface $session, EmployeRepository $employeRepository): array
     {
         $currentEmploye = $this->resolveCurrentEmploye($session, $employeRepository);
@@ -66,6 +69,10 @@ final class ProjetController extends AbstractController
         ];
     }
 
+    /**
+     * @param array<int, Projet> $projets
+     * @return array<int, Projet>
+     */
     private function filterProjetsForEmploye(array $projets, ?Employe $employe, bool $isManager): array
     {
         if ($isManager || $employe === null) {
@@ -1046,7 +1053,7 @@ final class ProjetController extends AbstractController
         }
 
         $conclusionData = [
-            'name'           => $projet->getNom(),
+            'name'           => $projet->getNom() ?? '',
             'statut'         => $projet->getStatut() ?? 'inconnu',
             'priorite'       => $projet->getPriorite(),
             'dateDebut'      => $projet->getDateDebut()?->format('d/m/Y'),
