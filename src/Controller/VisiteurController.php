@@ -23,7 +23,7 @@ final class VisiteurController extends AbstractController
         $oauthVisiteurId = (int) $session->get('oauth_google_complete_phone_visiteur_id', 0);
         if ($oauthVisiteurId > 0) {
             $oauthVisiteur = $visiteurRepository->find($oauthVisiteurId);
-            if (!$oauthVisiteur) {
+            if ($oauthVisiteur === null) {
                 $session->remove('oauth_google_complete_phone_visiteur_id');
                 $this->addFlash('error', 'Compte Google introuvable. Veuillez recommencer.');
 
@@ -38,7 +38,7 @@ final class VisiteurController extends AbstractController
             $googlePhoneForm->handleRequest($request);
 
             if ($googlePhoneForm->isSubmitted() && $googlePhoneForm->isValid()) {
-                $telephone = (string) $oauthVisiteur->getTelephone();
+                $telephone = (int) $oauthVisiteur->getTelephone();
                 $oauthGoogleService->updateVisiteurPhone($oauthVisiteur, $telephone, $entityManager);
 
                 $session->remove('oauth_google_complete_phone_visiteur_id');

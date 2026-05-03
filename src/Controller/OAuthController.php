@@ -72,7 +72,7 @@ final class OAuthController extends AbstractController
 		}
 
 		$visiteur = $result['visiteur'];
-		if (!$visiteur) {
+		if ($visiteur === null) {
 			$this->addFlash('error', 'Erreur de connexion Google.');
 
 			return $this->redirectToRoute('login');

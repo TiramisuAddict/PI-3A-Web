@@ -20,22 +20,25 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final class ProfileController extends AbstractController
 {
+    /**
+     * @return list<string>
+     */
     private function decodeSkills(?string $skillsJson): array
     {
-        $decoded = json_decode((string) $skillsJson, true);
+        $decoded = json_decode($skillsJson, true);
         if (!is_array($decoded)) {
             return [];
         }
 
         $skills = [];
         foreach ($decoded as $skill) {
-            $value = trim((string) $skill);
+            $value = trim($skill);
             if ($value !== '') {
                 $skills[] = $value;
             }
         }
 
-        return array_values(array_unique($skills));
+        return array_unique($skills);
     }
 
     #[Route('/profil', name: 'profil', methods: ['GET', 'POST'])]
@@ -44,7 +47,7 @@ final class ProfileController extends AbstractController
 
         if ($session->get('employe_logged_in') === true) {
             $employeId = $session->get('employe_id');
-            $employe = $employeId ? $employeRepository->find($employeId) : null;
+            $employe = $employeId !== null && (int) $employeId > 0 ? $employeRepository->find((int) $employeId) : null;
             $profileForm = $this->createForm(EmployeType::class, $employe);
             $profileForm->remove('poste');
             $profileForm->remove('role');
@@ -53,11 +56,11 @@ final class ProfileController extends AbstractController
 
             if ($profileForm->isSubmitted() && $profileForm->isValid()) {
                 $otherEmploye = $employeRepository->findOneBy(['e_mail' => $employe->getEmail()]);
-                if ($otherEmploye && $otherEmploye->getId_employe() !== $employe->getId_employe()) {
+                if ($otherEmploye !== null && $otherEmploye->getId_employe() !== $employe->getId_employe()) {
                     $profileForm->get('e_mail')->addError(new FormError('Cet email est déjà utilisé.'));
                 } else {
                     $cvFile = $profileForm->get('cv_data')->getData();
-                    if ($cvFile) {
+                    if ($cvFile instanceof UploadedFile) {
                         $cvContent = file_get_contents($cvFile->getPathname());
                         if ($cvContent === false) {
                             $this->addFlash('error', 'Impossible de lire le fichier CV uploadé.');
@@ -114,12 +117,12 @@ final class ProfileController extends AbstractController
 
         $employeId = (int) $session->get('employe_id', 0);
         $employe = $employeId > 0 ? $employeRepository->find($employeId) : null;
-        if (!$employe) {
+        if ($employe === null) {
             return $this->redirectToRoute('login');
         }
 
         $competenceEmploye = $employe->getCompetenceEmploye();
-        if (!$competenceEmploye) {
+        if ($competenceEmploye === null) {
             $competenceEmploye = new CompetenceEmploye();
             $competenceEmploye->setEmploye($employe);
             $employe->setCompetenceEmploye($competenceEmploye);
@@ -129,7 +132,7 @@ final class ProfileController extends AbstractController
         $skills = $this->decodeSkills($competenceEmploye->getSkills());
         if (!in_array($skill, $skills, true)) {
             $skills[] = $skill;
-            $competenceEmploye->setSkills(json_encode(array_values($skills), JSON_UNESCAPED_UNICODE));
+            $competenceEmploye->setSkills(json_encode($skills, JSON_UNESCAPED_UNICODE));
             $entityManager->flush();
             $this->addFlash('success', 'Compétence ajoutée.');
         }
@@ -155,7 +158,7 @@ final class ProfileController extends AbstractController
 
         $employeId = (int) $session->get('employe_id', 0);
         $employe = $employeId > 0 ? $employeRepository->find($employeId) : null;
-        if (!$employe || !$employe->getCompetenceEmploye()) {
+        if ($employe === null || $employe->getCompetenceEmploye() === null) {
             return $this->redirectToRoute('profil');
         }
 
@@ -172,8 +175,8 @@ final class ProfileController extends AbstractController
     #[Route('/profil/upload-image', name: 'profil_upload_image', methods: ['POST'])]
     public function uploadImage( Request $request, SessionInterface $session,EmployeRepository $employeRepository,EntityManagerInterface $entityManager,SluggerInterface $slugger): JsonResponse {
 
-        $employeId = $session->get('employe_id');
-        $employe = $employeId ? $employeRepository->find($employeId) : null;
+        $employeId = (int) $session->get('employe_id', 0);
+        $employe = $employeId > 0 ? $employeRepository->find($employeId) : null;
         $file = $request->files->get('image');
         
         if (!$file instanceof UploadedFile) {
@@ -208,7 +211,7 @@ final class ProfileController extends AbstractController
 
             // Supprimer l'ancienne image si elle existe
             $oldImage = $employe->getImage_profil();
-            if ($oldImage) {
+            if ($oldImage !== null && $oldImage !== '') {
                 $oldImagePath = $this->getParameter('kernel.project_dir') . '/public' . $oldImage;
                 if (file_exists($oldImagePath)) {
                     unlink($oldImagePath);

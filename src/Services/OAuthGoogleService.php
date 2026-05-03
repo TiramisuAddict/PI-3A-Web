@@ -39,6 +39,9 @@ class OAuthGoogleService
         $session->set('visiteur_email', $visiteur->getEmail());
     }
 
+    /**
+     * @return array<string, Visiteur|string|null>
+     */
     public function findOrCreateVisiteurFromGoogle(string $mode,object $googleUser,VisiteurRepository $visiteurRepository,EntityManagerInterface $entityManager,UserPasswordHasherInterface $passwordHasher): array {
         $email = strtolower($googleUser->getEmail());
         if ($email === '') {
@@ -50,14 +53,14 @@ class OAuthGoogleService
 
         $visiteur = $visiteurRepository->findOneBy(['e_mail' => $email]);
 
-        if ($mode === 'register' && $visiteur) {
+        if ($mode === 'register' && $visiteur !== null) {
             return [
                 'visiteur' => null,
                 'error' => 'Ce compte Google est deja associe a un visiteur.',
             ];
         }
 
-        if (!$visiteur) {
+        if ($visiteur === null) {
             $firstName = $googleUser->getFirstName() ?? '';
             $lastName = $googleUser->getLastName() ?? '';
 
@@ -82,7 +85,7 @@ class OAuthGoogleService
             $visiteur->setPrenom($firstName);
             $visiteur->setNom($lastName);
             $visiteur->setEmail($email);
-            $visiteur->setTelephone(0);
+            $visiteur->setTelephone((int) '0');
             $visiteur->setMotdepasse($passwordHasher->hashPassword($visiteur, bin2hex(random_bytes(24))));
 
             $entityManager->persist($visiteur);
@@ -95,7 +98,7 @@ class OAuthGoogleService
         ];
     }
 
-    public function updateVisiteurPhone(Visiteur $visiteur, string $telephone, EntityManagerInterface $entityManager): void
+    public function updateVisiteurPhone(Visiteur $visiteur, int $telephone, EntityManagerInterface $entityManager): void
     {
         $visiteur->setTelephone($telephone);
         $entityManager->flush();

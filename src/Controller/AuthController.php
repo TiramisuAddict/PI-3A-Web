@@ -82,7 +82,7 @@ final class AuthController extends AbstractController
 
             // Vérification admin système (SHA-256)
             $admin = $adminRepo->findOneBy(['e_mail' => $email]);
-            if ($admin && $admin->getMot_de_passe() === $passwordGenerator->hash($password)) {
+            if ($admin !== null && $admin->getMot_de_passe() === $passwordGenerator->hash($password)) {
                 /*
                 $destination = $admin->getTelephone();
                 if ($destination === '') {
@@ -108,7 +108,7 @@ final class AuthController extends AbstractController
             }
 
             $employe = $employeRepo->findOneBy(['e_mail' => $email]);
-                if ($employe) {
+                if ($employe !== null) {
                 $compte = null;
                 foreach ($employe->getComptes() as $c) {
                     // Accept SHA-256 hashed passwords; keep legacy checks as fallback
@@ -118,7 +118,7 @@ final class AuthController extends AbstractController
                     }
                 }
 
-                if ($compte) {
+                if ($compte !== null) {
                     /*
                     $destination =$employe->getTelephone();
                     if ($destination === '') {
@@ -147,7 +147,7 @@ final class AuthController extends AbstractController
             }
 
             $visiteur = $visiteurRepo->findOneBy(['e_mail' => $email]);
-            if ($visiteur && password_verify($password,$visiteur->getMotdepasse())) {
+            if ($visiteur !== null && password_verify($password,$visiteur->getMotdepasse())) {
                 $this->clearOtpFlow($session, $twilioVerifyService, 'two_factor');
                 $session->set('visiteur_logged_in', true);
                 $session->set('visiteur_id', $visiteur->getId_visiteur());

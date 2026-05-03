@@ -31,13 +31,13 @@ final class FaceController extends AbstractController
                 return $this->json(['success' => false,'message' => 'User not authenticated.'], 401);}
 
             $employe = $this->employeRepository->find($employeId);
-            if (!$employe) {
+            if ($employe === null) {
                 return $this->json(['success' => false,'message' => 'User not found.'], 404);}
 
             // Validate embedding
             $embedding = $data['embedding'] ?? null;
             $validation = $this->faceRecognitionService->validateEmbedding($embedding);
-            if (!$validation['valid']) {
+            if ($validation['valid'] !== true) {
                 return $this->json(['success' => false,'message' => 'Invalid face embedding: ' . $validation['error']], 400);
             }
 
@@ -80,14 +80,14 @@ final class FaceController extends AbstractController
             }
 
             $employe = $this->employeRepository->findOneBy(['e_mail' => $email]);
-            if (!$employe) {
+            if ($employe === null) {
                 return $this->json([
                     'success' => false,
                     'message' => 'User not found.'
                 ], 404);
             }
 
-            if (!$employe->getFaceEnabled() || !$employe->getFaceEmbedding()) {
+            if ($employe->getFaceEnabled() !== true || $employe->getFaceEmbedding() === null) {
                 return $this->json([
                     'success' => false,
                     'message' => 'Face ID not enabled for this user.'
@@ -138,14 +138,14 @@ final class FaceController extends AbstractController
             }
 
             $employe = $this->employeRepository->findOneBy(['e_mail' => $email]);
-            if (!$employe) {
+            if ($employe === null) {
                 return $this->json([
                     'success' => false,
                     'message' => 'User not found.'
                 ], 404);
             }
 
-            if (!$employe->getFaceEnabled() || !$employe->getFaceEmbedding()) {
+            if ($employe->getFaceEnabled() !== true || $employe->getFaceEmbedding() === null) {
                 return $this->json([
                     'success' => false,
                     'message' => 'Face ID not enabled for this user.'
@@ -180,7 +180,7 @@ final class FaceController extends AbstractController
             }
 
             $employe = $this->employeRepository->find($employeId);
-            if (!$employe) {
+            if ($employe === null) {
                 return $this->json([
                     'success' => false,
                     'message' => 'User not found.'
@@ -221,7 +221,7 @@ final class FaceController extends AbstractController
         }
 
         $employe = $this->employeRepository->find($employeId);
-        if (!$employe) {
+        if ($employe === null) {
             return $this->json([
                 'enabled' => false,
                 'registered_at' => null
