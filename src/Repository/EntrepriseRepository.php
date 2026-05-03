@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Entreprise;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -40,23 +41,26 @@ class EntrepriseRepository extends ServiceEntityRepository
     //            ->getOneOrNullResult()
     //        ;
     //    }
-    public function findByFilters($search, $status)
+    /**
+     * @return array<int, Entreprise>
+     */
+    public function findByFilters(?string $search, ?string $status): array
     {
         return $this->createByFiltersQueryBuilder($search, $status)
             ->getQuery()
             ->getResult();
     }
 
-    public function createByFiltersQueryBuilder($search, $status)
+    public function createByFiltersQueryBuilder(?string $search, ?string $status): QueryBuilder
     {
         $qb = $this->createQueryBuilder('e');
 
-        if ($search) {
+        if ($search !== null && $search !== '') {
             $qb->andWhere('LOWER(e.nom_entreprise) LIKE :search OR LOWER(e.nom) LIKE :search')
-                ->setParameter('search', '%' . strtolower((string) $search) . '%');
+                ->setParameter('search', '%' . strtolower($search) . '%');
         }
 
-        if ($status) {
+        if ($status !== null && $status !== '') {
             $qb->andWhere('e.statut = :status')
                 ->setParameter('status', $status);
         }
@@ -64,6 +68,9 @@ class EntrepriseRepository extends ServiceEntityRepository
         return $qb->orderBy('e.date_demande', 'DESC');
     }
 
+    /**
+     * @return array<int, array<string, int|string>>
+     */
     public function countByStatus(): array
     {
         return $this->createQueryBuilder('e')
@@ -74,6 +81,9 @@ class EntrepriseRepository extends ServiceEntityRepository
             ->getArrayResult();
     }
 
+    /**
+     * @return array<int, array<string, int|string>>
+     */
     public function countByDateDemande(): array
     {
         return $this->createQueryBuilder('e')
@@ -84,6 +94,9 @@ class EntrepriseRepository extends ServiceEntityRepository
             ->getArrayResult();
     }
 
+    /**
+     * @return array<int, array<string, int|string>>
+     */
     public function countByCountry(int $limit = 5): array
     {
         return $this->createQueryBuilder('e')

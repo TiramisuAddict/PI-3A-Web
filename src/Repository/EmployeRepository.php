@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Employe;
 use App\Entity\Entreprise;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -19,18 +20,18 @@ class EmployeRepository extends ServiceEntityRepository
         parent::__construct($registry, Employe::class);
     }
 
-    public function createFilteredQueryBuilder(Entreprise $entreprise, ?string $search, ?string $role)
+    public function createFilteredQueryBuilder(Entreprise $entreprise, ?string $search, ?string $role): QueryBuilder
     {
         $qb = $this->createQueryBuilder('e')
             ->andWhere('e.entreprise = :entreprise')
             ->setParameter('entreprise', $entreprise);
 
-        if ($search) {
+        if ($search !== null && $search !== '') {
             $qb->andWhere('LOWER(e.nom) LIKE :search OR LOWER(e.prenom) LIKE :search')
                 ->setParameter('search', '%' . strtolower($search) . '%');
         }
 
-        if ($role) {
+        if ($role !== null && $role !== '') {
             $qb->andWhere('LOWER(e.role) = :role')
                 ->setParameter('role', strtolower($role));
         }
@@ -38,6 +39,9 @@ class EmployeRepository extends ServiceEntityRepository
         return $qb;
     }
 
+    /**
+     * @return array<int, Employe>
+     */
     public function findByEntrepriseAndFilters(Entreprise $entreprise, ?string $search, ?string $role): array
     {
         return $this->createFilteredQueryBuilder($entreprise, $search, $role)
@@ -46,6 +50,9 @@ class EmployeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return array<int, Employe>
+     */
     public function findByEntrepriseAndFiltersPaginated(Entreprise $entreprise, ?string $search, ?string $role, int $page, int $perPage): array
     {
         $offset = max(0, ($page - 1) * $perPage);
@@ -58,6 +65,9 @@ class EmployeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function findDemandeManagerEmailsByEntrepriseId(int $entrepriseId): array
     {
         $rows = $this->createQueryBuilder('e')

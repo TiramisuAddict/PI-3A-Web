@@ -179,8 +179,10 @@ final class AdminController extends AbstractController
         if ($session->get('admin_logged_in') !== true) {
             return $this->redirectToRoute('login');
         }
-        $search = $request->query->get('search', '');
-        $status = $request->query->get('status', '');
+        $search = $request->query->get('search');
+        $search = is_string($search) ? $search : null;
+        $status = $request->query->get('status');
+        $status = is_string($status) ? $status : null;
 
         $allFilteredEntreprises = $entrepriseRepo->findByFilters($search, $status);
         $page = max(1, (int) $request->query->get('page', 1));
@@ -225,8 +227,8 @@ final class AdminController extends AbstractController
                         $mailerService->sendTemporaryPassword(
                             $mailer,
                             $recipientEmail,
-                            (string) $employe->getPrenom(),
-                            (string) $employe->getNom(),
+                            $employe->getPrenom(),
+                            $employe->getNom(),
                             $plainPassword
                         );
                         $this->addFlash('success', 'Compte cree et mot de passe envoye par e-mail.');

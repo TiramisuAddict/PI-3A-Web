@@ -90,7 +90,7 @@ class Visiteur implements PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getPassword(): ?string
+    public function getPassword(): string
     {
         return $this->mot_de_passe;
     }
@@ -113,6 +113,7 @@ class Visiteur implements PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    /** @var Collection<int, Candidat> */
     #[ORM\OneToMany(targetEntity: Candidat::class, mappedBy: 'visiteur')]
     private Collection $candidats;
 
@@ -136,6 +137,11 @@ class Visiteur implements PasswordAuthenticatedUserInterface
     {
         $this->getCandidats()->removeElement($candidat);
         return $this;
+    }
+
+    public function __construct()
+    {
+        $this->candidats = new ArrayCollection();
     }
 
 }

@@ -149,7 +149,7 @@ final class ForgotPasswordController extends AbstractController
     }
 
     #[Route('/forgot-password/new', name: 'forgot_password_new', methods: ['GET', 'POST'])]
-    public function forgotPasswordNew(Request $request, SessionInterface $session, AdministrateurSystemeRepository $adminRepo, EmployeRepository $employeRepo, EntityManagerInterface $entityManager, UserPasswordHasherInterface $passwordHasher, \App\Services\PasswordGenerator $passwordGenerator): Response
+    public function forgotPasswordNew(Request $request, SessionInterface $session, AdministrateurSystemeRepository $adminRepo, EmployeRepository $employeRepo, EntityManagerInterface $entityManager, UserPasswordHasherInterface $passwordHasher, \App\Service\PasswordGenerator $passwordGenerator): Response
     {
         if ($session->get('reset_password_pending') !== true || $session->get('reset_password_verified') !== true) {
             return $this->redirectToRoute('forgot_password');

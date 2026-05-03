@@ -201,9 +201,9 @@ public function dashboard(Request $request, SessionInterface $session, EmployeRe
             try {
                 $mailerService->sendTemporaryPassword(
                     $mailer,
-                    (string) $employe->getEmail(),
-                    (string) $employe->getPrenom(),
-                    (string) $employe->getNom(),
+                    $employe->getEmail(),
+                    $employe->getPrenom(),
+                    $employe->getNom(),
                     $plainPassword
                 );
                 $this->addFlash('success', 'Mot de passe envoye par e-mail.');

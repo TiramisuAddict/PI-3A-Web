@@ -10,13 +10,17 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class OAuthGoogleService
 {
+    /**
+     * @param array{object, string} $callable
+     */
     private function readGoogleStringValue(object $googleUser, string $method): ?string
     {
-        if (!is_callable([$googleUser, $method])) {
+        $callable = [$googleUser, $method];
+        if (!is_callable($callable)) {
             return null;
         }
 
-        $value = call_user_func([$googleUser, $method]);
+        $value = call_user_func($callable);
         return is_string($value) ? $value : null;
     }
 
