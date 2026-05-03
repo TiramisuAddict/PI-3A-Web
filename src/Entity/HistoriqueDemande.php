@@ -16,23 +16,28 @@ class HistoriqueDemande
     private ?int $id_historique = null;
 
     #[ORM\ManyToOne(targetEntity: Demande::class, inversedBy: 'historiqueDemandes')]
-    #[ORM\JoinColumn(name: 'id_demande', referencedColumnName: 'id_demande')]
+    #[ORM\JoinColumn(name: 'demande_id', referencedColumnName: 'id_demande', nullable: false, onDelete: 'CASCADE')]
     private ?Demande $demande = null;
 
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $ancien_statut = null;
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $nouveau_statut = null;
+    private string $nouveau_statut = '';
 
     #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $date_action = null;
+    private \DateTimeInterface $date_action;
 
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $acteur = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $commentaire = null;
+
+    public function __construct()
+    {
+        $this->date_action = new \DateTimeImmutable();
+    }
 
     public function getIdHistorique(): ?int
     {
@@ -61,7 +66,7 @@ class HistoriqueDemande
         return $this;
     }
 
-    public function getNouveauStatut(): ?string
+    public function getNouveauStatut(): string
     {
         return $this->nouveau_statut;
     }
@@ -72,7 +77,7 @@ class HistoriqueDemande
         return $this;
     }
 
-    public function getDateAction(): ?\DateTimeInterface
+    public function getDateAction(): \DateTimeInterface
     {
         return $this->date_action;
     }

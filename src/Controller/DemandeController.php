@@ -231,7 +231,7 @@ class DemandeController extends AbstractController
 
                         $demandeDetail = new DemandeDetail();
                         $demandeDetail->setDemande($demande);
-                        $demandeDetail->setDetails(json_encode($persistedDetails));
+                        $demandeDetail->setDetails($this->encodeDetailsPayload($persistedDetails));
                         $this->em->persist($demandeDetail);
                     }
 
@@ -246,8 +246,8 @@ class DemandeController extends AbstractController
 
                     if ($aiGenerated && $aiConfirmed) {
                         $this->demandeAiAssistant->recordAcceptedDescriptionFeedback(
-                            $demande->getTitre() ?? '',
-                            $demande->getDescription() ?? '',
+                            $demande->getTitre(),
+                            $demande->getDescription(),
                             $demande->getTypeDemande(),
                             $demande->getCategorie(),
                             $employe->getId_employe()
@@ -258,11 +258,11 @@ class DemandeController extends AbstractController
                         $this->demandeAiAssistant->recordAcceptedAutreFeedback(
                             '' !== $submittedAiRawPrompt ? $submittedAiRawPrompt : $submittedAiDescription,
                             [
-                                'titre' => $demande->getTitre() ?? '',
-                                'description' => $demande->getDescription() ?? '',
+                                'titre' => $demande->getTitre(),
+                                'description' => $demande->getDescription(),
                                 'priorite' => $demande->getPriorite() ?? '',
-                                'categorie' => $demande->getCategorie() ?? '',
-                                'typeDemande' => $demande->getTypeDemande() ?? '',
+                                'categorie' => $demande->getCategorie(),
+                                'typeDemande' => $demande->getTypeDemande(),
                             ],
                             $submittedDetails,
                             $submittedAiFieldPlan,
@@ -348,11 +348,15 @@ class DemandeController extends AbstractController
                 return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
             }
 
-            $data        = json_decode($request->getContent(), true);
-            $newStatus   = $data['status'] ?? null;
-            $commentaire = $data['commentaire'] ?? '';
+            $data = json_decode($request->getContent(), true);
+            if (!is_array($data)) {
+                return new JsonResponse(['success' => false, 'message' => 'Payload JSON invalide'], 400);
+            }
 
-            if (null === $newStatus || '' === (string) $newStatus) {
+            $newStatus   = $this->nullableScalarString($data['status'] ?? null);
+            $commentaire = $this->nullableScalarString($data['commentaire'] ?? '') ?? '';
+
+            if (null === $newStatus || '' === $newStatus) {
                 return new JsonResponse(['success' => false, 'message' => 'Statut requis'], 400);
             }
 
@@ -503,14 +507,16 @@ class DemandeController extends AbstractController
 
         if ($demandeDetails->count() > 0) {
             $firstDetail = $demandeDetails->first();
-            $rawDetailsData = json_decode($firstDetail->getDetails(), true) ?? [];
-            $rawDetailsData = is_array($rawDetailsData) ? $rawDetailsData : [];
-            $detailsData = $this->filterVisibleDetails($rawDetailsData);
-            $decisionDetails = $this->filterDecisionDetails($rawDetailsData);
-            $aiFieldLabels = $this->extractAiFieldLabels($rawDetailsData);
+            if ($firstDetail instanceof DemandeDetail) {
+                $rawDetailsData = json_decode($firstDetail->getDetails(), true) ?? [];
+                $rawDetailsData = is_array($rawDetailsData) ? $rawDetailsData : [];
+                $detailsData = $this->filterVisibleDetails($rawDetailsData);
+                $decisionDetails = $this->filterDecisionDetails($rawDetailsData);
+                $aiFieldLabels = $this->extractAiFieldLabels($rawDetailsData);
 
-            foreach ($detailsData as $key => $value) {
-                $fieldLabels[$key] = $aiFieldLabels[$key] ?? $this->formHelper->getFieldLabel($demande->getTypeDemande(), $key);
+                foreach ($detailsData as $key => $value) {
+                    $fieldLabels[$key] = $aiFieldLabels[$key] ?? $this->formHelper->getFieldLabel($demande->getTypeDemande(), $key);
+                }
             }
         }
 
@@ -555,10 +561,10 @@ class DemandeController extends AbstractController
             return $this->redirectToRoute('demande_index');
         }
 
-        $newStatus   = $request->request->get('status');
-        $commentaire = trim((string) $request->request->get('commentaire', ''));
+        $newStatus   = $this->nullableScalarString($request->request->get('status'));
+        $commentaire = $this->nullableScalarString($request->request->get('commentaire', '')) ?? '';
 
-        if (null === $newStatus || '' === (string) $newStatus) {
+        if (null === $newStatus || '' === $newStatus) {
             $this->addFlash('danger', 'Statut manquant.');
             return $this->redirectToRoute('demande_show', ['id' => $id]);
         }
@@ -639,7 +645,10 @@ class DemandeController extends AbstractController
         $demandeDetails  = $demande->getDemandeDetails();
         if ($demandeDetails->count() > 0) {
             $firstDetail     = $demandeDetails->first();
-            $existingDetails = json_decode($firstDetail->getDetails(), true) ?? [];
+            if ($firstDetail instanceof DemandeDetail) {
+                $existingDetails = json_decode($firstDetail->getDetails(), true) ?? [];
+                $existingDetails = is_array($existingDetails) ? $existingDetails : [];
+            }
         }
         $existingAiFieldPlan = $this->extractStoredAiFieldPlan($existingDetails);
         $usesStoredAiSchema = [] !== $existingAiFieldPlan;
@@ -666,9 +675,10 @@ class DemandeController extends AbstractController
             }
 
             if ($form->isValid() && [] === $detailErrors) {
-                $oldStatus   = $this->em->getUnitOfWork()->getOriginalEntityData($demande)['status'] ?? $demande->getStatus();
+                $oldStatusRaw = $this->em->getUnitOfWork()->getOriginalEntityData($demande)['status'] ?? $demande->getStatus();
+                $oldStatus   = $oldStatusRaw instanceof \BackedEnum ? (string) $oldStatusRaw->value : (string) $oldStatusRaw;
                 $newStatus   = $demande->getStatus();
-                $commentaire = $form->get('commentaire')->getData();
+                $commentaire = $this->nullableScalarString($form->get('commentaire')->getData()) ?? '';
                 $actorLabel  = $this->getActorLabel($session);
                 $statusChanged = $oldStatus !== $newStatus;
 
@@ -683,7 +693,7 @@ class DemandeController extends AbstractController
                     $historique->setAncienStatut($oldStatus);
                     $historique->setNouveauStatut($newStatus);
                     $historique->setActeur($actorLabel);
-                    $historique->setCommentaire($commentaire ?? 'Statut modifie');
+                    $historique->setCommentaire('' !== $commentaire ? $commentaire : 'Statut modifie');
                     $historique->setDateAction(new \DateTime());
                     $this->em->persist($historique);
                 }
@@ -705,13 +715,18 @@ class DemandeController extends AbstractController
                         $detail->setDemande($demande);
                         $this->em->persist($detail);
                     }
-                    $detail->setDetails(json_encode($submittedDetails));
+                    if (!$detail instanceof DemandeDetail) {
+                        $detail = new DemandeDetail();
+                        $detail->setDemande($demande);
+                        $this->em->persist($detail);
+                    }
+                    $detail->setDetails($this->encodeDetailsPayload($submittedDetails));
                 }
 
                 $this->em->flush();
 
                 if ($statusChanged) {
-                    $this->demandeMailer->notifyEmployeStatusChanged($demande, $oldStatus, $newStatus, $actorLabel, (string) $commentaire);
+                    $this->demandeMailer->notifyEmployeStatusChanged($demande, $oldStatus, $newStatus, $actorLabel, $commentaire);
                 }
 
                 $this->addFlash('success', 'Demande mise a jour avec succes.');
@@ -794,6 +809,26 @@ class DemandeController extends AbstractController
     private function jsonAccessDenied(string $message, int $status = 403): JsonResponse
     {
         return new JsonResponse(['success' => false, 'message' => $message], $status);
+    }
+
+    private function nullableScalarString(mixed $value): ?string
+    {
+        if (null === $value || !is_scalar($value)) {
+            return null;
+        }
+
+        return trim((string) $value);
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     */
+    private function encodeDetailsPayload(array $details): string
+    {
+        return json_encode(
+            $details,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR
+        );
     }
 
     private function getActorLabel(SessionInterface $session): string
@@ -1262,6 +1297,8 @@ class DemandeController extends AbstractController
                 continue;
             }
 
+            $valueString = trim((string) $value);
+
             if ($type === 'number') {
                 if (!is_numeric($value)) {
                     $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" doit etre un nombre valide.', 'type' => 'format'];
@@ -1281,7 +1318,7 @@ class DemandeController extends AbstractController
 
             if ($type === 'date') {
                 try {
-                    $date = new \DateTime($value);
+                    $date = new \DateTime($valueString);
                     $date->setTime(0, 0, 0);
                     $lowerKey   = strtolower($key);
                     $lowerLabel = strtolower($label);
@@ -1323,12 +1360,12 @@ class DemandeController extends AbstractController
                     ? array_values(array_map('strval', $field['options']))
                     : [];
 
-                if ([] !== $options && !in_array((string) $value, $options, true)) {
+                if ([] !== $options && !in_array($valueString, $options, true)) {
                     $errors[] = ['field' => $key, 'message' => 'La valeur choisie pour "' . $label . '" est invalide.', 'type' => 'format'];
                 }
             }
 
-            if (($type === 'text' || $type === 'textarea') && mb_strlen(trim((string) $value)) > 2000) {
+            if (($type === 'text' || $type === 'textarea') && mb_strlen($valueString) > 2000) {
                 $errors[] = ['field' => $key, 'message' => 'Le champ "' . $label . '" ne peut pas depasser 2000 caracteres.', 'type' => 'format'];
             }
         }

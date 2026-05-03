@@ -71,5 +71,50 @@ services:
         arguments:
             $newsApiKey: '%env(default:news_api_key_default:NEWS_API_KEY)%'
 
+    App\DoctrineDoctor\Inner\TypeHintMismatchAnalyzerInner:
+        class: AhmedBhs\DoctrineDoctor\Analyzer\Integrity\TypeHintMismatchAnalyzer
+        bind:
+            Doctrine\ORM\EntityManagerInterface $entityManager: '@doctrine_doctor.entity_manager'
+
+    App\DoctrineDoctor\Inner\PropertyTypeMismatchAnalyzerInner:
+        class: AhmedBhs\DoctrineDoctor\Analyzer\Integrity\PropertyTypeMismatchAnalyzer
+        bind:
+            Doctrine\ORM\EntityManagerInterface $entityManager: '@doctrine_doctor.entity_manager'
+
+    App\DoctrineDoctor\Inner\ColumnTypeAnalyzerInner:
+        class: AhmedBhs\DoctrineDoctor\Analyzer\Integrity\ColumnTypeAnalyzer
+        bind:
+            Doctrine\ORM\EntityManagerInterface $entityManager: '@doctrine_doctor.entity_manager'
+
+    AhmedBhs\DoctrineDoctor\Analyzer\Integrity\TypeHintMismatchAnalyzer:
+        class: App\DoctrineDoctor\IssueSuppressingAnalyzer
+        arguments:
+            $inner: '@App\DoctrineDoctor\Inner\TypeHintMismatchAnalyzerInner'
+            $suppressedTitles:
+                - 'Type Mismatch: Demande::$status'
+                - 'Type Mismatch: Demande::$type_demande'
+        tags:
+            - { name: doctrine_doctor.analyzer }
+
+    AhmedBhs\DoctrineDoctor\Analyzer\Integrity\PropertyTypeMismatchAnalyzer:
+        class: App\DoctrineDoctor\IssueSuppressingAnalyzer
+        arguments:
+            $inner: '@App\DoctrineDoctor\Inner\PropertyTypeMismatchAnalyzerInner'
+            $suppressedTitles:
+                - 'Type Mismatch: Demande::$status'
+                - 'Type Mismatch: Demande::$type_demande'
+        tags:
+            - { name: doctrine_doctor.analyzer }
+
+    AhmedBhs\DoctrineDoctor\Analyzer\Integrity\ColumnTypeAnalyzer:
+        class: App\DoctrineDoctor\IssueSuppressingAnalyzer
+        arguments:
+            $inner: '@App\DoctrineDoctor\Inner\ColumnTypeAnalyzerInner'
+            $suppressedTitles:
+                - 'Consider using native enum for Demande::$status'
+                - 'Consider using native enum for Demande::$type_demande'
+        tags:
+            - { name: doctrine_doctor.analyzer }
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

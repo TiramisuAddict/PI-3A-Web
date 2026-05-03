@@ -92,7 +92,7 @@ class SeedAutreMlDemandesCommand extends Command
 
         foreach ($seeds as $seed) {
             $exists = (int) $connection->fetchOne(
-                'SELECT COUNT(*) FROM demande WHERE id_employe = ? AND titre = ? AND type_demande = ?',
+                'SELECT COUNT(*) FROM demande WHERE employe_id = ? AND titre = ? AND type_demande = ?',
                 [$employeeId, $seed['title'], $seed['type']]
             ) > 0;
 
@@ -108,7 +108,7 @@ class SeedAutreMlDemandesCommand extends Command
             }
 
             $connection->insert('demande', [
-                'id_employe' => $employeeId,
+                'employe_id' => $employeeId,
                 'categorie' => $seed['category'],
                 'titre' => $seed['title'],
                 'description' => $seed['description'],
@@ -120,13 +120,13 @@ class SeedAutreMlDemandesCommand extends Command
 
             $demandeId = (int) $connection->lastInsertId();
             $details = $this->detailsPayload($seed);
-            $connection->insert('demande_details', [
-                'id_demande' => $demandeId,
+            $connection->insert('demande_detail', [
+                'demande_id' => $demandeId,
                 'details' => json_encode($details, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ]);
 
             $connection->insert('historique_demande', [
-                'id_demande' => $demandeId,
+                'demande_id' => $demandeId,
                 'ancien_statut' => null,
                 'nouveau_statut' => 'Nouvelle',
                 'date_action' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),

@@ -2,6 +2,8 @@
 
 namespace App\Service;
 
+use App\Enum\DemandeStatus;
+
 class DemandeFormHelper
 {
     private const CATEGORY_TYPES = [
@@ -50,17 +52,6 @@ class DemandeFormHelper
         'HAUTE',
         'NORMALE',
         'BASSE'
-    ];
-
-    private const STATUSES = [
-        'Nouvelle',
-        'En cours',
-        'En attente',
-        'Resolue',
-        'Rejetee',
-        'Reconsideration',
-        'Fermee',
-        'Annulee'
     ];
 
     private const CATEGORY_ALIASES = [
@@ -126,7 +117,7 @@ class DemandeFormHelper
      */
     public function getStatuses(): array
     {
-        return self::STATUSES;
+        return DemandeStatus::values();
     }
 
     public function resolveCanonicalCategory(?string $category, ?string $typeDemande = null): ?string

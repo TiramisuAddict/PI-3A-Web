@@ -6,6 +6,7 @@ use App\Entity\Demande;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
+use BackedEnum;
 
 /**
  * @extends ServiceEntityRepository<Demande>
@@ -98,7 +99,10 @@ class DemandeRepository extends ServiceEntityRepository
 
         $grouped = [];
         foreach ($results as $result) {
-            $grouped[$result['type_demande']] = (int) $result['count'];
+            $typeDemande = $this->normalizeScalarString($result['type_demande'] ?? null);
+            if ('' !== $typeDemande) {
+                $grouped[$typeDemande] = (int) $result['count'];
+            }
         }
         return $grouped;
     }
@@ -145,7 +149,7 @@ class DemandeRepository extends ServiceEntityRepository
                    ->setParameter('statusVariants', self::RESOLVED_STATUS_VARIANTS);
             } else {
                 $qb->andWhere('d.status = :status')
-                   ->setParameter('status', $filters['status']);
+                   ->setParameter('status', $this->normalizeStatusParameter((string) $filters['status']));
             }
         }
 
@@ -178,7 +182,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->andWhere('d.type_demande = :typeDemande')
             ->andWhere('d.date_creation >= :startDate')
             ->setParameter('employeId', $employeId)
-            ->setParameter('typeDemande', $typeDemande)
+            ->setParameter('typeDemande', $this->normalizeTypeParameter($typeDemande))
             ->setParameter('startDate', $startDate)
             ->setParameter('referenceDate', $referenceDate);
 
@@ -218,7 +222,7 @@ class DemandeRepository extends ServiceEntityRepository
             }
 
             $categorie = trim((string) ($row['categorie'] ?? ''));
-            $typeDemande = trim((string) ($row['typeDemande'] ?? ''));
+            $typeDemande = $this->normalizeScalarString($row['typeDemande'] ?? null);
             $priorite = strtoupper(trim((string) ($row['priorite'] ?? 'NORMALE')));
 
             if ('' === $categorie || '' === $typeDemande) {
@@ -257,7 +261,7 @@ class DemandeRepository extends ServiceEntityRepository
         $samples = [];
         foreach ($rows as $row) {
             $text = trim(trim((string) ($row['titre'] ?? '')) . ' ' . trim((string) ($row['description'] ?? '')));
-            $status = trim((string) ($row['status'] ?? ''));
+            $status = $this->normalizeScalarString($row['status'] ?? null);
             if ('' === $text || '' === $status) {
                 continue;
             }
@@ -267,7 +271,7 @@ class DemandeRepository extends ServiceEntityRepository
                 'status' => $status,
                 'priorite' => strtoupper(trim((string) ($row['priorite'] ?? 'NORMALE'))),
                 'categorie' => trim((string) ($row['categorie'] ?? '')),
-                'typeDemande' => trim((string) ($row['typeDemande'] ?? '')),
+                'typeDemande' => $this->normalizeScalarString($row['typeDemande'] ?? null),
             ];
         }
 
@@ -335,7 +339,7 @@ class DemandeRepository extends ServiceEntityRepository
                 'description' => $description,
                 'priorite' => trim((string) ($row['priorite'] ?? '')),
                 'categorie' => trim((string) ($row['categorie'] ?? '')),
-                'typeDemande' => trim((string) ($row['typeDemande'] ?? 'Autre')),
+                'typeDemande' => $this->normalizeScalarString($row['typeDemande'] ?? null, 'Autre'),
             ];
 
             $storedFieldPlan = $details['_ai_field_plan'] ?? $details['__ai_field_plan'] ?? null;
@@ -491,17 +495,41 @@ class DemandeRepository extends ServiceEntityRepository
         return in_array($status, self::RESOLVED_STATUS_VARIANTS, true);
     }
 
-    private function normalizeStatusKey(?string $status): ?string
+    private function normalizeStatusKey(mixed $status): ?string
     {
-        if (null === $status) {
+        $normalizedStatus = $this->normalizeScalarString($status);
+        if ('' === $normalizedStatus) {
             return null;
         }
 
-        if ($this->isResolvedStatus($status)) {
+        if ($this->isResolvedStatus($normalizedStatus)) {
             return 'Resolue';
         }
 
-        return $status;
+        return $normalizedStatus;
+    }
+
+    private function normalizeStatusParameter(string $status): string
+    {
+        return trim($status);
+    }
+
+    private function normalizeTypeParameter(string $typeDemande): string
+    {
+        return trim($typeDemande);
+    }
+
+    private function normalizeScalarString(mixed $value, string $default = ''): string
+    {
+        if ($value instanceof BackedEnum) {
+            return is_string($value->value) ? $value->value : (string) $value->value;
+        }
+
+        if (null === $value) {
+            return $default;
+        }
+
+        return trim((string) $value);
     }
 
     private function toBooleanValue(mixed $value): bool

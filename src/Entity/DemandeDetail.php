@@ -6,7 +6,7 @@ use Doctrine\ORM\Mapping as ORM;
 use App\Repository\DemandeDetailRepository;
 
 #[ORM\Entity(repositoryClass: DemandeDetailRepository::class)]
-#[ORM\Table(name: 'demande_details')]
+#[ORM\Table(name: 'demande_detail')]
 class DemandeDetail
 {
     #[ORM\Id]
@@ -16,11 +16,11 @@ class DemandeDetail
     private ?int $id_details = null;
 
     #[ORM\ManyToOne(targetEntity: Demande::class, inversedBy: 'demandeDetails')]
-    #[ORM\JoinColumn(name: 'id_demande', referencedColumnName: 'id_demande')]
+    #[ORM\JoinColumn(name: 'demande_id', referencedColumnName: 'id_demande', nullable: false, onDelete: 'CASCADE')]
     private ?Demande $demande = null;
 
     #[ORM\Column(type: 'text', nullable: false)]
-    private ?string $details = null;
+    private string $details = '';
 
     public function getIdDetails(): ?int
     {
@@ -38,7 +38,7 @@ class DemandeDetail
         return $this;
     }
 
-    public function getDetails(): ?string
+    public function getDetails(): string
     {
         return $this->details;
     }
