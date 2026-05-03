@@ -90,11 +90,12 @@ class DemandeMailer
         }
 
         $actionLabel = $event === 'created' ? 'Nouvelle demande creee' : 'Demande annulee';
+        $titre = trim($demande->getTitre());
 
         $email = (new TemplatedEmail())
             ->from($this->getFromAddress())
             ->to(...$recipients)
-            ->subject(sprintf('%s: %s', $actionLabel, $demande->getTitre() ?? 'Demande'))
+            ->subject(sprintf('%s: %s', $actionLabel, '' !== $titre ? $titre : 'Demande'))
             ->htmlTemplate('email/demande/rh_admin_event.html.twig')
             ->context([
                 'demande' => $demande,

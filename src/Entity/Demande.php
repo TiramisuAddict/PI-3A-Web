@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use App\Enum\DemandeRequestType;
+use App\Enum\DemandeStatus;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -40,7 +42,7 @@ class Demande
     private \DateTimeInterface $date_creation;
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private string $type_demande = '';
+    private string $type_demande = 'Autre';
 
     /** @var Collection<int, DemandeDetail> */
     #[ORM\OneToMany(targetEntity: DemandeDetail::class, mappedBy: 'demande', cascade: ['persist', 'remove'], orphanRemoval: true)]
@@ -122,9 +124,16 @@ class Demande
         return $this->status;
     }
 
-    public function setStatus(string $status): self
+    public function getStatusEnum(): ?DemandeStatus
     {
-        $this->status = $status;
+        return DemandeStatus::tryFrom($this->status);
+    }
+
+    public function setStatus(string|DemandeStatus $status): self
+    {
+        $this->status = $status instanceof DemandeStatus
+            ? $status->value
+            : trim($status);
         return $this;
     }
 
@@ -144,9 +153,16 @@ class Demande
         return $this->type_demande;
     }
 
-    public function setTypeDemande(string $type_demande): self
+    public function getTypeDemandeEnum(): ?DemandeRequestType
     {
-        $this->type_demande = $type_demande;
+        return DemandeRequestType::tryFrom($this->type_demande);
+    }
+
+    public function setTypeDemande(string|DemandeRequestType $type_demande): self
+    {
+        $this->type_demande = $type_demande instanceof DemandeRequestType
+            ? $type_demande->value
+            : trim($type_demande);
         return $this;
     }
 

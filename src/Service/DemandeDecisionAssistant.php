@@ -91,10 +91,10 @@ class DemandeDecisionAssistant
             $qualityPenalty += min(0.35, 0.12 * count($weakRequired));
         }
 
-        $type = trim((string) $demande->getTypeDemande());
+        $type = trim($demande->getTypeDemande());
         $normalizedType = $this->normalizeDecisionType($type);
-        $title = trim((string) $demande->getTitre());
-        $description = trim((string) $demande->getDescription());
+        $title = trim($demande->getTitre());
+        $description = trim($demande->getDescription());
         $descriptionLower = strtolower($description);
         $priorite = strtoupper(trim((string) $demande->getPriorite()));
 
@@ -207,7 +207,7 @@ class DemandeDecisionAssistant
 
             $reasons[] = sprintf(
                 'Des demandes de meme type (%s) ont ete creees recemment par le meme employe (%d sur %d jours).',
-                (string) $demande->getTypeDemande(),
+                $demande->getTypeDemande(),
                 $repeatPenalty['count'],
                 $repeatPenalty['windowDays']
             );
@@ -281,7 +281,7 @@ class DemandeDecisionAssistant
     private function buildRepeatTypePenalty(Demande $demande): array
     {
         $employeId = $demande->getEmploye()?->getId_employe();
-        $typeDemande = trim((string) $demande->getTypeDemande());
+        $typeDemande = trim($demande->getTypeDemande());
         $dateCreation = $demande->getDateCreation();
         $demandeId = $demande->getIdDemande();
 
@@ -294,7 +294,7 @@ class DemandeDecisionAssistant
             ];
         }
 
-        if (null === $employeId || '' === $typeDemande || null === $dateCreation) {
+        if (null === $employeId || '' === $typeDemande) {
             return [
                 'count' => 0,
                 'windowDays' => 7,
@@ -347,13 +347,13 @@ class DemandeDecisionAssistant
         $payload = [
             'demande' => [
                 'id' => $demande->getIdDemande(),
-                'categorie' => (string) $demande->getCategorie(),
-                'typeDemande' => (string) $demande->getTypeDemande(),
-                'titre' => (string) $demande->getTitre(),
-                'description' => (string) $demande->getDescription(),
+                'categorie' => $demande->getCategorie(),
+                'typeDemande' => $demande->getTypeDemande(),
+                'titre' => $demande->getTitre(),
+                'description' => $demande->getDescription(),
                 'priorite' => (string) $demande->getPriorite(),
-                'status' => (string) $demande->getStatus(),
-                'dateCreation' => $demande->getDateCreation()?->format('Y-m-d'),
+                'status' => $demande->getStatus(),
+                'dateCreation' => $demande->getDateCreation()->format('Y-m-d'),
             ],
             'details' => $details,
             'fieldDefinitions' => $fieldDefinitions,
@@ -770,11 +770,11 @@ class DemandeDecisionAssistant
     {
         $score = 0;
 
-        if ($this->isLowQualityValue((string) $demande->getTitre(), 'titre', 'Titre', 'text')) {
+        if ($this->isLowQualityValue($demande->getTitre(), 'titre', 'Titre', 'text')) {
             $score += 30;
         }
 
-        if ($this->isLowQualityValue((string) $demande->getDescription(), 'description', 'Description', 'textarea')) {
+        if ($this->isLowQualityValue($demande->getDescription(), 'description', 'Description', 'textarea')) {
             $score += 35;
         }
 

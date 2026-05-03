@@ -192,7 +192,8 @@ class Employe
     #[ORM\OneToMany(targetEntity: Commentaire::class, mappedBy: 'employe')]
     private Collection $commentaires;
 
-    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employe')]
+    /** @var Collection<int, Demande> */
+    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employe', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $demandes;
 
     /**

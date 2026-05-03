@@ -92,7 +92,7 @@ class BackfillDemandeDetailsCommand extends Command
             }
 
             $rawDetails = $detailEntity->getDetails();
-            $currentDetails = json_decode((string) $rawDetails, true);
+            $currentDetails = json_decode($rawDetails, true);
             if (!is_array($currentDetails)) {
                 $currentDetails = [];
             }
@@ -199,8 +199,8 @@ class BackfillDemandeDetailsCommand extends Command
         }
 
         $sourceText = trim(implode(' ', array_filter([
-            $demande->getTitre() ?? '',
-            $demande->getDescription() ?? '',
+            $demande->getTitre(),
+            $demande->getDescription(),
             $this->flattenScalarDetails($details),
         ], function ($v) {
             return '' !== trim($v);
@@ -228,7 +228,7 @@ class BackfillDemandeDetailsCommand extends Command
             }
 
             if ('date' === $type && !$this->hasMeaningfulValue($normalized[$key] ?? null)) {
-                $normalized[$key] = $demande->getDateCreation()?->format('Y-m-d') ?? date('Y-m-d');
+                $normalized[$key] = $demande->getDateCreation()->format('Y-m-d');
             }
         }
 
@@ -250,7 +250,7 @@ class BackfillDemandeDetailsCommand extends Command
         }
 
         if (!$this->hasMeaningfulValue($details['dateDepense'] ?? null)) {
-            $details['dateDepense'] = $demande->getDateCreation()?->format('Y-m-d') ?? date('Y-m-d');
+            $details['dateDepense'] = $demande->getDateCreation()->format('Y-m-d');
         }
 
         if (!$this->hasMeaningfulValue($details['justificatif'] ?? null)) {
@@ -324,7 +324,7 @@ class BackfillDemandeDetailsCommand extends Command
         }
 
         if (!$this->hasMeaningfulValue($details['dateDebutTeletravail'] ?? null)) {
-            $details['dateDebutTeletravail'] = $demande->getDateCreation()?->format('Y-m-d') ?? date('Y-m-d');
+            $details['dateDebutTeletravail'] = $demande->getDateCreation()->format('Y-m-d');
         }
 
         return $details;
@@ -368,7 +368,7 @@ class BackfillDemandeDetailsCommand extends Command
      */
     private function migrateFormationExterneDetails(Demande $demande, array $details): array
     {
-        $title = trim((string) $demande->getTitre());
+        $title = trim($demande->getTitre());
         $suggestedName = $this->extractTrainingLabelFromTitle($title, 'formation');
 
         if ($this->isSuspiciousTrainingValue($details['nomFormationExt'] ?? null) || !$this->hasMeaningfulValue($details['nomFormationExt'] ?? null)) {
@@ -396,7 +396,7 @@ class BackfillDemandeDetailsCommand extends Command
      */
     private function migrateFormationInterneDetails(Demande $demande, array $details): array
     {
-        $title = trim((string) $demande->getTitre());
+        $title = trim($demande->getTitre());
         $suggestedName = $this->extractTrainingLabelFromTitle($title, 'formation');
 
         if ($this->isSuspiciousTrainingValue($details['nomFormation'] ?? null) || !$this->hasMeaningfulValue($details['nomFormation'] ?? null)) {
@@ -420,7 +420,7 @@ class BackfillDemandeDetailsCommand extends Command
      */
     private function migrateCertificationDetails(Demande $demande, array $details): array
     {
-        $title = trim((string) $demande->getTitre());
+        $title = trim($demande->getTitre());
         $suggestedName = $this->extractTrainingLabelFromTitle($title, 'certification');
 
         if ($this->isSuspiciousTrainingValue($details['nomCertification'] ?? null) || !$this->hasMeaningfulValue($details['nomCertification'] ?? null)) {
@@ -452,12 +452,16 @@ class BackfillDemandeDetailsCommand extends Command
             return $options[0];
         }
 
+        $title = $demande->getTitre();
+        $description = $demande->getDescription();
+        $descriptionFallback = '' !== trim($description) ? $description : $title;
+
         return match ($key) {
-            'justification', 'justificationLogiciel', 'justificationCertif' => $demande->getDescription() ?? $demande->getTitre(),
-            'descriptionProbleme', 'motif', 'motifTeletravail', 'details', 'objectif', 'objectifFormation' => $demande->getDescription() ?? $demande->getTitre(),
-            'systeme', 'nomLogiciel', 'nomFormationExt', 'nomFormation', 'nomCertification' => $demande->getTitre() ?? $canonicalType,
+            'justification', 'justificationLogiciel', 'justificationCertif' => $descriptionFallback,
+            'descriptionProbleme', 'motif', 'motifTeletravail', 'details', 'objectif', 'objectifFormation' => $descriptionFallback,
+            'systeme', 'nomLogiciel', 'nomFormationExt', 'nomFormation', 'nomCertification' => '' !== trim($title) ? $title : $canonicalType,
             'lieuFormation', 'lieuExamen', 'lieuMutation', 'adresseTeletravail' => 'A confirmer',
-            default => ('text' === $type || 'textarea' === $type) ? ($demande->getTitre() ?? $canonicalType) : null,
+            default => ('text' === $type || 'textarea' === $type) ? ('' !== trim($title) ? $title : $canonicalType) : null,
         };
     }
 
@@ -535,7 +539,7 @@ class BackfillDemandeDetailsCommand extends Command
             return true;
         }
 
-        return !preg_match('/^\d+\s+(jour|jours|semaine|semaines|mois|heure|heures)$/', $normalized);
+        return preg_match('/^\d+\s+(jour|jours|semaine|semaines|mois|heure|heures)$/', $normalized) !== 1;
     }
 
     private function isGenericObjectiveValue(mixed $value): bool
