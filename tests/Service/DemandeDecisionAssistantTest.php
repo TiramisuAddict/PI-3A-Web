@@ -110,4 +110,51 @@ final class DemandeDecisionAssistantTest extends TestCase
         self::assertSame([], $result['missingRequired']);
         self::assertArrayHasKey('mlSignals', $result);
     }
+
+    public function testAnalyzeRejectsVagueAutreDemandWithPoorTitleAndDescription(): void
+    {
+        $assistant = new DemandeDecisionAssistant(
+            $this->createMock(DemandeRepository::class),
+            $this->createMock(LoggerInterface::class)
+        );
+
+        $demande = (new Demande())
+            ->setTypeDemande('Autre')
+            ->setTitre('test')
+            ->setDescription('test')
+            ->setPriorite('NORMALE')
+            ->setStatus('Nouvelle')
+            ->setDateCreation(new \DateTimeImmutable('2026-04-24'));
+
+        $result = $assistant->analyze($demande, [], []);
+
+        self::assertSame('Rejetee', $result['recommendedStatus']);
+        self::assertLessThanOrEqual(0.25, $result['confidence']);
+        self::assertNotEmpty($result['warnings']);
+        self::assertNotEmpty($result['reasons']);
+    }
+
+    public function testAnalyzeMarksCompleteAutreDemandAsResolvable(): void
+    {
+        $assistant = new DemandeDecisionAssistant(
+            $this->createMock(DemandeRepository::class),
+            $this->createMock(LoggerInterface::class)
+        );
+
+        $demande = (new Demande())
+            ->setTypeDemande('Autre')
+            ->setTitre('Reservation de salle pour atelier produit')
+            ->setDescription('Reservation de salle pour un atelier produit avec plusieurs participants.')
+            ->setPriorite('NORMALE')
+            ->setStatus('Nouvelle')
+            ->setDateCreation(new \DateTimeImmutable('2026-04-24'));
+
+        $result = $assistant->analyze($demande, [], []);
+
+        self::assertSame('Resolue', $result['recommendedStatus']);
+        self::assertSame(1.0, $result['completeness']);
+        self::assertSame([], $result['missingRequired']);
+        self::assertSame([], $result['weakRequired']);
+        self::assertSame([], $result['warnings']);
+    }
 }
