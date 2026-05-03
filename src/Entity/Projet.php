@@ -275,6 +275,7 @@ class Projet
         return $this;
     }
 
+    /** @var Collection<int, Employe> */
     #[ORM\ManyToMany(targetEntity: Employe::class, inversedBy: 'projetsEquipe')]
     #[ORM\JoinTable(
         name: 'equipe_projet',
@@ -285,7 +286,6 @@ class Projet
             new ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')
         ]
     )]
-    /** @var Collection<int, Employe> */
     private Collection $membresEquipe;
 
     public function __construct()

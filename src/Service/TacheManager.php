@@ -12,6 +12,10 @@ class TacheManager
             throw new \InvalidArgumentException('Le titre est obligatoire.');
         }
 
+        if (mb_strlen(trim((string) $tache->getTitre())) > 150) {
+            throw new \InvalidArgumentException('Le titre ne peut pas dépasser 150 caractères.');
+        }
+
         $dateDeb = $tache->getDate_deb();
         $dateLimite = $tache->getDate_limite();
 
