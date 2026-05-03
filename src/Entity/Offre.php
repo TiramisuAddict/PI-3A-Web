@@ -130,6 +130,9 @@ class Offre
         return $this;
     }
 
+    /**
+     * @var Collection<int, Candidat>
+     */
     #[ORM\OneToMany(targetEntity: Candidat::class, mappedBy: 'offre')]
     private Collection $candidats;
 
@@ -139,13 +142,10 @@ class Offre
     }
 
     /**
-     * @return Collection<int, Candidat>
-     */
+    * @return Collection<int, Candidat>
+    */
     public function getCandidats(): Collection
     {
-        if (!$this->candidats instanceof Collection) {
-            $this->candidats = new ArrayCollection();
-        }
         return $this->candidats;
     }
 
