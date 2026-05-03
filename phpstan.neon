@@ -6,34 +6,34 @@ parameters:
     ignoreErrors:
         -
             identifier: cast.useless
-            path: src/Services/DemandeAiAssistant.php
+            path: src/Service/DemandeAiAssistant.php
         -
             identifier: nullCoalesce.offset
-            path: src/Services/DemandeAiAssistant.php
+            path: src/Service/DemandeAiAssistant.php
         -
             identifier: nullCoalesce.variable
-            path: src/Services/DemandeAiAssistant.php
+            path: src/Service/DemandeAiAssistant.php
         -
             identifier: function.alreadyNarrowedType
-            path: src/Services/DemandeAiAssistant.php
+            path: src/Service/DemandeAiAssistant.php
         -
             identifier: arrayValues.list
-            path: src/Services/DemandeAiAssistant.php
+            path: src/Service/DemandeAiAssistant.php
         -
             identifier: ternary.shortNotAllowed
-            path: src/Services/DemandeAiAssistant.php
+            path: src/Service/DemandeAiAssistant.php
         -
             identifier: empty.notAllowed
-            path: src/Services/DemandeAiAssistant.php
+            path: src/Service/DemandeAiAssistant.php
         -
             identifier: method.unused
-            path: src/Services/DemandeAiAssistant.php
+            path: src/Service/DemandeAiAssistant.php
         -
             identifier: varTag.nativeType
-            path: src/Services/DemandeAiAssistant.php
+            path: src/Service/DemandeAiAssistant.php
         -
             identifier: identical.alwaysFalse
-            path: src/Services/DemandeAiAssistant.php
+            path: src/Service/DemandeAiAssistant.php
         -
             identifier: notIdentical.alwaysTrue
-            path: src/Services/DemandeAiAssistant.php
+            path: src/Service/DemandeAiAssistant.php
