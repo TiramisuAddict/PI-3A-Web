@@ -472,7 +472,7 @@
 
                                     <div class="offre-info-item">
                                         <span class="offre-info-label">Candidats</span>
-                                        <span class="offre-info-value">{{ offre.candidats|length }} candidat(s)</span>
+                                        <span class="offre-info-value">{{ candidatCounts[offre.id]|default(0) }} candidat(s)</span>
                                     </div>
                                 </div>
 
@@ -501,10 +501,9 @@
                                                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
                                                         </div>
                                                         <div class="modal-body">
-                                                            {{ render(controller('App\\Controller\\CandidatController::postuler', {
-                                                                'offreId': offre.id,
-                                                                'visiteurId': visiteur_id
-                                                            })) }}
+                                                            {% include 'candidat/_postuler.html.twig' with {
+                                                                form_action: path('app_candidature_postuler', {'offreId': offre.id, 'visiteurId': visiteur_id})
+                                                            } %}
                                                         </div>
                                                     </div>
                                                 </div>

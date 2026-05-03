@@ -50,8 +50,12 @@ final class OffreController extends AbstractController
 
         $offres = $offre_repository->findByFilters($q, $category, $contract, 'OUVERT');
 
-        return $this->render('offre/index.html.twig' , [ //page
-            'offres' => $offres
+        $offreIds = array_values(array_filter(array_map(static fn(Offre $o): ?int => $o->getId(), $offres)));
+        $candidatCounts = $offre_repository->findCandidatCountsByOffreIds($offreIds);
+
+        return $this->render('offre/index.html.twig', [
+            'offres' => $offres,
+            'candidatCounts' => $candidatCounts,
         ]);
     }
 
