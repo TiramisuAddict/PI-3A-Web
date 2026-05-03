@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Service;
 class FaceRecognitionService
 {
     private const EMBEDDING_MIN_LENGTH = 128;

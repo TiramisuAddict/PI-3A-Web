@@ -7,7 +7,7 @@ namespace App\Tests\Services;
 use App\Entity\Demande;
 use App\Entity\Employe;
 use App\Repository\DemandeRepository;
-use App\Services\DemandeDecisionAssistant;
+use App\Service\DemandeDecisionAssistant;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 

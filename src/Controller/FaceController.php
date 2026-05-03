@@ -4,7 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Employe;
 use App\Repository\EmployeRepository;
-use App\Services\FaceRecognitionService;
+use App\Service\FaceRecognitionService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Services;
 
-use App\Services\DemandeFormHelper;
+use App\Service\DemandeFormHelper;
 use PHPUnit\Framework\TestCase;
 
 final class DemandeFormHelperTest extends TestCase

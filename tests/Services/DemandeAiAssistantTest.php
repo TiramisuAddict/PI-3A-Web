@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Services;
 
 use App\Repository\DemandeRepository;
-use App\Services\DemandeAiAssistant;
+use App\Service\DemandeAiAssistant;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;

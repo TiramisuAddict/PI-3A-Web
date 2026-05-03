@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Service;
 
 use App\Repository\DemandeRepository;
 use Psr\Log\LoggerInterface;

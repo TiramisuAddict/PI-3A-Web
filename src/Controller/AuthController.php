@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Services\TwilioVerifyService;
+use App\Service\TwilioVerifyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;

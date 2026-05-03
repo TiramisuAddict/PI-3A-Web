@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Service;
 
 use App\Entity\Demande;
 use App\Repository\EmployeRepository;

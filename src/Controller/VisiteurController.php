@@ -5,7 +5,7 @@ namespace App\Controller;
 use App\Entity\Visiteur;
 use App\Form\VisiteurType;
 use App\Repository\VisiteurRepository;
-use App\Services\OAuthGoogleService;
+use App\Service\OAuthGoogleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormFactoryInterface;

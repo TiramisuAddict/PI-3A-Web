@@ -6,10 +6,10 @@ namespace App\Tests\Controller;
 
 use App\Controller\DemandeController;
 use App\Repository\DemandeRepository;
-use App\Services\DemandeAiAssistant;
-use App\Services\DemandeDecisionAssistant;
-use App\Services\DemandeFormHelper;
-use App\Services\DemandeMailer;
+use App\Service\DemandeAiAssistant;
+use App\Service\DemandeDecisionAssistant;
+use App\Service\DemandeFormHelper;
+use App\Service\DemandeMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;

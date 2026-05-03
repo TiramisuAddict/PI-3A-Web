@@ -2,8 +2,8 @@
 
 namespace App\Controller;
 
-use App\Services\DemandeAiAssistant;
-use App\Services\DemandeFormHelper;
+use App\Service\DemandeAiAssistant;
+use App\Service\DemandeFormHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
