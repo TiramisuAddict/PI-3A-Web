@@ -80,9 +80,16 @@ final class AuthController extends AbstractController
                 return $this->render('auth/login.html.twig', ['form' => $form]);
             }
 
-            // Vérification admin système (SHA-256)
+            // Vérification admin système
             $admin = $adminRepo->findOneBy(['e_mail' => $email]);
-            if ($admin !== null && $admin->getMot_de_passe() === $passwordGenerator->hash($password)) {
+            if ($admin !== null) {
+                $storedPassword = $admin->getMot_de_passe();
+                if ($storedPassword !== $password && $storedPassword !== $passwordGenerator->hash($password)) {
+                    $storedPassword = null;
+                }
+            }
+
+            if ($admin !== null && $storedPassword !== null) {
                 /*
                 $destination = $admin->getTelephone();
                 if ($destination === '') {

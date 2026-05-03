@@ -29,9 +29,9 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $nom_entreprise = null;
+    private string $nom_entreprise;
 
-    public function getNomEntreprise(): ?string
+    public function getNomEntreprise(): string
     {
         return $this->nom_entreprise;
     }
@@ -43,9 +43,9 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $pays = null;
+    private string $pays;
 
-    public function getPays(): ?string
+    public function getPays(): string
     {
         return $this->pays;
     }
@@ -57,9 +57,9 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $ville = null;
+    private string $ville;
 
-    public function getVille(): ?string
+    public function getVille(): string
     {
         return $this->ville;
     }
@@ -71,9 +71,9 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $nom = null;
+    private string $nom;
 
-    public function getNom(): ?string
+    public function getNom(): string
     {
         return $this->nom;
     }
@@ -85,9 +85,9 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $prenom = null;
+    private string $prenom;
 
-    public function getPrenom(): ?string
+    public function getPrenom(): string
     {
         return $this->prenom;
     }
@@ -99,9 +99,9 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $matricule_fiscale = null;
+    private string $matricule_fiscale;
 
-    public function getMatriculeFiscale(): ?string
+    public function getMatriculeFiscale(): string
     {
         return $this->matricule_fiscale;
     }
@@ -113,9 +113,9 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'integer', nullable: false)]
-    private ?int $telephone = null;
+    private int $telephone;
 
-    public function getTelephone(): ?int
+    public function getTelephone(): int
     {
         return $this->telephone;
     }
@@ -127,9 +127,9 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $e_mail = null;
+    private string $e_mail;
 
-    public function getEmail(): ?string
+    public function getEmail(): string
     {
         return $this->e_mail;
     }
@@ -141,9 +141,9 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $statut = null;
+    private string $statut;
 
-    public function getStatut(): ?string
+    public function getStatut(): string
     {
         return $this->statut;
     }
@@ -183,9 +183,9 @@ class Entreprise
     }
 
     #[ORM\Column(type: 'date', nullable: false)]
-    private ?\DateTimeInterface $date_demande = null;
+    private \DateTimeInterface $date_demande;
 
-    public function getDate_demande(): ?\DateTimeInterface
+    public function getDate_demande(): \DateTimeInterface
     {
         return $this->date_demande;
     }
@@ -196,6 +196,7 @@ class Entreprise
         return $this;
     }
 
+    /** @var Collection<int, Employe> */
     #[ORM\OneToMany(targetEntity: Employe::class, mappedBy: 'entreprise')]
     private Collection $employes;
 
@@ -204,9 +205,6 @@ class Entreprise
      */
     public function getEmployes(): Collection
     {
-        if (!$this->employes instanceof Collection) {
-            $this->employes = new ArrayCollection();
-        }
         return $this->employes;
     }
 
@@ -222,6 +220,11 @@ class Entreprise
     {
         $this->getEmployes()->removeElement($employe);
         return $this;
+    }
+
+    public function __construct()
+    {
+        $this->employes = new ArrayCollection();
     }
 
 }

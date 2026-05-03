@@ -30,9 +30,9 @@ class Visiteur implements PasswordAuthenticatedUserInterface
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $nom = null;
+    private string $nom;
 
-    public function getNom(): ?string
+    public function getNom(): string
     {
         return $this->nom;
     }
@@ -44,9 +44,9 @@ class Visiteur implements PasswordAuthenticatedUserInterface
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $prenom = null;
+    private string $prenom;
 
-    public function getPrenom(): ?string
+    public function getPrenom(): string
     {
         return $this->prenom;
     }
@@ -58,9 +58,9 @@ class Visiteur implements PasswordAuthenticatedUserInterface
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $e_mail = null;
+    private string $e_mail;
 
-    public function getEmail(): ?string
+    public function getEmail(): string
     {
         return $this->e_mail;
     }
@@ -72,9 +72,9 @@ class Visiteur implements PasswordAuthenticatedUserInterface
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $mot_de_passe = null;
+    private string $mot_de_passe;
 
-    public function getMotdepasse(): ?string
+    public function getMotdepasse(): string
     {
         return $this->mot_de_passe;
     }
@@ -85,7 +85,7 @@ class Visiteur implements PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getPassword(): ?string
+    public function getPassword(): string
     {
         return $this->mot_de_passe;
     }
@@ -95,9 +95,9 @@ class Visiteur implements PasswordAuthenticatedUserInterface
     }
 
     #[ORM\Column(type: 'integer', nullable: false)]
-    private ?int $telephone = null;
+    private int $telephone;
 
-    public function getTelephone(): ?int
+    public function getTelephone(): int
     {
         return $this->telephone;
     }
@@ -108,6 +108,7 @@ class Visiteur implements PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    /** @var Collection<int, Candidat> */
     #[ORM\OneToMany(targetEntity: Candidat::class, mappedBy: 'visiteur')]
     private Collection $candidats;
 
@@ -116,9 +117,6 @@ class Visiteur implements PasswordAuthenticatedUserInterface
      */
     public function getCandidats(): Collection
     {
-        if (!$this->candidats instanceof Collection) {
-            $this->candidats = new ArrayCollection();
-        }
         return $this->candidats;
     }
 
@@ -134,6 +132,11 @@ class Visiteur implements PasswordAuthenticatedUserInterface
     {
         $this->getCandidats()->removeElement($candidat);
         return $this;
+    }
+
+    public function __construct()
+    {
+        $this->candidats = new ArrayCollection();
     }
 
 }

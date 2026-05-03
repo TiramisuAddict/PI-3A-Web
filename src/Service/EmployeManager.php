@@ -18,13 +18,13 @@ class EmployeManager
 
         $email = $employe->getEmail();
 
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !str_ends_with(strtolower($email), '@gmail.com')) {
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || !str_ends_with(strtolower($email), '@gmail.com')) {
             throw new \InvalidArgumentException('Email invalide: il doit se terminer par @gmail.com');
         }
 
         $telephone = $employe->getTelephone();
 
-        if ($telephone === null || $telephone < 10000000 || $telephone > 99999999) {
+        if ($telephone < 10000000 || $telephone > 99999999) {
             throw new \InvalidArgumentException('Le téléphone doit contenir exactement 8 chiffres');
         }
 
@@ -38,11 +38,11 @@ class EmployeManager
 
         $dateEmbauche = $employe->getDateEmbauche();
         if ($dateEmbauche !== null) {
-            $today = new \DateTime();
-            $today->setTime(0, 0, 0);
             $d = clone $dateEmbauche;
-            $d->setTime(0, 0, 0);
-            if ($d > $today) {
+            $today = new \DateTimeImmutable('today');
+            $candidate = $d instanceof \DateTimeImmutable ? $d : \DateTimeImmutable::createFromInterface($d);
+
+            if ($candidate > $today) {
                 throw new \InvalidArgumentException("La date d'embauche doit être inférieure ou égale à la date d'aujourd'hui");
             }
         }

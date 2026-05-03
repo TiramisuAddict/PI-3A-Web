@@ -30,9 +30,9 @@ class Compte implements PasswordAuthenticatedUserInterface
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $mot_de_passe = null;
+    private string $mot_de_passe;
 
-    public function getMot_de_passe(): ?string
+    public function getMot_de_passe(): string
     {
         return $this->mot_de_passe;
     }
@@ -43,7 +43,7 @@ class Compte implements PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getPassword(): ?string
+    public function getPassword(): string
     {
         return $this->mot_de_passe;
     }

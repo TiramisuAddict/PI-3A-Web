@@ -51,8 +51,7 @@ class EmployeType extends AbstractType
                     'Employé'=> 'employé',
                     'Chef de projet'=> 'chef projet',
                     ],
-                ],
-                ['constraints' => [
+                    'constraints' => [
                     new Assert\NotBlank(message: 'Le rôle est obligatoire'),
                 ],])
             ->add('date_embauche', DateType::class,['label'   => 'Date d\'embauche',

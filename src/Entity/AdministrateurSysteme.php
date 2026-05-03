@@ -29,9 +29,9 @@ class AdministrateurSysteme
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $e_mail = null;
+    private string $e_mail;
 
-    public function getE_mail(): ?string
+    public function getE_mail(): string
     {
         return $this->e_mail;
     }
@@ -43,9 +43,9 @@ class AdministrateurSysteme
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $mot_de_passe = null;
+    private string $mot_de_passe;
 
-    public function getMot_de_passe(): ?string
+    public function getMot_de_passe(): string
     {
         return $this->mot_de_passe;
     }

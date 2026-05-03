@@ -29,9 +29,9 @@ class Employe
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $nom = null;
+    private string $nom;
 
-    public function getNom(): ?string
+    public function getNom(): string
     {
         return $this->nom;
     }
@@ -43,9 +43,9 @@ class Employe
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $prenom = null;
+    private string $prenom;
 
-    public function getPrenom(): ?string
+    public function getPrenom(): string
     {
         return $this->prenom;
     }
@@ -57,9 +57,9 @@ class Employe
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $e_mail = null;
+    private string $e_mail;
 
-    public function getEmail(): ?string
+    public function getEmail(): string
     {
         return $this->e_mail;
     }
@@ -71,9 +71,9 @@ class Employe
     }
 
     #[ORM\Column(type: 'integer', nullable: false)]
-    private ?int $telephone = null;
+    private int $telephone;
 
-    public function getTelephone(): ?int
+    public function getTelephone(): int
     {
         return $this->telephone;
     }
@@ -85,9 +85,9 @@ class Employe
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $poste = null;
+    private string $poste;
 
-    public function getPoste(): ?string
+    public function getPoste(): string
     {
         return $this->poste;
     }
@@ -99,9 +99,9 @@ class Employe
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
-    private ?string $role = null;
+    private string $role;
 
-    public function getRole(): ?string
+    public function getRole(): string
     {
         return $this->role;
     }
@@ -156,7 +156,11 @@ class Employe
     }
 
     #[ORM\Column(type: 'blob', columnDefinition: 'MEDIUMBLOB DEFAULT NULL', nullable: true)]
-    private  mixed $cv_data = null;
+    /**
+     * Blob column that Doctrine may hydrate as string or resource.
+     * @var string|resource|null
+     */
+    private $cv_data = null;
 
     public function getCvData(): ?string
     {
@@ -168,7 +172,7 @@ class Employe
         return is_string($this->cv_data) ? $this->cv_data : null;
     }
 
-    public function setCvData(?string $cv_data): self
+    public function setCvData(string|null $cv_data): self
     {
         $this->cv_data = $cv_data;
         return $this;
@@ -189,6 +193,7 @@ class Employe
     }
 
 
+    /** @var Collection<int, Commentaire> */
     #[ORM\OneToMany(targetEntity: Commentaire::class, mappedBy: 'employe')]
     private Collection $commentaires;
 
@@ -197,9 +202,6 @@ class Employe
      */
     public function getCommentaires(): Collection
     {
-        if (!$this->commentaires instanceof Collection) {
-            $this->commentaires = new ArrayCollection();
-        }
         return $this->commentaires;
     }
 
@@ -231,6 +233,7 @@ class Employe
         return $this;
     }
 
+    /** @var Collection<int, Compte> */
     #[ORM\OneToMany(targetEntity: Compte::class, mappedBy: 'employe')]
     private Collection $comptes;
 
@@ -239,9 +242,6 @@ class Employe
      */
     public function getComptes(): Collection
     {
-        if (!$this->comptes instanceof Collection) {
-            $this->comptes = new ArrayCollection();
-        }
         return $this->comptes;
     }
 
@@ -259,6 +259,7 @@ class Employe
         return $this;
     }
 
+    /** @var Collection<int, Projet> */
     #[ORM\OneToMany(targetEntity: Projet::class, mappedBy: 'responsable')]
     private Collection $projetsResponsables;
 
@@ -267,10 +268,6 @@ class Employe
      */
     public function getProjetsResponsables(): Collection
     {
-        if (!$this->projetsResponsables instanceof Collection) {
-            $this->projetsResponsables = new ArrayCollection();
-        }
-
         return $this->projetsResponsables;
     }
 
@@ -293,6 +290,7 @@ class Employe
         return $this;
     }
 
+    /** @var Collection<int, Projet> */
     #[ORM\ManyToMany(targetEntity: Projet::class, mappedBy: 'membresEquipe')]
     private Collection $projetsEquipe;
 
@@ -301,10 +299,6 @@ class Employe
      */
     public function getProjetsEquipe(): Collection
     {
-        if (!$this->projetsEquipe instanceof Collection) {
-            $this->projetsEquipe = new ArrayCollection();
-        }
-
         return $this->projetsEquipe;
     }
 
@@ -327,6 +321,9 @@ class Employe
         return $this;
     }
 
+    /**
+     * @return Collection<int, Projet>
+     */
     public function getProjets(): Collection
     {
         return $this->getProjetsResponsables();
@@ -352,26 +349,37 @@ class Employe
         return $this->removeProjetEquipe($projet);
     }
 
+    /**
+     * @return Collection<int, Projet>
+     */
     public function getProjetsMembre(): Collection
     {
         return $this->getProjetsEquipe();
     }
 
+    /**
+     * @return Collection<int, Projet>
+     */
     public function getProjetsMembres(): Collection
     {
         return $this->getProjetsEquipe();
     }
 
+    /**
+     * @return Collection<int, Projet>
+     */
     public function getProjetsEnEquipe(): Collection
     {
         return $this->getProjetsEquipe();
     }
 
+    /** @var Collection<int, Tache> */
     #[ORM\OneToMany(targetEntity: Tache::class, mappedBy: 'employe')]
     private Collection $taches;
 
     public function __construct()
     {
+        $this->commentaires = new ArrayCollection();
         $this->comptes = new ArrayCollection();
         $this->projetsResponsables = new ArrayCollection();
         $this->projetsEquipe = new ArrayCollection();
@@ -385,9 +393,6 @@ class Employe
      */
     public function getTaches(): Collection
     {
-        if (!$this->taches instanceof Collection) {
-            $this->taches = new ArrayCollection();
-        }
         return $this->taches;
     }
 
@@ -422,9 +427,6 @@ class Employe
      */
     public function getProjets1(): Collection
     {
-        if (!$this->projets1 instanceof Collection) {
-            $this->projets1 = new ArrayCollection();
-        }
         return $this->projets1;
     }
 
@@ -459,9 +461,6 @@ class Employe
      */
     public function getPosts1(): Collection
     {
-        if (!$this->posts1 instanceof Collection) {
-            $this->posts1 = new ArrayCollection();
-        }
         return $this->posts1;
     }
 
@@ -479,14 +478,24 @@ class Employe
         return $this;
     }
 
+    /**
+     * Face embedding vector from Face API (array of floats).
+     * @var array<int, float>|null
+     */
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $face_embedding = null;
 
+    /**
+     * @return array<int, float>|null
+     */
     public function getFaceEmbedding(): ?array
     {
         return $this->face_embedding;
     }
 
+    /**
+     * @param array<int, float>|null $face_embedding
+     */
     public function setFaceEmbedding(?array $face_embedding): self
     {
         $this->face_embedding = $face_embedding;
