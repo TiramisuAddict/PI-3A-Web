@@ -19,7 +19,7 @@ class FormationRepository extends ServiceEntityRepository
     /**
      * @return Formation[]
      */
-    public function findForRhDashboard(string $q = '', string $sort = 'date_desc', int $minCapacite = 0, string $dateScope = 'all'): array
+    public function findForRhDashboard(string $q = '', string $sort = 'date_desc', int $minCapacite = 0, string $dateScope = 'all', int $limit = 0, int $offset = 0): array
     {
         $qb = $this->createQueryBuilder('f');
 
@@ -71,6 +71,13 @@ class FormationRepository extends ServiceEntityRepository
         }
 
         $qb->addOrderBy('f.titre', 'ASC');
+
+        if ($limit > 0) {
+            $qb->setMaxResults($limit);
+            if ($offset > 0) {
+                $qb->setFirstResult($offset);
+            }
+        }
 
         return $qb->getQuery()->getResult();
     }

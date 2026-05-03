@@ -24,8 +24,9 @@ class EvaluationFormationRepository extends ServiceEntityRepository
             ->andWhere('e.id_employe = :employeeId')
             ->setParameter('employeeId', $employeeId)
             ->orderBy('ev.dateEvaluation', 'DESC')
-            ->getQuery()
-            ->getResult();
+                ->setMaxResults(50)
+                ->getQuery()
+                ->getResult();
     }
 
     public function findOneByFormationAndEmploye(int $formationId, int $employeeId): ?EvaluationFormation
