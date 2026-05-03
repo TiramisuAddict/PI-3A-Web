@@ -139,9 +139,4 @@ class Visiteur implements PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function __construct()
-    {
-        $this->candidats = new ArrayCollection();
-    }
-
 }
