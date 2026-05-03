@@ -88,46 +88,46 @@ class Tache
     #[ORM\Column(type: 'string', nullable: false)]
     #[Assert\NotBlank(message: 'Le titre est obligatoire.', normalizer: 'trim')]
     #[Assert\Length(min: 3, max: 150, minMessage: 'Le titre doit contenir au moins {{ limit }} caracteres.', maxMessage: 'Le titre ne peut pas depasser {{ limit }} caracteres.', normalizer: 'trim')]
-    private ?string $titre = null;
+    private string $titre = '';
 
-    public function getTitre(): ?string
+    public function getTitre(): string
     {
         return $this->titre;
     }
 
-    public function setTitre(?string $titre): self
+    public function setTitre(string $titre): self
     {
-        $this->titre = $titre !== null ? trim($titre) : null;
+        $this->titre = trim($titre);
         return $this;
     }
 
     #[ORM\Column(type: 'text', nullable: false)]
     #[Assert\NotBlank(message: 'La description est obligatoire.', normalizer: 'trim')]
     #[Assert\Length(min: 10, max: 1000, minMessage: 'La description doit contenir au moins {{ limit }} caracteres.', maxMessage: 'La description ne peut pas depasser {{ limit }} caracteres.', normalizer: 'trim')]
-    private ?string $description = null;
+    private string $description = '';
 
-    public function getDescription(): ?string
+    public function getDescription(): string
     {
         return $this->description;
     }
 
-    public function setDescription(?string $description): self
+    public function setDescription(string $description): self
     {
-        $this->description = $description !== null ? trim($description) : null;
+        $this->description = trim($description);
         return $this;
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
     #[Assert\NotBlank(message: 'Le statut est obligatoire.')]
     #[Assert\Choice(choices: self::STATUT_VALUES, message: 'Le statut selectionne est invalide.')]
-    private ?string $statut_tache = null;
+    private string $statut_tache = self::STATUT_A_FAIRE;
 
-    public function getStatut_tache(): ?string
+    public function getStatut_tache(): string
     {
         return $this->statut_tache;
     }
 
-    public function setStatut_tache(?string $statut_tache): self
+    public function setStatut_tache(string $statut_tache): self
     {
         $this->statut_tache = $statut_tache;
         return $this;
@@ -136,14 +136,14 @@ class Tache
     #[ORM\Column(type: 'string', nullable: false)]
     #[Assert\NotBlank(message: 'La priorite est obligatoire.')]
     #[Assert\Choice(choices: self::PRIORITE_VALUES, message: 'La priorite selectionnee est invalide.')]
-    private ?string $priorite = null;
+    private string $priorite = self::PRIORITE_MOYENNE;
 
-    public function getPriorite(): ?string
+    public function getPriorite(): string
     {
         return $this->priorite;
     }
 
-    public function setPriorite(?string $priorite): self
+    public function setPriorite(string $priorite): self
     {
         $this->priorite = $priorite;
         return $this;
@@ -153,14 +153,14 @@ class Tache
     #[Assert\NotNull(message: 'La date de debut est obligatoire.')]
     #[Assert\Type(type: \DateTimeInterface::class, message: 'La date de debut doit etre une date valide.')]
     #[Assert\GreaterThanOrEqual('today', message: 'La date de debut ne peut pas etre dans le passe.')]
-    private ?\DateTimeInterface $date_deb = null;
+    private \DateTimeInterface $date_deb;
 
-    public function getDate_deb(): ?\DateTimeInterface
+    public function getDate_deb(): \DateTimeInterface
     {
         return $this->date_deb;
     }
 
-    public function setDate_deb(?\DateTimeInterface $date_deb): static
+    public function setDate_deb(\DateTimeInterface $date_deb): static
     {
         $this->date_deb = $date_deb instanceof \DateTimeImmutable
             ? \DateTime::createFromImmutable($date_deb)
@@ -171,14 +171,14 @@ class Tache
     #[ORM\Column(type: 'date', nullable: false)]
     #[Assert\NotNull(message: 'La date limite est obligatoire.')]
     #[Assert\Type(type: \DateTimeInterface::class, message: 'La date limite doit etre une date valide.')]
-    private ?\DateTimeInterface $date_limite = null;
+    private \DateTimeInterface $date_limite;
 
-    public function getDate_limite(): ?\DateTimeInterface
+    public function getDate_limite(): \DateTimeInterface
     {
         return $this->date_limite;
     }
 
-    public function setDate_limite(?\DateTimeInterface $date_limite): static
+    public function setDate_limite(\DateTimeInterface $date_limite): static
     {
         $this->date_limite = $date_limite instanceof \DateTimeImmutable
             ? \DateTime::createFromImmutable($date_limite)
@@ -188,7 +188,7 @@ class Tache
 
     #[ORM\Column(type: 'integer', nullable: false)]
     #[Assert\Range(min: 0, max: 100, notInRangeMessage: 'La progression doit etre comprise entre {{ min }} et {{ max }}.')]
-    private ?int $progression = null;
+    private int $progression = 0;
 
     #[Assert\Callback]
     public function validateAssignment(ExecutionContextInterface $context): void
@@ -204,7 +204,7 @@ class Tache
                 ->addViolation();
         }
 
-        if ($this->date_deb instanceof \DateTimeInterface && $this->date_limite instanceof \DateTimeInterface && $this->date_deb > $this->date_limite) {
+        if ($this->date_deb > $this->date_limite) {
             $context
                 ->buildViolation('La date limite doit etre superieure ou egale a la date de debut.')
                 ->atPath('date_limite')
@@ -212,7 +212,7 @@ class Tache
         }
     }
 
-    public function getProgression(): ?int
+    public function getProgression(): int
     {
         return $this->progression;
     }
@@ -228,34 +228,34 @@ class Tache
         return $this->id_tache;
     }
 
-    public function getStatutTache(): ?string
+    public function getStatutTache(): string
     {
         return $this->statut_tache;
     }
 
-    public function setStatutTache(?string $statut_tache): static
+    public function setStatutTache(string $statut_tache): static
     {
         $this->statut_tache = $statut_tache;
 
         return $this;
     }
 
-    public function getDateDeb(): ?\DateTimeInterface
+    public function getDateDeb(): \DateTimeInterface
     {
         return $this->date_deb;
     }
 
-    public function setDateDeb(?\DateTimeInterface $date_deb): static
+    public function setDateDeb(\DateTimeInterface $date_deb): static
     {
         return $this->setDate_deb($date_deb);
     }
 
-    public function getDateLimite(): ?\DateTimeInterface
+    public function getDateLimite(): \DateTimeInterface
     {
         return $this->date_limite;
     }
 
-    public function setDateLimite(?\DateTimeInterface $date_limite): static
+    public function setDateLimite(\DateTimeInterface $date_limite): static
     {
         return $this->setDate_limite($date_limite);
     }
@@ -270,6 +270,11 @@ class Tache
         $this->employe = $employe;
 
         return $this;
+    }
+    public function __construct()
+    {
+    $this->date_deb = new \DateTime();
+    $this->date_limite = new \DateTime();
     }
 
 }
