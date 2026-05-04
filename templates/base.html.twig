@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html data-turbo="false">
     <head>
         <meta charset="UTF-8">
         <title>{% block title %}Welcome!{% endblock %}</title>
@@ -25,8 +25,7 @@
             }
         </style>
 
-        {% block stylesheets %}
-        {% endblock %}
+        {% block stylesheets %}{% endblock %}
 
         {% block javascripts %}
             {% block importmap %}{{ importmap('app') }}{% endblock %}

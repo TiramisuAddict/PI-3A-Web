@@ -6,10 +6,6 @@
 {{ parent() }}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
-    html, body {
-        overflow: hidden !important;
-        height: 100% !important;
-    }
     .stats-row {
         display: flex;
         gap: 12px;
@@ -451,7 +447,6 @@
     </div>
 </div>
 </div>
-{{ include('demande/_logout_modal.html.twig') }}
 {% endblock %}
 
 {% block javascripts %}
@@ -753,6 +748,14 @@
                 }
             });
         }
+
+        // Rebind pagination links when page is restored from cache
+        document.addEventListener('turbo:load', function() {
+            // Only rebind if we're on a demande index page
+            if (document.querySelector('.card.table-card')) {
+                bindPaginationLinks();
+            }
+        });
 
     });
 

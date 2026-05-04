@@ -1,6 +1,8 @@
 <header class="navbar navbar-expand-md navbar-light border-bottom bg-white" style="height:56px;">
   <div class="container-fluid">
-    <a href="#" class="navbar-brand py-0">
+    {% set normalized_nav_role = role|default('')|trim|lower %}
+    {% set nav_home_route = normalized_nav_role in ['rh', 'administrateur entreprise'] ? 'app_admin_dashboard' : 'app_employe_home' %}
+    <a href="{{ path(nav_home_route) }}" class="navbar-brand py-0">
       <img src="/images/WKlogo.svg" height="150"  width="150" alt="Logo">
     </a>
     {% set avatarEmploye = employe is defined and employe ? employe : current_employe() %}
@@ -15,8 +17,8 @@
         {% endif %}
       </div>
       <div class="nav-item dropdown">
-        <a href="#" class="nav-link d-flex lh-1 text-reset align-items-center gap-2"
-          data-bs-toggle="dropdown">
+        <button type="button" class="nav-link d-flex lh-1 text-reset align-items-center gap-2 border-0 bg-transparent p-0"
+          data-bs-toggle="dropdown" aria-expanded="false">
           {% if avatarEmploye and avatarEmploye.getImage_profil() %}
             <img src="{{ avatarEmploye.getImage_profil() }}" alt="Avatar" class="avatar avatar-sm" style="width:40px; height:40px; border-radius:50%; object-fit: cover;">
           {% else %}
@@ -28,11 +30,11 @@
               {% endif %}
             </span>
           {% endif %}
-          <div class="d-none d-xl-block">
-            <div style="font-size:0.875rem;">{{ email|default('') }}</div>
-            <div class="small text-secondary">{{ role|default('') }}</div>
-          </div>
-        </a>
+          <span class="d-none d-xl-block text-start">
+            <span class="d-block" style="font-size:0.875rem;">{{ email|default('') }}</span>
+            <span class="d-block small text-secondary">{{ role|default('') }}</span>
+          </span>
+        </button>
         <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
           <span class="dropdown-item-text text-secondary small">
             {% if google_session_linked %}
@@ -43,7 +45,7 @@
           </span>
           <div class="dropdown-divider"></div>
           <a href="{{ path('profil') }}" class="dropdown-item">Profil</a>
-          <a href="#" class="dropdown-item">Paramètres</a>
+          <button type="button" class="dropdown-item border-0 bg-transparent w-100 text-start">Paramètres</button>
 
           <a href="{{ path('app_google_link_start') }}" class="dropdown-item" id="linkGoogleAccountBtn">
             Lier mon compte Google
@@ -58,10 +60,10 @@
           </form>
           
           <div class="dropdown-divider"></div>
-          <a href="#" class="dropdown-item text-danger"
+          <button type="button" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start"
             data-bs-toggle="modal" data-bs-target="#logoutModal">
             Se déconnecter
-          </a>
+          </button>
         </div>
       </div>
     </div>
