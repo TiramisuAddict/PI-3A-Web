@@ -171,9 +171,16 @@ final class ParticipationTicketController extends AbstractController
             return null;
         }
 
-        $addresses = gethostbynamel($hostName) ?: [];
+        $addresses = gethostbynamel($hostName);
+
+        if ($addresses === false) {
+            return null;
+        }
+
         foreach ($addresses as $address) {
-            if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) && !str_starts_with($address, '127.')) {
+            $isValidIpv4 = filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false;
+
+            if ($isValidIpv4 && !str_starts_with($address, '127.')) {
                 $port = $request->getPort();
                 $portSuffix = in_array($port, [80, 443], true) ? '' : ':' . $port;
 
