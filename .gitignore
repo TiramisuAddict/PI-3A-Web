@@ -35,3 +35,7 @@ yarn-error.log
 __pycache__/
 *.py[cod]
 
+
+###> phpstan/phpstan ###
+phpstan.neon
+###< phpstan/phpstan ###

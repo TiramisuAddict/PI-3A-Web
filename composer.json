@@ -57,8 +57,8 @@
         "twig/twig": "^2.12|^3.24"
     },
     "require-dev": {
-        "ahmed-bhs/doctrine-doctor": "*",
-        "phpstan/phpstan": "^1.0",
+        "ahmed-bhs/doctrine-doctor": "^1.1",
+        "phpstan/phpstan": "^1.12",
         "phpstan/phpstan-phpunit": "^1.0",
         "phpstan/phpstan-strict-rules": "^1.0",
         "phpunit/phpunit": "^9.6.34",

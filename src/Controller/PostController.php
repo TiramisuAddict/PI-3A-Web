@@ -42,7 +42,7 @@ final class PostController extends AbstractController
     private function resolvePostAuthorEmployeId(Request $request, Connection $connection): int
     {
         $session = $request->hasSession() ? $request->getSession() : null;
-        if ($session) {
+        if ($session !== null) {
             foreach (['employee_id', 'id_employe', 'employe_id'] as $sessionKey) {
                 if ($session->has($sessionKey)) {
                     $id = (int) $session->get($sessionKey);
@@ -268,7 +268,13 @@ final class PostController extends AbstractController
             return;
         }
 
-        $uploadDir = $this->getParameter('uploads_dir') . '/events';
+       $uploadsDir = $this->getParameter('uploads_dir');
+
+        if (!is_string($uploadsDir)) {
+            throw new \RuntimeException('Le paramètre uploads_dir doit être une chaîne de caractères.');
+        }
+
+        $uploadDir = $uploadsDir . '/events';
         $this->ensureUploadDirectoryExists($uploadDir);
 
         $nextOrder = $this->resolveNextEventImageOrder($post);
@@ -278,7 +284,15 @@ final class PostController extends AbstractController
                 continue;
             }
 
-            $extension = $uploadedFile->guessExtension() ?: $uploadedFile->getClientOriginalExtension() ?: 'bin';
+            $extension = $uploadedFile->guessExtension();
+
+            if ($extension === null || $extension === '') {
+                $extension = $uploadedFile->getClientOriginalExtension();
+            }
+
+            if ($extension === '') {
+                $extension = 'bin';
+            }
             $filename = $this->generateUniqueFilename() . '.' . $extension;
             $uploadedFile->move($uploadDir, $filename);
 
@@ -293,11 +307,18 @@ final class PostController extends AbstractController
     private function deleteEventImageFile(EventImage $eventImage): void
     {
         $imagePath = $eventImage->getImagePath();
-        if (!$imagePath) {
+
+        if ($imagePath === null || $imagePath === '') {
             return;
         }
 
-        $filePath = $this->getParameter('uploads_dir') . '/events/' . basename($imagePath);
+        $uploadsDir = $this->getParameter('uploads_dir');
+
+        if (!is_string($uploadsDir)) {
+            throw new \RuntimeException('Le paramètre uploads_dir doit être une chaîne de caractères.');
+        }
+
+        $filePath = $uploadsDir . '/events/' . basename($imagePath);
         if ($this->filesystem->exists($filePath)) {
             $this->filesystem->remove($filePath);
         }
