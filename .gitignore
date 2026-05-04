@@ -39,3 +39,6 @@ __pycache__/
 ###> phpstan/phpstan ###
 phpstan.neon
 ###< phpstan/phpstan ###
+
+# Uploads
+/uploads/
