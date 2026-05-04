@@ -41,7 +41,7 @@ class DemandeMailerTriggerCommand extends Command
         $id = (int) $input->getArgument('id');
         $action = (string) $input->getOption('action');
 
-        $demande = $this->demandeRepository->find($id);
+        $demande = $this->demandeRepository->findOneWithEmploye($id);
         if (null === $demande) {
             $io->error(sprintf('Demande with id %d not found.', $id));
             return Command::FAILURE;
