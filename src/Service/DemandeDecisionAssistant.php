@@ -428,7 +428,7 @@ class DemandeDecisionAssistant
     private function fetchDecisionTrainingSamples(): array
     {
         try {
-            return $this->demandeRepository->fetchDecisionTrainingSamples(1800);
+            return $this->demandeRepository->fetchDecisionTrainingSamples(96);
         } catch (\Throwable $e) {
             $this->logger->warning('Decision ML training samples unavailable.', ['exception' => $e->getMessage()]);
             return [];

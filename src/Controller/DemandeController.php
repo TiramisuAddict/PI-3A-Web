@@ -89,7 +89,6 @@ class DemandeController extends AbstractController
         $stats = [
             'total'      => $demandes->getTotalItemCount(),
             'byStatus'   => $this->demandeRepository->countGroupByStatus($scopedEmployeId, $activeFilters),
-            'byPriorite' => $this->demandeRepository->countGroupByPriorite($scopedEmployeId, $activeFilters),
         ];
 
         return $this->render(
@@ -496,7 +495,7 @@ class DemandeController extends AbstractController
             return $this->redirectToRoute('login');
         }
 
-        $demande = $this->demandeRepository->findOneWithEmploye($id);
+        $demande = $this->demandeRepository->findOneForShow($id);
 
         if (null === $demande) {
             throw $this->createNotFoundException('Demande non trouvee');
