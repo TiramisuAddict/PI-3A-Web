@@ -90,9 +90,10 @@ final class FormationController extends AbstractController
                          FROM inscription_formation i
                                                  INNER JOIN formation f ON f.id_formation = i.id_formation
                              LEFT JOIN employe e ON e.id_employe = i.id_employe
-                         WHERE i.statut = "EN_ATTENTE"
+                         WHERE i.statut = :status
                          ORDER BY i.id_inscription DESC
-                         LIMIT ' . (int) $pendingLimit
+                         LIMIT ' . (int) $pendingLimit,
+                        ['status' => 'EN_ATTENTE']
                 );
 
         $pendingByFormation = [];
@@ -106,7 +107,7 @@ final class FormationController extends AbstractController
         }
 
         return $this->render('formation/index.html.twig', [
-            'formations' => $formationRepository->findForRhDashboard($q, $sort, $minCapacite, $dateScope),
+            'formations' => $formationRepository->findForRhDashboard($q, $sort, $minCapacite, $dateScope, 50),
             'pending_inscriptions' => $pendingInscriptions,
             'pending_by_formation' => $pendingByFormation,
             'pending_inscriptions_by_formation' => $pendingInscriptionByFormation,
