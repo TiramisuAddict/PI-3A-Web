@@ -94,7 +94,7 @@ class EvaluationFormation
     public function initializeDateEvaluation(): void
     {
         if ($this->dateEvaluation === null) {
-            $this->dateEvaluation = new \DateTimeImmutable();
+              $this->dateEvaluation = new \DateTime();
         }
     }
 }
