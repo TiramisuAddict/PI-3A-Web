@@ -6,35 +6,49 @@ use App\Entity\Employe;
 
 class EmployeManager
 {
-    public function validate(Employe $employe): bool
+    private function readRequiredString(callable $getter, string $message): string
     {
-        if ($employe->getNom() === '') {
-            throw new \InvalidArgumentException('Le nom est obligatoire');
+        try {
+            $value = $getter();
+        } catch (\Error) {
+            throw new \InvalidArgumentException($message);
         }
 
-        if ($employe->getPrenom() === '') {
-            throw new \InvalidArgumentException('Le prénom est obligatoire');
+        if (!is_string($value) || $value === '') {
+            throw new \InvalidArgumentException($message);
         }
 
-        $email = $employe->getEmail();
+        return $value;
+    }
 
-        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || !str_ends_with(strtolower($email), '@gmail.com')) {
-            throw new \InvalidArgumentException('Email invalide: il doit se terminer par @gmail.com');
+    private function readTelephone(Employe $employe): int
+    {
+        try {
+            $telephone = $employe->getTelephone();
+        } catch (\Error) {
+            throw new \InvalidArgumentException('Le téléphone doit contenir exactement 8 chiffres');
         }
-
-        $telephone = $employe->getTelephone();
 
         if ($telephone < 10000000 || $telephone > 99999999) {
             throw new \InvalidArgumentException('Le téléphone doit contenir exactement 8 chiffres');
         }
 
-        if ($employe->getPoste() === '') {
-            throw new \InvalidArgumentException('Le poste est obligatoire');
+        return $telephone;
+    }
+
+    public function validate(Employe $employe): bool
+    {
+        $this->readRequiredString(static fn() => $employe->getNom(), 'Le nom est obligatoire');
+        $this->readRequiredString(static fn() => $employe->getPrenom(), 'Le prénom est obligatoire');
+        $email = $this->readRequiredString(static fn() => $employe->getEmail(), 'Email invalide: il doit se terminer par @gmail.com');
+
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || !str_ends_with(strtolower($email), '@gmail.com')) {
+            throw new \InvalidArgumentException('Email invalide: il doit se terminer par @gmail.com');
         }
 
-        if ($employe->getRole() === '') {
-            throw new \InvalidArgumentException('Le rôle est obligatoire');
-        }
+        $this->readTelephone($employe);
+        $this->readRequiredString(static fn() => $employe->getPoste(), 'Le poste est obligatoire');
+        $this->readRequiredString(static fn() => $employe->getRole(), 'Le rôle est obligatoire');
 
         $dateEmbauche = $employe->getDateEmbauche();
         if ($dateEmbauche !== null) {

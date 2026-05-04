@@ -280,10 +280,10 @@ class Projet
     #[ORM\JoinTable(
         name: 'equipe_projet',
         joinColumns: [
-            new ORM\JoinColumn(name: 'id_projet', referencedColumnName: 'id_projet')
+            new ORM\JoinColumn(name: 'id_projet_id', referencedColumnName: 'id_projet')
         ],
         inverseJoinColumns: [
-            new ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')
+            new ORM\JoinColumn(name: 'id_employe_id', referencedColumnName: 'id_employe')
         ]
     )]
     private Collection $membresEquipe;

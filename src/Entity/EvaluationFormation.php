@@ -16,11 +16,11 @@ class EvaluationFormation
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Formation::class)]
-    #[ORM\JoinColumn(name: 'id_formation', referencedColumnName: 'id_formation', nullable: false, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'id_formation_id', referencedColumnName: 'id_formation', nullable: false, onDelete: 'CASCADE')]
     private ?Formation $formation = null;
 
     #[ORM\ManyToOne(targetEntity: Employe::class)]
-    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe', nullable: false, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'id_employe_id', referencedColumnName: 'id_employe', nullable: false, onDelete: 'CASCADE')]
     private ?Employe $employe = null;
 
     #[ORM\Column(type: 'integer')]

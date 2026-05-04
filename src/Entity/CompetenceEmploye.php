@@ -72,7 +72,7 @@ class CompetenceEmploye
     }
 
     #[ORM\OneToOne(targetEntity: Employe::class, inversedBy: 'competenceEmploye')]
-    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe', unique: true)]
+    #[ORM\JoinColumn(name: 'id_employe_id', referencedColumnName: 'id_employe', unique: true)]
     private ?Employe $employe = null;
 
     public function getEmploye(): ?Employe

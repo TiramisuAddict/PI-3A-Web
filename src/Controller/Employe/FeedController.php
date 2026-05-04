@@ -6,6 +6,7 @@ use App\Entity\Commentaire;
 use App\Entity\Employe;
 use App\Entity\Notification;
 use App\Entity\Post;
+use App\Repository\CommentaireRepository;
 use App\Repository\EmployeRepository;
 use App\Repository\PostRepository;
 use App\Service\BadWordService;
@@ -13,6 +14,8 @@ use App\Service\NewsService;
 use App\Service\ParticipationTicketService;
 use App\Service\ReasonAssistantService;
 use App\Service\ToxicIntentService;
+use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -25,9 +28,13 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 #[Route('/employe')]
 class FeedController extends AbstractController
 {
+    private const FEED_POST_LIMIT = 50;
+    private const FEED_COMMENT_LIMIT = 50;
+
     public function __construct(
         private readonly PostRepository $postRepository,
         private readonly EmployeRepository $employeRepository,
+        private readonly CommentaireRepository $commentaireRepository,
         private readonly EntityManagerInterface $em,
         private readonly ReasonAssistantService $reasonAssistantService,
         private readonly BadWordService $badWordService,
@@ -59,7 +66,7 @@ class FeedController extends AbstractController
     private function buildDisplayLabel(?Employe $employe): string
     {
         if ($employe instanceof Employe) {
-            $label = trim(sprintf('%s %s', (string) $employe->getPrenom(), (string) $employe->getNom()));
+            $label = trim(sprintf('%s %s', $employe->getPrenom(), $employe->getNom()));
             if ($label !== '') {
                 return $label;
             }
@@ -110,6 +117,7 @@ class FeedController extends AbstractController
     {
         $commentUserId = (int) $row['utilisateur_id'];
         $authorName = $authorLabels[$commentUserId] ?? 'Employe';
+        $editedAt = $row['edited_at'] ?? null;
 
         return [
             'id_commentaire' => (int) $row['id_commentaire'],
@@ -119,10 +127,10 @@ class FeedController extends AbstractController
             'date_commentaire' => $row['date_commentaire'] instanceof \DateTimeInterface
                 ? $row['date_commentaire']->format('c')
                 : (new \DateTimeImmutable((string) $row['date_commentaire']))->format('c'),
-            'edited_at' => $row['edited_at']
-                ? ($row['edited_at'] instanceof \DateTimeInterface
-                    ? $row['edited_at']->format('c')
-                    : (new \DateTimeImmutable((string) $row['edited_at']))->format('c'))
+            'edited_at' => $editedAt !== null
+                ? ($editedAt instanceof \DateTimeInterface
+                    ? $editedAt->format('c')
+                    : (new \DateTimeImmutable((string) $editedAt))->format('c'))
                 : null,
             'utilisateur_id' => $commentUserId,
             'author_name' => $authorName,
@@ -169,6 +177,8 @@ class FeedController extends AbstractController
     }
 
     /**
+     * @param list<int> $postIds
+     *
      * @return array{commentsByPost: array<int, array<int, array<string, mixed>>>, commentsCount: array<int, int>, authorLabels: array<int, string>}
      */
     private function loadCommentsData(array $postIds, ?int $currentUserId): array
@@ -181,24 +191,29 @@ class FeedController extends AbstractController
             ];
         }
 
+        $commentsCountRows = $this->em->getConnection()->executeQuery(
+            'SELECT post_id, COUNT(*) AS cnt
+             FROM commentaire
+             WHERE post_id IN (?)
+             GROUP BY post_id',
+            [array_values($postIds)],
+            [ArrayParameterType::INTEGER]
+        )->fetchAllAssociative();
+        $commentsCount = array_map('intval', array_column($commentsCountRows, 'cnt', 'post_id'));
+
         $rows = $this->em->getConnection()->executeQuery(
             'SELECT id_commentaire, contenu, date_commentaire, edited_at, utilisateur_id, post_id, parent_id
              FROM commentaire
              WHERE post_id IN (?)
-             ORDER BY date_commentaire ASC',
+             ORDER BY date_commentaire ASC
+             LIMIT ' . self::FEED_COMMENT_LIMIT,
             [array_values($postIds)],
-            [\Doctrine\DBAL\ArrayParameterType::INTEGER]
+            [ArrayParameterType::INTEGER]
         )->fetchAllAssociative();
 
         $commentUserIds = array_map(static fn (array $row): int => (int) $row['utilisateur_id'], $rows);
         $authorLabels = $this->resolveAuthorLabels($commentUserIds);
         $commentsByPost = $this->buildCommentsTreeByPost($rows, $authorLabels, $currentUserId);
-        $commentsCount = [];
-
-        foreach ($rows as $row) {
-            $postId = (int) $row['post_id'];
-            $commentsCount[$postId] = ($commentsCount[$postId] ?? 0) + 1;
-        }
 
         return [
             'commentsByPost' => $commentsByPost,
@@ -207,16 +222,21 @@ class FeedController extends AbstractController
         ];
     }
 
+    /**
+     * @param array<int, string> $authorLabels
+     *
+     * @return array<string, mixed>
+     */
     private function serializeComment(Commentaire $comment, array $authorLabels, ?int $currentUserId): array
     {
-        $authorId = (int) $comment->getUtilisateurId();
+        $authorId = $comment->getUtilisateurId();
 
         return [
             'id_commentaire' => $comment->getIdCommentaire(),
             'post_id' => $comment->getPost()?->getIdPost(),
             'parent_id' => $comment->getParent()?->getIdCommentaire(),
             'contenu' => $comment->getContenu(),
-            'date_commentaire' => $comment->getDateCommentaire()?->format('c'),
+            'date_commentaire' => $comment->getDateCommentaire()->format('c'),
             'edited_at' => $comment->getEditedAt()?->format('c'),
             'author_name' => $authorLabels[$authorId] ?? 'Employe',
             'owned_by_current_user' => $currentUserId !== null && $authorId === $currentUserId,
@@ -282,7 +302,7 @@ class FeedController extends AbstractController
 
     private function createPostNotification(Post $post, int $actorUserId, string $title, string $message): void
     {
-        $ownerUserId = (int) $post->getUtilisateurId();
+        $ownerUserId = $post->getUtilisateurId();
         if ($ownerUserId <= 0 || $ownerUserId === $actorUserId) {
             return;
         }
@@ -302,21 +322,20 @@ class FeedController extends AbstractController
     #[Route('/feed', name: 'app_employe_feed', methods: ['GET'])]
     public function feed(Request $request, SessionInterface $session): Response
     {
-        $filter = $request->query->get('filter', 'all');
+        $filter = $request->query->getString('filter', 'all');
         $userId = $this->getUserIdFromSession($session);
         $topNews = $this->newsService->getTopNews();
 
-        $criteria = ['active' => true];
-        if ($filter === 'annonce') {
-            $criteria['type_post'] = 1;
-        } elseif ($filter === 'evenement') {
-            $criteria['type_post'] = 2;
+        $posts = $this->postRepository->findActiveFeedPostsWithEventImages($filter, self::FEED_POST_LIMIT);
+        $postIds = [];
+        foreach ($posts as $post) {
+            $postId = $post->getIdPost();
+            if ($postId !== null) {
+                $postIds[] = $postId;
+            }
         }
-
-        $posts = $this->postRepository->findBy($criteria, ['date_creation' => 'DESC']);
-        $postIds = array_map(fn ($post) => $post->getIdPost(), $posts);
-        $postAuthorLabels = $this->resolveAuthorLabels(array_map(fn ($post) => (int) $post->getUtilisateurId(), $posts));
-        $currentUserLabel = $userId ? ($this->resolveAuthorLabels([$userId])[$userId] ?? 'Employe') : 'Employe';
+        $postAuthorLabels = $this->resolveAuthorLabels(array_map(static fn (Post $post): int => $post->getUtilisateurId(), $posts));
+        $currentUserLabel = $userId !== null ? ($this->resolveAuthorLabels([$userId])[$userId] ?? 'Employe') : 'Employe';
 
         if ($postIds === []) {
             return $this->render('employe/feed.html.twig', [
@@ -352,45 +371,50 @@ class FeedController extends AbstractController
         $likesResult = $conn->executeQuery(
             'SELECT post_id, COUNT(*) AS cnt FROM like_post WHERE post_id IN (?) GROUP BY post_id',
             [array_values($postIds)],
-            [\Doctrine\DBAL\ArrayParameterType::INTEGER]
+            [ArrayParameterType::INTEGER]
         )->fetchAllAssociative();
         $likesCount = array_map('intval', array_column($likesResult, 'cnt', 'post_id'));
 
         $participationsResult = $conn->executeQuery(
             'SELECT post_id, COUNT(*) AS cnt FROM participation WHERE post_id IN (?) GROUP BY post_id',
             [array_values($postIds)],
-            [\Doctrine\DBAL\ArrayParameterType::INTEGER]
+            [ArrayParameterType::INTEGER]
         )->fetchAllAssociative();
         $participantsCount = array_map('intval', array_column($participationsResult, 'cnt', 'post_id'));
 
         $placesRestantes = [];
         foreach ($posts as $post) {
+            $postId = $post->getIdPost();
+            if ($postId === null) {
+                continue;
+            }
+
             $capacity = $post->getCapaciteMax();
             if ($capacity !== null) {
-                $used = $participantsCount[$post->getIdPost()] ?? 0;
-                $placesRestantes[$post->getIdPost()] = max(0, $capacity - $used);
+                $used = $participantsCount[$postId] ?? 0;
+                $placesRestantes[$postId] = max(0, $capacity - $used);
             }
         }
 
         $commentsData = $this->loadCommentsData($postIds, $userId);
 
         $userLikedIds = [];
-        if ($userId) {
+        if ($userId !== null) {
             $userLikes = $conn->executeQuery(
                 'SELECT post_id FROM like_post WHERE utilisateur_id = ? AND post_id IN (?)',
                 [$userId, array_values($postIds)],
-                [null, \Doctrine\DBAL\ArrayParameterType::INTEGER]
+                [ParameterType::INTEGER, ArrayParameterType::INTEGER]
             )->fetchFirstColumn();
             $userLikedIds = array_map('intval', $userLikes);
         }
 
         $userParticipatIds = [];
         $userParticipationTicketUrls = [];
-        if ($userId) {
+        if ($userId !== null) {
             $userParts = $conn->executeQuery(
                 'SELECT id_participation, post_id, utilisateur_id, date_action FROM participation WHERE utilisateur_id = ? AND post_id IN (?)',
                 [$userId, array_values($postIds)],
-                [null, \Doctrine\DBAL\ArrayParameterType::INTEGER]
+                [ParameterType::INTEGER, ArrayParameterType::INTEGER]
             )->fetchAllAssociative();
             $userParticipatIds = array_map(static fn (array $row): int => (int) $row['post_id'], $userParts);
 
@@ -439,16 +463,16 @@ class FeedController extends AbstractController
     public function like(int $id_post, Request $request, SessionInterface $session): JsonResponse
     {
         $userId = $this->getUserIdFromSession($session);
-        if (!$userId) {
+        if ($userId === null) {
             return new JsonResponse(['success' => false, 'message' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$this->isCsrfTokenValid("feed_like_{$id_post}", $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid("feed_like_{$id_post}", $request->request->getString('_token'))) {
             return new JsonResponse(['success' => false, 'message' => 'CSRF token invalid'], Response::HTTP_FORBIDDEN);
         }
 
         $post = $this->postRepository->find($id_post);
-        if (!$post) {
+        if ($post === null) {
             return new JsonResponse(['success' => false, 'message' => 'Post not found'], Response::HTTP_NOT_FOUND);
         }
 
@@ -459,7 +483,7 @@ class FeedController extends AbstractController
         )->fetchOne();
 
         $liked = false;
-        if ($existing) {
+        if ($existing !== false) {
             $conn->executeStatement(
                 'DELETE FROM like_post WHERE utilisateur_id = ? AND post_id = ?',
                 [$userId, $id_post]
@@ -496,16 +520,16 @@ class FeedController extends AbstractController
     public function comment(int $id_post, Request $request, SessionInterface $session): JsonResponse
     {
         $userId = $this->getUserIdFromSession($session);
-        if (!$userId) {
+        if ($userId === null) {
             return new JsonResponse(['success' => false, 'message' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$this->isCsrfTokenValid("feed_comment_{$id_post}", $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid("feed_comment_{$id_post}", $request->request->getString('_token'))) {
             return new JsonResponse(['success' => false, 'message' => 'CSRF token invalid'], Response::HTTP_FORBIDDEN);
         }
 
         $post = $this->postRepository->find($id_post);
-        if (!$post) {
+        if ($post === null) {
             return new JsonResponse(['success' => false, 'message' => 'Post not found'], Response::HTTP_NOT_FOUND);
         }
 
@@ -519,11 +543,11 @@ class FeedController extends AbstractController
             return $unsafeCommentResponse;
         }
 
-        $parentId = $request->request->get('parent_id');
+        $parentId = $request->request->getString('parent_id');
         $parentComment = null;
 
-        if ($parentId !== null && $parentId !== '') {
-            $parentComment = $this->em->getRepository(Commentaire::class)->find((int) $parentId);
+        if ($parentId !== '') {
+            $parentComment = $this->commentaireRepository->find((int) $parentId);
             if (!$parentComment instanceof Commentaire || $parentComment->getPost()?->getIdPost() !== $id_post) {
                 return new JsonResponse(['success' => false, 'message' => 'Parent comment not found'], Response::HTTP_NOT_FOUND);
             }
@@ -559,20 +583,20 @@ class FeedController extends AbstractController
     public function editComment(int $id_commentaire, Request $request, SessionInterface $session): JsonResponse
     {
         $userId = $this->getUserIdFromSession($session);
-        if (!$userId) {
+        if ($userId === null) {
             return new JsonResponse(['success' => false, 'message' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$this->isCsrfTokenValid("feed_comment_edit_{$id_commentaire}", $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid("feed_comment_edit_{$id_commentaire}", $request->request->getString('_token'))) {
             return new JsonResponse(['success' => false, 'message' => 'CSRF token invalid'], Response::HTTP_FORBIDDEN);
         }
 
-        $comment = $this->em->getRepository(Commentaire::class)->find($id_commentaire);
+        $comment = $this->commentaireRepository->find($id_commentaire);
         if (!$comment instanceof Commentaire) {
             return new JsonResponse(['success' => false, 'message' => 'Comment not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ((int) $comment->getUtilisateurId() !== $userId) {
+        if ($comment->getUtilisateurId() !== $userId) {
             return new JsonResponse(['success' => false, 'message' => 'Forbidden'], Response::HTTP_FORBIDDEN);
         }
 
@@ -603,34 +627,37 @@ class FeedController extends AbstractController
     public function deleteComment(int $id_commentaire, Request $request, SessionInterface $session): JsonResponse
     {
         $userId = $this->getUserIdFromSession($session);
-        if (!$userId) {
+        if ($userId === null) {
             return new JsonResponse(['success' => false, 'message' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$this->isCsrfTokenValid("feed_comment_delete_{$id_commentaire}", $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid("feed_comment_delete_{$id_commentaire}", $request->request->getString('_token'))) {
             return new JsonResponse(['success' => false, 'message' => 'CSRF token invalid'], Response::HTTP_FORBIDDEN);
         }
 
-        $comment = $this->em->getRepository(Commentaire::class)->find($id_commentaire);
+        $comment = $this->commentaireRepository->find($id_commentaire);
         if (!$comment instanceof Commentaire) {
             return new JsonResponse(['success' => false, 'message' => 'Comment not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ((int) $comment->getUtilisateurId() !== $userId) {
+        if ($comment->getUtilisateurId() !== $userId) {
             return new JsonResponse(['success' => false, 'message' => 'Forbidden'], Response::HTTP_FORBIDDEN);
         }
 
         $postId = (int) $comment->getPost()?->getIdPost();
         $parentId = $comment->getParent()?->getIdCommentaire();
 
-        $this->em->remove($comment);
-        $this->em->flush();
+        $this->em->wrapInTransaction(function () use ($comment): void {
+            $this->commentaireRepository->reparentDirectRepliesBeforeDelete($comment);
+            $this->em->remove($comment);
+        });
 
         return new JsonResponse([
             'success' => true,
             'count' => $this->getCommentCountForPost($postId),
             'deleted_comment_id' => $id_commentaire,
             'parent_id' => $parentId,
+            'replacement_parent_id' => $parentId,
             'post_id' => $postId,
         ]);
     }
@@ -639,16 +666,16 @@ class FeedController extends AbstractController
     public function participate(int $id_post, Request $request, SessionInterface $session): JsonResponse
     {
         $userId = $this->getUserIdFromSession($session);
-        if (!$userId) {
+        if ($userId === null) {
             return new JsonResponse(['success' => false, 'message' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$this->isCsrfTokenValid("feed_participate_{$id_post}", $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid("feed_participate_{$id_post}", $request->request->getString('_token'))) {
             return new JsonResponse(['success' => false, 'message' => 'CSRF token invalid'], Response::HTTP_FORBIDDEN);
         }
 
         $post = $this->postRepository->find($id_post);
-        if (!$post) {
+        if ($post === null) {
             return new JsonResponse(['success' => false, 'message' => 'Post not found'], Response::HTTP_NOT_FOUND);
         }
 
@@ -660,7 +687,7 @@ class FeedController extends AbstractController
 
         $participating = false;
         $ticketUrl = null;
-        if ($existing) {
+        if ($existing !== false) {
             $conn->executeStatement(
                 'DELETE FROM participation WHERE utilisateur_id = ? AND post_id = ?',
                 [$userId, $id_post]

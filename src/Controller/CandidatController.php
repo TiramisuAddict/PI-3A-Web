@@ -294,7 +294,9 @@ final class CandidatController extends AbstractController
 
         foreach ($offreCandidats as $candidat){
             $pdfcontent = $candidat->getCvData();
-            $textFromPdf = $matchingService->extractTextFromPDF($pdfcontent);
+            $textFromPdf = $pdfcontent !== null
+                ? $matchingService->extractTextFromPDF($pdfcontent)
+                : '';
             
             $matchingResult = $matchingService->match($processedOffreDescription, $textFromPdf);
             $candidat->setScore($matchingResult);

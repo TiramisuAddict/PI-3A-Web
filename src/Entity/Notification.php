@@ -10,6 +10,11 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'notification')]
 class Notification
 {
+    public function __construct()
+    {
+        $this->date_creation = new \DateTimeImmutable();
+    }
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
@@ -30,9 +35,9 @@ class Notification
     #[ORM\Column(type: 'integer', nullable: false)]
     #[Assert\NotNull(message: 'L’identifiant utilisateur est obligatoire.')]
     #[Assert\Type(type: 'integer', message: 'L’identifiant utilisateur doit être un entier.')]
-    private ?int $user_id = null;
+    private int $user_id = 0;
 
-    public function getUserId(): ?int
+    public function getUserId(): int
     {
         return $this->user_id;
     }
@@ -47,9 +52,9 @@ class Notification
     #[ORM\Column(type: 'string', nullable: false)]
     #[Assert\NotBlank(message: 'Le titre est obligatoire.')]
     #[Assert\Length(min: 3, max: 255, minMessage: 'Le titre doit contenir au moins {{ limit }} caractères.')]
-    private ?string $titre = null;
+    private string $titre = '';
 
-    public function getTitre(): ?string
+    public function getTitre(): string
     {
         return $this->titre;
     }
@@ -63,9 +68,9 @@ class Notification
     #[ORM\Column(type: 'text', nullable: false)]
     #[Assert\NotBlank(message: 'Le message est obligatoire.')]
     #[Assert\Length(min: 3, minMessage: 'Le message doit contenir au moins {{ limit }} caractères.')]
-    private ?string $message = null;
+    private string $message = '';
 
-    public function getMessage(): ?string
+    public function getMessage(): string
     {
         return $this->message;
     }
@@ -76,20 +81,19 @@ class Notification
         return $this;
     }
 
-    #[ORM\Column(type: 'datetime', nullable: false)]
+    #[ORM\Column(type: 'datetime_immutable', nullable: false)]
     #[Assert\NotNull(message: 'La date de création est obligatoire.')]
-    #[Assert\Type(\DateTimeInterface::class)]
-    #[Assert\DateTime(message: 'La date de création doit être valide.')]
-    private ?\DateTimeInterface $date_creation = null;
+    #[Assert\Type(\DateTimeImmutable::class)]
+    private \DateTimeImmutable $date_creation;
 
-    public function getDateCreation(): ?\DateTimeInterface
+    public function getDateCreation(): \DateTimeImmutable
     {
         return $this->date_creation;
     }
 
     public function setDateCreation(\DateTimeInterface $date_creation): self
     {
-        $this->date_creation = $date_creation;
+        $this->date_creation = \DateTimeImmutable::createFromInterface($date_creation);
 
         return $this;
     }

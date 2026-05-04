@@ -1183,13 +1183,19 @@
                 return list;
             }
 
-            function ensureRepliesContainer(card) {
+            function findRepliesContainer(card) {
                 var replies = null;
                 Array.prototype.forEach.call(card.children, function (child) {
                     if (!replies && child.classList && child.classList.contains('feed-comment-replies')) {
                         replies = child;
                     }
                 });
+
+                return replies;
+            }
+
+            function ensureRepliesContainer(card) {
+                var replies = findRepliesContainer(card);
                 if (!replies) {
                     replies = document.createElement('div');
                     replies.className = 'feed-comment-replies';
@@ -1274,9 +1280,33 @@
                 }
             }
 
-            function removeCommentFromUi(commentId) {
+            function removeCommentFromUi(commentId, postId, replacementParentId) {
                 var card = document.getElementById('comment-' + commentId);
                 if (!card) return;
+
+                var directReplies = findRepliesContainer(card);
+                var directReplyCards = [];
+                if (directReplies) {
+                    Array.prototype.forEach.call(directReplies.children, function (child) {
+                        if (child.classList && child.classList.contains('feed-comment-card')) {
+                            directReplyCards.push(child);
+                        }
+                    });
+                }
+
+                var replacementParent = replacementParentId ? document.getElementById('comment-' + replacementParentId) : null;
+                var replyDestination = replacementParent ? ensureRepliesContainer(replacementParent) : ensureCommentsList(postId);
+                var keepOriginalPosition = !replacementParent && replyDestination && card.parentElement === replyDestination;
+                directReplyCards.forEach(function (replyCard) {
+                    replyCard.dataset.parentId = replacementParentId ? String(replacementParentId) : '';
+                    if (replyDestination) {
+                        if (keepOriginalPosition) {
+                            replyDestination.insertBefore(replyCard, card);
+                        } else {
+                            replyDestination.appendChild(replyCard);
+                        }
+                    }
+                });
 
                 var repliesContainer = card.parentElement;
                 card.remove();
@@ -1517,7 +1547,7 @@
                 }
 
                 if (action === 'delete-comment') {
-                    if (!window.confirm('Supprimer ce commentaire et ses reponses ?')) {
+                    if (!window.confirm('Supprimer ce commentaire ? Les reponses seront conservees.')) {
                         return;
                     }
 
@@ -1528,7 +1558,7 @@
                         });
 
                         if (deleteData.success) {
-                            removeCommentFromUi(deleteData.deleted_comment_id);
+                            removeCommentFromUi(deleteData.deleted_comment_id, deleteData.post_id, deleteData.replacement_parent_id);
                             updateCommentSummary(deleteData.post_id, deleteData.count);
                             ensureEmptyState(deleteData.post_id);
                         } else {

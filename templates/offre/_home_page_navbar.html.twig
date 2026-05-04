@@ -52,20 +52,7 @@
                 data-bs-toggle="dropdown"
                 aria-label="Open user menu"
                 >
-                <span class="avatar avatar-sm"
-                    style="background-image: url({{ asset('images/WKlogo.svg') }})"></span>
                 <div class="d-none d-xl-block ps-2">
-                    {#<div>Paul Kuna</div>
-                    <div class="mt-1 small text-secondary">Designer UI</div>
-                </div>
-                </a>
-                <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                <a href="#" class="dropdown-item">Statut</a>
-                <a href="./profile.html" class="dropdown-item">Profil</a>
-                <a href="#" class="dropdown-item">Retour</a>
-                <div class="dropdown-divider"></div>
-                <a href="./settings.html" class="dropdown-item">Parametres</a>
-                <a href="./sign-in.html" class="dropdown-item">Deconnexion</a>#}
                     <div>{{ (visiteur_prenom|default('')) ~ ' ' ~ (visiteur_nom|default('')) }}</div>
                     <div class="mt-1 small text-secondary">{{ visiteur_email|default('Visiteur') }}</div>
                 </div>

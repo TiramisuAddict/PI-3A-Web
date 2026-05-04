@@ -10,10 +10,10 @@ use App\Repository\CandidatRepository;
 #[ORM\Entity(repositoryClass: CandidatRepository::class)]
 #[ORM\Table(
     name: 'candidat',
-    uniqueConstraints: [new ORM\UniqueConstraint(name: 'code_candidature', columns: ['code_candidature'])],
+    uniqueConstraints: [new ORM\UniqueConstraint(name: 'uniq_code_candidature', columns: ['code_candidature'])],
     indexes: [
-        new ORM\Index(name: 'fk_offre', columns: ['id_offre']),
-        new ORM\Index(name: 'fk_v', columns: ['id_visiteur'])
+        new ORM\Index(name: 'idx_candidat_offre', columns: ['id_offre_id']),
+        new ORM\Index(name: 'idx_candidat_visiteur', columns: ['id_visiteur_id'])
     ]
 )]
 class Candidat
@@ -159,7 +159,7 @@ class Candidat
     }
 
     #[ORM\ManyToOne(targetEntity: Offre::class, inversedBy: 'candidats')]
-    #[ORM\JoinColumn(name: 'id_offre', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'id_offre_id', referencedColumnName: 'id')]
     private ?Offre $offre = null;
 
     public function getOffre(): ?Offre
@@ -174,7 +174,7 @@ class Candidat
     }
 
     #[ORM\ManyToOne(targetEntity: Visiteur::class, inversedBy: 'candidats')]
-    #[ORM\JoinColumn(name: 'id_visiteur', referencedColumnName: 'id_visiteur')]
+    #[ORM\JoinColumn(name: 'id_visiteur_id', referencedColumnName: 'id_visiteur')]
     private ?Visiteur $visiteur = null;
 
     public function getVisiteur(): ?Visiteur

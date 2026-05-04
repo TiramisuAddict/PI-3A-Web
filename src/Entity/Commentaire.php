@@ -15,6 +15,7 @@ class Commentaire
     public function __construct()
     {
         $this->replies = new ArrayCollection();
+        $this->date_commentaire = new \DateTimeImmutable();
     }
 
     #[ORM\Id]
@@ -25,32 +26,32 @@ class Commentaire
     #[ORM\Column(type: 'text', nullable: false)]
     #[Assert\NotBlank(message: 'Le commentaire ne peut pas etre vide.')]
     #[Assert\Length(min: 3, minMessage: 'Le commentaire doit contenir au moins {{ limit }} caracteres.')]
-    private ?string $contenu = null;
+    private string $contenu = '';
 
-    #[ORM\Column(type: 'datetime', nullable: false)]
+    #[ORM\Column(type: 'datetime_immutable', nullable: false)]
     #[Assert\NotNull(message: 'La date du commentaire est obligatoire.')]
-    #[Assert\Type(\DateTimeInterface::class)]
-    #[Assert\DateTime(message: 'La date du commentaire doit etre valide.')]
-    private ?\DateTimeInterface $date_commentaire = null;
+    #[Assert\Type(\DateTimeImmutable::class)]
+    private \DateTimeImmutable $date_commentaire;
 
     #[ORM\Column(type: 'integer', nullable: false)]
     #[Assert\NotNull(message: 'L identifiant utilisateur est obligatoire.')]
     #[Assert\Type(type: 'integer', message: 'L identifiant utilisateur doit etre un entier.')]
-    private ?int $utilisateur_id = null;
+    private int $utilisateur_id = 0;
 
     #[ORM\ManyToOne(targetEntity: Post::class, inversedBy: 'commentaires')]
     #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post', nullable: false)]
     #[Assert\NotNull(message: 'Le post associe est obligatoire.')]
     private ?Post $post = null;
 
-    #[ORM\Column(type: 'datetime', nullable: true)]
-    private ?\DateTimeInterface $edited_at = null;
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $edited_at = null;
 
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'replies')]
-    #[ORM\JoinColumn(name: 'parent_id', referencedColumnName: 'id_commentaire', nullable: true, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'parent_id', referencedColumnName: 'id_commentaire', nullable: true, onDelete: 'SET NULL')]
     private ?self $parent = null;
 
-    #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent', orphanRemoval: true)]
+    /** @var Collection<int, self> */
+    #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent')]
     #[ORM\OrderBy(['date_commentaire' => 'ASC'])]
     private Collection $replies;
 
@@ -66,7 +67,7 @@ class Commentaire
         return $this;
     }
 
-    public function getContenu(): ?string
+    public function getContenu(): string
     {
         return $this->contenu;
     }
@@ -78,19 +79,19 @@ class Commentaire
         return $this;
     }
 
-    public function getDateCommentaire(): ?\DateTimeInterface
+    public function getDateCommentaire(): \DateTimeImmutable
     {
         return $this->date_commentaire;
     }
 
     public function setDateCommentaire(\DateTimeInterface $date_commentaire): self
     {
-        $this->date_commentaire = $date_commentaire;
+        $this->date_commentaire = \DateTimeImmutable::createFromInterface($date_commentaire);
 
         return $this;
     }
 
-    public function getUtilisateurId(): ?int
+    public function getUtilisateurId(): int
     {
         return $this->utilisateur_id;
     }
@@ -114,14 +115,16 @@ class Commentaire
         return $this;
     }
 
-    public function getEditedAt(): ?\DateTimeInterface
+    public function getEditedAt(): ?\DateTimeImmutable
     {
         return $this->edited_at;
     }
 
     public function setEditedAt(?\DateTimeInterface $edited_at): self
     {
-        $this->edited_at = $edited_at;
+        $this->edited_at = $edited_at !== null
+            ? \DateTimeImmutable::createFromInterface($edited_at)
+            : null;
 
         return $this;
     }

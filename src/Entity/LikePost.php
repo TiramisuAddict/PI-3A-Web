@@ -10,6 +10,11 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'like_post')]
 class LikePost
 {
+    public function __construct()
+    {
+        $this->date_like = new \DateTimeImmutable();
+    }
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
@@ -30,9 +35,9 @@ class LikePost
     #[ORM\Column(type: 'integer', nullable: false)]
     #[Assert\NotNull(message: 'L’identifiant utilisateur est obligatoire.')]
     #[Assert\Type(type: 'integer', message: 'L’identifiant utilisateur doit être un entier.')]
-    private ?int $utilisateur_id = null;
+    private int $utilisateur_id = 0;
 
-    public function getUtilisateurId(): ?int
+    public function getUtilisateurId(): int
     {
         return $this->utilisateur_id;
     }
@@ -44,7 +49,7 @@ class LikePost
         return $this;
     }
 
-    #[ORM\OneToOne(targetEntity: Post::class, inversedBy: 'likePost')]
+    #[ORM\OneToOne(targetEntity: Post::class)]
     #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post', unique: true, nullable: false)]
     #[Assert\NotNull(message: 'Le post associé est obligatoire.')]
     private ?Post $post = null;
@@ -61,20 +66,19 @@ class LikePost
         return $this;
     }
 
-    #[ORM\Column(type: 'datetime', nullable: false)]
+    #[ORM\Column(type: 'datetime_immutable', nullable: false)]
     #[Assert\NotNull(message: 'La date du like est obligatoire.')]
-    #[Assert\Type(\DateTimeInterface::class)]
-    #[Assert\DateTime(message: 'La date du like doit être valide.')]
-    private ?\DateTimeInterface $date_like = null;
+    #[Assert\Type(\DateTimeImmutable::class)]
+    private \DateTimeImmutable $date_like;
 
-    public function getDateLike(): ?\DateTimeInterface
+    public function getDateLike(): \DateTimeImmutable
     {
         return $this->date_like;
     }
 
     public function setDateLike(\DateTimeInterface $date_like): self
     {
-        $this->date_like = $date_like;
+        $this->date_like = \DateTimeImmutable::createFromInterface($date_like);
 
         return $this;
     }

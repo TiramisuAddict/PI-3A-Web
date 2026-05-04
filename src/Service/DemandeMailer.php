@@ -101,7 +101,7 @@ class DemandeMailer
                 'demande' => $demande,
                 'event' => $event,
                 'actionLabel' => $actionLabel,
-                'ownerEmail' => $demande->getEmploye()->getEmail() ?? '',
+                'ownerEmail' => $this->resolveOwnerEmail($demande),
             ]);
 
         $this->sendSafely($email, [
@@ -133,5 +133,15 @@ class DemandeMailer
     {
         $configured = trim((string) ($_ENV['MAILER_FROM'] ?? ''));
         return $configured !== '' ? $configured : self::DEFAULT_FROM;
+    }
+
+    private function resolveOwnerEmail(Demande $demande): string
+    {
+        $employe = $demande->getEmploye();
+        if (null === $employe) {
+            return '';
+        }
+
+        return trim($employe->getEmail());
     }
 }

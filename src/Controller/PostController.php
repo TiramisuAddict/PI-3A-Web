@@ -190,8 +190,13 @@ final class PostController extends AbstractController
     }
 
     #[Route('/{id_post}', name: 'app_post_show', methods: ['GET'])]
-    public function show(#[MapEntity(id: 'id_post')] Post $post): Response
+    public function show(int $id_post, PostRepository $postRepository): Response
     {
+        $post = $postRepository->findOneWithEventImages($id_post);
+        if (!$post instanceof Post) {
+            throw $this->createNotFoundException('Publication introuvable.');
+        }
+
         $apiKey = $_ENV['GOOGLE_MAPS_API_KEY'];
 
         return $this->render('post/show.html.twig', [
@@ -201,8 +206,13 @@ final class PostController extends AbstractController
     }
 
     #[Route('/{id_post}/edit', name: 'app_post_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, #[MapEntity(id: 'id_post')] Post $post, EntityManagerInterface $entityManager): Response
+    public function edit(Request $request, int $id_post, PostRepository $postRepository, EntityManagerInterface $entityManager): Response
     {
+        $post = $postRepository->findOneWithEventImages($id_post);
+        if (!$post instanceof Post) {
+            throw $this->createNotFoundException('Publication introuvable.');
+        }
+
         $form = $this->createForm(PostType::class, $post);
         $form->handleRequest($request);
 

@@ -28,7 +28,7 @@ class EventImage
     }
 
     #[ORM\ManyToOne(targetEntity: Post::class, inversedBy: 'eventImages')]
-    #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post', nullable: false)]
+    #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post', nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'Le post associé est obligatoire.')]
     private ?Post $post = null;
 
@@ -46,9 +46,9 @@ class EventImage
     #[ORM\Column(type: 'string', nullable: false)]
     #[Assert\NotBlank(message: 'Le chemin de l’image est obligatoire.')]
     #[Assert\Length(min: 3, max: 512, minMessage: 'Le chemin doit contenir au moins {{ limit }} caractères.')]
-    private ?string $image_path = null;
+    private string $image_path = '';
 
-    public function getImagePath(): ?string
+    public function getImagePath(): string
     {
         return $this->image_path;
     }

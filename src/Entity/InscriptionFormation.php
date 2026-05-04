@@ -17,7 +17,7 @@ class InscriptionFormation
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Formation::class)]
-    #[ORM\JoinColumn(name: 'id_formation', referencedColumnName: 'id_formation', nullable: false, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'id_formation_id', referencedColumnName: 'id_formation', nullable: false, onDelete: 'CASCADE')]
     private ?Formation $formation = null;
 
     #[ORM\Column(name: 'id_employe')]

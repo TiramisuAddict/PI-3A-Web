@@ -26,7 +26,7 @@ final class FormationController extends AbstractController
         }
 
         $pending = $connection->fetchOne(
-            'SELECT COUNT(i.id_inscription) FROM inscription_formation i WHERE i.id_formation = ? AND i.statut = ?',
+            'SELECT COUNT(i.id_inscription) FROM inscription_formation i WHERE i.id_formation_id = ? AND i.statut = ?',
             [$id, 'EN_ATTENTE']
         ) ?? 0;
 
@@ -88,7 +88,7 @@ final class FormationController extends AbstractController
                 $pendingInscriptions = $connection->fetchAllAssociative(
                                                 'SELECT i.id_inscription, i.id_employe, i.raison, i.statut, f.id_formation AS formation_id, f.titre AS formation_titre, COALESCE(e.prenom, "") AS prenom, COALESCE(e.nom, "") AS nom
                          FROM inscription_formation i
-                                                 INNER JOIN formation f ON f.id_formation = i.id_formation
+                                                 INNER JOIN formation f ON f.id_formation = i.id_formation_id
                              LEFT JOIN employe e ON e.id_employe = i.id_employe
                          WHERE i.statut = "EN_ATTENTE"
                          ORDER BY i.id_inscription DESC

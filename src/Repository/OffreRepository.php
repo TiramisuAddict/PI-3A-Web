@@ -69,6 +69,34 @@ class OffreRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Returns a single-query count map: [offreId => candidatCount]
+     *
+     * @param int[] $ids
+     * @return array<int, int>
+     */
+    public function findCandidatCountsByOffreIds(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $rows = $this->getEntityManager()->createQuery(
+            'SELECT IDENTITY(c.offre) AS offre_id, COUNT(c.id) AS cnt
+             FROM App\Entity\Candidat c
+             WHERE c.offre IN (:ids)
+             GROUP BY c.offre'
+        )
+        ->setParameter('ids', $ids)
+        ->getResult();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int) $row['offre_id']] = (int) $row['cnt'];
+        }
+        return $map;
+    }
+
 //    /**
 //     * @return Offre[] Returns an array of Offre objects
 //     */

@@ -18,6 +18,8 @@ class Post
         $this->eventImages = new ArrayCollection();
         $this->commentaires = new ArrayCollection();
         $this->notifications = new ArrayCollection();
+        $this->date_creation = new \DateTimeImmutable();
+        $this->coordinates = new Coordinates();
     }
 
     #[ORM\Id]
@@ -39,9 +41,9 @@ class Post
     #[ORM\Column(type: 'string', nullable: false)]
     #[Assert\NotBlank(message: 'Le titre est obligatoire.')]
     #[Assert\Length(min: 3, max: 255, minMessage: 'Le titre doit contenir au moins {{ limit }} caractères.')]
-    private ?string $titre = null;
+    private string $titre = '';
 
-    public function getTitre(): ?string
+    public function getTitre(): string
     {
         return $this->titre;
     }
@@ -55,9 +57,9 @@ class Post
     #[ORM\Column(type: 'text', nullable: false)]
     #[Assert\NotBlank(message: 'Le contenu est obligatoire.')]
     #[Assert\Length(min: 3, minMessage: 'Le contenu doit contenir au moins {{ limit }} caractères.')]
-    private ?string $contenu = null;
+    private string $contenu = '';
 
-    public function getContenu(): ?string
+    public function getContenu(): string
     {
         return $this->contenu;
     }
@@ -71,9 +73,9 @@ class Post
     #[ORM\Column(type: 'integer', nullable: false)]
     #[Assert\NotNull(message: 'Le type de publication est obligatoire.')]
     #[Assert\Type(type: 'integer', message: 'Le type doit être un nombre entier.')]
-    private ?int $type_post = null;
+    private int $type_post = 1;
 
-    public function getTypePost(): ?int
+    public function getTypePost(): int
     {
         return $this->type_post;
     }
@@ -87,25 +89,25 @@ class Post
     #[ORM\Column(type: 'datetime_immutable', nullable: false)]
     #[Assert\NotNull(message: 'La date de création est obligatoire.')]
     #[Assert\Type(\DateTimeInterface::class, message: 'La date de création doit être une date/heure valide.')]
-    private ?\DateTimeInterface $date_creation = null;
+    private \DateTimeImmutable $date_creation;
 
-    public function getDateCreation(): ?\DateTimeInterface
+    public function getDateCreation(): \DateTimeImmutable
     {
         return $this->date_creation;
     }
 
     public function setDateCreation(\DateTimeInterface $date_creation): self
     {
-        $this->date_creation = $date_creation;
+        $this->date_creation = \DateTimeImmutable::createFromInterface($date_creation);
         return $this;
     }
 
     #[ORM\Column(type: 'integer', nullable: false)]
     #[Assert\NotNull(message: 'L’identifiant utilisateur est obligatoire.')]
     #[Assert\Type(type: 'integer', message: 'L’identifiant utilisateur doit être un entier.')]
-    private ?int $utilisateur_id = null;
+    private int $utilisateur_id = 0;
 
-    public function getUtilisateurId(): ?int
+    public function getUtilisateurId(): int
     {
         return $this->utilisateur_id;
     }
@@ -132,31 +134,35 @@ class Post
 
     #[ORM\Column(type: 'date_immutable', nullable: true)]
     #[Assert\Type(\DateTimeInterface::class, message: 'La date de début d’événement doit être une date valide.')]
-    private ?\DateTimeInterface $date_evenement = null;
+    private ?\DateTimeImmutable $date_evenement = null;
 
-    public function getDateEvenement(): ?\DateTimeInterface
+    public function getDateEvenement(): ?\DateTimeImmutable
     {
         return $this->date_evenement;
     }
 
     public function setDateEvenement(?\DateTimeInterface $date_evenement): self
     {
-        $this->date_evenement = $date_evenement;
+        $this->date_evenement = $date_evenement !== null
+            ? \DateTimeImmutable::createFromInterface($date_evenement)
+            : null;
         return $this;
     }
 
     #[ORM\Column(type: 'date_immutable', nullable: true)]
     #[Assert\Type(\DateTimeInterface::class, message: 'La date de fin d’événement doit être une date valide.')]
-    private ?\DateTimeInterface $date_fin_evenement = null;
+    private ?\DateTimeImmutable $date_fin_evenement = null;
 
-    public function getDateFinEvenement(): ?\DateTimeInterface
+    public function getDateFinEvenement(): ?\DateTimeImmutable
     {
         return $this->date_fin_evenement;
     }
 
     public function setDateFinEvenement(?\DateTimeInterface $date_fin_evenement): self
     {
-        $this->date_fin_evenement = $date_fin_evenement;
+        $this->date_fin_evenement = $date_fin_evenement !== null
+            ? \DateTimeImmutable::createFromInterface($date_fin_evenement)
+            : null;
         return $this;
     }
 
@@ -190,35 +196,47 @@ class Post
         return $this;
     }
 
-    #[ORM\Column(type: 'decimal', nullable: true)]
-    #[Assert\Type(type: 'numeric', message: 'La latitude doit être un nombre.')]
-    #[Assert\Range(notInRangeMessage: 'La latitude doit être comprise entre -90 et 90.', min: -90, max: 90)]
-    private ?float $latitude = null;
+    #[ORM\Embedded(class: Coordinates::class, columnPrefix: false)]
+    #[Assert\Valid]
+    private Coordinates $coordinates;
 
-    public function getLatitude(): ?float
+    public function getLatitude(): ?string
     {
-        return $this->latitude;
+        return $this->getCoordinates()->getLatitude();
     }
 
-    public function setLatitude(?float $latitude): self
+    public function setLatitude(float|string|null $latitude): self
     {
-        $this->latitude = $latitude;
+        $this->getCoordinates()->setLatitude($latitude);
+
         return $this;
     }
 
-    #[ORM\Column(type: 'decimal', nullable: true)]
-    #[Assert\Type(type: 'numeric', message: 'La longitude doit être un nombre.')]
-    #[Assert\Range(notInRangeMessage: 'La longitude doit être comprise entre -180 et 180.', min: -180, max: 180)]
-    private ?float $longitude = null;
-
-    public function getLongitude(): ?float
+    public function getLongitude(): ?string
     {
-        return $this->longitude;
+        return $this->getCoordinates()->getLongitude();
     }
 
-    public function setLongitude(?float $longitude): self
+    public function setLongitude(float|string|null $longitude): self
     {
-        $this->longitude = $longitude;
+        $this->getCoordinates()->setLongitude($longitude);
+
+        return $this;
+    }
+
+    public function getCoordinates(): Coordinates
+    {
+        if (!isset($this->coordinates)) {
+            $this->coordinates = new Coordinates();
+        }
+
+        return $this->coordinates;
+    }
+
+    public function setCoordinates(?Coordinates $coordinates): self
+    {
+        $this->coordinates = $coordinates ?? new Coordinates();
+
         return $this;
     }
 
@@ -286,20 +304,6 @@ class Post
         return $this;
     }
 
-    #[ORM\OneToOne(targetEntity: LikePost::class, mappedBy: 'post')]
-    private ?LikePost $likePost = null;
-
-    public function getLikePost(): ?LikePost
-    {
-        return $this->likePost;
-    }
-
-    public function setLikePost(?LikePost $likePost): self
-    {
-        $this->likePost = $likePost;
-        return $this;
-    }
-
     #[ORM\OneToMany(targetEntity: Notification::class, mappedBy: 'post')]
     private Collection $notifications;
 
@@ -325,20 +329,6 @@ class Post
     public function removeNotification(Notification $notification): self
     {
         $this->getNotifications()->removeElement($notification);
-        return $this;
-    }
-
-    #[ORM\OneToOne(targetEntity: Participation::class, mappedBy: 'post')]
-    private ?Participation $participation = null;
-
-    public function getParticipation(): ?Participation
-    {
-        return $this->participation;
-    }
-
-    public function setParticipation(?Participation $participation): self
-    {
-        $this->participation = $participation;
         return $this;
     }
 

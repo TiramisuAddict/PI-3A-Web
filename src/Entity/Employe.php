@@ -141,7 +141,7 @@ class Employe
     }
 
     #[ORM\ManyToOne(targetEntity: Entreprise::class, inversedBy: 'employes')]
-    #[ORM\JoinColumn(name: 'id_entreprise', referencedColumnName: 'id_entreprise')]
+    #[ORM\JoinColumn(name: 'id_entreprise_id', referencedColumnName: 'id_entreprise')]
     private ?Entreprise $entreprise = null;
 
     public function getEntreprise(): ?Entreprise
@@ -193,35 +193,9 @@ class Employe
     }
 
 
-    /** @var Collection<int, Commentaire> */
-    #[ORM\OneToMany(targetEntity: Commentaire::class, mappedBy: 'employe')]
-    private Collection $commentaires;
-
     /** @var Collection<int, Demande> */
     #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'employe', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $demandes;
-
-    /**
-     * @return Collection<int, Commentaire>
-     */
-    public function getCommentaires(): Collection
-    {
-        return $this->commentaires;
-    }
-
-    public function addCommentaire(Commentaire $commentaire): self
-    {
-        if (!$this->getCommentaires()->contains($commentaire)) {
-            $this->getCommentaires()->add($commentaire);
-        }
-        return $this;
-    }
-
-    public function removeCommentaire(Commentaire $commentaire): self
-    {
-        $this->getCommentaires()->removeElement($commentaire);
-        return $this;
-    }
 
     #[ORM\OneToOne(targetEntity: CompetenceEmploye::class, mappedBy: 'employe')]
     private ?CompetenceEmploye $competenceEmploye = null;
@@ -383,14 +357,11 @@ class Employe
 
     public function __construct()
     {
-        $this->commentaires = new ArrayCollection();
         $this->comptes = new ArrayCollection();
         $this->demandes = new ArrayCollection();
         $this->projetsResponsables = new ArrayCollection();
         $this->projetsEquipe = new ArrayCollection();
         $this->taches = new ArrayCollection();
-        $this->projets1 = new ArrayCollection();
-        $this->posts1 = new ArrayCollection();
     }
 
     /**
@@ -439,76 +410,6 @@ class Employe
             $demande->setEmploye(null);
         }
 
-        return $this;
-    }
-
-    #[ORM\ManyToMany(targetEntity: Projet::class, inversedBy: 'employes')]
-    #[ORM\JoinTable(
-        name: 'equipe_projet',
-        joinColumns: [
-            new ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')
-        ],
-        inverseJoinColumns: [
-            new ORM\JoinColumn(name: 'id_projet', referencedColumnName: 'id_projet')
-        ]
-    )]
-    /** @var Collection<int, Projet> */
-    private Collection $projets1;
-
-    /**
-     * @return Collection<int, Projet>
-     */
-    public function getProjets1(): Collection
-    {
-        return $this->projets1;
-    }
-
-    public function addProjet1(Projet $projet): self
-    {
-        if (!$this->getProjets1()->contains($projet)) {
-            $this->getProjets1()->add($projet);
-        }
-        return $this;
-    }
-
-    public function removeProjet1(Projet $projet): self
-    {
-        $this->getProjets1()->removeElement($projet);
-        return $this;
-    }
-
-    #[ORM\ManyToMany(targetEntity: Post::class, inversedBy: 'employes')]
-    #[ORM\JoinTable(
-        name: 'like_post',
-        joinColumns: [
-            new ORM\JoinColumn(name: 'utilisateur_id', referencedColumnName: 'id_employe')
-        ],
-        inverseJoinColumns: [
-            new ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post')
-        ]
-    )]
-    /** @var Collection<int, Post> */
-    private Collection $posts1;
-
-    /**
-     * @return Collection<int, Post>
-     */
-    public function getPosts1(): Collection
-    {
-        return $this->posts1;
-    }
-
-    public function addPost1(Post $post): self
-    {
-        if (!$this->getPosts1()->contains($post)) {
-            $this->getPosts1()->add($post);
-        }
-        return $this;
-    }
-
-    public function removePost1(Post $post): self
-    {
-        $this->getPosts1()->removeElement($post);
         return $this;
     }
 

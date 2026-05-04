@@ -7,7 +7,7 @@ class OffreManager
 {
     public function validate(Offre $offre): bool
     {
-        if (empty($offre->getTitrePoste())) {
+        if ($offre->getTitrePoste() === null || $offre->getTitrePoste() === '') {
             throw new \InvalidArgumentException('Le titre du poste est obligatoire');
         }
 

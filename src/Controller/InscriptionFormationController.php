@@ -200,8 +200,8 @@ final class InscriptionFormationController extends AbstractController
         $formationReviews = $connection->fetchAllAssociative(
             'SELECT ev.note, ev.commentaire, ev.date_evaluation, COALESCE(e.prenom, "") AS prenom, COALESCE(e.nom, "") AS nom
              FROM evaluation_formation ev
-             LEFT JOIN employe e ON e.id_employe = ev.id_employe
-             WHERE ev.id_formation = ?
+             LEFT JOIN employe e ON e.id_employe = ev.id_employe_id
+             WHERE ev.id_formation_id = ?
              ORDER BY ev.date_evaluation DESC
              LIMIT 10',
             [$id]
@@ -562,9 +562,9 @@ final class InscriptionFormationController extends AbstractController
         $formations = $formationRepository->findForRhDashboard('', 'date_desc', 0, 'all', 50, 0);
 
                 $reviewStatsRows = $connection->fetchAllAssociative(
-                            'SELECT ev.id_formation AS formation_id, COUNT(ev.id_evaluation) AS reviews_count, ROUND(AVG(ev.note), 2) AS average_note
+                            'SELECT ev.id_formation_id AS formation_id, COUNT(ev.id_evaluation) AS reviews_count, ROUND(AVG(ev.note), 2) AS average_note
                          FROM evaluation_formation ev
-                             GROUP BY ev.id_formation'
+                             GROUP BY ev.id_formation_id'
                 );
 
         $reviewStatsByFormation = [];
@@ -656,8 +656,8 @@ final class InscriptionFormationController extends AbstractController
             $formationReviews = $connection->fetchAllAssociative(
                 'SELECT ev.note, ev.commentaire, ev.date_evaluation, COALESCE(e.prenom, "") AS prenom, COALESCE(e.nom, "") AS nom
                  FROM evaluation_formation ev
-                 LEFT JOIN employe e ON e.id_employe = ev.id_employe
-                 WHERE ev.id_formation = ?
+                 LEFT JOIN employe e ON e.id_employe = ev.id_employe_id
+                 WHERE ev.id_formation_id = ?
                  ORDER BY ev.date_evaluation DESC
                  LIMIT 10',
                 [$selectedFormation->getId()]

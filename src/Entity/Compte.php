@@ -53,7 +53,7 @@ class Compte implements PasswordAuthenticatedUserInterface
     }
 
     #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'comptes')]
-    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
+    #[ORM\JoinColumn(name: 'id_employe_id', referencedColumnName: 'id_employe')]
     private ?Employe $employe = null;
 
     public function getEmploye(): ?Employe

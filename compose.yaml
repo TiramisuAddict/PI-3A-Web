@@ -2,21 +2,27 @@
 services:
 ###> doctrine/doctrine-bundle ###
   database:
-    image: postgres:${POSTGRES_VERSION:-16}-alpine
+    image: mariadb:${MARIADB_VERSION:-10.4}
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-app}
-      # You should definitely change the password in production
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
-      POSTGRES_USER: ${POSTGRES_USER:-app}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-Momentum}
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+      TZ: Europe/Berlin
+    command:
+      - --default-time-zone=Europe/Berlin
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=536870912
+      - --innodb-flush-log-at-trx-commit=2
+      - --sql-mode=NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO
     healthcheck:
-      test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB:-app}", "-U", "${POSTGRES_USER:-app}"]
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
       timeout: 5s
       retries: 5
       start_period: 60s
     volumes:
-      - database_data:/var/lib/postgresql/data:rw
+      - database_data:/var/lib/mysql:rw
       # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
-      # - ./docker/db/data:/var/lib/postgresql/data:rw
+      # - ./docker/db/data:/var/lib/mysql:rw
 ###< doctrine/doctrine-bundle ###
 
 volumes:

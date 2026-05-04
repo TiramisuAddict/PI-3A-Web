@@ -10,6 +10,11 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'participation')]
 class Participation
 {
+    public function __construct()
+    {
+        $this->date_action = new \DateTimeImmutable();
+    }
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
@@ -30,9 +35,9 @@ class Participation
     #[ORM\Column(type: 'integer', nullable: false)]
     #[Assert\NotNull(message: 'L’identifiant utilisateur est obligatoire.')]
     #[Assert\Type(type: 'integer', message: 'L’identifiant utilisateur doit être un entier.')]
-    private ?int $utilisateur_id = null;
+    private int $utilisateur_id = 0;
 
-    public function getUtilisateurId(): ?int
+    public function getUtilisateurId(): int
     {
         return $this->utilisateur_id;
     }
@@ -44,7 +49,7 @@ class Participation
         return $this;
     }
 
-    #[ORM\OneToOne(targetEntity: Post::class, inversedBy: 'participation')]
+    #[ORM\OneToOne(targetEntity: Post::class)]
     #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id_post', unique: true, nullable: false)]
     #[Assert\NotNull(message: 'Le post associé est obligatoire.')]
     private ?Post $post = null;
@@ -63,9 +68,9 @@ class Participation
     #[ORM\Column(type: 'string', nullable: false)]
     #[Assert\NotBlank(message: 'Le statut est obligatoire.')]
     #[Assert\Length(min: 2, max: 64, minMessage: 'Le statut doit contenir au moins {{ limit }} caractères.')]
-    private ?string $statut = null;
+    private string $statut = '';
 
-    public function getStatut(): ?string
+    public function getStatut(): string
     {
         return $this->statut;
     }
@@ -76,20 +81,19 @@ class Participation
         return $this;
     }
 
-    #[ORM\Column(type: 'datetime', nullable: false)]
+    #[ORM\Column(type: 'datetime_immutable', nullable: false)]
     #[Assert\NotNull(message: 'La date d’action est obligatoire.')]
-    #[Assert\Type(\DateTimeInterface::class)]
-    #[Assert\DateTime(message: 'La date d’action doit être valide.')]
-    private ?\DateTimeInterface $date_action = null;
+    #[Assert\Type(\DateTimeImmutable::class)]
+    private \DateTimeImmutable $date_action;
 
-    public function getDateAction(): ?\DateTimeInterface
+    public function getDateAction(): \DateTimeImmutable
     {
         return $this->date_action;
     }
 
     public function setDateAction(\DateTimeInterface $date_action): self
     {
-        $this->date_action = $date_action;
+        $this->date_action = \DateTimeImmutable::createFromInterface($date_action);
 
         return $this;
     }

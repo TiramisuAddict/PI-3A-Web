@@ -96,11 +96,18 @@ final class CommentaireController extends AbstractController
     }
 
     #[Route('/{id_commentaire}', name: 'app_commentaire_delete', methods: ['POST'])]
-    public function delete(Request $request, Commentaire $commentaire, EntityManagerInterface $entityManager): Response
+    public function delete(
+        Request $request,
+        Commentaire $commentaire,
+        EntityManagerInterface $entityManager,
+        CommentaireRepository $commentaireRepository
+    ): Response
     {
         if ($this->isCsrfTokenValid('delete'.$commentaire->getIdCommentaire(), $request->getPayload()->getString('_token'))) {
-            $entityManager->remove($commentaire);
-            $entityManager->flush();
+            $entityManager->wrapInTransaction(function () use ($entityManager, $commentaire, $commentaireRepository): void {
+                $commentaireRepository->reparentDirectRepliesBeforeDelete($commentaire);
+                $entityManager->remove($commentaire);
+            });
         }
 
         $postId = $request->query->getInt('id_post', 0);

@@ -54,7 +54,7 @@ class Tache
     }
 
     #[ORM\ManyToOne(targetEntity: Projet::class, inversedBy: 'taches')]
-    #[ORM\JoinColumn(name: 'id_projet', referencedColumnName: 'id_projet')]
+    #[ORM\JoinColumn(name: 'id_projet_id', referencedColumnName: 'id_projet')]
     #[Assert\NotNull(message: 'Le projet est obligatoire pour cette tache.')]
     private ?Projet $projet = null;
 
@@ -70,7 +70,7 @@ class Tache
     }
 
     #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'taches')]
-    #[ORM\JoinColumn(name: 'id_employe', referencedColumnName: 'id_employe')]
+    #[ORM\JoinColumn(name: 'id_employe_id', referencedColumnName: 'id_employe')]
     #[Assert\NotNull(message: 'Veuillez choisir un employe.')]
     private ?Employe $employe = null;
 
