@@ -82,8 +82,9 @@ final class AuthController extends AbstractController
 
             // Vérification admin système
             $admin = $adminRepo->findOneBy(['e_mail' => $email]);
-            $storedPassword = $admin->getMot_de_passe();
+            $storedPassword = null; 
             if ($admin !== null) {
+                $storedPassword = $admin->getMot_de_passe();
                 if ($storedPassword !== $password && $storedPassword !== $passwordGenerator->hash($password)) {
                     $storedPassword = null;
                 }

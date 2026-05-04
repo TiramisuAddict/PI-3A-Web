@@ -869,6 +869,16 @@
             });
         }
 
+        // Clean up pagination listeners before Turbo caches this page
+        document.addEventListener('turbo:before-cache', function() {
+            // Remove all click listeners from pagination links by cloning and replacing
+            var paginationLinks = document.querySelectorAll('.card.table-card .card-footer a');
+            paginationLinks.forEach(function(link) {
+                var clone = link.cloneNode(true);
+                link.parentNode.replaceChild(clone, link);
+            });
+        });
+
     });
 
     window.filterByStatus = filterByStatus;
