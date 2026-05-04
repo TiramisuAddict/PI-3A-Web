@@ -23,14 +23,24 @@ class DemandeRepository extends ServiceEntityRepository
 
     /**
      * @param array<string,mixed> $filters
-     * @return Demande[]
+     * @return list<Demande>
      */
-    public function findWithFilters(array $filters, ?int $employeId = null): array
+    public function findWithFilters(array $filters, ?int $employeId = null, int $limit = 100, int $offset = 0): array
     {
-        return $this->createFilteredQueryBuilder($filters, $employeId)
+        $queryBuilder = $this->createFilteredQueryBuilder($filters, $employeId)
             ->orderBy('d.date_creation', 'DESC')
+            ->setMaxResults(max(1, $limit));
+
+        if ($offset > 0) {
+            $queryBuilder->setFirstResult($offset);
+        }
+
+        /** @var list<Demande> $demandes */
+        $demandes = $queryBuilder
             ->getQuery()
             ->getResult();
+
+        return $demandes;
     }
 
     /**
@@ -44,6 +54,19 @@ class DemandeRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    public function findOneWithEmploye(int $id): ?Demande
+    {
+        $demande = $this->createQueryBuilder('d')
+            ->leftJoin('d.employe', 'e')
+            ->addSelect('e')
+            ->andWhere('d.id_demande = :id')
+            ->setParameter('id', $id)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $demande instanceof Demande ? $demande : null;
+    }
+
     /**
      * @param array<string,mixed> $filters
      * @return array<string,int>
@@ -53,7 +76,6 @@ class DemandeRepository extends ServiceEntityRepository
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
             ->select('NEW App\\Dto\\GroupCountResult(d.status, COUNT(d.id_demande))')
             ->groupBy('d.status')
-            ->orderBy('COUNT(d.id_demande)', 'DESC')
             ->getQuery()
             ->getResult();
 
@@ -66,6 +88,7 @@ class DemandeRepository extends ServiceEntityRepository
                 $grouped[$status] = ($grouped[$status] ?? 0) + $count;
             }
         }
+        arsort($grouped);
         return $grouped;
     }
 
@@ -78,7 +101,6 @@ class DemandeRepository extends ServiceEntityRepository
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
             ->select('NEW App\\Dto\\GroupCountResult(d.priorite, COUNT(d.id_demande))')
             ->groupBy('d.priorite')
-            ->orderBy('COUNT(d.id_demande)', 'DESC')
             ->getQuery()
             ->getResult();
 
@@ -88,6 +110,7 @@ class DemandeRepository extends ServiceEntityRepository
             $label = $this->normalizeScalarString($result->label, 'Non definie');
             $grouped[$label] = $result->getCount();
         }
+        arsort($grouped);
         return $grouped;
     }
 
@@ -100,7 +123,6 @@ class DemandeRepository extends ServiceEntityRepository
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
             ->select('NEW App\\Dto\\GroupCountResult(d.type_demande, COUNT(d.id_demande))')
             ->groupBy('d.type_demande')
-            ->orderBy('COUNT(d.id_demande)', 'DESC')
             ->getQuery()
             ->getResult();
 
@@ -112,6 +134,7 @@ class DemandeRepository extends ServiceEntityRepository
                 $grouped[$typeDemande] = $result->getCount();
             }
         }
+        arsort($grouped);
         return $grouped;
     }
 
@@ -124,7 +147,6 @@ class DemandeRepository extends ServiceEntityRepository
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
             ->select('NEW App\\Dto\\GroupCountResult(d.categorie, COUNT(d.id_demande))')
             ->groupBy('d.categorie')
-            ->orderBy('COUNT(d.id_demande)', 'DESC')
             ->getQuery()
             ->getResult();
 
@@ -134,6 +156,7 @@ class DemandeRepository extends ServiceEntityRepository
             $label = $this->normalizeScalarString($result->label, 'Non definie');
             $grouped[$label] = $result->getCount();
         }
+        arsort($grouped);
         return $grouped;
     }
 
@@ -145,7 +168,8 @@ class DemandeRepository extends ServiceEntityRepository
         $qb = $this->createQueryBuilder('d');
 
         if (null !== $employeId) {
-            $qb->andWhere('IDENTITY(d.employe) = :employeId')
+            $qb->innerJoin('d.employe', 'scopeEmploye')
+               ->andWhere('scopeEmploye.id_employe = :employeId')
                ->setParameter('employeId', $employeId);
         }
 

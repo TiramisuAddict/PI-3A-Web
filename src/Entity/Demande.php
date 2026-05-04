@@ -16,7 +16,6 @@ class Demande
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
-    /** @phpstan-ignore-next-line */
     private ?int $id_demande = null;
 
     #[ORM\ManyToOne(targetEntity: Employe::class, inversedBy: 'demandes')]

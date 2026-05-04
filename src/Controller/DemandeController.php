@@ -13,6 +13,7 @@ use App\Service\DemandeAiAssistant;
 use App\Service\DemandeDecisionAssistant;
 use App\Service\DemandeFormHelper;
 use Doctrine\ORM\EntityManagerInterface;
+use Knp\Component\Pager\Event\Subscriber\Paginate\Callback\CallbackPagination;
 use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -73,14 +74,20 @@ class DemandeController extends AbstractController
         if ($limit < 1)   $limit = 1;
         if ($limit > 100) $limit = 100;
 
-        $queryBuilder = $this->demandeRepository
-            ->createFilteredQueryBuilder($activeFilters, $scopedEmployeId)
-            ->orderBy('d.date_creation', 'DESC');
+        $paginationSource = new CallbackPagination(
+            fn (): int => $this->demandeRepository->countAll($scopedEmployeId, $activeFilters),
+            fn (int $offset, int $pageLimit): array => $this->demandeRepository->findWithFilters(
+                $activeFilters,
+                $scopedEmployeId,
+                $pageLimit,
+                $offset
+            )
+        );
 
-        $demandes = $paginator->paginate($queryBuilder, $page, $limit);
+        $demandes = $paginator->paginate($paginationSource, $page, $limit);
 
         $stats = [
-            'total'      => $this->demandeRepository->countAll($scopedEmployeId, $activeFilters),
+            'total'      => $demandes->getTotalItemCount(),
             'byStatus'   => $this->demandeRepository->countGroupByStatus($scopedEmployeId, $activeFilters),
             'byPriorite' => $this->demandeRepository->countGroupByPriorite($scopedEmployeId, $activeFilters),
         ];
@@ -342,7 +349,7 @@ class DemandeController extends AbstractController
         }
 
         try {
-            $demande = $this->demandeRepository->find($id);
+            $demande = $this->demandeRepository->findOneWithEmploye($id);
 
             if (null === $demande) {
                 return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
@@ -419,7 +426,7 @@ class DemandeController extends AbstractController
             return $this->redirectToRoute('demande_show', ['id' => $id]);
         }
 
-        $demande = $this->demandeRepository->find($id);
+        $demande = $this->demandeRepository->findOneWithEmploye($id);
 
         if (null === $demande) {
             $this->addFlash('danger', 'Demande non trouvee.');
@@ -468,7 +475,7 @@ class DemandeController extends AbstractController
             return $this->redirectToRoute('demande_index');
         }
 
-        $demande = $this->demandeRepository->find($id);
+        $demande = $this->demandeRepository->findOneWithEmploye($id);
 
         if (null === $demande) {
             $this->addFlash('danger', 'Demande non trouvee.');
@@ -489,7 +496,7 @@ class DemandeController extends AbstractController
             return $this->redirectToRoute('login');
         }
 
-        $demande = $this->demandeRepository->find($id);
+        $demande = $this->demandeRepository->findOneWithEmploye($id);
 
         if (null === $demande) {
             throw $this->createNotFoundException('Demande non trouvee');
@@ -523,7 +530,7 @@ class DemandeController extends AbstractController
         $decisionAdvice = $this->demandeDecisionAssistant->analyze(
             $demande,
             $decisionDetails,
-            $this->formHelper->getFieldsForType((string) $demande->getTypeDemande())
+            $this->formHelper->getFieldsForType($demande->getTypeDemande())
         );
 
         return $this->render(
@@ -554,7 +561,7 @@ class DemandeController extends AbstractController
             return $this->redirectToRoute('demande_show', ['id' => $id]);
         }
 
-        $demande = $this->demandeRepository->find($id);
+        $demande = $this->demandeRepository->findOneWithEmploye($id);
 
         if (null === $demande) {
             $this->addFlash('danger', 'Demande non trouvee.');
@@ -609,7 +616,7 @@ class DemandeController extends AbstractController
             throw $this->createAccessDeniedException('Seuls les comptes RH et administrateur entreprise peuvent modifier une demande.');
         }
 
-        $demande = $this->demandeRepository->find($id);
+        $demande = $this->demandeRepository->findOneWithEmploye($id);
 
         if (null === $demande) {
             throw $this->createNotFoundException('Demande non trouvee');
