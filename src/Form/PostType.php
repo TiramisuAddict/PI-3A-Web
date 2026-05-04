@@ -139,7 +139,7 @@ class PostType extends AbstractType
 
                     continue;
                 }
-                if (\in_array($key, ['capacite_max'], true) && $v !== '') {
+                if ($key === 'capacite_max') {
                     $data[$key] = (int) $v;
                 }
             }
