@@ -749,14 +749,12 @@
             });
         }
 
-        // Clean up pagination listeners before Turbo caches this page
-        document.addEventListener('turbo:before-cache', function() {
-            // Remove all click listeners from pagination links by cloning and replacing
-            var paginationLinks = document.querySelectorAll('.card.table-card .card-footer a');
-            paginationLinks.forEach(function(link) {
-                var clone = link.cloneNode(true);
-                link.parentNode.replaceChild(clone, link);
-            });
+        // Rebind pagination links when page is restored from cache
+        document.addEventListener('turbo:load', function() {
+            // Only rebind if we're on a demande index page
+            if (document.querySelector('.card.table-card')) {
+                bindPaginationLinks();
+            }
         });
 
     });
