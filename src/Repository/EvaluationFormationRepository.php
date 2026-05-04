@@ -52,16 +52,17 @@ class EvaluationFormationRepository extends ServiceEntityRepository
      */
     public function findBestReviewedFormation(): ?array
     {
-        $row = $this->createQueryBuilder('ev')
-            ->select('f.id AS formation_id', 'f.titre AS formation_titre', 'COUNT(ev.id) AS reviews_count', 'AVG(ev.note) AS average_note')
-            ->join('ev.formation', 'f')
-            ->groupBy('f.id', 'f.titre')
-            ->orderBy('reviews_count', 'DESC')
-            ->addOrderBy('average_note', 'DESC')
-            ->addOrderBy('f.titre', 'ASC')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+        $row = $this->getEntityManager()->getConnection()->fetchAssociative(
+            'SELECT f.id_formation AS formation_id,
+                    f.titre AS formation_titre,
+                    COUNT(e.id_evaluation) AS reviews_count,
+                    AVG(e.note) AS average_note
+             FROM evaluation_formation e
+             INNER JOIN formation f ON f.id_formation = e.id_formation
+             GROUP BY f.id_formation, f.titre
+             ORDER BY reviews_count DESC, average_note DESC, f.titre ASC
+             LIMIT 1'
+        );
 
         if ($row === null) {
             return null;
