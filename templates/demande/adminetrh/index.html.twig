@@ -6,10 +6,6 @@
 {{ parent() }}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
-    html, body {
-        overflow: hidden !important;
-        height: 100% !important;
-    }
     .stats-row {
         display: flex;
         gap: 12px;
@@ -564,7 +560,6 @@
 {% endfor %}
 </div>
 
-{{ include('demande/_logout_modal.html.twig') }}
 {% endblock %}
 
 {% block javascripts %}
