@@ -15,6 +15,7 @@ use BackedEnum;
 class DemandeRepository extends ServiceEntityRepository
 {
     private const RESOLVED_STATUS_VARIANTS = ['Resolue', 'Résolue', 'Resolu', 'Résolu'];
+    private const GROUP_STATS_MAX_ROWS = 99;
 
     public function __construct(ManagerRegistry $registry)
     {
@@ -67,6 +68,34 @@ class DemandeRepository extends ServiceEntityRepository
         return $demande instanceof Demande ? $demande : null;
     }
 
+    public function findOneForShow(int $id): ?Demande
+    {
+        $demande = $this->createQueryBuilder('d')
+            ->leftJoin('d.employe', 'e')
+            ->addSelect('e')
+            ->leftJoin('d.demandeDetails', 'dd')
+            ->addSelect('dd')
+            ->andWhere('d.id_demande = :id')
+            ->setParameter('id', $id)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        if (!$demande instanceof Demande) {
+            return null;
+        }
+
+        // Load history in a second query to avoid a cartesian product with details.
+        $this->createQueryBuilder('d')
+            ->select('d', 'hd')
+            ->leftJoin('d.historiqueDemandes', 'hd')
+            ->andWhere('d.id_demande = :id')
+            ->setParameter('id', $id)
+            ->getQuery()
+            ->getResult();
+
+        return $demande;
+    }
+
     /**
      * @param array<string,mixed> $filters
      * @return array<string,int>
@@ -76,6 +105,7 @@ class DemandeRepository extends ServiceEntityRepository
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
             ->select('NEW App\\Dto\\GroupCountResult(d.status, COUNT(d.id_demande))')
             ->groupBy('d.status')
+            ->setMaxResults(self::GROUP_STATS_MAX_ROWS)
             ->getQuery()
             ->getResult();
 
@@ -101,6 +131,7 @@ class DemandeRepository extends ServiceEntityRepository
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
             ->select('NEW App\\Dto\\GroupCountResult(d.priorite, COUNT(d.id_demande))')
             ->groupBy('d.priorite')
+            ->setMaxResults(self::GROUP_STATS_MAX_ROWS)
             ->getQuery()
             ->getResult();
 
@@ -123,6 +154,7 @@ class DemandeRepository extends ServiceEntityRepository
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
             ->select('NEW App\\Dto\\GroupCountResult(d.type_demande, COUNT(d.id_demande))')
             ->groupBy('d.type_demande')
+            ->setMaxResults(self::GROUP_STATS_MAX_ROWS)
             ->getQuery()
             ->getResult();
 
@@ -147,6 +179,7 @@ class DemandeRepository extends ServiceEntityRepository
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
             ->select('NEW App\\Dto\\GroupCountResult(d.categorie, COUNT(d.id_demande))')
             ->groupBy('d.categorie')
+            ->setMaxResults(self::GROUP_STATS_MAX_ROWS)
             ->getQuery()
             ->getResult();
 
@@ -289,7 +322,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->select('d.titre AS titre, d.description AS description, d.status AS status, d.priorite AS priorite, d.categorie AS categorie, d.type_demande AS typeDemande')
             ->andWhere('d.status IS NOT NULL')
             ->orderBy('d.date_creation', 'DESC')
-            ->setMaxResults(max(100, $limit))
+            ->setMaxResults(max(1, $limit))
             ->getQuery()
             ->getArrayResult();
 
