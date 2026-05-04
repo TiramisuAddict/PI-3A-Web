@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Dto\GroupCountResult;
 use App\Entity\Entreprise;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
@@ -73,12 +74,20 @@ class EntrepriseRepository extends ServiceEntityRepository
      */
     public function countByStatus(): array
     {
-        return $this->createQueryBuilder('e')
-            ->select('e.statut AS statut, COUNT(e.id_entreprise) AS total')
+        $results = $this->createQueryBuilder('e')
+            ->select('NEW App\\Dto\\GroupCountResult(e.statut, COUNT(e.id_entreprise))')
             ->groupBy('e.statut')
-            ->orderBy('total', 'DESC')
+            ->orderBy('COUNT(e.id_entreprise)', 'DESC')
             ->getQuery()
-            ->getArrayResult();
+            ->getResult();
+
+        $grouped = [];
+        /** @var GroupCountResult $result */
+        foreach ($results as $result) {
+            $grouped[(string) $result->label] = $result->getCount();
+        }
+
+        return $grouped;
     }
 
     /**
@@ -86,12 +95,25 @@ class EntrepriseRepository extends ServiceEntityRepository
      */
     public function countByDateDemande(): array
     {
-        return $this->createQueryBuilder('e')
-            ->select('e.date_demande AS date_demande, COUNT(e.id_entreprise) AS total')
+        $results = $this->createQueryBuilder('e')
+            ->select('NEW App\\Dto\\GroupCountResult(e.date_demande, COUNT(e.id_entreprise))')
             ->groupBy('e.date_demande')
             ->orderBy('e.date_demande', 'ASC')
             ->getQuery()
-            ->getArrayResult();
+            ->getResult();
+
+        $grouped = [];
+        /** @var GroupCountResult $result */
+        foreach ($results as $result) {
+            $label = $result->label;
+            if ($label instanceof \DateTimeInterface) {
+                $label = $label->format('Y-m-d H:i:s');
+            }
+
+            $grouped[(string) $label] = $result->getCount();
+        }
+
+        return $grouped;
     }
 
     /**

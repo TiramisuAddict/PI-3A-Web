@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Dto\GroupCountResult;
 use App\Entity\Demande;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
@@ -50,15 +51,17 @@ class DemandeRepository extends ServiceEntityRepository
     public function countGroupByStatus(?int $employeId = null, array $filters = []): array
     {
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
-            ->select('d.status AS status, COUNT(d.id_demande) as cnt')
+            ->select('NEW App\\Dto\\GroupCountResult(d.status, COUNT(d.id_demande))')
             ->groupBy('d.status')
+            ->orderBy('COUNT(d.id_demande)', 'DESC')
             ->getQuery()
             ->getResult();
 
         $grouped = [];
+        /** @var GroupCountResult $result */
         foreach ($results as $result) {
-            $status = $this->normalizeStatusKey($result['status'] ?? null);
-            $count  = (int) ($result['cnt'] ?? 0);
+            $status = $this->normalizeStatusKey($result->label);
+            $count  = $result->getCount();
             if ($status !== null) {
                 $grouped[$status] = ($grouped[$status] ?? 0) + $count;
             }
@@ -73,14 +76,17 @@ class DemandeRepository extends ServiceEntityRepository
     public function countGroupByPriorite(?int $employeId = null, array $filters = []): array
     {
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
-            ->select('d.priorite, COUNT(d.id_demande) as count')
+            ->select('NEW App\\Dto\\GroupCountResult(d.priorite, COUNT(d.id_demande))')
             ->groupBy('d.priorite')
+            ->orderBy('COUNT(d.id_demande)', 'DESC')
             ->getQuery()
             ->getResult();
 
         $grouped = [];
+        /** @var GroupCountResult $result */
         foreach ($results as $result) {
-            $grouped[$result['priorite'] ?? 'Non definie'] = (int) $result['count'];
+            $label = $this->normalizeScalarString($result->label, 'Non definie');
+            $grouped[$label] = $result->getCount();
         }
         return $grouped;
     }
@@ -92,16 +98,18 @@ class DemandeRepository extends ServiceEntityRepository
     public function countGroupByType(?int $employeId = null, array $filters = []): array
     {
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
-            ->select('d.type_demande, COUNT(d.id_demande) as count')
+            ->select('NEW App\\Dto\\GroupCountResult(d.type_demande, COUNT(d.id_demande))')
             ->groupBy('d.type_demande')
+            ->orderBy('COUNT(d.id_demande)', 'DESC')
             ->getQuery()
             ->getResult();
 
         $grouped = [];
+        /** @var GroupCountResult $result */
         foreach ($results as $result) {
-            $typeDemande = $this->normalizeScalarString($result['type_demande'] ?? null);
+            $typeDemande = $this->normalizeScalarString($result->label);
             if ('' !== $typeDemande) {
-                $grouped[$typeDemande] = (int) $result['count'];
+                $grouped[$typeDemande] = $result->getCount();
             }
         }
         return $grouped;
@@ -114,14 +122,17 @@ class DemandeRepository extends ServiceEntityRepository
     public function countGroupByCategorie(?int $employeId = null, array $filters = []): array
     {
         $results = $this->createFilteredQueryBuilder($filters, $employeId)
-            ->select('d.categorie, COUNT(d.id_demande) as count')
+            ->select('NEW App\\Dto\\GroupCountResult(d.categorie, COUNT(d.id_demande))')
             ->groupBy('d.categorie')
+            ->orderBy('COUNT(d.id_demande)', 'DESC')
             ->getQuery()
             ->getResult();
 
         $grouped = [];
+        /** @var GroupCountResult $result */
         foreach ($results as $result) {
-            $grouped[$result['categorie']] = (int) $result['count'];
+            $label = $this->normalizeScalarString($result->label, 'Non definie');
+            $grouped[$label] = $result->getCount();
         }
         return $grouped;
     }
