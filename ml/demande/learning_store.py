@@ -8,7 +8,10 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
-from extractors import STOPWORDS, normalize_ws, norm, sentence_case, tokenize
+try:
+    from .extractors import STOPWORDS, normalize_ws, norm, sentence_case, tokenize
+except ImportError:  # pragma: no cover - supports direct execution from ml/demande
+    from extractors import STOPWORDS, normalize_ws, norm, sentence_case, tokenize
 
 
 BASE_DETAIL_KEYS = {

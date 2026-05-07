@@ -7,8 +7,12 @@ import math
 import re
 from typing import Iterable
 
-from extractors import ExtractedEntities, contains_term, extract_entities, has_any_word, norm, normalize_ws, tokenize
-from learning_store import FieldSpec, LearningProfile, TrainingSample, build_learning_profile
+try:
+    from .extractors import ExtractedEntities, contains_term, extract_entities, has_any_word, norm, normalize_ws, tokenize
+    from .learning_store import FieldSpec, LearningProfile, TrainingSample, build_learning_profile
+except ImportError:  # pragma: no cover - supports direct execution from ml/demande
+    from extractors import ExtractedEntities, contains_term, extract_entities, has_any_word, norm, normalize_ws, tokenize
+    from learning_store import FieldSpec, LearningProfile, TrainingSample, build_learning_profile
 
 
 MIN_SCHEMA_MATCH_SCORE = 0.52

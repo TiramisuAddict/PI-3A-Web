@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from field_planner import generate_response, validate_llm_candidate
+try:
+    from .field_planner import generate_response, validate_llm_candidate
+except ImportError:  # pragma: no cover - supports direct execution from ml/demande
+    from field_planner import generate_response, validate_llm_candidate
 
 
 def generate_autre_response(request_data: dict[str, Any]) -> dict[str, Any]:

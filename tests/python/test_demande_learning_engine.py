@@ -1,14 +1,9 @@
-import sys
 import unittest
 from datetime import datetime, timedelta
-from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "ml" / "demande"))
-
-import demande_adaptive_model as adaptive  # noqa: E402
-from extractors import extract_date, extract_entities, has_word  # noqa: E402
+from ml.demande import demande_adaptive_model as adaptive
+from ml.demande.extractors import extract_date, extract_entities, has_word
 
 
 class DemandeLearningEngineTest(unittest.TestCase):

@@ -5,33 +5,62 @@ from dataclasses import replace
 import re
 from typing import Any, Iterable
 
-from extractors import (
-    ExtractedEntities,
-    MATERIAL_TERMS,
-    contains_term,
-    extract_entities,
-    extract_first_number,
-    extract_period_label,
-    extract_transport_mode,
-    has_any_word,
-    has_phrase,
-    has_word,
-    norm,
-    normalize_ws,
-    sentence_case,
-    smart_title,
-    tokenize,
-)
-from learning_store import (
-    FieldSpec,
-    LearningProfile,
-    build_learning_profile,
-    infer_field_type,
-    is_long_text_key,
-    label_from_key,
-    should_suppress_field,
-)
-from retrieval import MIN_SCHEMA_MATCH_SCORE, RetrievalMatch, RetrievalResult, field_role, rank_requests, retrieval_stats
+try:
+    from .extractors import (
+        ExtractedEntities,
+        MATERIAL_TERMS,
+        contains_term,
+        extract_entities,
+        extract_first_number,
+        extract_period_label,
+        extract_transport_mode,
+        has_any_word,
+        has_phrase,
+        has_word,
+        norm,
+        normalize_ws,
+        sentence_case,
+        smart_title,
+        tokenize,
+    )
+    from .learning_store import (
+        FieldSpec,
+        LearningProfile,
+        build_learning_profile,
+        infer_field_type,
+        is_long_text_key,
+        label_from_key,
+        should_suppress_field,
+    )
+    from .retrieval import MIN_SCHEMA_MATCH_SCORE, RetrievalMatch, RetrievalResult, field_role, rank_requests, retrieval_stats
+except ImportError:  # pragma: no cover - supports direct execution from ml/demande
+    from extractors import (
+        ExtractedEntities,
+        MATERIAL_TERMS,
+        contains_term,
+        extract_entities,
+        extract_first_number,
+        extract_period_label,
+        extract_transport_mode,
+        has_any_word,
+        has_phrase,
+        has_word,
+        norm,
+        normalize_ws,
+        sentence_case,
+        smart_title,
+        tokenize,
+    )
+    from learning_store import (
+        FieldSpec,
+        LearningProfile,
+        build_learning_profile,
+        infer_field_type,
+        is_long_text_key,
+        label_from_key,
+        should_suppress_field,
+    )
+    from retrieval import MIN_SCHEMA_MATCH_SCORE, RetrievalMatch, RetrievalResult, field_role, rank_requests, retrieval_stats
 
 
 MAX_FIELDS = 8
