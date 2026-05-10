@@ -36,15 +36,19 @@
           <div class="card shadow-sm h-100">
             <div class="card-body text-center p-4">
               <div class="position-relative d-inline-block mb-3 avatar-container" style="cursor: pointer;">
-                {% if profile_type == 'employee' and employe.getImage_profil() %}
-                  <img src="{{ employe.getImage_profil() }}" alt="Avatar" class="avatar avatar-xl text-white fw-bold" style="width: 100px; height: 100px; border-radius:50%; object-fit: cover;">
+                {% if profile_type == 'employee' and employe %}
+                  {% set imagePath = employe.getImage_profil() %}
+                  {% set hasValidImage = imagePath and imagePath != '' and imagePath != '/icons/user.png' %}
+                  {% if hasValidImage %}
+                    <img src="{{ imagePath }}" alt="Avatar" class="avatar avatar-xl text-white fw-bold" style="width: 100px; height: 100px; border-radius:50%; object-fit: cover;">
+                  {% else %}
+                    <div class="avatar avatar-xl text-white fw-bold" style="background:#4254D6; font-size:1.3rem; width:100px; height:100px; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+                      {{ employe.getPrenom()|first }}{{ employe.getNom()|first }}
+                    </div>
+                  {% endif %}
                 {% else %}
                   <div class="avatar avatar-xl text-white fw-bold" style="background:#4254D6; font-size:1.3rem; width:100px; height:100px; border-radius:50%; display:flex; align-items:center; justify-content:center;">
-                    {% if profile_type == 'employee' %}
-                      {{ employe.getPrenom()|first }}{{ employe.getNom()|first }}
-                    {% else %}
-                      AD
-                    {% endif %}
+                    AD
                   </div>
                 {% endif %}
                 <div class="avatar-overlay d-flex align-items-center justify-content-center" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); border-radius: 50%; opacity: 0; transition: opacity 0.3s ease; display: none;">
