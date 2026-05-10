@@ -5,7 +5,7 @@
 {% block body %}
   {{ include('components/navbar.html.twig') }}
   <div class="d-flex overflow-hidden" style="height:calc(100vh - 56px);">
-    {{ include('components/sidebar.html.twig', {'active_page': 'accueil','sidebar_role': role}) }}
+    {{ include('components/sidebar.html.twig', {'active_page': 'employes','sidebar_role': role}) }}
     <div class="flex-fill overflow-y-auto p-4 d-flex flex-column" style="min-width:0;">
 
       <div class="d-flex flex-column flex-grow-1">
@@ -90,8 +90,10 @@
             onclick="toggleDetail({{ emp.getId_employe() }})"
             onmouseover="this.style.borderColor='#4254D6'; this.style.cursor='pointer';"
             onmouseout="this.style.borderColor='{% if employe_select is defined and employe_select.getId_employe() == emp.getId_employe() %}#4254D6{% else %}#dee2e6{% endif %}'">
-            {% if emp.getImage_profil() %}
-              <img src="{{ emp.getImage_profil() }}" alt="Avatar" class="avatar avatar-sm" style="flex-shrink:0; width: 40px; height: 40px; border-radius:50%; object-fit: cover;">
+            {% set imagePath = emp.getImage_profil() %}
+            {% set hasValidImage = imagePath and imagePath != '' and imagePath != '/icons/user.png' %}
+            {% if hasValidImage %}
+              <img src="{{ imagePath }}" alt="Avatar" class="avatar avatar-sm" style="flex-shrink:0; width: 40px; height: 40px; border-radius:50%; object-fit: cover;">
             {% else %}
               <span class="avatar avatar-sm bg-blue-lt text-blue fw-bold" style="flex-shrink:0; display:flex; align-items:center; justify-content:center; width:40px; height:40px; border-radius:50%;">
                 {{ emp.getPrenom()|first }}{{ emp.getNom()|first }}

@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Visiteur;
 use App\Form\VisiteurType;
+use App\Service\PasswordGenerator;
 use App\Repository\VisiteurRepository;
 use App\Service\OAuthGoogleService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -13,12 +14,11 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class VisiteurController extends AbstractController
 {
     #[Route('/visiteur/compte_visiteur', name: 'compte_visiteur', methods: ['GET', 'POST'])]
-    public function ajouter(Request $request, EntityManagerInterface $entityManager, UserPasswordHasherInterface $passwordHasher, SessionInterface $session, VisiteurRepository $visiteurRepository, OAuthGoogleService $oauthGoogleService, FormFactoryInterface $formFactory): Response
+    public function ajouter(Request $request, EntityManagerInterface $entityManager, SessionInterface $session, VisiteurRepository $visiteurRepository, OAuthGoogleService $oauthGoogleService, FormFactoryInterface $formFactory, PasswordGenerator $passwordGenerator): Response
     {
         $oauthVisiteurId = (int) $session->get('oauth_google_complete_phone_visiteur_id', 0);
         if ($oauthVisiteurId > 0) {
@@ -62,8 +62,23 @@ final class VisiteurController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            // prevent duplicate account with same email
+            $existing = $visiteurRepository->findOneBy(['e_mail' => $visiteur->getEmail()]);
+            if ($existing !== null) {
+                $this->addFlash('warning', 'Un visiteur avec cet email existe déjà.');
+                return $this->redirectToRoute('compte_visiteur');
+            }
+
             $plainPassword = $form->get('mot_de_passe')->getData();
-            $visiteur->setMotdepasse($passwordHasher->hashPassword($visiteur, $plainPassword));
+            // Hash password using the same SHA-256 strategy as employees
+            $hashedPassword = $passwordGenerator->hash($plainPassword);
+            $existingPassword = $visiteurRepository->findOneBy(['mot_de_passe' => $hashedPassword]);
+            if ($existingPassword !== null) {
+                $this->addFlash('error', 'Ce mot de passe existe déjà.');
+                return $this->redirectToRoute('compte_visiteur');
+            }
+
+            $visiteur->setMotdepasse($hashedPassword);
 
             $entityManager->persist($visiteur);
             $entityManager->flush();

@@ -158,7 +158,7 @@ final class AuthController extends AbstractController
             $visiteur = $visiteurRepo->findOneBy(['e_mail' => $email]);
             if ($visiteur !== null) {
                 $visiteurHash = $visiteur->getMotdepasse();
-                if ($visiteurHash !== null && password_verify($password, $visiteurHash)) {
+                if ($visiteurHash !== null && ($visiteurHash === $passwordGenerator->hash($password) || password_verify($password, $visiteurHash))) {
                 $this->clearOtpFlow($session, $twilioVerifyService, 'two_factor');
                 $session->set('visiteur_logged_in', true);
                 $session->set('visiteur_id', $visiteur->getId_visiteur());

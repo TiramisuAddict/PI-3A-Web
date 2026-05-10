@@ -37,8 +37,8 @@ class EmployeType extends AbstractType
             ->add('telephone',TextType::class,['label' => 'Téléphone', 'empty_data' => '', 'constraints' => [
                     new Assert\NotBlank(message: 'Le téléphone est obligatoire'),
                     new Assert\Regex(
-                        pattern: '/^[0-9]+$/',
-                        message: 'Le téléphone doit contenir uniquement des chiffres .'
+                        pattern: '/^[0-9]{8}$/',
+                        message: 'Le téléphone doit contenir exactement 8 chiffres.'
                     ),
                 ],])
             ->add('poste',TextType::class,['label' => 'Poste','constraints' => [
