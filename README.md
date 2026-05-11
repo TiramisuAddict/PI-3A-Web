@@ -6,60 +6,23 @@ The Recruitment Management (Gestion des Recrutements) application is a comprehen
 
 The system leverages AI-powered candidate evaluation, advanced context matching, and integrated video conferencing to create an efficient, modern recruitment workflow that reduces time-to-hire and improves candidate quality.
 
+## Screenshots
 
+<img src="https://raw.githubusercontent.com/TiramisuAddict/PI-3A-Web/refs/heads/gestion-offre/public/images/sc10.png" width="800">
+<img src="https://raw.githubusercontent.com/TiramisuAddict/PI-3A-Web/refs/heads/gestion-offre/public/images/sc1.png" width="800">
 
 ## Features
 
 ### BackOffice (HR Interface)
 
-#### Job Offer Management (Gestion Offre)
-- **Create & Publish Job Offers**: Create detailed job offers with descriptions, requirements, qualifications, and application deadlines
-- **Offer Management**: Edit, publish, archive, and manage multiple job offers simultaneously
-- **Candidate Tracking**: Monitor applications for each offer in real-time
-- **Offer Analytics**: View application statistics and performance metrics for each job offer
-
-#### Candidate Management (Gestion Candidat)
-- **Application Management**: Track all incoming candidate applications and manage their status throughout the recruitment pipeline
-- **Candidate Profiles**: Access comprehensive candidate information including resumes, cover letters, education, and work experience
-- **Candidate Scoring**: View AI-generated candidate scores and evaluation results
-- **Status Updates**: Update candidate status through various pipeline stages (Applied, Screened, Interview Scheduled, Interviewed, Accepted, Rejected)
-- **Communication**: Send notifications and updates to candidates at each stage of the process
-
-#### Deep Learning Resume Preselection
-- **AI-Powered Screening**: Automatically evaluate and score candidates based on job requirements and qualifications
-- **Resume Analysis**: Extract and analyze key information from resumes using natural language processing
-- **Qualification Matching**: Identify candidates whose qualifications match job offer requirements
-- **Efficiency**: Reduce manual screening time and identify top candidates automatically
-
-#### Interview Scheduling (Meet Integration)
-- **Google Meet Integration**: Schedule video interviews directly through the platform
-- **Automated Notifications**: Send meeting invitations and reminders to candidates and interviewers
-- **Calendar Management**: Sync with calendar systems for interview scheduling
-- **Meeting Links**: Generate and share Google Meet links automatically with participants
-- **Interview Tracking**: Monitor scheduled interviews and interview outcomes
-
-#### Analytics & Reporting
-- **Recruitment Dashboards**: Visualize key recruitment metrics and KPIs
-- **Charts & Analytics**: View hiring pipeline, conversion rates, and time-to-hire analytics
-- **Candidate Source Analytics**: Track which sources produce the best candidates
-- **Performance Insights**: Gain data-driven insights to optimize the recruitment process
+- **Job Offer Management** : Create and manage job offers with detailed descriptions, requirements, qualifications, and application deadlines.
+- **Candidate Management** : Track and manage candidate applications, resumes, and recruitment statuses throughout the hiring process.
+- **AI Resume Preselection** : Automatically analyze and screen resumes using AI to identify the most qualified candidates based on job requirements.
+- **Interview Scheduling (Google Meet Integration)** : Schedule interviews, generate Google Meet links, and send automated notifications to candidates and interviewers.
+- **Charts & Analytics** : Visualize recruitment metrics, candidate statistics, and hiring performance through dashboards and analytics.
 
 ### FrontOffice (Candidate Interface)
 
-#### Job Discovery
-- **Browse Job Offers**: Display all active job offers with detailed information
-- **Advanced Search**: Filter and search jobs by location, department, salary range, and keywords
-- **Job Details**: Access comprehensive job descriptions, requirements, and application instructions
-- **Save Jobs**: Bookmark job offers for later reference
-
-#### Application Submission
-- **Easy Application**: Simple and intuitive application process
-- **File Uploads**: Upload resumes, cover letters, and supporting documents
-- **Application Form**: Complete structured application forms with customizable fields
-- **Instant Confirmation**: Receive confirmation upon successful application submission
-
-#### Application Tracking
-- **Application Status**: Track the status of submitted applications in real-time
-- **Status Updates**: Receive notifications when application status changes
-- **Interview Notifications**: Get alerted when interviews are scheduled
-- **Application History**: View all past applications and their outcomes
+- **Job Offer Display** : Display active job offers with detailed descriptions, requirements, and application instructions.
+- **Application Submission** : Allow candidates to submit applications online with resume and document uploads.
+- **Application Tracking** : Enable candidates to track their application status and receive notifications about updates and interviews.
