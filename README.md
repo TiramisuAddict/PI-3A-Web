@@ -21,7 +21,7 @@ Built with Symfony 6.4 following an MVC architecture, the application focuses on
 |------------------|-------------|
 | Demand management | Team Larry |
 | Training / Course management | Team Larry |
-| Recruitment management | <a href="https://github.com/TiramisuAddict">TiramisuAddict</a> |
+| <a href="https://github.com/TiramisuAddict/PI-3A-Web/tree/gestion-offre">Recruitment management </a> | <a href="https://github.com/TiramisuAddict">TiramisuAddict</a> |
 | Project management | Team Larry |
 | User / Employee management | Team Larry |
 | Social Feed / Posts management | Team Larry |
@@ -87,7 +87,7 @@ php -S localhost:8000 -t public
 Then open:
 
 ```txt
-http://localhost:8000
+http://localhost:8000/accueil
 ```
 
 ---
