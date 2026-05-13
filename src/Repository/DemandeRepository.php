@@ -26,9 +26,9 @@ class DemandeRepository extends ServiceEntityRepository
      * @param array<string,mixed> $filters
      * @return list<Demande>
      */
-    public function findWithFilters(array $filters, ?int $employeId = null, int $limit = 100, int $offset = 0): array
+    public function findWithFilters(array $filters, ?int $employeId = null, int $limit = 100, int $offset = 0, ?int $entrepriseId = null): array
     {
-        $queryBuilder = $this->createFilteredQueryBuilder($filters, $employeId)
+        $queryBuilder = $this->createFilteredQueryBuilder($filters, $employeId, $entrepriseId)
             ->orderBy('d.date_creation', 'DESC')
             ->setMaxResults(max(1, $limit));
 
@@ -47,9 +47,9 @@ class DemandeRepository extends ServiceEntityRepository
     /**
      * @param array<string,mixed> $filters
      */
-    public function countAll(?int $employeId = null, array $filters = []): int
+    public function countAll(?int $employeId = null, array $filters = [], ?int $entrepriseId = null): int
     {
-        return (int) $this->createFilteredQueryBuilder($filters, $employeId)
+        return (int) $this->createFilteredQueryBuilder($filters, $employeId, $entrepriseId)
             ->select('COUNT(d.id_demande)')
             ->getQuery()
             ->getSingleScalarResult();
@@ -60,6 +60,8 @@ class DemandeRepository extends ServiceEntityRepository
         $demande = $this->createQueryBuilder('d')
             ->leftJoin('d.employe', 'e')
             ->addSelect('e')
+            ->leftJoin('e.entreprise', 'en')
+            ->addSelect('en')
             ->andWhere('d.id_demande = :id')
             ->setParameter('id', $id)
             ->getQuery()
@@ -73,6 +75,8 @@ class DemandeRepository extends ServiceEntityRepository
         $demande = $this->createQueryBuilder('d')
             ->leftJoin('d.employe', 'e')
             ->addSelect('e')
+            ->leftJoin('e.entreprise', 'en')
+            ->addSelect('en')
             ->leftJoin('d.demandeDetails', 'dd')
             ->addSelect('dd')
             ->andWhere('d.id_demande = :id')
@@ -100,9 +104,9 @@ class DemandeRepository extends ServiceEntityRepository
      * @param array<string,mixed> $filters
      * @return array<string,int>
      */
-    public function countGroupByStatus(?int $employeId = null, array $filters = []): array
+    public function countGroupByStatus(?int $employeId = null, array $filters = [], ?int $entrepriseId = null): array
     {
-        $results = $this->createFilteredQueryBuilder($filters, $employeId)
+        $results = $this->createFilteredQueryBuilder($filters, $employeId, $entrepriseId)
             ->select('NEW App\\Dto\\GroupCountResult(d.status, COUNT(d.id_demande))')
             ->groupBy('d.status')
             ->setMaxResults(self::GROUP_STATS_MAX_ROWS)
@@ -126,9 +130,9 @@ class DemandeRepository extends ServiceEntityRepository
      * @param array<string,mixed> $filters
      * @return array<string,int>
      */
-    public function countGroupByPriorite(?int $employeId = null, array $filters = []): array
+    public function countGroupByPriorite(?int $employeId = null, array $filters = [], ?int $entrepriseId = null): array
     {
-        $results = $this->createFilteredQueryBuilder($filters, $employeId)
+        $results = $this->createFilteredQueryBuilder($filters, $employeId, $entrepriseId)
             ->select('NEW App\\Dto\\GroupCountResult(d.priorite, COUNT(d.id_demande))')
             ->groupBy('d.priorite')
             ->setMaxResults(self::GROUP_STATS_MAX_ROWS)
@@ -149,9 +153,9 @@ class DemandeRepository extends ServiceEntityRepository
      * @param array<string,mixed> $filters
      * @return array<string,int>
      */
-    public function countGroupByType(?int $employeId = null, array $filters = []): array
+    public function countGroupByType(?int $employeId = null, array $filters = [], ?int $entrepriseId = null): array
     {
-        $results = $this->createFilteredQueryBuilder($filters, $employeId)
+        $results = $this->createFilteredQueryBuilder($filters, $employeId, $entrepriseId)
             ->select('NEW App\\Dto\\GroupCountResult(d.type_demande, COUNT(d.id_demande))')
             ->groupBy('d.type_demande')
             ->setMaxResults(self::GROUP_STATS_MAX_ROWS)
@@ -174,9 +178,9 @@ class DemandeRepository extends ServiceEntityRepository
      * @param array<string,mixed> $filters
      * @return array<string,int>
      */
-    public function countGroupByCategorie(?int $employeId = null, array $filters = []): array
+    public function countGroupByCategorie(?int $employeId = null, array $filters = [], ?int $entrepriseId = null): array
     {
-        $results = $this->createFilteredQueryBuilder($filters, $employeId)
+        $results = $this->createFilteredQueryBuilder($filters, $employeId, $entrepriseId)
             ->select('NEW App\\Dto\\GroupCountResult(d.categorie, COUNT(d.id_demande))')
             ->groupBy('d.categorie')
             ->setMaxResults(self::GROUP_STATS_MAX_ROWS)
@@ -196,14 +200,22 @@ class DemandeRepository extends ServiceEntityRepository
     /**
      * @param array<string,mixed> $filters
      */
-    public function createFilteredQueryBuilder(array $filters = [], ?int $employeId = null): QueryBuilder
+    public function createFilteredQueryBuilder(array $filters = [], ?int $employeId = null, ?int $entrepriseId = null): QueryBuilder
     {
         $qb = $this->createQueryBuilder('d');
 
+        if (null !== $employeId || null !== $entrepriseId) {
+            $qb->innerJoin('d.employe', 'scopeEmploye');
+        }
+
         if (null !== $employeId) {
-            $qb->innerJoin('d.employe', 'scopeEmploye')
-               ->andWhere('scopeEmploye.id_employe = :employeId')
+            $qb->andWhere('scopeEmploye.id_employe = :employeId')
                ->setParameter('employeId', $employeId);
+        }
+
+        if (null !== $entrepriseId) {
+            $qb->andWhere('IDENTITY(scopeEmploye.entreprise) = :entrepriseId')
+               ->setParameter('entrepriseId', $entrepriseId);
         }
 
         if (isset($filters['categorie']) && '' !== trim((string) $filters['categorie'])) {
@@ -227,9 +239,13 @@ class DemandeRepository extends ServiceEntityRepository
         }
 
         if (isset($filters['search']) && '' !== trim((string) $filters['search'])) {
-            $qb->andWhere(
-                'd.titre LIKE :search OR d.description LIKE :search OR d.type_demande LIKE :search OR d.categorie LIKE :search OR d.status LIKE :search'
-            )->setParameter('search', '%' . $filters['search'] . '%');
+            $qb->andWhere($qb->expr()->orX(
+                'd.titre LIKE :search',
+                'd.description LIKE :search',
+                'd.type_demande LIKE :search',
+                'd.categorie LIKE :search',
+                'd.status LIKE :search'
+            ))->setParameter('search', '%' . $filters['search'] . '%');
         }
 
         return $qb;
