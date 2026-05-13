@@ -489,4 +489,21 @@
   })();
   </script>
   {% endif %}
+  <script>
+    // Ensure sidebar links navigate on first click (ignore anchors and new-tab links)
+    document.addEventListener('DOMContentLoaded', function () {
+      var aside = document.querySelector('aside');
+      if (!aside) return;
+      aside.querySelectorAll('a[href]').forEach(function (a) {
+        var href = a.getAttribute('href') || '';
+        if (!href || href.startsWith('#') || href.startsWith('javascript:') || a.target === '_blank') return;
+        a.addEventListener('click', function (e) {
+          if (e.defaultPrevented) return;
+          if (e.button === 1 || e.ctrlKey || e.metaKey || e.shiftKey) return; // allow new-tab
+          e.preventDefault();
+          window.location.href = a.href;
+        });
+      });
+    });
+  </script>
 </aside>

@@ -1,7 +1,15 @@
 import unittest
 
 
+<<<<<<< HEAD
 from ml.demande import demande_adaptive_model as adaptive
+=======
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "ml" / "demande"))
+
+from ml.demande import demande_adaptive_model as adaptive  # noqa: E402
+>>>>>>> 756622399c74cc59f341d90f7cdfcaa7c5de4828
 
 
 class DemandeAdaptiveModelTest(unittest.TestCase):

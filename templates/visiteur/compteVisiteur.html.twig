@@ -36,6 +36,14 @@
                     <div class="alert alert-danger" role="alert">{{ message }}</div>
                 {% endfor %}
 
+                {% for message in app.flashes('warning') %}
+                    <div class="alert alert-warning" role="alert">{{ message }}</div>
+                {% endfor %}
+
+                {% for message in app.flashes('info') %}
+                    <div class="alert alert-info" role="alert">{{ message }}</div>
+                {% endfor %}
+
                 <div class="mb-3">
                     <a href="{{ path('oauth_google_register_start') }}" class="btn btn-outline-secondary w-100 d-inline-flex align-items-center justify-content-center gap-2">
                         <img src="/images/google.png" alt="Google" width="18" height="18">

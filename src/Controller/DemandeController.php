@@ -61,8 +61,9 @@ class DemandeController extends AbstractController
             'search'    => $request->query->get('search'),
         ];
 
-        $isManager       = $this->canManageDemandes($session);
-        $scopedEmployeId = $isManager ? null : $this->getLoggedInEmployeId($session);
+        $isManager           = $this->canManageDemandes($session);
+        $scopedEmployeId     = $isManager ? null : $this->getLoggedInEmployeId($session);
+        $scopedEntrepriseId  = $this->getScopedEntrepriseIdForQueries($session);
 
         $activeFilters = array_filter(
             $filters,
@@ -75,12 +76,13 @@ class DemandeController extends AbstractController
         if ($limit > 100) $limit = 100;
 
         $paginationSource = new CallbackPagination(
-            fn (): int => $this->demandeRepository->countAll($scopedEmployeId, $activeFilters),
+            fn (): int => $this->demandeRepository->countAll($scopedEmployeId, $activeFilters, $scopedEntrepriseId),
             fn (int $offset, int $pageLimit): array => $this->demandeRepository->findWithFilters(
                 $activeFilters,
                 $scopedEmployeId,
                 $pageLimit,
-                $offset
+                $offset,
+                $scopedEntrepriseId
             )
         );
 
@@ -88,7 +90,11 @@ class DemandeController extends AbstractController
 
         $stats = [
             'total'      => $demandes->getTotalItemCount(),
+<<<<<<< HEAD
             'byStatus'   => $this->demandeRepository->countGroupByStatus($scopedEmployeId, $activeFilters),
+=======
+            'byStatus'   => $this->demandeRepository->countGroupByStatus($scopedEmployeId, $activeFilters, $scopedEntrepriseId),
+>>>>>>> 756622399c74cc59f341d90f7cdfcaa7c5de4828
         ];
 
         return $this->render(
@@ -308,14 +314,15 @@ class DemandeController extends AbstractController
             return $this->redirectToRoute('login');
         }
 
-        $scopedEmployeId = $this->canManageDemandes($session) ? null : $this->getLoggedInEmployeId($session);
+        $scopedEmployeId    = $this->canManageDemandes($session) ? null : $this->getLoggedInEmployeId($session);
+        $scopedEntrepriseId = $this->getScopedEntrepriseIdForQueries($session);
 
         $stats = [
-            'total'      => $this->demandeRepository->countAll($scopedEmployeId),
-            'byStatus'   => $this->demandeRepository->countGroupByStatus($scopedEmployeId),
-            'byPriorite' => $this->demandeRepository->countGroupByPriorite($scopedEmployeId),
-            'byType'     => $this->demandeRepository->countGroupByType($scopedEmployeId),
-            'byCategorie'=> $this->demandeRepository->countGroupByCategorie($scopedEmployeId),
+            'total'      => $this->demandeRepository->countAll($scopedEmployeId, [], $scopedEntrepriseId),
+            'byStatus'   => $this->demandeRepository->countGroupByStatus($scopedEmployeId, [], $scopedEntrepriseId),
+            'byPriorite' => $this->demandeRepository->countGroupByPriorite($scopedEmployeId, [], $scopedEntrepriseId),
+            'byType'     => $this->demandeRepository->countGroupByType($scopedEmployeId, [], $scopedEntrepriseId),
+            'byCategorie'=> $this->demandeRepository->countGroupByCategorie($scopedEmployeId, [], $scopedEntrepriseId),
         ];
 
         return $this->render(
@@ -352,6 +359,10 @@ class DemandeController extends AbstractController
 
             if (null === $demande) {
                 return new JsonResponse(['success' => false, 'message' => 'Demande non trouvee'], 404);
+            }
+
+            if (!$this->canAccessDemande($demande, $session)) {
+                return $this->jsonAccessDenied('Vous ne pouvez pas modifier une demande d une autre entreprise.');
             }
 
             $data = json_decode($request->getContent(), true);
@@ -394,9 +405,10 @@ class DemandeController extends AbstractController
                 $this->demandeMailer->notifyEmployeStatusChanged($demande, $oldStatus, $newStatus, $actorLabel, $commentaire);
             }
 
+            $scopedEntrepriseId = $this->getScopedEntrepriseIdForQueries($session);
             $stats = [
-                'total'    => $this->demandeRepository->countAll(null),
-                'byStatus' => $this->demandeRepository->countGroupByStatus(null),
+                'total'    => $this->demandeRepository->countAll(null, [], $scopedEntrepriseId),
+                'byStatus' => $this->demandeRepository->countGroupByStatus(null, [], $scopedEntrepriseId),
             ];
 
             $session->save();
@@ -478,6 +490,11 @@ class DemandeController extends AbstractController
 
         if (null === $demande) {
             $this->addFlash('danger', 'Demande non trouvee.');
+            return $this->redirectToRoute('demande_index');
+        }
+
+        if (!$this->canAccessDemande($demande, $session)) {
+            $this->addFlash('danger', 'Vous ne pouvez pas supprimer une demande d une autre entreprise.');
             return $this->redirectToRoute('demande_index');
         }
 
@@ -567,6 +584,11 @@ class DemandeController extends AbstractController
             return $this->redirectToRoute('demande_index');
         }
 
+        if (!$this->canAccessDemande($demande, $session)) {
+            $this->addFlash('danger', 'Vous ne pouvez pas modifier une demande d une autre entreprise.');
+            return $this->redirectToRoute('demande_index');
+        }
+
         $newStatus   = $this->nullableScalarString($request->request->get('status'));
         $commentaire = $this->nullableScalarString($request->request->get('commentaire', '')) ?? '';
 
@@ -619,6 +641,10 @@ class DemandeController extends AbstractController
 
         if (null === $demande) {
             throw $this->createNotFoundException('Demande non trouvee');
+        }
+
+        if (!$this->canAccessDemande($demande, $session)) {
+            throw $this->createAccessDeniedException('Vous ne pouvez pas modifier une demande d une autre entreprise.');
         }
 
         if ($demande->getStatus() === 'Annulee') {
@@ -762,8 +788,10 @@ class DemandeController extends AbstractController
 
     private function canManageDemandes(SessionInterface $session): bool
     {
+        $role = mb_strtolower(trim((string) $session->get('employe_role')));
+
         return $this->isEmployeLoggedIn($session)
-            && in_array((string) $session->get('employe_role'), ['RH', 'administrateur entreprise'], true);
+            && in_array($role, ['rh', 'administrateur entreprise'], true);
     }
 
     private function canTransitionStatus(?string $currentStatus, ?string $newStatus): bool
@@ -800,10 +828,35 @@ class DemandeController extends AbstractController
         return is_numeric($employeId) ? (int) $employeId : null;
     }
 
+    private function getLoggedInEntrepriseId(SessionInterface $session): ?int
+    {
+        $entrepriseId = $session->get('employe_id_entreprise');
+        if (!is_numeric($entrepriseId)) {
+            return null;
+        }
+
+        $entrepriseId = (int) $entrepriseId;
+        return $entrepriseId > 0 ? $entrepriseId : null;
+    }
+
+    private function getScopedEntrepriseIdForQueries(SessionInterface $session): ?int
+    {
+        if (!$this->canManageDemandes($session)) {
+            return null;
+        }
+
+        return $this->getLoggedInEntrepriseId($session) ?? 0;
+    }
+
     private function canAccessDemande(Demande $demande, SessionInterface $session): bool
     {
         if ($this->canManageDemandes($session)) {
-            return true;
+            $managerEntrepriseId = $this->getLoggedInEntrepriseId($session);
+            $demandeEntrepriseId = $demande->getEmploye()?->getEntreprise()?->getId_entreprise();
+
+            return null !== $managerEntrepriseId
+                && null !== $demandeEntrepriseId
+                && $managerEntrepriseId === $demandeEntrepriseId;
         }
         $demandeEmployeId  = $demande->getEmploye()?->getId_employe();
         $loggedInEmployeId = $this->getLoggedInEmployeId($session);
