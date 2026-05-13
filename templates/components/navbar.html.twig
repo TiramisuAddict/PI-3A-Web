@@ -1,7 +1,7 @@
 <header class="navbar navbar-expand-md navbar-light border-bottom bg-white" style="height:56px;">
   <div class="container-fluid">
-    <a href="#" class="navbar-brand py-0">
-      <img src="/images/WKlogo.svg" height="150"  width="150" alt="Logo">
+    <a href="{{ path('app_home') }}" class="navbar-brand py-0 d-flex align-items-center" style="height:56px;">
+      <img src="/images/WKlogo.svg" height="42" width="auto" alt="Logo" style="display:block; object-fit:contain;">
     </a>
     {% set avatarEmploye = employe is defined and employe ? employe : current_employe() %}
     {% set google_session_linked = app.session.get('google_linked') == true and app.session.get('google_access_token') is not empty %}

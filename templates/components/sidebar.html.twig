@@ -8,8 +8,8 @@
   <ul class="list-unstyled d-flex flex-column gap-1 mb-0 mt-2">
 
     <li>
-      <a href="{{ is_rh_sidebar ? path('app_admin_dashboard') : path('app_employe_home') }}"
-        class="d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none
+      <a href="{{ path('app_home') }}"
+        class="d-flex w-100 align-items-center gap-3 px-3 py-2 rounded text-decoration-none
         {{ active_page is defined and active_page == 'accueil' ? 'bg-blue-lt text-blue fw-medium' : 'text-secondary' }}">
         <i class="ti ti-home" style="font-size:18px;"></i>
         <span style="font-size:0.875rem;">Accueil</span>
@@ -18,7 +18,7 @@
 
     <li>
       <a href="{{ path('demande_index') }}"
-        class="d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none
+        class="d-flex w-100 align-items-center gap-3 px-3 py-2 rounded text-decoration-none
         {{ active_page is defined and active_page == 'demandes' ? 'bg-blue-lt text-blue fw-medium' : 'text-secondary' }}">
         <i class="ti ti-file-text" style="font-size:18px;"></i>
         <span style="font-size:0.875rem;">Les demandes</span>
@@ -27,7 +27,7 @@
 
     <li>
       <a href="{{ path('app_projet_index') }}"
-        class="d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none
+        class="d-flex w-100 align-items-center gap-3 px-3 py-2 rounded text-decoration-none
         {{ active_page is defined and active_page == 'projets' ? 'bg-blue-lt text-blue fw-medium' : 'text-secondary' }}">
         <i class="ti ti-layout-kanban" style="font-size:18px;"></i>
         <span style="font-size:0.875rem;">Les projets</span>
@@ -36,7 +36,7 @@
 
     <li>
       <a href="{{ is_rh_sidebar ? path('app_formation_rh') : path('app_inscription_employe') }}"
-        class="d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none
+        class="d-flex w-100 align-items-center gap-3 px-3 py-2 rounded text-decoration-none
         {{ active_page is defined and active_page == 'formations' ? 'bg-blue-lt text-blue fw-medium' : 'text-secondary' }}">
         <i class="ti ti-school" style="font-size:18px;"></i>
         <span style="font-size:0.875rem;">Les formations</span>
@@ -46,7 +46,7 @@
     {% if is_rh_sidebar %}
     <li>
       <a href="{{ path('RH_Home') }}"
-        class="d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none
+        class="d-flex w-100 align-items-center gap-3 px-3 py-2 rounded text-decoration-none
         {{ active_page is defined and active_page == 'employes' ? 'bg-blue-lt text-blue fw-medium' : 'text-secondary' }}">
         <i class="ti ti-users" style="font-size:18px;"></i>
         <span style="font-size:0.875rem;">Gestion d'employés</span>
@@ -58,7 +58,7 @@
     {% if is_rh_sidebar %}
     <li>
       <a href="{{ path('app_candidat_dashboard') }}"
-        class="d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none
+        class="d-flex w-100 align-items-center gap-3 px-3 py-2 rounded text-decoration-none
         {{ active_page is defined and active_page == 'offres' ? 'bg-blue-lt text-blue fw-medium' : 'text-secondary' }}">
         <i class="ti ti-circle-check" style="font-size:18px;"></i>
         <span style="font-size:0.875rem;">Les offres</span>
