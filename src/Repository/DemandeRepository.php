@@ -75,11 +75,8 @@ class DemandeRepository extends ServiceEntityRepository
         $demande = $this->createQueryBuilder('d')
             ->leftJoin('d.employe', 'e')
             ->addSelect('e')
-<<<<<<< HEAD
-=======
             ->leftJoin('e.entreprise', 'en')
             ->addSelect('en')
->>>>>>> 756622399c74cc59f341d90f7cdfcaa7c5de4828
             ->leftJoin('d.demandeDetails', 'dd')
             ->addSelect('dd')
             ->andWhere('d.id_demande = :id')

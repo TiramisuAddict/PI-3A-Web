@@ -90,11 +90,7 @@ class DemandeController extends AbstractController
 
         $stats = [
             'total'      => $demandes->getTotalItemCount(),
-<<<<<<< HEAD
-            'byStatus'   => $this->demandeRepository->countGroupByStatus($scopedEmployeId, $activeFilters),
-=======
             'byStatus'   => $this->demandeRepository->countGroupByStatus($scopedEmployeId, $activeFilters, $scopedEntrepriseId),
->>>>>>> 756622399c74cc59f341d90f7cdfcaa7c5de4828
         ];
 
         return $this->render(
